@@ -1,0 +1,31 @@
+{
+  "_note": "Merged over scenario.json by the simulators: processes shallow-merged, knobs.<launcher> shallow-merged, timing.<launcher> merged over SIM_TIMING then the scenario, quitDuringSwitch overrides. Everything else ignored.",
+  "processes": {
+    "table": [
+      {
+        "name": "VALORANT-Win64-Shipping",
+        "pid": 1,
+        "path": null
+      }
+    ]
+  },
+  "knobs": {
+    "steam": {
+      "expiredSessions": [
+        "76561198000000003"
+      ]
+    },
+    "riot": {
+      "rejected": [
+        "33333333-3333-4333-8333-333333333333"
+      ],
+      "pressPlayFails": true
+    }
+  },
+  "timing": {
+    "steam": {
+      "signInMs": 2000
+    }
+  },
+  "quitDuringSwitch": "quit"
+}

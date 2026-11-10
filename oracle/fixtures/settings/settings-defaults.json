@@ -1,0 +1,79 @@
+{
+  "_note": "Effective value when the key is unset in the settings table, and the code that applies the default. Values are strings in the table; booleans are the strings \"true\"/\"false\" (getBool also accepts \"1\").",
+  "dryRun": {
+    "default": "false",
+    "appliedBy": "settings.getBool(\"dryRun\", false) in src/main/services/launch.ts"
+  },
+  "logLevel": {
+    "default": "info",
+    "appliedBy": "initLogging level (dev builds always start at debug) in src/main/index.ts"
+  },
+  "artwork.autoFetch": {
+    "default": "true",
+    "appliedBy": "settings.getBool(\"artwork.autoFetch\", true) in src/main/index.ts"
+  },
+  "backups.keep": {
+    "default": "20",
+    "appliedBy": "settings.getInt(\"backups.keep\", DEFAULT_BACKUPS_TO_KEEP) in src/main/index.ts"
+  },
+  "epic.launchUri": {
+    "default": "catalog",
+    "appliedBy": "launchUriForm thunk in src/main/index.ts"
+  },
+  "battlenet.launch": {
+    "default": "exec",
+    "appliedBy": "launchForm thunk in src/main/index.ts"
+  },
+  "steam.autoLogin": {
+    "default": "false",
+    "appliedBy": "settings.getBool(\"steam.autoLogin\", false) in src/main/index.ts"
+  },
+  "riot.pressPlay": {
+    "default": "true",
+    "appliedBy": "settings.getBool(\"riot.pressPlay\", true) in src/main/index.ts"
+  },
+  "play.hideToTray": {
+    "default": "true",
+    "appliedBy": "settings.getBool(\"play.hideToTray\", true) in src/main/index.ts"
+  },
+  "steam.path": {
+    "default": null,
+    "appliedBy": "main-only; unset means automatic detection"
+  },
+  "epic.path": {
+    "default": null,
+    "appliedBy": "main-only; unset means automatic detection"
+  },
+  "battlenet.path": {
+    "default": null,
+    "appliedBy": "main-only; unset means automatic detection"
+  },
+  "riot.path": {
+    "default": null,
+    "appliedBy": "main-only; unset means automatic detection"
+  },
+  "window.bounds": {
+    "default": null,
+    "appliedBy": "main-only; unset means 1280x800 at the OS default position, not maximized"
+  },
+  "window.closeToTray": {
+    "default": "true",
+    "appliedBy": "settings.getBool(\"window.closeToTray\", true) in src/main/index.ts"
+  },
+  "firstRun.dismissed": {
+    "default": null,
+    "appliedBy": "renderer: the setup guide opens when unset and no account exists"
+  },
+  "updates.auto": {
+    "default": "true",
+    "appliedBy": "settings.getBool(\"updates.auto\", true) in src/main/index.ts"
+  },
+  "whatsNew.enabled": {
+    "default": "true",
+    "appliedBy": "renderer reads !== \"false\""
+  },
+  "whatsNew.lastSeen": {
+    "default": null,
+    "appliedBy": "main writes the running version on a brand-new DB (seedWhatsNewSeen); unset on an older folder reads as older than every entry"
+  }
+}

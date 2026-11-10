@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "launcher": "battlenet",
+  "createdAt": "2026-11-07T03:23:28.598Z",
+  "reason": "switch to Alt",
+  "files": [
+    {
+      "relative": "Battle.net.config",
+      "source": "C:\\Users\\<user>\\AppData\\Roaming\\Battle.net\\Battle.net.config",
+      "existed": true,
+      "bytes": 4087,
+      "sha256": "7043ba330052b87e349534a8471c026d7c79e01c65d48b60c24c45845bdeb1bd"
+    }
+  ],
+  "meta": {
+    "unifiedAuth": "[{\"name\":\"AA11BB22\",\"enc\":\"amtqampqamo+amI5Yz4+PGpqams7ODs4Ozg7ODs4Ozg7ODs4Ozg7ODs4Ozg7ODs4Ozg7ODs4Ozg7ODs4Ozg7ODs4Ozg7ODs4Ozg7ODs4Ozg7ODs4Ozg7ODs4Ozg7ODs4\"}]"
+  }
+}

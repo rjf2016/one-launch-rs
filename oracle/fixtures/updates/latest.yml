@@ -1,0 +1,10 @@
+version: 1.0.0-beta.4
+files:
+  - url: OneLaunch-1.0.0-beta.4-setup.exe
+    sha512: TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==
+    size: 50
+path: OneLaunch-1.0.0-beta.4-setup.exe
+sha512: TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==
+releaseDate: '2026-11-20T00:00:00.000Z'
+signature: 'WmaNrmSbkp1CA6SZqh1JKrl+0wZxwCx88sNKpz5iCKZIcx1YC6TyeqBeaipegc2nAQ6gtrynYf6GS2v/bVScCA=='
+keyId: '3376dec30c48c71f'

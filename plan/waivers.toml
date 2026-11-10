@@ -1,0 +1,5 @@
+# Tests and parity rows that will not be ported. Owner-approved only; the count may not rise without the owner.
+# [[waiver]]
+# id = "T-0000"                 catalogue or ledger id
+# category = "web-only"         one of the categories approved at the Milestone 0 gate
+# reason = "..."                one sentence

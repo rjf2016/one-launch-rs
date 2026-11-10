@@ -1,0 +1,22 @@
+{
+  "_note": "Every key at a non-default value, exactly as stored (key -> value string). This is also the shape settings:getAll returns.",
+  "dryRun": "true",
+  "logLevel": "debug",
+  "artwork.autoFetch": "false",
+  "backups.keep": "100",
+  "epic.launchUri": "appname",
+  "battlenet.launch": "uri",
+  "steam.autoLogin": "true",
+  "riot.pressPlay": "false",
+  "play.hideToTray": "false",
+  "steam.path": "D:\\Games\\Steam",
+  "epic.path": "D:\\Games\\Epic Games\\Launcher",
+  "battlenet.path": "D:\\Games\\Battle.net",
+  "riot.path": "D:\\Riot Games\\Riot Client",
+  "window.bounds": "{\"x\":2560,\"y\":0,\"width\":1920,\"height\":1040,\"maximized\":true}",
+  "window.closeToTray": "false",
+  "firstRun.dismissed": "true",
+  "updates.auto": "false",
+  "whatsNew.enabled": "false",
+  "whatsNew.lastSeen": "1.0.0-beta.2"
+}

@@ -1,0 +1,17 @@
+{
+  "_note": "Renderer localStorage (per Chromium profile under <dataDir>\\chromium, never read by main). Both are read inside try/catch and may be absent.",
+  "sidebar": {
+    "values": [
+      "expanded",
+      "collapsed"
+    ],
+    "absentMeans": "follow the window width: collapsed below 1100 px, expanded above"
+  },
+  "library.sort": {
+    "values": [
+      "name",
+      "lastPlayed"
+    ],
+    "absentMeans": "lastPlayed"
+  }
+}

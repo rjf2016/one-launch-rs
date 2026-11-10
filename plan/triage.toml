@@ -1,0 +1,949 @@
+# Triage table for the Rust rewrite: one row per item in spec/SPEC.md section 11 (known issues and bloat)
+# and section 12 (open questions), then the rows found during planning (ids X-..).
+# The owner approves this table before any Rust is written. Agents never decide these ad hoc.
+#
+# How to fill it in: set `decision` on every row whose `decision` is empty.
+#   decision = "keep"   port it exactly as the Electron code behaves, quirks included
+#   decision = "drop"   do not port it (dead surface, dev weight, Electron-only cost)
+#   decision = "fix"    port the corrected or deliberately changed behaviour described in `why`
+# A note may follow after a colon, for example "fix: cap at 4 MiB".
+# `recommend` is the planning recommendation; "decide" means it needs your product answer and `why` lists the options.
+# Rows with source = "plan" were settled when the rewrite plan was approved and are pre-filled.
+# `affects` lists the oracle artefacts a non-keep decision changes; it is filled during Milestone 0.
+# This file is a protected path: changes need the owner's approval.
+
+# ---------------------------------------------------------------------------
+# 11.1 Memory and CPU
+# ---------------------------------------------------------------------------
+
+[[item]]
+id = "S11.1-01"
+spec = "§11.1"
+summary = "Every registry read and process check spawns a child process (cmd.exe plus reg.exe, or PowerShell compiling C# on each call, about 0.2 s), and the adapters call them freely."
+recommend = "drop"
+why = "Native registry and process APIs remove the cost; the adapters' call pattern and the rules of spec section 8 stay."
+decision = "drop: native registry and process APIs under the same no-handle and Riot rules"
+source = "plan"
+affects = []
+
+[[item]]
+id = "S11.1-02"
+spec = "§11.1"
+summary = "The renderer polls launch:status (150 ms), artwork:status (0.5 to 4 s) and updates:status (1 to 60 s), never backing off, even while the window is hidden."
+recommend = "drop"
+why = "Backend events update the UI directly; the banner, flash and clipboard timings the user sees are unchanged."
+decision = "drop: push replaces polling inside the app and user-visible timings stay; the status queries remain in the command surface for replay"
+source = "plan"
+affects = []
+
+[[item]]
+id = "S11.1-03"
+spec = "§11.1"
+summary = "Repeated reads that could be cached: app:info and settings:getAll from several mounts; Epic's currentSession recomputed up to six times per operation; Epic launchGame re-parsing every manifest; Battle.net storedValueName decrypting the whole session blob for a plan."
+recommend = "keep"
+why = "UI-side duplicates disappear with shared stores, but adapter recomputation stays as coded: caching changes which launcher state a decision sees and would diverge from the replays; optimise after cutover."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.1-04"
+spec = "§11.1"
+summary = "Unbounded data: launch_history has no index, cap or foreign keys; artwork rows are pruned only on a library scan; settings rows for removed keys stay; the redaction name set stops growing at 2,000; the database is copied in full on every start."
+recommend = "keep"
+why = "The schema stays at v5 and both builds share the data folder until cutover, so storage behaviour is ported as it is; retention is a later product call (see S12.3-30)."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.1-05"
+spec = "§11.1"
+summary = "The poster grid is not virtualised and re-renders on every status poll and keystroke."
+recommend = "drop"
+why = "The Rust grid virtualises rows and decodes images off the UI thread; the layout rules (column sizing, gaps, fallbacks) are matched exactly."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.1-06"
+spec = "§11.1"
+summary = "Install size is 372 MiB, 98.8 % of it Electron."
+recommend = "drop"
+why = "An Electron-only cost; a native binary has no equivalent."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.1-07"
+spec = "§11.1"
+summary = "Five adapter file reads are uncapped (Steam's two loginusers.vdf re-reads, Epic writeSession, the Battle.net config re-read, the Riot lockfile), unlike every other launcher-file read."
+recommend = "fix"
+why = "Cap them with the existing 4 MiB and 1 MiB limits and the same refusal the capped reads give; behaviour differs only for oversized files, and uncapped reads break the project's own parser rule."
+decision = "fix"
+source = ""
+affects = []
+
+# ---------------------------------------------------------------------------
+# 11.2 Duplicated state and code
+# ---------------------------------------------------------------------------
+
+[[item]]
+id = "S11.2-01"
+spec = "§11.2"
+summary = "The renderer store caches two domain answers (launcherStatus, updateStatus) against its own UI-state-only rule."
+recommend = "drop"
+why = "Renderer-internal structure; in Rust the stores own domain state by design, with no visible difference."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.2-02"
+spec = "§11.2"
+summary = "The errorMessage and errorText helpers are defined eight times in the renderer and once in main."
+recommend = "drop"
+why = "One helper, provided the Milestone 0 copy inventory shows the copies produce identical text; any copy that differs keeps its own wording."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.2-03"
+spec = "§11.2"
+summary = "The clipboard note is built in two places that must stay identical."
+recommend = "drop"
+why = "One builder producing the same text."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.2-04"
+spec = "§11.2"
+summary = "Duplicate components and helpers for remembered accounts: two RememberedRow, two SkeletonRow, two readers with their own selection state, keyOf and uidOf, and ImportLauncher defined twice."
+recommend = "drop"
+why = "One component each; the rendered result is held to the layout captures of both screens."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.2-05"
+spec = "§11.2"
+summary = "SettingsView keeps its own EditableSetting union of 11 keys, kept in step with SETTING_KEYS by hand."
+recommend = "drop"
+why = "Typed settings accessors give one list."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.2-06"
+spec = "§11.2"
+summary = "Two code paths serve the startup answers (the preload's startup() and the invoke fallback), and updates:status and accounts:list are prefetched but never read as seeds."
+recommend = "drop"
+why = "A native app has no preload; one startup bundle seeds the stores, with the same first-paint content."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.2-07"
+spec = "§11.2"
+summary = "The quit path calls app.quit() twice by design (prevent, clean up, quit again)."
+recommend = "drop"
+why = "An explicit shutdown state machine replaces it; the order of observable effects in the quit timeline (spec 6.2) is kept."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.2-08"
+spec = "§11.2"
+summary = "AccountsService.checkUnique loads every account of the launcher and compares launcherUid in JavaScript although a prepared lookup exists."
+recommend = "keep"
+why = "Port the comparison rule exactly as the JavaScript applies it (a SQL lookup could compare differently); how the rows are fetched is free."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.2-09"
+spec = "§11.2"
+summary = "backups:restore lists and parses every manifest of the launcher to check the id exists, then the adapter loads the manifest again."
+recommend = "drop"
+why = "Check the one id directly, with the same error code and text for an unknown id; the restore replay covers it."
+decision = "drop"
+source = ""
+affects = []
+
+# ---------------------------------------------------------------------------
+# 11.3 Dead or unused surface
+# ---------------------------------------------------------------------------
+
+[[item]]
+id = "S11.3-01"
+spec = "§11.3"
+summary = "The IPC channels app:ping and launchers:games have no renderer caller."
+recommend = "drop"
+why = "Dead surface already on the roadmap's drop list; the replay scripts must not call them."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-02"
+spec = "§11.3"
+summary = "DTO fields the renderer never reads cross IPC on every call (AppInfo.chrome, logDir, dbPath; StartupMetrics.readyToShowMs; LaunchAttention.kind, until; LaunchPreflight.alreadyActive, launcherRunning, runningGame; LaunchJob.backupId; SwitchRecovery.jobId; Game.installPath, installed, lastSeenAt; BackupSnapshot.path), and settings:getAll returns window.bounds."
+recommend = "keep"
+why = "Replay diffs whole responses against Electron and several of these fields are the evidence of backend behaviour; they cost nothing in-process. Only AppInfo.chrome has no native value and is dropped."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-03"
+spec = "§11.3"
+summary = "Shared types and helpers with no caller outside tests: LaunchHistoryEntry, isSecretKey, SECRET_KEYS."
+recommend = "drop"
+why = "Dead code; the tests that exist only for them are waived."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-04"
+spec = "§11.3"
+summary = "Renderer props never passed (Dropdown dense, Collapsible defaultOpen, TagInput placeholder, MenuItem.disabled and others), exports used only in their own file, unreachable branches (SessionPanel warn tone, StepIcon skipped, the useFlash default ttl), and LauncherStatus.implemented still gating rows."
+recommend = "drop"
+why = "No reachable state shows any of it; the implemented field itself is handled in S12.3-28."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-05"
+spec = "§11.3"
+summary = "Main-process code with no production caller: BackupService.readFile, ArtworkService.idle, Steam vdfHas, unused constants, parsed-but-unconsumed fields and events in the Steam, Epic, Battle.net and Riot parsers, Riot launchRequest(events), and spliceSessionBlock with a non-null body."
+recommend = "drop"
+why = "Drop the uncalled functions and constants. Parser outputs keep their unused fields and events so vectors compare the full result, and spliceSessionBlock keeps the non-null body because the ported simulator uses it."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-06"
+spec = "§11.3"
+summary = "Legacy compatibility that may no longer be needed: the Battle.net v2 session blob parser, the pre-2.52.12 Battle.net 'Launch request' event, the Riot pre-116 and build-116 log markers, Steam's MostRecent synonym."
+recommend = "keep"
+why = "Takeover opens existing data folders and users may run older client builds; the parsers are small and covered by vectors."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-07"
+spec = "§11.3"
+summary = "Battle.net's plan.executable is always true, so the dialog's blocked stage never shows for Battle.net; Steam's plan marks 'manual' always skipped and 'verify' never skipped on the credentials path, the opposite of what happens at run time."
+recommend = "keep"
+why = "The plan text is user-visible and replayed against Electron, so it is ported as coded; the Steam step flags are a fix candidate after cutover."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-08"
+spec = "§11.3"
+summary = "secrets.diagnostics.roundtrip and vault:getSecret exist only for the Settings self-test."
+recommend = "keep"
+why = "The self-test is a visible Settings feature."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-09"
+spec = "§11.3"
+summary = "getBool accepts '1' although nothing writes it, and settings:get has a single renderer caller (backups.keep)."
+recommend = "keep"
+why = "A stored '1' in an existing database must read the same after takeover; the command stays for replay."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-10"
+spec = "§11.3"
+summary = "plural(n, 'entry') yields 'entrys' in an Epic message."
+recommend = "fix"
+why = "A plain typo in user-visible text; the corrected 'entries' becomes the expected value in the affected vectors."
+decision = "fix"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-11"
+spec = "§11.3"
+summary = "Signing code (signManifest, publicKeyOf) ships in the client with no caller in src, and two SHA-512 implementations exist only because the quit handler must stay synchronous."
+recommend = "drop"
+why = "Signing lives in the release tool only; Rust needs one SHA-512."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-12"
+spec = "§11.3"
+summary = "Artwork makes up to six Steam CDN requests per game (2 hosts x 3 kinds) before SteamGridDB and tries two Steam search endpoints in sequence."
+recommend = "keep"
+why = "The request cascade is specified in spec section 7 and diffed by replay; trimming it is a product change for after cutover."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-13"
+spec = "§11.3"
+summary = "The private clipboard write spawns PowerShell with System.Windows.Forms for one call, and the embedded C# of the process scripts is recompiled on every call."
+recommend = "drop"
+why = "Native clipboard and process calls set the same three exclusion formats with no child process."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.3-14"
+spec = "§11.3"
+summary = "WindowsRegistry.query puts the cmd.exe command line into read errors, inconsistent with the write path's rule."
+recommend = "drop"
+why = "No command line exists natively; read errors carry the key path and the Win32 code only."
+decision = "drop"
+source = ""
+affects = []
+
+# ---------------------------------------------------------------------------
+# 11.4 Development-only weight in the production bundle
+# ---------------------------------------------------------------------------
+
+[[item]]
+id = "S11.4-01"
+spec = "§11.4"
+summary = "The four launcher simulators, the static registry and process doubles and the fake-platform wiring (about 1,900 lines) ship inside the production bundle, inert."
+recommend = "drop"
+why = "Compiled out of release builds; kept for development and CI behind a cargo feature."
+decision = "drop: the fake platform and simulators live behind the fake cargo feature, never in release builds"
+source = "plan"
+affects = []
+
+# ---------------------------------------------------------------------------
+# 11.5 Behaviour that looks like a bug or a trap
+# ---------------------------------------------------------------------------
+
+[[item]]
+id = "S11.5-01"
+spec = "§11.5"
+summary = "Epic, Battle.net and Riot journal the snapshot before any write, so a switch whose writes are all no-ops can end 'failed' with a backupId and restored null, and a crash can raise a recovery prompt for a write that never happened; Steam's credentials path takes a snapshot but never fires onBackup."
+recommend = "keep"
+why = "Journal and backup ordering is the most safety-critical code and is diffed step by step in replay; port as coded and treat the spurious prompt as a fix candidate after cutover."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-02"
+spec = "§11.5"
+summary = "Epic's settingsPaths picks the newest settings file by mtime with a 2 s tie rule favouring WindowsEditor, and the session is written into both files although the launcher reads only the newest."
+recommend = "keep"
+why = "Which launcher files are written is exactly what replay and the real switches verify; writing one file only is roadmap item C9, after cutover."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-03"
+spec = "§11.5"
+summary = "Game.lastLaunch relies on SQLite's bare-column rule to pick the account_id that goes with MAX(launched_at)."
+recommend = "keep"
+why = "The Rust build runs the same SQL on the same SQLite engine, so the result is identical including ties; rewriting the query risks a different tie-break."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-04"
+spec = "§11.5"
+summary = "rememberBounds saves on every close, including a close turned into a hide; isMaximized() can read false for a hidden window and pendingMaximize is set only for a hidden start."
+recommend = "fix"
+why = "The outcome depends on Electron's window API and was never verified (S12.3-26), so it cannot be reproduced faithfully; save the last visible placement and keep the maximised flag across a hide. The pure placement rules stay exact."
+decision = "fix"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-05"
+spec = "§11.5"
+summary = "Database copies are pruned by file-name sort, so a clock set backwards makes a copy look older than it is."
+recommend = "keep"
+why = "Same naming and prune rule, so both builds manage one backups folder identically; the edge case is harmless."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-06"
+spec = "§11.5"
+summary = "A failed recovery:dismiss still closes the prompt, so the question can return next start unexplained; a launch:status poll error marks the job failed in the renderer while main's job may still run."
+recommend = "keep"
+why = "Keep the dismiss behaviour as coded. The poll-error path disappears with polling, since an in-process job stream cannot fail that way."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-07"
+spec = "§11.5"
+summary = "The Import accounts dialog closes on Escape and backdrop click even while an import is in flight; the Restore dialog has no Escape handler."
+recommend = "keep"
+why = "Visible dialog behaviour, matched as coded; both are small fix candidates after cutover."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-08"
+spec = "§11.5"
+summary = "Dropdown and MenuButton close on any scroll event anywhere in the window, including scrolls in unrelated containers."
+recommend = "keep"
+why = "Visible behaviour that is simple to reproduce with a window-level scroll observer."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-09"
+spec = "§11.5"
+summary = "launchers:importAccounts and accounts:create change accounts without requireIdle, unlike accounts:update; the docs say they should refuse during a job."
+recommend = "keep"
+why = "A plain omission against the docs, but harmless (both only add rows) and reachable during Instant Play, so adding BUSY would change what the user sees; fix after cutover. Same item as S12.2-12."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-10"
+spec = "§11.5"
+summary = "settings:set queues artwork on enabling auto-fetch only when the previously stored value was exactly 'false'."
+recommend = "keep"
+why = "Ported as coded; it differs from a looser rule only for values nothing writes."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-11"
+spec = "§11.5"
+summary = "The Riot rollback closes a running client with a shutdown that cannot be interrupted (up to 3 s + 10 s + 10 s plus a restart watch, three rounds) before restoring the file."
+recommend = "keep"
+why = "Riot timing and rollback are validated against the real client and must complete before the restore; no change during the port."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-12"
+spec = "§11.5"
+summary = "Epic's close step once took 54 s because the launcher handed off to its updater (roadmap B24), and Battle.net waits its full 5 s restart watch after every clean shutdown (B22)."
+recommend = "keep"
+why = "Timing budgets are ported exactly and mirrored in the simulators; B22 and B24 move to after cutover unless you want them fixed in Electron first, which re-captures the affected replays."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-13"
+spec = "§11.5"
+summary = "A hard kill in the first 10 s or so of a data folder's first session loses the vault key, because Chromium has not yet written chromium\\Local State."
+recommend = "fix"
+why = "The Rust build writes the key file atomically when it creates the key, so the window does not exist; format and location are unchanged. See X-07."
+decision = "fix"
+source = ""
+affects = []
+
+[[item]]
+id = "S11.5-14"
+spec = "§11.5"
+summary = "The CSP is only a meta tag, not a header."
+recommend = "drop"
+why = "No web content in a native UI."
+decision = "drop"
+source = ""
+affects = []
+
+# ---------------------------------------------------------------------------
+# 12.1 Product decisions for the rewrite (settled by the approved plan)
+# ---------------------------------------------------------------------------
+
+[[item]]
+id = "S12.1-01"
+spec = "§12.1 q1"
+summary = "Fake-launcher mode: does the Rust app need an in-process fake platform, or is end-to-end testing done another way?"
+recommend = "keep"
+why = "Agents may never touch real launchers, so the fake platform is the only way they can exercise Play."
+decision = "keep: platform traits with the four simulators ported, behind a cargo feature that release builds never enable"
+source = "plan"
+affects = []
+
+[[item]]
+id = "S12.1-02"
+spec = "§12.1 q2"
+summary = "Push vs poll: drop the polls and the revision counter, or keep the counter as the change signal?"
+recommend = "drop"
+why = "GPUI state propagation replaces every poll."
+decision = "drop: push replaces polling inside the app and user-visible timings stay; the status queries remain in the command surface for replay"
+source = "plan"
+affects = []
+
+[[item]]
+id = "S12.1-03"
+spec = "§12.1 q3"
+summary = "Child processes vs native APIs for registry and process work, and whether the ETW trace is the acceptance test."
+recommend = "drop"
+why = "Native calls remove about 0.2 s per operation."
+decision = "drop: native registry and process APIs under the same no-handle and Riot rules; the trace check is the acceptance test"
+source = "plan"
+affects = []
+
+[[item]]
+id = "S12.1-04"
+spec = "§12.1 q4"
+summary = "The updater: rebuild the same flow or change the distribution model?"
+recommend = "keep"
+why = "Existing installs can only be reached through the current flow."
+decision = "keep: the same flow, the same two pinned keys and the signed latest.yml contract; the release runbook is unchanged"
+source = "plan"
+affects = []
+
+[[item]]
+id = "S12.1-05"
+spec = "§12.1 q5"
+summary = "Installer technology, and whether it keeps the HKCU GUID install detection the updater relies on."
+recommend = "keep"
+why = "The first Rust installer must satisfy the contract the Electron updater expects."
+decision = "keep: electron-builder's NSIS templates vendored and frozen with today's settings; the same HKCU GUID install detection"
+source = "plan"
+affects = []
+
+[[item]]
+id = "S12.1-06"
+spec = "§12.1 q6"
+summary = "Vault key ownership: migrate secrets out of Chromium's os_crypt format, or ask users to re-enter them?"
+recommend = "keep"
+why = "Keeping the format means either build can open the folder, so going back always works."
+decision = "keep: the vault stays in Electron's os_crypt-compatible format, read and write; no secret is re-entered"
+source = "plan"
+affects = []
+
+[[item]]
+id = "S12.1-07"
+spec = "§12.1 q7"
+summary = "Riot rules: confirm they are kept and that nothing in the Rust toolchain violates rule 1."
+recommend = "keep"
+why = "Standing decisions."
+decision = "keep: Riot rules unchanged; crates that open process handles are banned and a CI trace job checks it"
+source = "plan"
+affects = []
+
+[[item]]
+id = "S12.1-08"
+spec = "§12.1 q8"
+summary = "Wording and copy: is a full copy inventory wanted before the UI is built?"
+recommend = "keep"
+why = "A 1:1 UI needs every string verbatim, not only the behaviour-carrying ones."
+decision = "keep: all copy is matched verbatim; the full inventory is extracted automatically in Milestone 0"
+source = "plan"
+affects = []
+
+[[item]]
+id = "S12.1-09"
+spec = "§12.1 q9"
+summary = "Settings: keep the string-valued settings table, or type them?"
+recommend = "keep"
+why = "Both builds read the same table until cutover."
+decision = "keep: string key/value table on disk with typed accessors in Rust; defaults as in spec section 9"
+source = "plan"
+affects = []
+
+# ---------------------------------------------------------------------------
+# 12.2 Where the docs and the code disagree
+# ---------------------------------------------------------------------------
+
+[[item]]
+id = "S12.2-10"
+spec = "§12.2 q10"
+summary = "The docs say artwork is removed with its game by cascade; games are never deleted, so the prune is the only path."
+recommend = "keep"
+why = "The code is the oracle; the docs are wrong, not the behaviour."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.2-11"
+spec = "§12.2 q11"
+summary = "The docs say updates.auto off means no update traffic unless asked; a background check already in flight still completes."
+recommend = "keep"
+why = "The code is the oracle; a one-request race, not a plain bug."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.2-12"
+spec = "§12.2 q12"
+summary = "The docs say handlers that change accounts answer BUSY during a job; launchers:importAccounts and accounts:create do not."
+recommend = "keep"
+why = "A plain omission, but harmless and user-reachable; see S11.5-09 for the reasoning and the after-cutover fix."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.2-13"
+spec = "§12.2 q13"
+summary = "The docs say preflight names the game for every launcher; only Riot's uses the forGame argument."
+recommend = "keep"
+why = "The code is the oracle; the docs overstate, not a bug."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.2-14"
+spec = "§12.2 q14"
+summary = "The docs say the backup manifest's meta holds registry values; Battle.net's meta.unifiedAuth is a JSON string of vault ciphertexts."
+recommend = "keep"
+why = "The on-disk manifest format must stay readable by both builds; the docs are wrong."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.2-15"
+spec = "§12.2 q15"
+summary = "The docs say Riot's plan warning and its GAME_RUNNING refusal carry the same sentence; the two texts differ."
+recommend = "keep"
+why = "Both strings are ported verbatim; the docs are wrong."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.2-16"
+spec = "§12.2 q16"
+summary = "The docs say Riot's login-page check applies to a closed client only; the code applies lastSignIn to whatever the watch reads."
+recommend = "keep"
+why = "The coded check is what was validated against the real client; not a plain bug."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.2-17"
+spec = "§12.2 q17"
+summary = "The docs describe Epic's shutdown as wait 20 s then a forced kill; the code also waits a 10 s killGraceMs after the kill."
+recommend = "keep"
+why = "The code is the oracle; the docs are incomplete."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.2-18"
+spec = "§12.2 q18"
+summary = "The docs list the Diagnostics rows without the Build row the code shows."
+recommend = "keep"
+why = "The row stays, showing the native build's equivalent value; the docs are incomplete."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.2-19"
+spec = "§12.2 q19"
+summary = "The docs say backups.keep is applied at the next snapshot; the dry-run plan text also reads it at once."
+recommend = "keep"
+why = "The code is the oracle; the docs are incomplete."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.2-20"
+spec = "§12.2 q20"
+summary = "The docs say Battle.net key names may contain ':' and are passed through; the parser drops any hit whose relative name contains a backslash."
+recommend = "keep"
+why = "The code is the oracle; dropping subkey hits is deliberate, not a bug."
+decision = "keep"
+source = ""
+affects = []
+
+# ---------------------------------------------------------------------------
+# 12.3 Behaviour the code leaves unverified or unobserved
+# ---------------------------------------------------------------------------
+
+[[item]]
+id = "S12.3-21"
+spec = "§12.3 q21"
+summary = "Steam: unobserved two-factor and invalid-password wordings, whether -login ever signs in without a password, case-insensitive login matching, the guessed 60-day stale-session limit, and signedInAs trusting ActiveUser while the log is silent."
+recommend = "keep"
+why = "Ported as coded; stays unverified until observed on a real client."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-22"
+spec = "§12.3 q22"
+summary = "Epic: guessed session-rejection wordings, LogTimes=Local, a second log file after the self-relaunch, polling to the deadline on an empty id, captureFresh(0) missing a rotated blob, and rememberPassword and mostRecent being one boolean."
+recommend = "keep"
+why = "Ported as coded; stays unverified."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-23"
+spec = "§12.3 q23"
+summary = "Battle.net: whether a running game is a child of Battle.net.exe, 20 of 22 products unverified, the unparsed self-update log sequence, id-less signed-in lines, a failed verdict mapped to timeout on the credentials path, GameLaunchWindowBehavior, and whether the forced kill could end someone else's forwarder."
+recommend = "keep"
+why = "Ported as coded, including the product table's verified flags; stays unverified."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-24"
+spec = "§12.3 q24"
+summary = "Riot: direct_launch_opt_in, refresh-token lifetime, unverified 2XKO image names, whether other Riot files matter, a logged sign-in with no session in the file after 15 s, holdsUnownedSession on an unreadable file, and window processes closed at every shutdown."
+recommend = "keep"
+why = "Ported as coded; nothing is verified by contacting Riot or touching a Riot process."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-25"
+spec = "§12.3 q25"
+summary = "Updates: the download cache layout is electron-updater's default, not app code; a manual check never re-arms the 6 h timer and setAuto(true) schedules a check 15 s later; uninstall, upgrade in place and a real update were never verified by hand."
+recommend = "keep"
+why = "Use the same folder and file name (%LOCALAPPDATA%\\one-launch-updater\\pending) so leftovers from the Electron updater are reused or cleaned; timer behaviour as coded; the unverified flows are covered by the CI takeover rehearsal and your one real update."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-26"
+spec = "§12.3 q26"
+summary = "Window: whether the saved maximized flag survives a hide-while-maximized; the vault banner says the key is lost when the chromium folder is deleted."
+recommend = "fix"
+why = "Keep the maximised flag across a hide (the same change as S11.5-04). The banner wording stays, because under the plan the key still lives in chromium\\Local State."
+decision = "fix"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-27"
+spec = "§12.3 q27"
+summary = "Riot pressPlay with no local-launch helper wired reads as off; only the fake platform can lack the helper."
+recommend = "keep"
+why = "The fake platform is ported, so the path stays reachable in tests."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-28"
+spec = "§12.3 q28"
+summary = "LauncherStatus.implemented can no longer be false; confirm it is dropped."
+recommend = "drop"
+why = "Drop the row gating in the UI; the field stays in the status response as constant true until cutover so replay diffs whole responses."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-29"
+spec = "§12.3 q29"
+summary = "Whether a Battle.net v2 blob exists in any real data folder, whether firstRun.dismissed should accept false, and whether development builds should always start at debug log level."
+recommend = "keep"
+why = "All three as coded; the Milestone 2 doctor run on a copy of your data folder can report whether any v2 blob exists."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-30"
+spec = "§12.3 q30"
+summary = "Whether launch_history keeps rows for deleted accounts and games, and what the retention should be (roadmap C2)."
+recommend = "keep"
+why = "No pruning during the port, since the schema is frozen at v5 until cutover; retention is a product decision for afterwards."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-31"
+spec = "§12.3 q31"
+summary = "Updates: electron-updater may use differential (blockmap) downloads, and verifyManifest accepts any plain .exe name rather than only OneLaunch-<version>-setup.exe."
+recommend = "drop"
+why = "Download whole files (a native installer is small and clients already fall back to whole files); keep the name rule as coded so manifest refusals match the vectors. See X-08."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-32"
+spec = "§12.3 q32"
+summary = "Artwork: SteamGridDB autocomplete takes the first hit without a name check, unlike the Steam search; IMAGE_HOSTS lists shared.steamstatic.com from one observed redirect."
+recommend = "keep"
+why = "Intended asymmetry, ported as coded; the host allowlist is one constant in the network crate, not a user setting."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-33"
+spec = "§12.3 q33"
+summary = "Window placement numbers (64 px sideways, 8 px above, 64 px from the bottom) and the 35 px caption overlay against the 36 px title strip: keep exactly, or re-derive for GPUI?"
+recommend = "keep"
+why = "Keep the placement numbers and the 36 px strip exactly (they have vectors and layout captures); the caption-button height is set in the Milestone 1 title-bar spike against your window-chrome capture."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-34"
+spec = "§12.3 q34"
+summary = "Installer: whether to hide the all-users choice (today it is offered, and such an install is refused updates and autostart), and whether an in-place update must preserve the Run value by the same isUpdated mechanism."
+recommend = "keep"
+why = "The frozen templates keep both as shipped, which is the least risk for the takeover release; hiding the all-users choice is the alternative and can follow after cutover."
+decision = "keep"
+source = ""
+affects = []
+
+[[item]]
+id = "S12.3-35"
+spec = "§12.3 q35"
+summary = "Process close: WM_CLOSE goes to the first visible unowned top-level window in z-order, for parity with taskkill /IM; is that parity required?"
+recommend = "keep"
+why = "The same selection rule natively (EnumWindows returns z-order); it is the behaviour validated on the real launchers."
+decision = "keep"
+source = ""
+affects = []
+
+# ---------------------------------------------------------------------------
+# Rows found during planning (not in the spec)
+# ---------------------------------------------------------------------------
+
+[[item]]
+id = "X-01"
+spec = "planning"
+summary = "The sidebar and Library-sort preferences live in Chromium localStorage, which a native app does not have."
+recommend = "decide"
+why = "Options: (a) two new keys in the settings table, which the Electron build ignores (its getAll filters unknown keys), or (b) a small prefs file in the data folder. Recommended: (a), without importing the old values; they reset once."
+decision = "fix: option (a), two new keys in the settings table; the old values are not imported and reset once"
+source = ""
+affects = []
+
+[[item]]
+id = "X-02"
+spec = "planning"
+summary = "Dates, times and name sorting follow the system locale today (Intl and localeCompare with no locale given), while the rest of the UI is English. This covers relative phrases, month names, the 12 or 24 hour clock, numeric date order, and the order of game and account names."
+recommend = "decide"
+why = "Options: (a) pin en-US for everything, which forces a 12 hour clock and month-first numeric dates on every user; (b) reproduce system-locale formatting with a new ICU-style dependency; (c) English words always, with clock, numeric date order and sorting taken from Windows regional settings through native calls (no new dependency). Recommended: (c); it matches Electron exactly for en-US users, and the reference captures pin en-US either way."
+decision = "fix: option (c), English words always; clock, numeric date order and name sorting from Windows regional settings through native calls, no new dependency"
+source = ""
+affects = []
+
+[[item]]
+id = "X-03"
+spec = "planning"
+summary = "The stock NSIS installer checks for the running app through WMI (Get-CimInstance Win32_Process), against the project's own no-WMI rule."
+recommend = "fix"
+why = "Replace it in the Rust installer with an image-name check for OneLaunch.exe through the customCheckAppRunning hook; the alternative is to keep it as shipped today."
+decision = "fix"
+source = ""
+affects = []
+
+[[item]]
+id = "X-04"
+spec = "planning"
+summary = "New behaviour: on its first run in a data folder the Rust build copies the database and chromium\\Local State aside before writing anything."
+recommend = "fix"
+why = "A rollback aid for the one-way takeover; it adds files under backups and changes nothing else."
+decision = "fix"
+source = ""
+affects = []
+
+[[item]]
+id = "X-05"
+spec = "planning"
+summary = "Dead surface on the roadmap's own drop list: the channels app:ping and launchers:games, AppInfo.logDir and chrome, Dropdown's dense prop, the dead Battle.net blocked path."
+recommend = "drop"
+why = "The channels, AppInfo.chrome and the dense prop are dropped (S11.3-01, S11.3-04); AppInfo.logDir stays in the response for replay (S11.3-02) and the Battle.net path needs no code of its own (S11.3-07)."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "X-06"
+spec = "planning"
+summary = "CSS effects GPUI may not support: backdrop blur (4 uses), the inset part of the panel shadow, icon drop-shadow, scale transforms in the setup guide, 150 ms colour transitions."
+recommend = "decide"
+why = "A Milestone 1 spike confirms which are real gaps; for each, the options are a close approximation (translucent fill, outer shadow only, opacity fade, instant colour change) or dropping the effect. Recommended: approximate."
+decision = "fix: approximate each gap the Milestone 1 spike confirms, never block on one. Defaults: backdrop blur becomes a more opaque translucent fill with matching text contrast; the inset shadow becomes a 1 px inner border in the highlight colour; the icon drop-shadow is dropped; scale stays on icons and cards fade only; colour transitions stay if one UI-kit helper covers every control, otherwise instant. Each confirmed gap is shown side by side at the Milestone 1 gate, where the owner may overrule it"
+source = ""
+affects = []
+
+[[item]]
+id = "X-07"
+spec = "planning"
+summary = "Electron writes the vault key to chromium\\Local State some seconds after start, an incidental Chromium timing."
+recommend = "fix"
+why = "Keep the outcome (same file, same format) but write it when the key is created; this also closes the key-loss window in S11.5-13."
+decision = "fix"
+source = ""
+affects = []
+
+[[item]]
+id = "X-08"
+spec = "planning"
+summary = "The release-sign tool refuses a draft without a blockmap, which no client needs (Electron clients fall back to a whole download)."
+recommend = "drop"
+why = "Drop the requirement in the ported sign tool; Rust releases publish the installer and latest.yml only."
+decision = "drop"
+source = ""
+affects = []
+
+[[item]]
+id = "X-09"
+spec = "planning"
+summary = "Nothing stops the Electron build and the Rust build opening one data folder at the same time during the transition."
+recommend = "decide"
+why = "Options: (a) hold chromium\\lockfile so Electron's single-instance lock refuses, (b) share one named lock, or (c) accept it, since the installer replaces one build with the other. Unverified; decide after the Milestone 1 vault spike."
+decision = "keep: option (c), accept it; the Rust app keeps one instance per data folder as Electron does. Adopt the lockfile guard only if the Milestone 1 vault spike shows Electron then exits cleanly"
+source = ""
+affects = []
+
+[[item]]
+id = "X-10"
+spec = "planning"
+summary = "The simulators and fake platform ship inside the Electron bundle today."
+recommend = "drop"
+why = "The same item as S11.4-01."
+decision = "drop: compiled out of release builds; available only behind the fake cargo feature"
+source = "plan"
+affects = []

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "launcher": "steam",
+  "createdAt": "2026-11-07T03:23:28.581Z",
+  "reason": "Before restoring 2026-11-07T03-23-28.574Z",
+  "files": [
+    {
+      "relative": "config/loginusers.vdf",
+      "source": "C:\\Program Files (x86)\\Steam\\config\\loginusers.vdf",
+      "existed": true,
+      "bytes": 875,
+      "sha256": "a40c88e03f6e0618d66386d9b29d80a8cc3bafee880193a89881e435f9507800"
+    }
+  ],
+  "meta": {
+    "AutoLoginUser": "user_3",
+    "RememberPassword": 1
+  }
+}

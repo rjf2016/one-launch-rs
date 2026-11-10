@@ -1,0 +1,5 @@
+repo = rjf2016/one-launch
+commit = f25111bf7445cd8d7ef95d5067b46fe6bb920d24
+version = 1.0.0-beta.3
+describes = master after the merge of pull request #36
+local = D:\Coding\slop\one-launch

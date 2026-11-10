@@ -1,0 +1,12 @@
+2026-11-07T03:23:28.635Z INFO  [main] starting {"version":"1.0.0-beta.3","electron":"44.7.0","dev":false,"dataDir":"C:\\Users\\[USER]\\AppData\\Roaming\\OneLaunch","dataDirSource":"default","platformSource":"real"}
+2026-11-07T03:23:28.636Z INFO  [main] database migrated {"from":4,"to":5,"applied":["artwork_launcher_source"]}
+2026-11-07T03:23:28.637Z INFO  [main] vault {"available":true,"backend":"dpapi","readable":true}
+2026-11-07T03:23:28.637Z INFO  [main] startup {"creationEpochMs":1762371000000,"processToNodeMs":180,"moduleLoadedMs":260,"readyMs":290,"dbMs":310,"vaultMs":330,"ipcMs":360,"windowCreatedMs":350,"windowShownMs":352,"readyToShowMs":640,"didFinishLoadMs":610}
+2026-11-07T03:23:28.637Z DEBUG [main:scan] scanned launcher {"launcher":"steam","added":0,"updated":3,"removed":0}
+2026-11-07T03:23:28.637Z INFO  [main:artwork] artwork queued {"queued":2}
+2026-11-07T03:23:28.638Z INFO  [main:ipc] account created {"id":"[UUID…5555]","launcher":"steam","hasSecret":true}
+2026-11-07T03:23:28.638Z WARN  [main:steam] sign-in needs the user {"reason":"Account Logon Denied","account":"[ACCOUNT]","login":"[ACCOUNT]","email":"[EMAIL]"}
+2026-11-07T03:23:28.638Z ERROR [main:ipc] ipc launchers:switchPlan failed {"code":"NOT_INSTALLED","message":"Steam is not installed. Command was: steam.exe -login [ACCOUNT] [REDACTED] and token=[REDACTED]"}
+2026-11-07T03:23:28.639Z INFO  [main:launch] launch job accepted {"jobId":"[UUID…0000]","accountId":"[UUID…5555]","gameId":null,"confirmClose":false,"instant":false,"direct":false}
+2026-11-07T03:23:28.639Z INFO  [main] window hidden to the tray
+2026-11-07T03:23:28.639Z INFO  [main] exit

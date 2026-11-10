@@ -1,0 +1,8 @@
+{
+  "_note": "Values of the window.bounds setting. Width and height are clamped to at least 960x600 when read; a placement whose title bar is not on a connected display is dropped (src/main/window-guard.ts placementFrom).",
+  "normal": "{\"x\":120,\"y\":80,\"width\":1400,\"height\":860,\"maximized\":false}",
+  "maximizedWithNormalBounds": "{\"x\":120,\"y\":80,\"width\":1400,\"height\":860,\"maximized\":true}",
+  "offScreenDroppedOnRead": "{\"x\":-5000,\"y\":-5000,\"width\":1280,\"height\":800,\"maximized\":false}",
+  "tooSmallClampedOnRead": "{\"x\":0,\"y\":0,\"width\":300,\"height\":200,\"maximized\":false}",
+  "malformedIgnored": "{not json"
+}

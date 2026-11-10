@@ -1,0 +1,44 @@
+{
+  "registryWrites": [
+    {
+      "op": "set",
+      "path": "HKCU\\Software\\Valve\\Steam\\AutoLoginUser",
+      "value": "user_3"
+    },
+    {
+      "op": "delete",
+      "path": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth\\AA11BB22"
+    }
+  ],
+  "processEvents": [
+    {
+      "kind": "close",
+      "exe": "<close>",
+      "args": [
+        "steam.exe"
+      ]
+    },
+    {
+      "kind": "kill",
+      "exe": "<kill>",
+      "args": [
+        "steam.exe"
+      ]
+    },
+    {
+      "kind": "start",
+      "exe": "D:\\scratch\\steam\\steam.exe",
+      "args": []
+    }
+  ],
+  "opened": [
+    "steam://rungameid/252950"
+  ],
+  "fetched": [
+    "https://store.steampowered.com/api/storesearch/?term=Rocket+League&l=english&cc=US"
+  ],
+  "clipboardWrites": 1,
+  "riotLaunchRequests": [
+    "valorant.live"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "launcher": "riot",
+  "createdAt": "2026-11-07T03:23:28.604Z",
+  "reason": "switch to Riot Alt",
+  "files": [
+    {
+      "relative": "Data/RiotGamesPrivateSettings.yaml",
+      "source": "C:\\Users\\<user>\\AppData\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml",
+      "existed": true,
+      "bytes": 5530,
+      "sha256": "a1d7a25202b1c1f7b522003064e39756a731c8cff458a40a1ad92d05b924da22",
+      "encrypted": true
+    }
+  ],
+  "meta": {}
+}

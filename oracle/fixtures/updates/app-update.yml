@@ -1,0 +1,5 @@
+provider: github
+owner: rjf2016
+repo: one-launch
+releaseType: draft
+updaterCacheDirName: one-launch-updater

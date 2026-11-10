@@ -1,0 +1,9 @@
+{
+  "_note": "latest.yml above is signed with a THROWAWAY Ed25519 key generated while making these fixtures. It is not one of the pinned release keys; verifyManifest accepts it only when this key is in the trusted list. Payload signed: \"one-launch-update-v1\\n<version>\\n<url>\\n<sha512>\\n<size>\\n\". keyId = first 16 hex of sha256(SPKI DER).",
+  "throwawayPublicKeySpkiBase64": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ=",
+  "keyId": "3376dec30c48c71f",
+  "pinnedReleaseKeyIds": [
+    "616ad3e53aac3ce4",
+    "35f13c45c6049dbe"
+  ]
+}

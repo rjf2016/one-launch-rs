@@ -1,0 +1,6 @@
+* text=auto eol=lf
+oracle/** -text
+spec/** -text
+*.png binary
+*.ico binary
+*.db binary

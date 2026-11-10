@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "jobId": "2460fb00-7174-4999-987c-1e5f0551b66e",
+  "launcher": "steam",
+  "accountId": "d43c6636-1136-43d4-9b46-c9ee10433ad0",
+  "startedAt": "2026-11-07T03:23:28.812Z",
+  "updatedAt": "2026-11-07T03:23:28.817Z",
+  "backupId": "2026-11-05T19-40-12.345Z",
+  "stepId": "wait",
+  "rollbackFailed": false
+}

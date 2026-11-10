@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "launcher": "epic",
+  "createdAt": "2026-11-07T03:23:28.593Z",
+  "reason": "switch to Main",
+  "files": [
+    {
+      "relative": "Config/Windows/GameUserSettings.ini",
+      "source": "C:\\Users\\<user>\\AppData\\Local\\EpicGamesLauncher\\Saved\\Config\\Windows\\GameUserSettings.ini",
+      "existed": true,
+      "bytes": 2038,
+      "sha256": "912d093abf98093af633e1aad8294718906944857bd28834cc5e39097e3fa314",
+      "encrypted": true
+    }
+  ],
+  "meta": {},
+  "pinned": "Holds a sign-in that no One Launch account owns"
+}
