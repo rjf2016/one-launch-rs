@@ -1,0 +1,2111 @@
+{
+  "events": [
+    {
+      "seq": 0,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "running",
+          "Save the outgoing session",
+          ""
+        ],
+        [
+          "backup",
+          "pending",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          ""
+        ],
+        [
+          "registry",
+          "pending",
+          "Put the account's session token in place",
+          ""
+        ],
+        [
+          "file",
+          "pending",
+          "Put the login first in the saved-accounts list",
+          ""
+        ],
+        [
+          "start",
+          "pending",
+          "Start Battle.net",
+          ""
+        ],
+        [
+          "wait",
+          "pending",
+          "Wait for the client to come up",
+          ""
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": null,
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 1,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "pending",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          ""
+        ],
+        [
+          "registry",
+          "pending",
+          "Put the account's session token in place",
+          ""
+        ],
+        [
+          "file",
+          "pending",
+          "Put the login first in the saved-accounts list",
+          ""
+        ],
+        [
+          "start",
+          "pending",
+          "Start Battle.net",
+          ""
+        ],
+        [
+          "wait",
+          "pending",
+          "Wait for the client to come up",
+          ""
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": null,
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 2,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "running",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          ""
+        ],
+        [
+          "registry",
+          "pending",
+          "Put the account's session token in place",
+          ""
+        ],
+        [
+          "file",
+          "pending",
+          "Put the login first in the saved-accounts list",
+          ""
+        ],
+        [
+          "start",
+          "pending",
+          "Start Battle.net",
+          ""
+        ],
+        [
+          "wait",
+          "pending",
+          "Wait for the client to come up",
+          ""
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": null,
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 3,
+      "k": "plat",
+      "op": "file.write",
+      "path": "{data}\\backups\\battlenet\\@backup:battlenet:1\\manifest.json"
+    },
+    {
+      "seq": 4,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "pending",
+          "Put the account's session token in place",
+          ""
+        ],
+        [
+          "file",
+          "pending",
+          "Put the login first in the saved-accounts list",
+          ""
+        ],
+        [
+          "start",
+          "pending",
+          "Start Battle.net",
+          ""
+        ],
+        [
+          "wait",
+          "pending",
+          "Wait for the client to come up",
+          ""
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 5,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "running",
+          "Put the account's session token in place",
+          ""
+        ],
+        [
+          "file",
+          "pending",
+          "Put the login first in the saved-accounts list",
+          ""
+        ],
+        [
+          "start",
+          "pending",
+          "Start Battle.net",
+          ""
+        ],
+        [
+          "wait",
+          "pending",
+          "Wait for the client to come up",
+          ""
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 6,
+      "k": "plat",
+      "op": "reg.set",
+      "path": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth\\B1B1B1B1",
+      "value": "binary"
+    },
+    {
+      "seq": 7,
+      "k": "plat",
+      "op": "reg.delete",
+      "path": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth\\AA11BB22"
+    },
+    {
+      "seq": 8,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "pending",
+          "Put the login first in the saved-accounts list",
+          ""
+        ],
+        [
+          "start",
+          "pending",
+          "Start Battle.net",
+          ""
+        ],
+        [
+          "wait",
+          "pending",
+          "Wait for the client to come up",
+          ""
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 9,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "running",
+          "Put the login first in the saved-accounts list",
+          ""
+        ],
+        [
+          "start",
+          "pending",
+          "Start Battle.net",
+          ""
+        ],
+        [
+          "wait",
+          "pending",
+          "Wait for the client to come up",
+          ""
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 10,
+      "k": "plat",
+      "op": "file.write",
+      "path": "{launchers}\\appdata\\Battle.net\\Battle.net.config",
+      "sha256": "a81e19298924a29458f60056e4978f03f07bc49761275984d2d40349c70b43e9"
+    },
+    {
+      "seq": 11,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "done",
+          "Put the login first in the saved-accounts list",
+          "saved3@example.com is now first of 5 saved accounts."
+        ],
+        [
+          "start",
+          "pending",
+          "Start Battle.net",
+          ""
+        ],
+        [
+          "wait",
+          "pending",
+          "Wait for the client to come up",
+          ""
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 12,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "done",
+          "Put the login first in the saved-accounts list",
+          "saved3@example.com is now first of 5 saved accounts."
+        ],
+        [
+          "start",
+          "running",
+          "Start Battle.net",
+          ""
+        ],
+        [
+          "wait",
+          "pending",
+          "Wait for the client to come up",
+          ""
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 13,
+      "k": "plat",
+      "op": "proc.start",
+      "exe": "{launchers}\\battlenet\\Battle.net Launcher.exe",
+      "args": []
+    },
+    {
+      "seq": 14,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "done",
+          "Put the login first in the saved-accounts list",
+          "saved3@example.com is now first of 5 saved accounts."
+        ],
+        [
+          "start",
+          "done",
+          "Start Battle.net",
+          "Client started."
+        ],
+        [
+          "wait",
+          "pending",
+          "Wait for the client to come up",
+          ""
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 15,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "done",
+          "Put the login first in the saved-accounts list",
+          "saved3@example.com is now first of 5 saved accounts."
+        ],
+        [
+          "start",
+          "done",
+          "Start Battle.net",
+          "Client started."
+        ],
+        [
+          "wait",
+          "running",
+          "Wait for the client to come up",
+          ""
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 16,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "done",
+          "Put the login first in the saved-accounts list",
+          "saved3@example.com is now first of 5 saved accounts."
+        ],
+        [
+          "start",
+          "done",
+          "Start Battle.net",
+          "Client started."
+        ],
+        [
+          "wait",
+          "done",
+          "Wait for the client to come up",
+          "Battle.net.exe is running."
+        ],
+        [
+          "verify",
+          "pending",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 17,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "done",
+          "Put the login first in the saved-accounts list",
+          "saved3@example.com is now first of 5 saved accounts."
+        ],
+        [
+          "start",
+          "done",
+          "Start Battle.net",
+          "Client started."
+        ],
+        [
+          "wait",
+          "done",
+          "Wait for the client to come up",
+          "Battle.net.exe is running."
+        ],
+        [
+          "verify",
+          "running",
+          "Confirm the client signed in",
+          ""
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 18,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "done",
+          "Put the login first in the saved-accounts list",
+          "saved3@example.com is now first of 5 saved accounts."
+        ],
+        [
+          "start",
+          "done",
+          "Start Battle.net",
+          "Client started."
+        ],
+        [
+          "wait",
+          "done",
+          "Wait for the client to come up",
+          "Battle.net.exe is running."
+        ],
+        [
+          "verify",
+          "done",
+          "Confirm the client signed in",
+          "Signed in as saved3@example.com."
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "skipped",
+          "Save the new session",
+          "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 19,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "done",
+          "Put the login first in the saved-accounts list",
+          "saved3@example.com is now first of 5 saved accounts."
+        ],
+        [
+          "start",
+          "done",
+          "Start Battle.net",
+          "Client started."
+        ],
+        [
+          "wait",
+          "done",
+          "Wait for the client to come up",
+          "Battle.net.exe is running."
+        ],
+        [
+          "verify",
+          "done",
+          "Confirm the client signed in",
+          "Signed in as saved3@example.com."
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "running",
+          "Save the new session",
+          ""
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 20,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "done",
+          "Put the login first in the saved-accounts list",
+          "saved3@example.com is now first of 5 saved accounts."
+        ],
+        [
+          "start",
+          "done",
+          "Start Battle.net",
+          "Client started."
+        ],
+        [
+          "wait",
+          "done",
+          "Wait for the client to come up",
+          "Battle.net.exe is running."
+        ],
+        [
+          "verify",
+          "done",
+          "Confirm the client signed in",
+          "Signed in as saved3@example.com."
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "done",
+          "Save the new session",
+          "The stored session is current."
+        ],
+        [
+          "launch",
+          "pending",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": false,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 21,
+      "k": "job",
+      "job": "@job:1",
+      "state": "running",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "done",
+          "Put the login first in the saved-accounts list",
+          "saved3@example.com is now first of 5 saved accounts."
+        ],
+        [
+          "start",
+          "done",
+          "Start Battle.net",
+          "Client started."
+        ],
+        [
+          "wait",
+          "done",
+          "Wait for the client to come up",
+          "Battle.net.exe is running."
+        ],
+        [
+          "verify",
+          "done",
+          "Confirm the client signed in",
+          "Signed in as saved3@example.com."
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "done",
+          "Save the new session",
+          "The stored session is current."
+        ],
+        [
+          "launch",
+          "running",
+          "Launch Overwatch",
+          ""
+        ]
+      ],
+      "attention": null,
+      "switched": true,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    },
+    {
+      "seq": 22,
+      "k": "plat",
+      "op": "proc.start",
+      "exe": "{launchers}\\battlenet\\Battle.net.exe",
+      "args": [
+        "--exec=launch Pro"
+      ]
+    },
+    {
+      "seq": 23,
+      "k": "job",
+      "job": "@job:1",
+      "state": "done",
+      "steps": [
+        [
+          "close",
+          "skipped",
+          "Close Battle.net",
+          "Skipped: Battle.net.exe is not running."
+        ],
+        [
+          "capture",
+          "done",
+          "Save the outgoing session",
+          "Saved Main's session (fingerprint 35a656be)."
+        ],
+        [
+          "backup",
+          "done",
+          "Back up Battle.net.config and the UnifiedAuth value",
+          "{data}\\backups\\battlenet\\@backup:battlenet:1"
+        ],
+        [
+          "registry",
+          "done",
+          "Put the account's session token in place",
+          "UnifiedAuth now holds the snapshot (fingerprint 3181ef24)."
+        ],
+        [
+          "file",
+          "done",
+          "Put the login first in the saved-accounts list",
+          "saved3@example.com is now first of 5 saved accounts."
+        ],
+        [
+          "start",
+          "done",
+          "Start Battle.net",
+          "Client started."
+        ],
+        [
+          "wait",
+          "done",
+          "Wait for the client to come up",
+          "Battle.net.exe is running."
+        ],
+        [
+          "verify",
+          "done",
+          "Confirm the client signed in",
+          "Signed in as saved3@example.com."
+        ],
+        [
+          "manual",
+          "skipped",
+          "Wait for you to sign in",
+          "Runs only if the client rejects the stored token or does not sign in within 8 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.5 min."
+        ],
+        [
+          "recapture",
+          "done",
+          "Save the new session",
+          "The stored session is current."
+        ],
+        [
+          "launch",
+          "done",
+          "Launch Overwatch",
+          "Sent \"{launchers}\\battlenet\\Battle.net.exe\" --exec=launch Pro (Battle.net started the game)"
+        ]
+      ],
+      "attention": null,
+      "switched": true,
+      "handOff": null,
+      "backupId": "@backup:battlenet:1",
+      "restored": null,
+      "error": null
+    }
+  ],
+  "final": {
+    "db": {
+      "user_version": 5,
+      "tables": {
+        "accounts": [
+          {
+            "id": "@acct:battlenet:new@example.com",
+            "launcher": "battlenet",
+            "display_name": "New",
+            "login": "new@example.com",
+            "secret_enc": {
+              "present": true,
+              "plaintextSha256": "bb2928d7fb7bf237931e86c9a2befb0a1de9a50542312c3506ac2307f91dc939"
+            },
+            "launcher_uid": null,
+            "tags": "[]",
+            "notes": "",
+            "last_used_at": null,
+            "created_at": "<ts>",
+            "updated_at": "<ts>"
+          },
+          {
+            "id": "@acct:battlenet:saved1@example.com",
+            "launcher": "battlenet",
+            "display_name": "Main",
+            "login": "saved1@example.com",
+            "secret_enc": {
+              "present": false,
+              "plaintextSha256": null
+            },
+            "launcher_uid": "0a1b2c3d",
+            "tags": "[]",
+            "notes": "",
+            "last_used_at": null,
+            "created_at": "<ts>",
+            "updated_at": "<ts>"
+          },
+          {
+            "id": "@acct:battlenet:saved3@example.com",
+            "launcher": "battlenet",
+            "display_name": "Alt",
+            "login": "saved3@example.com",
+            "secret_enc": {
+              "present": false,
+              "plaintextSha256": null
+            },
+            "launcher_uid": "0b2c3d4e",
+            "tags": "[]",
+            "notes": "",
+            "last_used_at": "<ts>",
+            "created_at": "<ts>",
+            "updated_at": "<ts>"
+          },
+          {
+            "id": "@acct:epic:alt@example.com",
+            "launcher": "epic",
+            "display_name": "Alt",
+            "login": "alt@example.com",
+            "secret_enc": {
+              "present": false,
+              "plaintextSha256": null
+            },
+            "launcher_uid": "22222222222222222222222222222222",
+            "tags": "[]",
+            "notes": "",
+            "last_used_at": null,
+            "created_at": "<ts>",
+            "updated_at": "<ts>"
+          },
+          {
+            "id": "@acct:epic:main@example.com",
+            "launcher": "epic",
+            "display_name": "Main",
+            "login": "main@example.com",
+            "secret_enc": {
+              "present": false,
+              "plaintextSha256": null
+            },
+            "launcher_uid": "33333333333333333333333333333333",
+            "tags": "[]",
+            "notes": "",
+            "last_used_at": null,
+            "created_at": "<ts>",
+            "updated_at": "<ts>"
+          },
+          {
+            "id": "@acct:epic:new@example.com",
+            "launcher": "epic",
+            "display_name": "New",
+            "login": "new@example.com",
+            "secret_enc": {
+              "present": true,
+              "plaintextSha256": "bb2928d7fb7bf237931e86c9a2befb0a1de9a50542312c3506ac2307f91dc939"
+            },
+            "launcher_uid": null,
+            "tags": "[]",
+            "notes": "",
+            "last_used_at": null,
+            "created_at": "<ts>",
+            "updated_at": "<ts>"
+          },
+          {
+            "id": "@acct:riot:riot_alt",
+            "launcher": "riot",
+            "display_name": "Riot Alt",
+            "login": "riot_alt",
+            "secret_enc": {
+              "present": false,
+              "plaintextSha256": null
+            },
+            "launcher_uid": "33333333-3333-4333-8333-333333333333",
+            "tags": "[]",
+            "notes": "",
+            "last_used_at": null,
+            "created_at": "<ts>",
+            "updated_at": "<ts>"
+          },
+          {
+            "id": "@acct:riot:riot_main",
+            "launcher": "riot",
+            "display_name": "Riot Main",
+            "login": "riot_main",
+            "secret_enc": {
+              "present": false,
+              "plaintextSha256": null
+            },
+            "launcher_uid": "11111111-1111-4111-8111-111111111111",
+            "tags": "[]",
+            "notes": "",
+            "last_used_at": null,
+            "created_at": "<ts>",
+            "updated_at": "<ts>"
+          },
+          {
+            "id": "@acct:riot:riot_new",
+            "launcher": "riot",
+            "display_name": "Riot New",
+            "login": "riot_new",
+            "secret_enc": {
+              "present": true,
+              "plaintextSha256": "bb2928d7fb7bf237931e86c9a2befb0a1de9a50542312c3506ac2307f91dc939"
+            },
+            "launcher_uid": null,
+            "tags": "[]",
+            "notes": "",
+            "last_used_at": null,
+            "created_at": "<ts>",
+            "updated_at": "<ts>"
+          },
+          {
+            "id": "@acct:steam:user_1",
+            "launcher": "steam",
+            "display_name": "Persona One",
+            "login": "user_1",
+            "secret_enc": {
+              "present": false,
+              "plaintextSha256": null
+            },
+            "launcher_uid": "76561198000000001",
+            "tags": "[]",
+            "notes": "",
+            "last_used_at": null,
+            "created_at": "<ts>",
+            "updated_at": "<ts>"
+          },
+          {
+            "id": "@acct:steam:user_3",
+            "launcher": "steam",
+            "display_name": "Persona Three",
+            "login": "user_3",
+            "secret_enc": {
+              "present": true,
+              "plaintextSha256": "8cba56ab4304de71c3fe1b6791c6a2f4c543f333be2a9a72bc44de5db91a6fa2"
+            },
+            "launcher_uid": "76561198000000003",
+            "tags": "[]",
+            "notes": "",
+            "last_used_at": null,
+            "created_at": "<ts>",
+            "updated_at": "<ts>"
+          }
+        ],
+        "artwork": [
+          {
+            "game_id": "@game:battlenet:prometheus",
+            "source": "steamcdn",
+            "grid_path": "@game:battlenet:prometheus/grid.png",
+            "hero_path": "@game:battlenet:prometheus/hero.png",
+            "logo_path": "@game:battlenet:prometheus/logo.png",
+            "fetched_at": "<ts>"
+          },
+          {
+            "game_id": "@game:epic:Sugar",
+            "source": "steamcdn",
+            "grid_path": "@game:epic:Sugar/grid.png",
+            "hero_path": "@game:epic:Sugar/hero.png",
+            "logo_path": "@game:epic:Sugar/logo.png",
+            "fetched_at": "<ts>"
+          },
+          {
+            "game_id": "@game:riot:valorant.live",
+            "source": "launcher",
+            "grid_path": "@game:riot:valorant.live/grid.ico",
+            "hero_path": null,
+            "logo_path": null,
+            "fetched_at": "<ts>"
+          },
+          {
+            "game_id": "@game:steam:252950",
+            "source": "steamcdn",
+            "grid_path": "@game:steam:252950/grid.png",
+            "hero_path": "@game:steam:252950/hero.png",
+            "logo_path": "@game:steam:252950/logo.png",
+            "fetched_at": "<ts>"
+          }
+        ],
+        "artwork_attempts": [
+          {
+            "game_id": "@game:riot:valorant.live",
+            "attempted_at": "<ts>",
+            "error": "No cover found online; showing the game’s own icon"
+          }
+        ],
+        "games": [
+          {
+            "id": "@game:battlenet:prometheus",
+            "launcher": "battlenet",
+            "launcher_game_id": "prometheus",
+            "name": "Overwatch",
+            "install_path": "{launchers}\\games\\Overwatch",
+            "installed": 1,
+            "last_seen_at": "<ts>",
+            "needs_update": 0,
+            "last_played_at": "2026-02-22T03:06:44.000Z"
+          },
+          {
+            "id": "@game:epic:Sugar",
+            "launcher": "epic",
+            "launcher_game_id": "Sugar",
+            "name": "Rocket League®",
+            "install_path": "D:\\Placeholder\\Epic Games\\rocketleague",
+            "installed": 1,
+            "last_seen_at": "<ts>",
+            "needs_update": 0,
+            "last_played_at": null
+          },
+          {
+            "id": "@game:riot:valorant.live",
+            "launcher": "riot",
+            "launcher_game_id": "valorant.live",
+            "name": "VALORANT",
+            "install_path": "{launchers}\\games\\VALORANT\\live",
+            "installed": 1,
+            "last_seen_at": "<ts>",
+            "needs_update": 0,
+            "last_played_at": "2025-10-09T08:53:20.000Z"
+          },
+          {
+            "id": "@game:steam:252950",
+            "launcher": "steam",
+            "launcher_game_id": "252950",
+            "name": "Rocket League",
+            "install_path": "{launchers}\\steam\\steamapps\\common\\rocketleague",
+            "installed": 1,
+            "last_seen_at": "<ts>",
+            "needs_update": 1,
+            "last_played_at": "2026-07-27T01:54:24.000Z"
+          }
+        ],
+        "launch_history": [
+          {
+            "id": "@history:1",
+            "game_id": "@game:battlenet:prometheus",
+            "account_id": "@acct:battlenet:saved3@example.com",
+            "launched_at": "<ts>",
+            "result": "ok"
+          }
+        ],
+        "launcher_sessions": [
+          {
+            "account_id": "@acct:battlenet:saved1@example.com",
+            "launcher": "battlenet",
+            "launcher_uid": "0a1b2c3d",
+            "blob_enc": {
+              "present": true,
+              "plaintextSha256": "bd68e8eb7d8254d8a159fac2a122a940ea55c5de22061f00ef2cf8e7b3221418"
+            },
+            "fingerprint": {
+              "sha256": "35a656be78cc49b5574798e25c60ce1d11cd6e6ca2d880fdd078e4119e817099"
+            },
+            "captured_at": "<ts>",
+            "verified_at": null,
+            "stale_reason": null
+          },
+          {
+            "account_id": "@acct:battlenet:saved3@example.com",
+            "launcher": "battlenet",
+            "launcher_uid": "0b2c3d4e",
+            "blob_enc": {
+              "present": true,
+              "plaintextSha256": "4cc07eb3a57d54a363740ffd39b2d457c00f22cf36041d7ea0713dfe18d5b8dd"
+            },
+            "fingerprint": {
+              "sha256": "3181ef242822e53a4ae54d90c372f1e247c9e13478c35dadff893741eff87cd1"
+            },
+            "captured_at": "<ts>",
+            "verified_at": "<ts>",
+            "stale_reason": null
+          },
+          {
+            "account_id": "@acct:epic:alt@example.com",
+            "launcher": "epic",
+            "launcher_uid": "22222222222222222222222222222222",
+            "blob_enc": {
+              "present": true,
+              "plaintextSha256": "c0d3d9d72b1abd69997b2031e06af018511baee96b2f4d1148b8b59c7b882793"
+            },
+            "fingerprint": {
+              "sha256": "3121c2803b7b6f737d24d68994a3718d24a30ae5fdc62d4935d9d8cdf3740269"
+            },
+            "captured_at": "<ts>",
+            "verified_at": null,
+            "stale_reason": null
+          },
+          {
+            "account_id": "@acct:riot:riot_alt",
+            "launcher": "riot",
+            "launcher_uid": "33333333-3333-4333-8333-333333333333",
+            "blob_enc": {
+              "present": true,
+              "plaintextSha256": "0a2b42d2ad354b3b41a706d204776a8bec46fa34ae6e7efc36bb7ed47e1062ef"
+            },
+            "fingerprint": {
+              "sha256": "04c38db022e44899bdd520a62051686d4d78484a4d12ad524ad8530d3b1c8aa6"
+            },
+            "captured_at": "<ts>",
+            "verified_at": null,
+            "stale_reason": null
+          }
+        ],
+        "secrets": [
+          {
+            "key": "vault.probe",
+            "value_enc": {
+              "present": true,
+              "plaintextSha256": "ba3874bd4b73c80b1ec72988f9b3c5a29daa1ee54ec8a780020b96b741943756"
+            },
+            "updated_at": "<ts>"
+          }
+        ],
+        "settings": [
+          {
+            "key": "firstRun.dismissed",
+            "value": "true"
+          },
+          {
+            "key": "whatsNew.lastSeen",
+            "value": "1.0.0-beta.3"
+          }
+        ]
+      }
+    },
+    "journal": null,
+    "backups": {
+      "db": {
+        "copies": 1
+      },
+      "steam": [],
+      "epic": [],
+      "battlenet": [
+        {
+          "id": "@backup:battlenet:1",
+          "createdAt": "<ts>",
+          "reason": "Before switching to Alt",
+          "pinned": null,
+          "meta": {
+            "unifiedAuth": [
+              {
+                "name": "AA11BB22",
+                "plaintextSha256": "35a656be78cc49b5574798e25c60ce1d11cd6e6ca2d880fdd078e4119e817099"
+              }
+            ]
+          },
+          "files": [
+            {
+              "relative": "Battle.net.config",
+              "source": "{launchers}\\appdata\\Battle.net\\Battle.net.config",
+              "existed": true,
+              "bytes": 4087,
+              "encrypted": false,
+              "sha256": "7043ba330052b87e349534a8471c026d7c79e01c65d48b60c24c45845bdeb1bd"
+            }
+          ]
+        }
+      ],
+      "riot": []
+    },
+    "launcherFiles": {
+      "steam/config/loginusers.vdf": {
+        "bytes": 875,
+        "sha256": "a40c88e03f6e0618d66386d9b29d80a8cc3bafee880193a89881e435f9507800",
+        "parsed": [
+          {
+            "steamId64": "76561198000000001",
+            "accountName": "user_1",
+            "personaName": "Persona One",
+            "rememberPassword": true,
+            "mostRecent": true,
+            "timestamp": 1789145779,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000002",
+            "accountName": "user_2",
+            "personaName": "Persona Two",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1759203770,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000003",
+            "accountName": "user_3",
+            "personaName": "Persona Three",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1755130895,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000004",
+            "accountName": "user_4",
+            "personaName": "Persona Four",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1716245512,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          }
+        ]
+      },
+      "localappdata/EpicGamesLauncher/Saved/Config/Windows/GameUserSettings.ini": {
+        "bytes": 2038,
+        "sha256": "0b519e2877e6194f3e7b8ebd1ccd84945e9548521a90eef4271e2d3394e1e730",
+        "parsed": {
+          "remembered": true,
+          "enable": "True",
+          "dataSha256": "39cdeb2f6698782b0e345b467622f0c6eabf4b17edcbd75f1061931ec5af174f",
+          "offlineDataSha256": "0fe44027d5e1988f05dd0b45e2e0577c2d35b237d9d509d3a95c05c0a8b80513"
+        }
+      },
+      "appdata/Battle.net/Battle.net.config": {
+        "bytes": 4087,
+        "sha256": "a81e19298924a29458f60056e4978f03f07bc49761275984d2d40349c70b43e9",
+        "parsed": {
+          "autoLogin": "true",
+          "savedAccountNames": [
+            "saved3@example.com",
+            "saved1@example.com",
+            "saved2@example.com",
+            "saved4@example.com",
+            "saved5@example.com"
+          ],
+          "version": "17778"
+        }
+      },
+      "localappdata/Riot Games/Riot Client/Data/RiotGamesPrivateSettings.yaml": {
+        "bytes": 5530,
+        "sha256": "0615e05eb692ce6a9eaa875a74ef67e40cf39bbb7ee104920fb40b49b3af2579",
+        "parsed": {
+          "kind": "session",
+          "session": {
+            "accountId": "11111111-1111-4111-8111-111111111111",
+            "riotId": {
+              "gameName": "Placeholder",
+              "tagLine": "0000"
+            },
+            "fingerprint": {
+              "sha256": "acd093bda9acd4eea95a94f9d3187365420d033664ae456d12a89707a262bf7c"
+            },
+            "dpopBound": false,
+            "writeCount": 3
+          }
+        }
+      }
+    },
+    "registry": [
+      {
+        "path": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth\\B1B1B1B1",
+        "type": "REG_BINARY",
+        "data": "01000000D08C9DDF0002ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB"
+      },
+      {
+        "path": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Riot Game Riot_Client.\\InstallLocation",
+        "type": "REG_SZ",
+        "data": "{launchers}/riot/"
+      },
+      {
+        "path": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Riot Game valorant.live\\DisplayIcon",
+        "type": "REG_SZ",
+        "data": "{launchers}/programdata/Riot Games/Metadata/valorant.live/valorant.live.ico"
+      },
+      {
+        "path": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Riot Game valorant.live\\DisplayName",
+        "type": "REG_SZ",
+        "data": "VALORANT"
+      },
+      {
+        "path": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Riot Game valorant.live\\InstallLocation",
+        "type": "REG_SZ",
+        "data": "{launchers}/games/VALORANT/live"
+      },
+      {
+        "path": "HKCU\\Software\\Valve\\Steam\\AutoLoginUser",
+        "type": "REG_SZ",
+        "data": "user_1"
+      },
+      {
+        "path": "HKCU\\Software\\Valve\\Steam\\RunningAppID",
+        "type": "REG_DWORD",
+        "data": "0x0"
+      },
+      {
+        "path": "HKCU\\Software\\Valve\\Steam\\SteamExe",
+        "type": "REG_SZ",
+        "data": "{launchers}/steam/steam.exe"
+      },
+      {
+        "path": "HKCU\\Software\\Valve\\Steam\\SteamPath",
+        "type": "REG_SZ",
+        "data": "{launchers}/steam"
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\Classes\\battlenet\\shell\\open\\command\\",
+        "type": "REG_SZ",
+        "data": "\"{launchers}\\battlenet\\Battle.net.exe\" --uri=\"%1\""
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\Classes\\com.epicgames.launcher\\shell\\open\\command\\",
+        "type": "REG_SZ",
+        "data": "\"{launchers}\\epic\\Launcher\\Portal\\Binaries\\Win64\\EpicGamesLauncher.exe\" %1"
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\Classes\\riotclient\\shell\\open\\command\\",
+        "type": "REG_SZ",
+        "data": "\"{launchers}\\riot\\RiotClientServices.exe\" --app-command=\"%1\""
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Epic Games\\EpicGamesLauncher\\AppDataPath",
+        "type": "REG_SZ",
+        "data": "{launchers}\\programdata\\Epic\\EpicGamesLauncher\\Data\\"
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Battle.net\\DisplayName",
+        "type": "REG_SZ",
+        "data": "Battle.net"
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Battle.net\\InstallLocation",
+        "type": "REG_SZ",
+        "data": "{launchers}\\battlenet"
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Battle.net\\UninstallString",
+        "type": "REG_SZ",
+        "data": "\"C:\\ProgramData\\Battle.net\\Agent\\Blizzard Uninstaller.exe\" --lang=enUS --uid=battle.net --displayname=\"Battle.net\""
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Hearthstone\\DisplayName",
+        "type": "REG_SZ",
+        "data": "Hearthstone"
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Hearthstone\\InstallLocation",
+        "type": "REG_SZ",
+        "data": "{launchers}\\games\\Hearthstone"
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Hearthstone\\UninstallString",
+        "type": "REG_SZ",
+        "data": "\"C:\\ProgramData\\Battle.net\\Agent\\Blizzard Uninstaller.exe\" --lang=enUS --uid=hs_beta --displayname=\"Hearthstone\""
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Overwatch\\DisplayName",
+        "type": "REG_SZ",
+        "data": "Overwatch"
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Overwatch\\InstallLocation",
+        "type": "REG_SZ",
+        "data": "{launchers}\\games\\Overwatch"
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Overwatch\\UninstallString",
+        "type": "REG_SZ",
+        "data": "\"C:\\ProgramData\\Battle.net\\Agent\\Blizzard Uninstaller.exe\" --lang=enUS --uid=prometheus --displayname=\"Overwatch\""
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{AEB35C6C-B6D4-4AA0-8452-DE699737B5F6}\\InstallLocation",
+        "type": "REG_SZ",
+        "data": "{launchers}\\epic\\"
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{AEB35C6C-B6D4-4AA0-8452-DE699737B5F6}\\UninstallString",
+        "type": "REG_SZ",
+        "data": "MsiExec.exe /X{AEB35C6C-B6D4-4AA0-8452-DE699737B5F6}"
+      },
+      {
+        "path": "HKLM\\SOFTWARE\\WOW6432Node\\Valve\\Steam\\InstallPath",
+        "type": "REG_SZ",
+        "data": "{launchers}\\steam"
+      }
+    ],
+    "log": {
+      "warn": [],
+      "error": []
+    }
+  }
+}

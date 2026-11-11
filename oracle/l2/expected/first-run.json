@@ -1,0 +1,52 @@
+{
+  "events": [],
+  "final": {
+    "db": {
+      "user_version": 5,
+      "tables": {
+        "accounts": [],
+        "artwork": [],
+        "artwork_attempts": [],
+        "games": [],
+        "launch_history": [],
+        "launcher_sessions": [],
+        "secrets": [
+          {
+            "key": "vault.probe",
+            "value_enc": {
+              "present": true,
+              "plaintextSha256": "ba3874bd4b73c80b1ec72988f9b3c5a29daa1ee54ec8a780020b96b741943756"
+            },
+            "updated_at": "<ts>"
+          }
+        ],
+        "settings": [
+          {
+            "key": "firstRun.dismissed",
+            "value": "true"
+          },
+          {
+            "key": "whatsNew.lastSeen",
+            "value": "1.0.0-beta.3"
+          }
+        ]
+      }
+    },
+    "journal": null,
+    "backups": {
+      "db": {
+        "copies": 2
+      },
+      "steam": [],
+      "epic": [],
+      "battlenet": [],
+      "riot": []
+    },
+    "launcherFiles": {},
+    "registry": [],
+    "log": {
+      "warn": [],
+      "error": []
+    }
+  }
+}

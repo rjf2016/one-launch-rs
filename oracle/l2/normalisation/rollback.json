@@ -1,0 +1,207 @@
+{
+  "script": "rollback",
+  "recordings": 5,
+  "clock": "2026-11-06T16:46:23.000Z",
+  "transient": [],
+  "volatile": [
+    "/events/*/backupId",
+    "/events/*/exe",
+    "/events/*/job",
+    "/events/*/path",
+    "/events/*/sha256",
+    "/events/*/steps/*/*",
+    "/final/backups/steam/*/createdAt",
+    "/final/backups/steam/*/files/*/source",
+    "/final/backups/steam/*/id",
+    "/final/db/tables/accounts/*/created_at",
+    "/final/db/tables/accounts/*/id",
+    "/final/db/tables/accounts/*/secret_enc",
+    "/final/db/tables/accounts/*/updated_at",
+    "/final/db/tables/artwork/*/fetched_at",
+    "/final/db/tables/artwork/*/game_id",
+    "/final/db/tables/artwork/*/grid_path",
+    "/final/db/tables/artwork/*/hero_path",
+    "/final/db/tables/artwork/*/logo_path",
+    "/final/db/tables/artwork_attempts/*/attempted_at",
+    "/final/db/tables/artwork_attempts/*/game_id",
+    "/final/db/tables/games/*/id",
+    "/final/db/tables/games/*/install_path",
+    "/final/db/tables/games/*/last_seen_at",
+    "/final/db/tables/launch_history/*/account_id",
+    "/final/db/tables/launch_history/*/game_id",
+    "/final/db/tables/launch_history/*/id",
+    "/final/db/tables/launch_history/*/launched_at",
+    "/final/db/tables/launcher_sessions/*/account_id",
+    "/final/db/tables/launcher_sessions/*/blob_enc",
+    "/final/db/tables/launcher_sessions/*/captured_at",
+    "/final/db/tables/secrets/*/updated_at",
+    "/final/db/tables/secrets/*/value_enc",
+    "/final/log/error/*",
+    "/final/log/warn/*",
+    "/final/registry/*/data"
+  ],
+  "normalised": [
+    {
+      "path": "/events/*/backupId",
+      "rule": "alias"
+    },
+    {
+      "path": "/events/*/exe",
+      "rule": "root"
+    },
+    {
+      "path": "/events/*/job",
+      "rule": "alias"
+    },
+    {
+      "path": "/events/*/path",
+      "rule": "alias"
+    },
+    {
+      "path": "/events/*/path",
+      "rule": "root"
+    },
+    {
+      "path": "/events/*/sha256",
+      "rule": "manifest"
+    },
+    {
+      "path": "/events/*/steps/*/*",
+      "rule": "alias"
+    },
+    {
+      "path": "/events/*/steps/*/*",
+      "rule": "root"
+    },
+    {
+      "path": "/final/backups/steam/*/createdAt",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/backups/steam/*/files/*/source",
+      "rule": "root"
+    },
+    {
+      "path": "/final/backups/steam/*/id",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/accounts/*/created_at",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/db/tables/accounts/*/id",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/accounts/*/secret_enc",
+      "rule": "enc"
+    },
+    {
+      "path": "/final/db/tables/accounts/*/updated_at",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/db/tables/artwork/*/fetched_at",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/db/tables/artwork/*/game_id",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/artwork/*/grid_path",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/artwork/*/hero_path",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/artwork/*/logo_path",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/artwork_attempts/*/attempted_at",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/db/tables/artwork_attempts/*/game_id",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/games/*/id",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/games/*/install_path",
+      "rule": "root"
+    },
+    {
+      "path": "/final/db/tables/games/*/last_seen_at",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/db/tables/launch_history/*/account_id",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/launch_history/*/game_id",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/launch_history/*/id",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/launch_history/*/launched_at",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/db/tables/launcher_sessions/*/account_id",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/db/tables/launcher_sessions/*/blob_enc",
+      "rule": "enc"
+    },
+    {
+      "path": "/final/db/tables/launcher_sessions/*/captured_at",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/db/tables/secrets/*/updated_at",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/db/tables/secrets/*/value_enc",
+      "rule": "enc"
+    },
+    {
+      "path": "/final/log/error/*",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/log/error/*",
+      "rule": "log-id"
+    },
+    {
+      "path": "/final/log/error/*",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/log/warn/*",
+      "rule": "alias"
+    },
+    {
+      "path": "/final/log/warn/*",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/registry/*/data",
+      "rule": "root"
+    }
+  ],
+  "normalisedNotVolatile": [],
+  "volatileNotNormalised": []
+}

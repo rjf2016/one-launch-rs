@@ -1,0 +1,22 @@
+{
+  "script": "first-run",
+  "recordings": 5,
+  "clock": "2026-11-06T16:46:23.000Z",
+  "transient": [],
+  "volatile": [
+    "/final/db/tables/secrets/*/updated_at",
+    "/final/db/tables/secrets/*/value_enc"
+  ],
+  "normalised": [
+    {
+      "path": "/final/db/tables/secrets/*/updated_at",
+      "rule": "ts"
+    },
+    {
+      "path": "/final/db/tables/secrets/*/value_enc",
+      "rule": "enc"
+    }
+  ],
+  "normalisedNotVolatile": [],
+  "volatileNotNormalised": []
+}

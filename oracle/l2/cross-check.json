@@ -1,0 +1,47 @@
+{
+  "electron": "44.7.0",
+  "build": "unpackaged, fake launchers, scratch data folder, ONELAUNCH_ORACLE_TRACE=1",
+  "rules": "platform events in exact order; the expectation's job events as a subsequence of the recorded ones; the final state exact",
+  "scripts": {
+    "play-all": {
+      "platformEvents": 20,
+      "jobEvents": 62,
+      "differences": 0,
+      "notCompared": [
+        "/final/registry: the fake registry lives in the app's memory and a running Electron shows none of it"
+      ]
+    },
+    "rollback": {
+      "platformEvents": 8,
+      "jobEvents": 13,
+      "differences": 0,
+      "notCompared": [
+        "/final/registry: the fake registry lives in the app's memory and a running Electron shows none of it"
+      ]
+    },
+    "handover": {
+      "platformEvents": 15,
+      "jobEvents": 60,
+      "differences": 0,
+      "notCompared": [
+        "/final/registry: the fake registry lives in the app's memory and a running Electron shows none of it"
+      ]
+    },
+    "recovery": {
+      "platformEvents": 8,
+      "jobEvents": 22,
+      "differences": 0,
+      "notCompared": [
+        "/final/registry: the fake registry lives in the app's memory and a running Electron shows none of it"
+      ]
+    },
+    "quit-during-switch": {
+      "platformEvents": 4,
+      "jobEvents": 20,
+      "differences": 0,
+      "notCompared": [
+        "/final/registry: the fake registry lives in the app's memory and a running Electron shows none of it"
+      ]
+    }
+  }
+}
