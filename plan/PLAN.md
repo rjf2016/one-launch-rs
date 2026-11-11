@@ -157,7 +157,7 @@ Runs in the Electron repo on a branch `oracle-tooling` that never merges and nev
 
 | # | Ticket | Done when |
 | --- | --- | --- |
-| T0 | Branch, schemas, normaliser, verify script with secret scan | `npm run check` passes; `src/` unchanged |
+| T0 | Branch, schemas, normaliser, verify script with secret scan | The check passes under the oracle clock (`plan/milestones/M0.md`); `src/` unchanged |
 | T1 | Triage table: one row per §11 and §12 item, plus the rows found during planning | Every row has your decision |
 | T2 | Test catalogue and result goldens | Count equals the test reporter's total |
 | T3 | Vectors (five agents: four launchers plus core) | Every listed function has cases; two runs byte-identical |
