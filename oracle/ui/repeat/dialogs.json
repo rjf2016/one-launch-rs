@@ -1,0 +1,93 @@
+{
+  "area": "dialogs",
+  "sidecars": {
+    "ui/shots/101-confirm-dialog.layout.json": {
+      "sha256": "8dd861124261ce7bcf33df44c1df60042e640923d2b5e0bc8a9f76747c4d9122",
+      "repeat": "identical"
+    },
+    "ui/shots/102-recovery-writing.layout.json": {
+      "sha256": "1df09f82fc766155df57f21fd290edf584cba2e7d4de5b2e27fc61ad70491887",
+      "repeat": "volatile"
+    },
+    "ui/shots/103-recovery-signing-in.layout.json": {
+      "sha256": "6552eaaac2406e42b869e838880aca1062d92ebd568c16215120d90c3cd3836c",
+      "repeat": "volatile"
+    },
+    "ui/shots/104-recovery-rollback-failed.layout.json": {
+      "sha256": "94f85bcdfd120f3dfd5e4f9c315c6eb2ce8d3c780b19da8da8090390ee46098d",
+      "repeat": "volatile"
+    },
+    "ui/shots/105-recovery-no-snapshot.layout.json": {
+      "sha256": "1577dad0572f06d5085e90f602e631b91825b61d00c0c8908229cbdc2c36bcbd",
+      "repeat": "volatile"
+    },
+    "ui/shots/106-recovery-restored.layout.json": {
+      "sha256": "7a9193822f901d1507f315b6ef254ce79421a2d8934a8353af52cc20e3e28a26",
+      "repeat": "identical"
+    },
+    "ui/shots/107-recovery-restore-error.layout.json": {
+      "sha256": "cfad097774530e5e13e038d02b14a494a4e09beb728f6c00e395f57bbe8556ba",
+      "repeat": "volatile"
+    },
+    "ui/shots/108-setup-welcome-960.layout.json": {
+      "sha256": "6b32c9bea9b86ac6395a179d44419ae571a6807afd8194ef77499dd2af50b726",
+      "repeat": "identical"
+    },
+    "ui/shots/108-setup-welcome.layout.json": {
+      "sha256": "b5c5889649c247a65b4ef70f13e9ada5737c137a256c8730375a43119f99b2d0",
+      "repeat": "identical"
+    },
+    "ui/shots/109-setup-launchers-none.layout.json": {
+      "sha256": "ee74f87efc3f9c54cfc0c197a0de49b65d5e40dab70213f2694614106dd5ba9e",
+      "repeat": "identical"
+    },
+    "ui/shots/110-setup-launchers-found.layout.json": {
+      "sha256": "76e09174ee4de50b9c2e71b54e6e110b3fc51749e6c182bd90dfd1a8ac33a38b",
+      "repeat": "identical"
+    },
+    "ui/shots/111-setup-launchers-loading.layout.json": {
+      "sha256": "4245942a0b4a44b19f7c99b2c494b10d70bee5b7311873dfded82924443d61d4",
+      "repeat": "identical"
+    },
+    "ui/shots/112-setup-play.layout.json": {
+      "sha256": "079c2bf123f4e6f93e4cb7baea5e81a96ded05258c6390c3cb007160cd0f3862",
+      "repeat": "identical"
+    },
+    "ui/shots/113-setup-play-preview-on.layout.json": {
+      "sha256": "f57d731b4c071217a57951d75672821292b2787e579735f6a0cfd3265b63bf37",
+      "repeat": "identical"
+    },
+    "ui/shots/114-setup-accounts-import.layout.json": {
+      "sha256": "fa1c135e75041a3678f1b4b188f48bca0788409e73d7c015ab58adcefca96950",
+      "repeat": "identical"
+    },
+    "ui/shots/115-setup-accounts-none.layout.json": {
+      "sha256": "d19771ed59a8e6c2957834fe71f1e385dd46327d1b44c7c9f668d128f5380e19",
+      "repeat": "identical"
+    },
+    "ui/shots/116-setup-accounts-by-hand-selected.layout.json": {
+      "sha256": "6da6f633e87260ea2f54aa21a497cef488675196b1e66c56e65680c8ad97b9db",
+      "repeat": "identical"
+    },
+    "ui/shots/117-setup-ready-all-set.layout.json": {
+      "sha256": "50c21e062f6384bad20d98e39bb10c0cf6a9dc302ed69ace07bc94343f8bf6dc",
+      "repeat": "identical"
+    },
+    "ui/shots/118-setup-ready-almost.layout.json": {
+      "sha256": "bb4403f4c17ad5ebdea06667d65e903bf3932c80e7bd6af40652ebe4818e4123",
+      "repeat": "identical"
+    },
+    "ui/shots/119-whats-new-960.layout.json": {
+      "sha256": "93b9b82f58ccafa3f52f97d654633cbe2b6568265446402ec22796a1e185e561",
+      "repeat": "identical"
+    },
+    "ui/shots/119-whats-new.layout.json": {
+      "sha256": "057bfd2f50632df2fe9cedc988bba86e82b4418c08b9d6271ae86c5c2f43a60d",
+      "repeat": "identical"
+    },
+    "ui/shots/120-whats-new-scrolled.layout.json": {
+      "sha256": "397b852ce813c6f2570f6bd7f1a7e2aa02718b0c7baca8ed22044ecdf01db1ef",
+      "repeat": "identical"
+    }
+  }
+}

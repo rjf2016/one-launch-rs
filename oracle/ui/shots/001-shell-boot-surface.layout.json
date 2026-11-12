@@ -1,0 +1,18 @@
+{
+  "id": 1,
+  "name": "shell-boot-surface",
+  "viewport": [1280,800],
+  "dpr": 1,
+  "locale": "en-US",
+  "tz": "UTC",
+  "clock": "2026-11-06T16:46:23.000Z",
+  "focus": null,
+  "paused": [],
+  "scroll": [],
+  "text": [],
+  "elements": [
+    {"role":"generic","name":"","ord":0,"box":[0,0,1280,800],"state":{"disabled":false,"checked":null,"expanded":null},"style":{"bg":"#0b0d12","color":"#e8eaf0"},"cls":"boot","tag":"div"},
+    {"role":"generic","name":"","ord":1,"box":[0,0,1280,36],"state":{"disabled":false,"checked":null,"expanded":null},"style":{"bg":"#12151c","color":"#e8eaf0","border":[0,0,1,0],"borderColor":["#e8eaf0","#e8eaf0","#262b3880","#e8eaf0"]},"cls":"boot-bar","tag":"div"},
+    {"role":"image","name":"","ord":0,"box":[592,370,96,96],"state":{"disabled":false,"checked":null,"expanded":null},"style":{"color":"#8b5cf6"},"cls":"boot-mark","tag":"svg"}
+  ]
+}

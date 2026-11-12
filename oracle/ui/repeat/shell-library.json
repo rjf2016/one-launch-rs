@@ -1,0 +1,129 @@
+{
+  "area": "shell-library",
+  "sidecars": {
+    "ui/shots/001-shell-boot-surface.layout.json": {
+      "sha256": "6118c9559590ea1a936ef45305372318eba5f7b5f37f0529ce520a06abe36149",
+      "repeat": "identical"
+    },
+    "ui/shots/002-shell-default-960.layout.json": {
+      "sha256": "1ae55a133caafd9ba1b9acf25c8d6772e4a23222ea49d3c742b4420620d025a7",
+      "repeat": "identical"
+    },
+    "ui/shots/002-shell-default.layout.json": {
+      "sha256": "7047ae88002d2654bd8affe0a92d4d38d8a10cf5b7d707e489a0c1dbdfc8382c",
+      "repeat": "identical"
+    },
+    "ui/shots/003-shell-sidebar-collapsed.layout.json": {
+      "sha256": "43e4eaa4778dfee581c8845def38578286ddde7cb88a816e680bd4605ae0ee13",
+      "repeat": "identical"
+    },
+    "ui/shots/004-shell-fake-badge.layout.json": {
+      "sha256": "7895eb8c16a00adb6fdf4260dbfb93914e0fbacd5ddf82129cbe4bcd2a8f045c",
+      "repeat": "identical"
+    },
+    "ui/shots/005-sidebar-preview-mode-card.layout.json": {
+      "sha256": "af2f419df4fbbce4a791fd1e6b1269f734a304ce0890098a740c9e3a4ef5c4fc",
+      "repeat": "identical"
+    },
+    "ui/shots/006-sidebar-update-ready-card.layout.json": {
+      "sha256": "a459c99ec89cb3837a369e3540fc90bea3263b35ce8bd991aa3350c8c6215162",
+      "repeat": "identical"
+    },
+    "ui/shots/007-sidebar-update-ready-disabled.layout.json": {
+      "sha256": "7eac833ecf1e39e6f0dbde34ca5349cc89f5201dce29f3c9cd77a9ffdedac8bc",
+      "repeat": "identical"
+    },
+    "ui/shots/008-shell-error-boundary.layout.json": {
+      "sha256": "bc73b833335734b0c1c531f75e0e7d7d58bdc12aee0dabb969b1be71ae66794e",
+      "repeat": "identical"
+    },
+    "ui/shots/009-shell-window-min-960x600.layout.json": {
+      "sha256": "b72762eb3c1b6162b5127d02f79eda4faeb31c56364752209e57ba1cc20132a4",
+      "repeat": "identical"
+    },
+    "ui/shots/010-library-populated-960.layout.json": {
+      "sha256": "222afa18e2ae8b2fd4dd7b3a79be99b10f687f558c4bb4b115bd5b6e58d4bd2b",
+      "repeat": "identical"
+    },
+    "ui/shots/010-library-populated.layout.json": {
+      "sha256": "a492668cc82d8ea02aa51bc288a19a9adf6738b6ab38812eaefda6a9fe2c4bc8",
+      "repeat": "identical"
+    },
+    "ui/shots/011-library-scanning.layout.json": {
+      "sha256": "e530f572a92918a2dc35a023662e73f8b0cfb844f9af04414c7ee204f0debdc6",
+      "repeat": "identical"
+    },
+    "ui/shots/012-library-no-launchers.layout.json": {
+      "sha256": "c6c1ebfcbb46d5c0882750d6f04df356ffc905bb5f75725b01cd08e1feb3d4bc",
+      "repeat": "identical"
+    },
+    "ui/shots/013-library-no-games.layout.json": {
+      "sha256": "0026b7ad6478c073fd2c26eff7fa134286fd45aab793d4895a93a0026ce85605",
+      "repeat": "identical"
+    },
+    "ui/shots/014-library-load-error.layout.json": {
+      "sha256": "61ab84c75aa91137e48269df27222debed2451c3545f37588ae691f6a7dc83ef",
+      "repeat": "identical"
+    },
+    "ui/shots/015-library-no-match-search.layout.json": {
+      "sha256": "80bbcb7bf11f88844b0f68231f0063c90430d1bc89d48434de3491aadc183a16",
+      "repeat": "identical"
+    },
+    "ui/shots/016-library-no-match-filter.layout.json": {
+      "sha256": "fda137a086e1e3af98b0b863543212d1faa128e10c7be899246570c726c98082",
+      "repeat": "identical"
+    },
+    "ui/shots/017-library-search-active.layout.json": {
+      "sha256": "a402cfbc166d7711451c2a566ab8d13d91aa4c8d6e5eda8e49788b0239003b5d",
+      "repeat": "identical"
+    },
+    "ui/shots/018-library-filter-dropdown-open.layout.json": {
+      "sha256": "8f611266ba52129af1087036fd53dc3783ec0da586c5335c65de660587b34016",
+      "repeat": "identical"
+    },
+    "ui/shots/019-library-sort-dropdown-open.layout.json": {
+      "sha256": "5e4c9b8341399f2062b1dcfcfe2a1ee4e4f2071cd17b26650d01bcc8b0414712",
+      "repeat": "identical"
+    },
+    "ui/shots/020-library-fetching-artwork.layout.json": {
+      "sha256": "c4a0b3f0f2e15b1c11caf064897d21d9203312951f35fd8192608729e38e946d",
+      "repeat": "identical"
+    },
+    "ui/shots/021-library-add-key-link.layout.json": {
+      "sha256": "db703be60843cef2f86d8015b18dafe50e4bc67affd8cc2b570ddaae3a48fcaf",
+      "repeat": "identical"
+    },
+    "ui/shots/022-library-card-hover.layout.json": {
+      "sha256": "c8ed9326852c2475083fcff79b2b3f6e47f36a16c6dcb70af83a93f2edca9548",
+      "repeat": "identical"
+    },
+    "ui/shots/023-library-card-busy.layout.json": {
+      "sha256": "06a512d7cff85031e0cba4e8538ccba920945a09a3cc9adb7ace3a1f19a3d248",
+      "repeat": "identical"
+    },
+    "ui/shots/024-library-card-update-badge.layout.json": {
+      "sha256": "c7b16bd7a37c3588042fc6848b476059f37f1c4bc7403b29fce7c92a46b7f3e1",
+      "repeat": "identical"
+    },
+    "ui/shots/025-library-card-launcher-icon.layout.json": {
+      "sha256": "496653ecbed29a5ca0e679450b455bbfc3fda4ba5a0a9379b9272387fec51abe",
+      "repeat": "identical"
+    },
+    "ui/shots/026-library-card-monogram.layout.json": {
+      "sha256": "5920abb97baec1fbe9bdbf9aeb1678a17954b6820744488ccd47e69f299f3ad6",
+      "repeat": "identical"
+    },
+    "ui/shots/027-library-card-removed-account.layout.json": {
+      "sha256": "1ac439f5a24cc72af6a0e859143bf796d035c2ac1d492ceb471906fef27ee9dd",
+      "repeat": "identical"
+    },
+    "ui/shots/028-library-card-menu.layout.json": {
+      "sha256": "ec7221c4f4c7f952366b4dededdb757f3649b7ce36221b93cb65afd2fb717e89",
+      "repeat": "identical"
+    },
+    "ui/shots/029-library-recent-strip.layout.json": {
+      "sha256": "7fd1bd6088a7b0bd5094ceb216487b49347320c9b4953434ce72bac61689638f",
+      "repeat": "identical"
+    }
+  }
+}

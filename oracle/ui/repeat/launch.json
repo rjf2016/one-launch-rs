@@ -1,0 +1,145 @@
+{
+  "area": "launch",
+  "sidecars": {
+    "ui/shots/066-launch-pick-960.layout.json": {
+      "sha256": "df5c25e9aab31239ee494ac735daf9aadaa59839dbaffc51f65f6f3b85c18265",
+      "repeat": "identical"
+    },
+    "ui/shots/066-launch-pick.layout.json": {
+      "sha256": "98a074979905d09f5e2d36b6af2e30d5b8ce6e9520bac6b8b8d9f1362dcae75c",
+      "repeat": "identical"
+    },
+    "ui/shots/067-launch-pick-switch-only.layout.json": {
+      "sha256": "399b78e6c6adf5bdae7d939b012a4d39034512d273a5391122b1a334923369fc",
+      "repeat": "identical"
+    },
+    "ui/shots/068-launch-pick-update-note.layout.json": {
+      "sha256": "3c16fc63f714e77cba56a50c9d0dcc1844a1518d91875f7dafac6148481d9e31",
+      "repeat": "identical"
+    },
+    "ui/shots/069-launch-empty-steam.layout.json": {
+      "sha256": "d772de5cfe20538d8e72739422351331dcb1fdc34140e7858c514d33988849d1",
+      "repeat": "identical"
+    },
+    "ui/shots/070-launch-empty-riot.layout.json": {
+      "sha256": "e8b19e914b822540c0da782f106b199ce92cc55594fb62fd09e896b757deec43",
+      "repeat": "identical"
+    },
+    "ui/shots/071-launch-checking.layout.json": {
+      "sha256": "95e04f59e972ef3df59fb70b89d9370cc7d0a341731e485682f91be42279769d",
+      "repeat": "identical"
+    },
+    "ui/shots/072-launch-confirm-close.layout.json": {
+      "sha256": "0064cc3c2e9ca5b4c4486848264ceda66eca5d5a95f11c4584f9036f8d503e27",
+      "repeat": "identical"
+    },
+    "ui/shots/073-launch-confirm-warnings.layout.json": {
+      "sha256": "55f847b948d42b4966cb5dd80e9f67294d454c0af9f7e71edcf7c2723119ea72",
+      "repeat": "identical"
+    },
+    "ui/shots/074-launch-confirm-details-open.layout.json": {
+      "sha256": "363854950303e593b5934e03da4f86127328ecfb9d7ec2d1644130da1f2e55b6",
+      "repeat": "identical"
+    },
+    "ui/shots/075-launch-preview.layout.json": {
+      "sha256": "eadac393ede78f1bc334543c2a810fdc9baf88b83b251e684ad64b7abc7f947f",
+      "repeat": "identical"
+    },
+    "ui/shots/076-launch-blocked.layout.json": {
+      "sha256": "41f102e95c51b972ae898d99f66f7a2acfd80c751e2fd265da26eb1bbfc024e4",
+      "repeat": "identical"
+    },
+    "ui/shots/077-launch-running.layout.json": {
+      "sha256": "8681f7daa576f867b85a53bedf36ad4ffc6793134146b8665ab20c7841078499",
+      "repeat": "identical"
+    },
+    "ui/shots/078-launch-running-details.layout.json": {
+      "sha256": "b9e83100d645066d67c374a8189759f48bd47e6098e8b3da2d8246a94059706b",
+      "repeat": "volatile"
+    },
+    "ui/shots/079-launch-handover-steam.layout.json": {
+      "sha256": "b8426c7c91c832db89cae414312549bcc3466ab6f46c519ca47da8bb80b750a0",
+      "repeat": "identical"
+    },
+    "ui/shots/080-launch-handover-battlenet.layout.json": {
+      "sha256": "b66c6fbf2f931ee5a9aeaece40d0708d2ed244ef60e771e0347e85b93ecbf681",
+      "repeat": "identical"
+    },
+    "ui/shots/081-launch-handover-riot.layout.json": {
+      "sha256": "afc7f744ad13011d12cad13c7fb2e7fe67964b52872587f20eb37c11ab99908e",
+      "repeat": "identical"
+    },
+    "ui/shots/082-launch-handover-copied.layout.json": {
+      "sha256": "f84bcd5aba6f9f89acb0c5904b9c6beaa6308f47dc0b5d4fd3ac4e3913b20a07",
+      "repeat": "identical"
+    },
+    "ui/shots/083-launch-stopping.layout.json": {
+      "sha256": "a4e7f5ff7d277fda217c3974e7aaffd188bc57dae27fabc1700eabf0debcd9e9",
+      "repeat": "identical"
+    },
+    "ui/shots/084-launch-done-launched.layout.json": {
+      "sha256": "32dbe9ce466bf582a1b264b693909b353e04411cf553d6f9b3b50d67a6b50393",
+      "repeat": "identical"
+    },
+    "ui/shots/085-launch-done-switched.layout.json": {
+      "sha256": "625f210ed57bca1eee5354448811d9e73b13a76c885e74f5095f304136fcb9d5",
+      "repeat": "identical"
+    },
+    "ui/shots/086-launch-done-handoff-riot.layout.json": {
+      "sha256": "85cf5017fb403ed5b3d185334adea64d6131265eb5aaac8d47f30cbf7861a6ba",
+      "repeat": "identical"
+    },
+    "ui/shots/087-launch-needs-sign-in.layout.json": {
+      "sha256": "6bca84251bc2b7af43a3a9eba30415a7415e9e62134eb37fba2ca4747467ffec",
+      "repeat": "identical"
+    },
+    "ui/shots/088-launch-cancelled-before-writes.layout.json": {
+      "sha256": "50fec63a54d43168b36090e456c55ce2e7d40d9405d60ea39bc1f0dc393777ee",
+      "repeat": "identical"
+    },
+    "ui/shots/090-launch-cancelled-after-start.layout.json": {
+      "sha256": "09bf4af2edf3686414718c14d273e644164f56ee26e1fd70f5252ff5a366e043",
+      "repeat": "identical"
+    },
+    "ui/shots/091-launch-failed-restored.layout.json": {
+      "sha256": "986d2781059bfd227df80bbb0cd3d4ed6f1e2d51609a34565265cb100b57cfae",
+      "repeat": "identical"
+    },
+    "ui/shots/092-launch-failed-restore-failed.layout.json": {
+      "sha256": "e8ed69c70497a002a47fbbf3fedeba5925217bd23378337af811ab0c6d5c8ec1",
+      "repeat": "volatile"
+    },
+    "ui/shots/093-launch-failed-launch-only.layout.json": {
+      "sha256": "02655d7c52aca764cfe373d48d3d5e2057d0ea5881125f7daf724bc7cda94d16",
+      "repeat": "identical"
+    },
+    "ui/shots/094-launch-failed-nothing-changed.layout.json": {
+      "sha256": "5d1fee61f27bdc631bdbea42e78ff100dd7420aa2ffa096634a9d43d5ddb0b4e",
+      "repeat": "identical"
+    },
+    "ui/shots/095-launch-error.layout.json": {
+      "sha256": "54f10258b55a2f1ed0ac48e9d5bb6fc08ccd815dcb39c89cbd00c16dfc02c77f",
+      "repeat": "identical"
+    },
+    "ui/shots/096-launch-game-running-riot.layout.json": {
+      "sha256": "1089a8c6c449b8ec842cc0bd58be02e2d7b4879098fa73c44a107f2d52d250b7",
+      "repeat": "identical"
+    },
+    "ui/shots/097-banner-running.layout.json": {
+      "sha256": "799b2b61e233050bc63a30da84a733f8351f64d0294bcc2c0fae92e267046938",
+      "repeat": "identical"
+    },
+    "ui/shots/098-banner-attention.layout.json": {
+      "sha256": "dc429e837e0d29cc7c9423f6b183f6b540b5491be857860c9f8b5b80bd0de494",
+      "repeat": "identical"
+    },
+    "ui/shots/099-banner-done.layout.json": {
+      "sha256": "8e8694afd1ca70ddce9af10f25608ce16c237026fc48c1eba0c8af25b60747ed",
+      "repeat": "identical"
+    },
+    "ui/shots/100-banner-failed.layout.json": {
+      "sha256": "aceb307ac45a3b6487cbfa6b1a5bf4058e0084424e6b5cd35aadce23a1387372",
+      "repeat": "identical"
+    }
+  }
+}

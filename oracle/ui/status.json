@@ -1,0 +1,2998 @@
+{
+  "clock": {
+    "start": "2026-11-06T16:46:23.000Z",
+    "runs": "main and the page both start here and run on at the real rate"
+  },
+  "locale": "en-US",
+  "tz": "UTC",
+  "counts": {
+    "rows": 174,
+    "captured": 160,
+    "owner": 12,
+    "skipped": 2,
+    "missing": 0
+  },
+  "rows": [
+    {
+      "id": 1,
+      "name": "shell-boot-surface",
+      "area": "shell-library",
+      "status": "captured",
+      "how": "the page reloaded with its script bundle blocked, so the document stays as index.html paints it; the mark is shown with its fade finished",
+      "files": [
+        {
+          "png": "ui/shots/001-shell-boot-surface.png",
+          "sidecar": "ui/shots/001-shell-boot-surface.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "shell-default",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/002-shell-default.png",
+          "sidecar": "ui/shots/002-shell-default.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/002-shell-default-960.png",
+          "sidecar": "ui/shots/002-shell-default-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "shell-sidebar-collapsed",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/003-shell-sidebar-collapsed.png",
+          "sidecar": "ui/shots/003-shell-sidebar-collapsed.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "shell-fake-badge",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/004-shell-fake-badge.png",
+          "sidecar": "ui/shots/004-shell-fake-badge.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "sidebar-preview-mode-card",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/005-sidebar-preview-mode-card.png",
+          "sidecar": "ui/shots/005-sidebar-preview-mode-card.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "sidebar-update-ready-card",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/006-sidebar-update-ready-card.png",
+          "sidecar": "ui/shots/006-sidebar-update-ready-card.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "sidebar-update-ready-disabled",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/007-sidebar-update-ready-disabled.png",
+          "sidecar": "ui/shots/007-sidebar-update-ready-disabled.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "shell-error-boundary",
+      "area": "shell-library",
+      "status": "captured",
+      "how": "fault injected over CDP: a builtin the Library calls while it renders is made to throw once",
+      "files": [
+        {
+          "png": "ui/shots/008-shell-error-boundary.png",
+          "sidecar": "ui/shots/008-shell-error-boundary.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "shell-window-min-960x600",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/009-shell-window-min-960x600.png",
+          "sidecar": "ui/shots/009-shell-window-min-960x600.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "library-populated",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/010-library-populated.png",
+          "sidecar": "ui/shots/010-library-populated.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/010-library-populated-960.png",
+          "sidecar": "ui/shots/010-library-populated-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "library-scanning",
+      "area": "shell-library",
+      "status": "captured",
+      "how": "the answers to artwork:status and launchers:status held in main, then the page reloaded: the Library has heard nothing of the scan yet",
+      "files": [
+        {
+          "png": "ui/shots/011-library-scanning.png",
+          "sidecar": "ui/shots/011-library-scanning.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "library-no-launchers",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/012-library-no-launchers.png",
+          "sidecar": "ui/shots/012-library-no-launchers.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "library-no-games",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/013-library-no-games.png",
+          "sidecar": "ui/shots/013-library-no-games.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "library-load-error",
+      "area": "shell-library",
+      "status": "captured",
+      "how": "fault injected in main: library:list answers with the error envelope its handler gives for a damaged database",
+      "files": [
+        {
+          "png": "ui/shots/014-library-load-error.png",
+          "sidecar": "ui/shots/014-library-load-error.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "library-no-match-search",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/015-library-no-match-search.png",
+          "sidecar": "ui/shots/015-library-no-match-search.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "library-no-match-filter",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/016-library-no-match-filter.png",
+          "sidecar": "ui/shots/016-library-no-match-filter.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "name": "library-search-active",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/017-library-search-active.png",
+          "sidecar": "ui/shots/017-library-search-active.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "library-filter-dropdown-open",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/018-library-filter-dropdown-open.png",
+          "sidecar": "ui/shots/018-library-filter-dropdown-open.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "name": "library-sort-dropdown-open",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/019-library-sort-dropdown-open.png",
+          "sidecar": "ui/shots/019-library-sort-dropdown-open.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "name": "library-fetching-artwork",
+      "area": "shell-library",
+      "status": "captured",
+      "how": "the bodies of artwork fetches held in main, then every game queued again: the queue stays at four",
+      "files": [
+        {
+          "png": "ui/shots/020-library-fetching-artwork.png",
+          "sidecar": "ui/shots/020-library-fetching-artwork.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "name": "library-add-key-link",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/021-library-add-key-link.png",
+          "sidecar": "ui/shots/021-library-add-key-link.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "name": "library-card-hover",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/022-library-card-hover.png",
+          "sidecar": "ui/shots/022-library-card-hover.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "name": "library-card-busy",
+      "area": "shell-library",
+      "status": "captured",
+      "how": "the answer to launch:preflight held in main after a click on a poster whose game was launched before",
+      "files": [
+        {
+          "png": "ui/shots/023-library-card-busy.png",
+          "sidecar": "ui/shots/023-library-card-busy.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "name": "library-card-update-badge",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/024-library-card-update-badge.png",
+          "sidecar": "ui/shots/024-library-card-update-badge.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "name": "library-card-launcher-icon",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/025-library-card-launcher-icon.png",
+          "sidecar": "ui/shots/025-library-card-launcher-icon.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "name": "library-card-monogram",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/026-library-card-monogram.png",
+          "sidecar": "ui/shots/026-library-card-monogram.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "name": "library-card-removed-account",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/027-library-card-removed-account.png",
+          "sidecar": "ui/shots/027-library-card-removed-account.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "name": "library-card-menu",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/028-library-card-menu.png",
+          "sidecar": "ui/shots/028-library-card-menu.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "name": "library-recent-strip",
+      "area": "shell-library",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/029-library-recent-strip.png",
+          "sidecar": "ui/shots/029-library-recent-strip.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "name": "accounts-list",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/030-accounts-list.png",
+          "sidecar": "ui/shots/030-accounts-list.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/030-accounts-list-960.png",
+          "sidecar": "ui/shots/030-accounts-list-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "name": "accounts-empty",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/031-accounts-empty.png",
+          "sidecar": "ui/shots/031-accounts-empty.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "name": "accounts-import-menu",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/032-accounts-import-menu.png",
+          "sidecar": "ui/shots/032-accounts-import-menu.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "name": "accounts-add-menu",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/033-accounts-add-menu.png",
+          "sidecar": "ui/shots/033-accounts-add-menu.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "name": "accounts-flash-imported",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/034-accounts-flash-imported.png",
+          "sidecar": "ui/shots/034-accounts-flash-imported.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "name": "accounts-flash-nothing-new",
+      "area": "accounts",
+      "status": "captured",
+      "how": "the Import button is disabled once everything is linked, so the three logins the open Battle.net dialog had selected were imported over IPC (launchers:importAccounts) behind it; its own Import then found nothing new",
+      "files": [
+        {
+          "png": "ui/shots/035-accounts-flash-nothing-new.png",
+          "sidecar": "ui/shots/035-accounts-flash-nothing-new.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "name": "accounts-load-error",
+      "area": "accounts",
+      "status": "captured",
+      "how": "fault injected in main: accounts:list answers with the error envelope its handler gives for a damaged database",
+      "files": [
+        {
+          "png": "ui/shots/036-accounts-load-error.png",
+          "sidecar": "ui/shots/036-accounts-load-error.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "name": "account-create-steam",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/037-account-create-steam.png",
+          "sidecar": "ui/shots/037-account-create-steam.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/037-account-create-steam-960.png",
+          "sidecar": "ui/shots/037-account-create-steam-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "name": "account-create-riot",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/038-account-create-riot.png",
+          "sidecar": "ui/shots/038-account-create-riot.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "name": "account-create-validation",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/039-account-create-validation.png",
+          "sidecar": "ui/shots/039-account-create-validation.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "name": "account-create-advanced-open",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/040-account-create-advanced-open.png",
+          "sidecar": "ui/shots/040-account-create-advanced-open.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "name": "account-create-leave-guard",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/041-account-create-leave-guard.png",
+          "sidecar": "ui/shots/041-account-create-leave-guard.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "name": "account-edit",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/042-account-edit.png",
+          "sidecar": "ui/shots/042-account-edit.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/042-account-edit-960.png",
+          "sidecar": "ui/shots/042-account-edit-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "name": "account-edit-created-flash",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/043-account-edit-created-flash.png",
+          "sidecar": "ui/shots/043-account-edit-created-flash.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "name": "account-edit-dirty",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/044-account-edit-dirty.png",
+          "sidecar": "ui/shots/044-account-edit-dirty.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "name": "account-edit-saved-flash",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/045-account-edit-saved-flash.png",
+          "sidecar": "ui/shots/045-account-edit-saved-flash.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "name": "account-edit-leave-guard",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/046-account-edit-leave-guard.png",
+          "sidecar": "ui/shots/046-account-edit-leave-guard.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "name": "account-edit-password-stored",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/047-account-edit-password-stored.png",
+          "sidecar": "ui/shots/047-account-edit-password-stored.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "name": "account-edit-password-editing",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/048-account-edit-password-editing.png",
+          "sidecar": "ui/shots/048-account-edit-password-editing.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "name": "account-edit-password-remove-confirm",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/049-account-edit-password-remove-confirm.png",
+          "sidecar": "ui/shots/049-account-edit-password-remove-confirm.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "name": "account-edit-copy-flash",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/050-account-edit-copy-flash.png",
+          "sidecar": "ui/shots/050-account-edit-copy-flash.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "name": "account-edit-session-saved",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/051-account-edit-session-saved.png",
+          "sidecar": "ui/shots/051-account-edit-session-saved.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "name": "account-edit-session-not-saved",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/052-account-edit-session-not-saved.png",
+          "sidecar": "ui/shots/052-account-edit-session-not-saved.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "name": "account-edit-session-stale",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/053-account-edit-session-stale.png",
+          "sidecar": "ui/shots/053-account-edit-session-stale.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "name": "account-edit-session-unlinked",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/054-account-edit-session-unlinked.png",
+          "sidecar": "ui/shots/054-account-edit-session-unlinked.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "name": "account-edit-session-forget-confirm",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/055-account-edit-session-forget-confirm.png",
+          "sidecar": "ui/shots/055-account-edit-session-forget-confirm.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "name": "account-edit-riot-stay-signed-in",
+      "area": "accounts",
+      "status": "captured",
+      "how": "the Riot Client takes 25 polls to exit (processes.shutdownPolls), and a switch to Riot Main was stopped while it closed: the client ends closed, nothing written, after a sign-in by hand without “Stay signed in”",
+      "files": [
+        {
+          "png": "ui/shots/056-account-edit-riot-stay-signed-in.png",
+          "sidecar": "ui/shots/056-account-edit-riot-stay-signed-in.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "name": "account-edit-switch-preview",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/057-account-edit-switch-preview.png",
+          "sidecar": "ui/shots/057-account-edit-switch-preview.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "name": "account-edit-switch-preview-credentials",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/058-account-edit-switch-preview-credentials.png",
+          "sidecar": "ui/shots/058-account-edit-switch-preview-credentials.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "name": "account-edit-delete-confirm",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/059-account-edit-delete-confirm.png",
+          "sidecar": "ui/shots/059-account-edit-delete-confirm.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "name": "import-steam-list",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/060-import-steam-list.png",
+          "sidecar": "ui/shots/060-import-steam-list.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "name": "import-battlenet-list",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/061-import-battlenet-list.png",
+          "sidecar": "ui/shots/061-import-battlenet-list.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "name": "import-loading",
+      "area": "accounts",
+      "status": "captured",
+      "how": "the answer to launchers:rememberedAccounts held in main before Import › From Steam was opened: the dialog is still waiting for the list",
+      "files": [
+        {
+          "png": "ui/shots/062-import-loading.png",
+          "sidecar": "ui/shots/062-import-loading.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "name": "import-empty",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/063-import-empty.png",
+          "sidecar": "ui/shots/063-import-empty.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 64,
+      "name": "import-all-linked",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/064-import-all-linked.png",
+          "sidecar": "ui/shots/064-import-all-linked.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 65,
+      "name": "import-error",
+      "area": "accounts",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/065-import-error.png",
+          "sidecar": "ui/shots/065-import-error.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 66,
+      "name": "launch-pick",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/066-launch-pick.png",
+          "sidecar": "ui/shots/066-launch-pick.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/066-launch-pick-960.png",
+          "sidecar": "ui/shots/066-launch-pick-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 67,
+      "name": "launch-pick-switch-only",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/067-launch-pick-switch-only.png",
+          "sidecar": "ui/shots/067-launch-pick-switch-only.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 68,
+      "name": "launch-pick-update-note",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/068-launch-pick-update-note.png",
+          "sidecar": "ui/shots/068-launch-pick-update-note.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 69,
+      "name": "launch-empty-steam",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/069-launch-empty-steam.png",
+          "sidecar": "ui/shots/069-launch-empty-steam.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "name": "launch-empty-riot",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/070-launch-empty-riot.png",
+          "sidecar": "ui/shots/070-launch-empty-riot.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 71,
+      "name": "launch-checking",
+      "area": "launch",
+      "status": "captured",
+      "how": "the answer to launch:preflight held in main after Play was pressed",
+      "files": [
+        {
+          "png": "ui/shots/071-launch-checking.png",
+          "sidecar": "ui/shots/071-launch-checking.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 72,
+      "name": "launch-confirm-close",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/072-launch-confirm-close.png",
+          "sidecar": "ui/shots/072-launch-confirm-close.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 73,
+      "name": "launch-confirm-warnings",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/073-launch-confirm-warnings.png",
+          "sidecar": "ui/shots/073-launch-confirm-warnings.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 74,
+      "name": "launch-confirm-details-open",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/074-launch-confirm-details-open.png",
+          "sidecar": "ui/shots/074-launch-confirm-details-open.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 75,
+      "name": "launch-preview",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/075-launch-preview.png",
+          "sidecar": "ui/shots/075-launch-preview.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 76,
+      "name": "launch-blocked",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/076-launch-blocked.png",
+          "sidecar": "ui/shots/076-launch-blocked.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 77,
+      "name": "launch-running",
+      "area": "launch",
+      "status": "captured",
+      "how": "knob-parked: the fake Steam runs as user_1 and never answers its restart (reactMs raised, signInMs and updateMs stretched), so the switch stays in Sign in",
+      "files": [
+        {
+          "png": "ui/shots/077-launch-running.png",
+          "sidecar": "ui/shots/077-launch-running.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 78,
+      "name": "launch-running-details",
+      "area": "launch",
+      "status": "captured",
+      "how": "knob-parked: the fake Steam runs as user_1 and never answers its restart (reactMs raised, signInMs and updateMs stretched), so the switch stays in Sign in",
+      "files": [
+        {
+          "png": "ui/shots/078-launch-running-details.png",
+          "sidecar": "ui/shots/078-launch-running-details.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 79,
+      "name": "launch-handover-steam",
+      "area": "launch",
+      "status": "captured",
+      "how": "knob-parked: Steam's session for user_3 expired and its -login answered with a Steam Guard verdict (steam.autoLogin on); the hand-over wait is stretched (manualSignInMs) and nobody signs in, so the switch stays on the panel",
+      "files": [
+        {
+          "png": "ui/shots/079-launch-handover-steam.png",
+          "sidecar": "ui/shots/079-launch-handover-steam.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 80,
+      "name": "launch-handover-battlenet",
+      "area": "launch",
+      "status": "captured",
+      "how": "knob-parked: the fake Battle.net rejects the saved token; the hand-over wait is stretched (manualSignInMs) and nobody signs in, so the switch stays on the panel",
+      "files": [
+        {
+          "png": "ui/shots/080-launch-handover-battlenet.png",
+          "sidecar": "ui/shots/080-launch-handover-battlenet.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 81,
+      "name": "launch-handover-riot",
+      "area": "launch",
+      "status": "captured",
+      "how": "knob-parked: the fake Riot Client rejects the saved sign-in; the hand-over wait is stretched (manualSignInMs) and nobody signs in, so the switch stays on the panel",
+      "files": [
+        {
+          "png": "ui/shots/081-launch-handover-riot.png",
+          "sidecar": "ui/shots/081-launch-handover-riot.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 82,
+      "name": "launch-handover-copied",
+      "area": "launch",
+      "status": "captured",
+      "how": "knob-parked as row 79: the hand-over wait is stretched (manualSignInMs) and nobody signs in, so the switch stays on the panel",
+      "files": [
+        {
+          "png": "ui/shots/082-launch-handover-copied.png",
+          "sidecar": "ui/shots/082-launch-handover-copied.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "name": "launch-stopping",
+      "area": "launch",
+      "status": "captured",
+      "how": "the fake Steam never exits (shutdownPolls and shutdownMs raised), so the switch stays in Close; the answer to launch:status held in main, then Stop pressed",
+      "files": [
+        {
+          "png": "ui/shots/083-launch-stopping.png",
+          "sidecar": "ui/shots/083-launch-stopping.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 84,
+      "name": "launch-done-launched",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/084-launch-done-launched.png",
+          "sidecar": "ui/shots/084-launch-done-launched.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 85,
+      "name": "launch-done-switched",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/085-launch-done-switched.png",
+          "sidecar": "ui/shots/085-launch-done-switched.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 86,
+      "name": "launch-done-handoff-riot",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/086-launch-done-handoff-riot.png",
+          "sidecar": "ui/shots/086-launch-done-handoff-riot.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 87,
+      "name": "launch-needs-sign-in",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/087-launch-needs-sign-in.png",
+          "sidecar": "ui/shots/087-launch-needs-sign-in.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 88,
+      "name": "launch-cancelled-before-writes",
+      "area": "launch",
+      "status": "captured",
+      "how": "Stop pressed while the switch was parked in Close as for row 83",
+      "files": [
+        {
+          "png": "ui/shots/088-launch-cancelled-before-writes.png",
+          "sidecar": "ui/shots/088-launch-cancelled-before-writes.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 89,
+      "name": "launch-cancelled-restored",
+      "area": "launch",
+      "status": "skipped",
+      "reason": "cannot be reached without editing src/: a Stop rolls back only when it lands after the first write and before the launcher is started, and on fake launchers nothing in that stretch waits (the fake registry and process list answer within one turn of the event loop, where no launch:cancel is handled). 66 timed Stops across the boundary ended either \"Nothing had been changed\" or \"Stopped while Steam was starting\"; test/pipeline.test.ts reaches the state by gating the process-list check there, which the kit cannot hold"
+    },
+    {
+      "id": 90,
+      "name": "launch-cancelled-after-start",
+      "area": "launch",
+      "status": "captured",
+      "how": "Stop waiting pressed on the hand-over parked as for row 79",
+      "files": [
+        {
+          "png": "ui/shots/090-launch-cancelled-after-start.png",
+          "sidecar": "ui/shots/090-launch-cancelled-after-start.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 91,
+      "name": "launch-failed-restored",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/091-launch-failed-restored.png",
+          "sidecar": "ui/shots/091-launch-failed-restored.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "name": "launch-failed-restore-failed",
+      "area": "launch",
+      "status": "captured",
+      "how": "fault: the fake Steam never shows up after its start (startFails), and while the switch waited for it one byte was appended to the stored loginusers.vdf of its snapshot in the scratch data folder, so the rollback refuses the copy",
+      "files": [
+        {
+          "png": "ui/shots/092-launch-failed-restore-failed.png",
+          "sidecar": "ui/shots/092-launch-failed-restore-failed.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 93,
+      "name": "launch-failed-launch-only",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/093-launch-failed-launch-only.png",
+          "sidecar": "ui/shots/093-launch-failed-launch-only.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 94,
+      "name": "launch-failed-nothing-changed",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/094-launch-failed-nothing-changed.png",
+          "sidecar": "ui/shots/094-launch-failed-nothing-changed.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 95,
+      "name": "launch-error",
+      "area": "launch",
+      "status": "captured",
+      "how": "a plain switch started over IPC and parked in Sign in (reactMs raised), then Play pressed in the dialog: main refuses the second launch:start with BUSY",
+      "files": [
+        {
+          "png": "ui/shots/095-launch-error.png",
+          "sidecar": "ui/shots/095-launch-error.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 96,
+      "name": "launch-game-running-riot",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/096-launch-game-running-riot.png",
+          "sidecar": "ui/shots/096-launch-game-running-riot.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 97,
+      "name": "banner-running",
+      "area": "launch",
+      "status": "captured",
+      "how": "knob-parked: the fake Steam runs as user_1 and never answers its restart (reactMs raised, signInMs and updateMs stretched), so the switch stays in Sign in",
+      "files": [
+        {
+          "png": "ui/shots/097-banner-running.png",
+          "sidecar": "ui/shots/097-banner-running.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 98,
+      "name": "banner-attention",
+      "area": "launch",
+      "status": "captured",
+      "how": "knob-parked as row 79: the hand-over wait is stretched (manualSignInMs) and nobody signs in, so the switch stays on the panel",
+      "files": [
+        {
+          "png": "ui/shots/098-banner-attention.png",
+          "sidecar": "ui/shots/098-banner-attention.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 99,
+      "name": "banner-done",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/099-banner-done.png",
+          "sidecar": "ui/shots/099-banner-done.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 100,
+      "name": "banner-failed",
+      "area": "launch",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/100-banner-failed.png",
+          "sidecar": "ui/shots/100-banner-failed.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "name": "confirm-dialog",
+      "area": "dialogs",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/101-confirm-dialog.png",
+          "sidecar": "ui/shots/101-confirm-dialog.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "name": "recovery-writing",
+      "area": "dialogs",
+      "status": "captured",
+      "how": "a Steam switch killed while it was writing. No knob parks a switch between its snapshot and the start of the launcher (a few milliseconds), so the confirm click is sent without waiting for its answer, switch.json is watched, and killHard follows the first entry that names the snapshot; the journal the app left names a write step (file). A kill that lands after the journal has moved on to the start step is undone with Restore snapshot in the prompt and the switch is run again, three times at most",
+      "files": [
+        {
+          "png": "ui/shots/102-recovery-writing.png",
+          "sidecar": "ui/shots/102-recovery-writing.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "name": "recovery-signing-in",
+      "area": "dialogs",
+      "status": "captured",
+      "how": "the fake Epic launcher never signs in (the reactMs knob), so the switch waits in its sign-in phase; the app is killed there and started again",
+      "files": [
+        {
+          "png": "ui/shots/103-recovery-signing-in.png",
+          "sidecar": "ui/shots/103-recovery-signing-in.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 104,
+      "name": "recovery-rollback-failed",
+      "area": "dialogs",
+      "status": "captured",
+      "how": "an Epic switch that fails after its write (the processes.startFails knob: the fake launcher never comes up) and whose rollback fails too: while the switch waited for the launcher, the Config folder of its snapshot was moved aside in the scratch data folder, so the restore found no file; once the app had written rollbackFailed to switch.json the folder was moved back, the app closed and started again. Nothing in switch.json was written by the capture",
+      "files": [
+        {
+          "png": "ui/shots/104-recovery-rollback-failed.png",
+          "sidecar": "ui/shots/104-recovery-rollback-failed.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 105,
+      "name": "recovery-no-snapshot",
+      "area": "dialogs",
+      "status": "captured",
+      "how": "the switch parked and killed as for row 103, and the folder of its snapshot removed from the scratch data folder between the kill and the restart",
+      "files": [
+        {
+          "png": "ui/shots/105-recovery-no-snapshot.png",
+          "sidecar": "ui/shots/105-recovery-no-snapshot.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "name": "recovery-restored",
+      "area": "dialogs",
+      "status": "captured",
+      "how": "the switch parked and killed as for row 103, then Restore snapshot pressed with the fake launcher closed",
+      "files": [
+        {
+          "png": "ui/shots/106-recovery-restored.png",
+          "sidecar": "ui/shots/106-recovery-restored.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "name": "recovery-restore-error",
+      "area": "dialogs",
+      "status": "captured",
+      "how": "the switch parked and killed as for row 103, and the app restarted with the fake Epic launcher running (the processes.running knob); the answer to recovery:restore held in main until the dialog had painted \"Restoring…\" and its disabled buttons had dropped the focus, then released. The refusal is the adapter's own",
+      "files": [
+        {
+          "png": "ui/shots/107-recovery-restore-error.png",
+          "sidecar": "ui/shots/107-recovery-restore-error.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "name": "setup-welcome",
+      "area": "dialogs",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/108-setup-welcome.png",
+          "sidecar": "ui/shots/108-setup-welcome.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/108-setup-welcome-960.png",
+          "sidecar": "ui/shots/108-setup-welcome-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "name": "setup-launchers-none",
+      "area": "dialogs",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/109-setup-launchers-none.png",
+          "sidecar": "ui/shots/109-setup-launchers-none.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 110,
+      "name": "setup-launchers-found",
+      "area": "dialogs",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/110-setup-launchers-found.png",
+          "sidecar": "ui/shots/110-setup-launchers-found.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "name": "setup-launchers-loading",
+      "area": "dialogs",
+      "status": "captured",
+      "how": "the answers to launchers:status and artwork:status held in main, then the page reloaded and the guide moved on to step 2",
+      "files": [
+        {
+          "png": "ui/shots/111-setup-launchers-loading.png",
+          "sidecar": "ui/shots/111-setup-launchers-loading.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 112,
+      "name": "setup-play",
+      "area": "dialogs",
+      "status": "captured",
+      "how": "the page's setInterval callbacks stopped before the step opened, so the phase demo stays on its first step, every phase pending",
+      "files": [
+        {
+          "png": "ui/shots/112-setup-play.png",
+          "sidecar": "ui/shots/112-setup-play.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "name": "setup-play-preview-on",
+      "area": "dialogs",
+      "status": "captured",
+      "how": "the page's setInterval callbacks stopped before the step opened, so the phase demo stays on its first step, every phase pending",
+      "files": [
+        {
+          "png": "ui/shots/113-setup-play-preview-on.png",
+          "sidecar": "ui/shots/113-setup-play-preview-on.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "name": "setup-accounts-import",
+      "area": "dialogs",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/114-setup-accounts-import.png",
+          "sidecar": "ui/shots/114-setup-accounts-import.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 115,
+      "name": "setup-accounts-none",
+      "area": "dialogs",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/115-setup-accounts-none.png",
+          "sidecar": "ui/shots/115-setup-accounts-none.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 116,
+      "name": "setup-accounts-by-hand-selected",
+      "area": "dialogs",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/116-setup-accounts-by-hand-selected.png",
+          "sidecar": "ui/shots/116-setup-accounts-by-hand-selected.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "name": "setup-ready-all-set",
+      "area": "dialogs",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/117-setup-ready-all-set.png",
+          "sidecar": "ui/shots/117-setup-ready-all-set.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 118,
+      "name": "setup-ready-almost",
+      "area": "dialogs",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/118-setup-ready-almost.png",
+          "sidecar": "ui/shots/118-setup-ready-almost.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 119,
+      "name": "whats-new",
+      "area": "dialogs",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/119-whats-new.png",
+          "sidecar": "ui/shots/119-whats-new.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/119-whats-new-960.png",
+          "sidecar": "ui/shots/119-whats-new-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 120,
+      "name": "whats-new-scrolled",
+      "area": "dialogs",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/120-whats-new-scrolled.png",
+          "sidecar": "ui/shots/120-whats-new-scrolled.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "name": "settings-general",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/121-settings-general.png",
+          "sidecar": "ui/shots/121-settings-general.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/121-settings-general-960.png",
+          "sidecar": "ui/shots/121-settings-general-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "name": "settings-general-autostart-disabled",
+      "area": "settings",
+      "status": "captured",
+      "how": "the answer to autostart:status held in main, then Settings opened again: the toggle is off and disabled, as it is for a copy that cannot start with Windows. On fake launchers the login item is in memory and always available, so the answer \"unavailable\" itself cannot be had",
+      "files": [
+        {
+          "png": "ui/shots/122-settings-general-autostart-disabled.png",
+          "sidecar": "ui/shots/122-settings-general-autostart-disabled.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 123,
+      "name": "settings-general-autostart-on",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/123-settings-general-autostart-on.png",
+          "sidecar": "ui/shots/123-settings-general-autostart-on.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 124,
+      "name": "settings-updates-idle",
+      "area": "settings",
+      "status": "captured",
+      "how": "automatic updates seeded off in the scenario and switched on for the shot, which puts the first check 15 s away; the session fails if that check began before the shot was done",
+      "files": [
+        {
+          "png": "ui/shots/124-settings-updates-idle.png",
+          "sidecar": "ui/shots/124-settings-updates-idle.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 125,
+      "name": "settings-updates-checking",
+      "area": "settings",
+      "status": "captured",
+      "how": "the loopback feed holds its answer to the request for latest.yml",
+      "files": [
+        {
+          "png": "ui/shots/125-settings-updates-checking.png",
+          "sidecar": "ui/shots/125-settings-updates-checking.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 126,
+      "name": "settings-updates-up-to-date",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/126-settings-updates-up-to-date.png",
+          "sidecar": "ui/shots/126-settings-updates-up-to-date.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 127,
+      "name": "settings-updates-downloading",
+      "area": "settings",
+      "status": "captured",
+      "how": "the loopback feed sends 524288 of the 1048576 installer bytes, one more byte 1.5 s later so that the updater reports its progress, and holds the rest",
+      "files": [
+        {
+          "png": "ui/shots/127-settings-updates-downloading.png",
+          "sidecar": "ui/shots/127-settings-updates-downloading.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 128,
+      "name": "settings-updates-ready",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/128-settings-updates-ready.png",
+          "sidecar": "ui/shots/128-settings-updates-ready.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 129,
+      "name": "settings-updates-failed",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/129-settings-updates-failed.png",
+          "sidecar": "ui/shots/129-settings-updates-failed.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 130,
+      "name": "settings-updates-unavailable-dev",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/130-settings-updates-unavailable-dev.png",
+          "sidecar": "ui/shots/130-settings-updates-unavailable-dev.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 131,
+      "name": "settings-updates-unavailable-custom-folder",
+      "area": "settings",
+      "status": "owner",
+      "reason": "only a packaged exe gives the custom-data-folder reason (every unpackaged run answers \"development\" first), and a capture never starts the packaged or the installed exe"
+    },
+    {
+      "id": 132,
+      "name": "settings-launchers",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/132-settings-launchers.png",
+          "sidecar": "ui/shots/132-settings-launchers.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/132-settings-launchers-960.png",
+          "sidecar": "ui/shots/132-settings-launchers-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 133,
+      "name": "settings-launchers-skeleton",
+      "area": "settings",
+      "status": "captured",
+      "how": "the answer to launchers:status held in main, then the page reloaded and the Launchers tab opened: the page has heard of no launcher yet",
+      "files": [
+        {
+          "png": "ui/shots/133-settings-launchers-skeleton.png",
+          "sidecar": "ui/shots/133-settings-launchers-skeleton.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 134,
+      "name": "settings-launchers-row-expanded",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/134-settings-launchers-row-expanded.png",
+          "sidecar": "ui/shots/134-settings-launchers-row-expanded.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 135,
+      "name": "settings-launchers-not-installed",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/135-settings-launchers-not-installed.png",
+          "sidecar": "ui/shots/135-settings-launchers-not-installed.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 136,
+      "name": "settings-launchers-needs-attention",
+      "area": "settings",
+      "status": "captured",
+      "how": "planted file: the fake Battle.net.config padded with spaces to 4194305 bytes, one over the limit for a launcher file, so the Battle.net health check throws LAUNCHER_FILE. A UTF-16 config does not throw; it only fails one health check, and the row gets no Needs attention pill",
+      "files": [
+        {
+          "png": "ui/shots/136-settings-launchers-needs-attention.png",
+          "sidecar": "ui/shots/136-settings-launchers-needs-attention.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 137,
+      "name": "settings-launchers-chosen-folder",
+      "area": "settings",
+      "status": "captured",
+      "how": "steam.path written into the scratch database with node:sqlite while the app was stopped, naming the fake Steam folder: settings:set refuses the key, and the native picker that sets it cannot be driven",
+      "files": [
+        {
+          "png": "ui/shots/137-settings-launchers-chosen-folder.png",
+          "sidecar": "ui/shots/137-settings-launchers-chosen-folder.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "name": "settings-launchers-locate-error",
+      "area": "settings",
+      "status": "captured",
+      "how": "fault injected in main: launchers:locate answers with the NOT_A_LAUNCHER envelope its handler gives for a wrong exe, so the native file picker never opens",
+      "files": [
+        {
+          "png": "ui/shots/138-settings-launchers-locate-error.png",
+          "sidecar": "ui/shots/138-settings-launchers-locate-error.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 139,
+      "name": "settings-play-hide-disabled",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/139-settings-play-hide-disabled.png",
+          "sidecar": "ui/shots/139-settings-play-hide-disabled.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 140,
+      "name": "settings-artwork-no-key",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/140-settings-artwork-no-key.png",
+          "sidecar": "ui/shots/140-settings-artwork-no-key.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/140-settings-artwork-no-key-960.png",
+          "sidecar": "ui/shots/140-settings-artwork-no-key-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 141,
+      "name": "settings-artwork-key-stored",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/141-settings-artwork-key-stored.png",
+          "sidecar": "ui/shots/141-settings-artwork-key-stored.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 142,
+      "name": "settings-artwork-key-invalid",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/142-settings-artwork-key-invalid.png",
+          "sidecar": "ui/shots/142-settings-artwork-key-invalid.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 143,
+      "name": "settings-artwork-queue-busy",
+      "area": "settings",
+      "status": "captured",
+      "how": "the bodies of artwork fetches held in main, then Refresh all: the queue stays at four",
+      "files": [
+        {
+          "png": "ui/shots/143-settings-artwork-queue-busy.png",
+          "sidecar": "ui/shots/143-settings-artwork-queue-busy.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 144,
+      "name": "settings-artwork-rescan-message",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/144-settings-artwork-rescan-message.png",
+          "sidecar": "ui/shots/144-settings-artwork-rescan-message.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 145,
+      "name": "settings-backups",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/145-settings-backups.png",
+          "sidecar": "ui/shots/145-settings-backups.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        },
+        {
+          "png": "ui/shots/145-settings-backups-960.png",
+          "sidecar": "ui/shots/145-settings-backups-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 146,
+      "name": "settings-backups-empty",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/146-settings-backups-empty.png",
+          "sidecar": "ui/shots/146-settings-backups-empty.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 147,
+      "name": "settings-backups-kept-pinned",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/147-settings-backups-kept-pinned.png",
+          "sidecar": "ui/shots/147-settings-backups-kept-pinned.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 148,
+      "name": "settings-backups-restore-dialog",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/148-settings-backups-restore-dialog.png",
+          "sidecar": "ui/shots/148-settings-backups-restore-dialog.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 149,
+      "name": "settings-backups-restore-refused",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/149-settings-backups-restore-refused.png",
+          "sidecar": "ui/shots/149-settings-backups-restore-refused.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 150,
+      "name": "settings-backups-restored",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/150-settings-backups-restored.png",
+          "sidecar": "ui/shots/150-settings-backups-restored.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 151,
+      "name": "settings-backups-keep-dropdown",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/151-settings-backups-keep-dropdown.png",
+          "sidecar": "ui/shots/151-settings-backups-keep-dropdown.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 152,
+      "name": "settings-advanced",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/152-settings-advanced.png",
+          "sidecar": "ui/shots/152-settings-advanced.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        },
+        {
+          "png": "ui/shots/152-settings-advanced-960.png",
+          "sidecar": "ui/shots/152-settings-advanced-960.layout.json",
+          "size": [
+            960,
+            600
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 153,
+      "name": "settings-advanced-preview-on",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/153-settings-advanced-preview-on.png",
+          "sidecar": "ui/shots/153-settings-advanced-preview-on.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 154,
+      "name": "settings-advanced-epic-dropdown",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/154-settings-advanced-epic-dropdown.png",
+          "sidecar": "ui/shots/154-settings-advanced-epic-dropdown.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 155,
+      "name": "settings-advanced-battlenet-dropdown",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/155-settings-advanced-battlenet-dropdown.png",
+          "sidecar": "ui/shots/155-settings-advanced-battlenet-dropdown.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 156,
+      "name": "settings-encryption-working",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/156-settings-encryption-working.png",
+          "sidecar": "ui/shots/156-settings-encryption-working.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 157,
+      "name": "settings-encryption-key-lost",
+      "area": "settings",
+      "status": "captured",
+      "how": "the chromium folder of the scratch data folder (it holds the wrapped key) deleted between two starts, after the first start had stored the seeded passwords and sign-ins",
+      "files": [
+        {
+          "png": "ui/shots/157-settings-encryption-key-lost.png",
+          "sidecar": "ui/shots/157-settings-encryption-key-lost.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 158,
+      "name": "settings-vault-reset-confirm",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/158-settings-vault-reset-confirm.png",
+          "sidecar": "ui/shots/158-settings-vault-reset-confirm.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 159,
+      "name": "settings-vault-reset-done",
+      "area": "settings",
+      "status": "captured",
+      "how": "the answer to vault:status held in main before the reset is confirmed: the banner and its note go when that answer arrives, and Status reads Checking… until then",
+      "files": [
+        {
+          "png": "ui/shots/159-settings-vault-reset-done.png",
+          "sidecar": "ui/shots/159-settings-vault-reset-done.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 160,
+      "name": "settings-encryption-unavailable",
+      "area": "settings",
+      "status": "captured",
+      "how": "planted file: chromium/Local State in the scratch data folder, written before the first start with an os_crypt.encrypted_key that is not a DPAPI key, so safeStorage reports that encryption is unavailable. The seed of this session has no password and no saved sign-in, which could not have been encrypted",
+      "files": [
+        {
+          "png": "ui/shots/160-settings-encryption-unavailable.png",
+          "sidecar": "ui/shots/160-settings-encryption-unavailable.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 161,
+      "name": "settings-diagnostics-log-level-dropdown",
+      "area": "settings",
+      "status": "captured",
+      "files": [
+        {
+          "png": "ui/shots/161-settings-diagnostics-log-level-dropdown.png",
+          "sidecar": "ui/shots/161-settings-diagnostics-log-level-dropdown.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "volatile"
+        }
+      ]
+    },
+    {
+      "id": 162,
+      "name": "settings-setting-save-error",
+      "area": "settings",
+      "status": "captured",
+      "how": "fault injected in main: settings:set answers with the error envelope of a read-only database",
+      "files": [
+        {
+          "png": "ui/shots/162-settings-setting-save-error.png",
+          "sidecar": "ui/shots/162-settings-setting-save-error.layout.json",
+          "size": [
+            1280,
+            800
+          ],
+          "repeat": "identical"
+        }
+      ]
+    },
+    {
+      "id": 163,
+      "name": "settings-developer-panel",
+      "area": "settings",
+      "status": "skipped",
+      "reason": "the Developer panel is loaded only when import.meta.env.DEV is set, which is the dev server (electron-vite dev); the build in out/ has no such chunk, and a capture must not start the dev server"
+    },
+    {
+      "id": 164,
+      "name": "native-quit-during-switch",
+      "area": null,
+      "status": "owner",
+      "reason": "a native message box, which CDP cannot capture"
+    },
+    {
+      "id": 165,
+      "name": "native-crash-dialog",
+      "area": null,
+      "status": "owner",
+      "reason": "a native message box, and reaching it needs a throw from main"
+    },
+    {
+      "id": 166,
+      "name": "native-startup-error",
+      "area": null,
+      "status": "owner",
+      "reason": "a native error box of the exe on a broken data folder"
+    },
+    {
+      "id": 167,
+      "name": "native-file-picker-locate",
+      "area": null,
+      "status": "owner",
+      "reason": "a native file picker"
+    },
+    {
+      "id": 168,
+      "name": "native-file-picker-image",
+      "area": null,
+      "status": "owner",
+      "reason": "a native file picker"
+    },
+    {
+      "id": 169,
+      "name": "tray-menu",
+      "area": null,
+      "status": "owner",
+      "reason": "the tray icon menu, drawn by Windows"
+    },
+    {
+      "id": 170,
+      "name": "tray-hidden-window",
+      "area": null,
+      "status": "owner",
+      "reason": "the taskbar and tray with the window hidden: a desktop shot"
+    },
+    {
+      "id": 171,
+      "name": "installer-welcome",
+      "area": null,
+      "status": "owner",
+      "reason": "the installer pages; an installer never runs on this PC"
+    },
+    {
+      "id": 172,
+      "name": "installer-smartscreen",
+      "area": null,
+      "status": "owner",
+      "reason": "SmartScreen on a freshly downloaded installer"
+    },
+    {
+      "id": 173,
+      "name": "windows-startup-apps-entry",
+      "area": null,
+      "status": "owner",
+      "reason": "Windows Settings › Apps › Startup, with the installed app"
+    },
+    {
+      "id": 174,
+      "name": "uninstaller",
+      "area": null,
+      "status": "owner",
+      "reason": "the uninstaller of the installed app"
+    }
+  ]
+}

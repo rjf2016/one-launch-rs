@@ -1,0 +1,161 @@
+{
+  "area": "accounts",
+  "sidecars": {
+    "ui/shots/030-accounts-list-960.layout.json": {
+      "sha256": "68c885c38ec6ed351493ace68d0def794bc9984b6df5c6a2cc4ae3bcdfbc6941",
+      "repeat": "identical"
+    },
+    "ui/shots/030-accounts-list.layout.json": {
+      "sha256": "2b2048929cc26dad5cb0369433ef49593d1bd0a02081b6d49ddfed95fb249dc8",
+      "repeat": "identical"
+    },
+    "ui/shots/031-accounts-empty.layout.json": {
+      "sha256": "f31930d3757b53bd44d260c84a6ad5ff6d2f22001c3a7226bfda89569cac06b4",
+      "repeat": "identical"
+    },
+    "ui/shots/032-accounts-import-menu.layout.json": {
+      "sha256": "28c4d83a732326c6be9625436dcb21632a94f6db697ad832c2d496118b3ba8bc",
+      "repeat": "identical"
+    },
+    "ui/shots/033-accounts-add-menu.layout.json": {
+      "sha256": "dd80df4bbbabe760ef213b3a44d9c556fbc4f07bb7e6793757ab67fe7c2295af",
+      "repeat": "identical"
+    },
+    "ui/shots/034-accounts-flash-imported.layout.json": {
+      "sha256": "5d2c48c285330dcd3ca3e50510cd5ac7f8d9f166aba243ffc45c2ddaed9078a7",
+      "repeat": "identical"
+    },
+    "ui/shots/035-accounts-flash-nothing-new.layout.json": {
+      "sha256": "0e24f3847aad3883d5d670bcf9cc484d560db37db857c08203ad98bbcc19c4d8",
+      "repeat": "identical"
+    },
+    "ui/shots/036-accounts-load-error.layout.json": {
+      "sha256": "a932bfb423894e9e9cebaabe86ba9ac28803d008f253b7900b4f731d939cb9fd",
+      "repeat": "identical"
+    },
+    "ui/shots/037-account-create-steam-960.layout.json": {
+      "sha256": "9c3121bf36277e6da8812e55c57a1d4eaf4a1bfe2bb98eb73bdb86d0a9e98157",
+      "repeat": "identical"
+    },
+    "ui/shots/037-account-create-steam.layout.json": {
+      "sha256": "317404fa0bcd0090d8673c3a882a69a5ae20b487304be10b853fd887edd77532",
+      "repeat": "identical"
+    },
+    "ui/shots/038-account-create-riot.layout.json": {
+      "sha256": "94adcff2b61de19de4571f583116f12fa98de93beb1eb02815416385d597873f",
+      "repeat": "identical"
+    },
+    "ui/shots/039-account-create-validation.layout.json": {
+      "sha256": "438c6feea3fd48673cf8b83fa0ecfb90446489257a713db07bef45419a3fe027",
+      "repeat": "identical"
+    },
+    "ui/shots/040-account-create-advanced-open.layout.json": {
+      "sha256": "3cafd335ba4996068b32da3dd697035df58b3e17711b464a0160bd9167ed73c6",
+      "repeat": "identical"
+    },
+    "ui/shots/041-account-create-leave-guard.layout.json": {
+      "sha256": "2a740522e215de698619daa8457124078fc4a79b90dae4327e82bb9e95bd5aa1",
+      "repeat": "identical"
+    },
+    "ui/shots/042-account-edit-960.layout.json": {
+      "sha256": "8d3e8cb89c020e66a21d51395ba49fac6a7eb48cefce7012160e4073a6665581",
+      "repeat": "identical"
+    },
+    "ui/shots/042-account-edit.layout.json": {
+      "sha256": "c4680c54330e027e14de5ed8e797cb4d9901914994e15d72eb5895ffd6a353e6",
+      "repeat": "identical"
+    },
+    "ui/shots/043-account-edit-created-flash.layout.json": {
+      "sha256": "3962af109199aebf40a3b2ac91253e7e9132332f134b112d8e379be8062d5a24",
+      "repeat": "identical"
+    },
+    "ui/shots/044-account-edit-dirty.layout.json": {
+      "sha256": "679fee58bce83ea812de65c6516a845b58a5e1bedac9152186e3a058469614b6",
+      "repeat": "identical"
+    },
+    "ui/shots/045-account-edit-saved-flash.layout.json": {
+      "sha256": "87c0bfe87fb4c2c004d93db9b581cab91789b2ca40562fa61ed13c4da670bef5",
+      "repeat": "identical"
+    },
+    "ui/shots/046-account-edit-leave-guard.layout.json": {
+      "sha256": "04396f367f46de0b2ab37418e8af0ff0003dfd871a2aabfd495cd66539a91bfb",
+      "repeat": "identical"
+    },
+    "ui/shots/047-account-edit-password-stored.layout.json": {
+      "sha256": "3454feadfa5e33d1e6e0ab59898cfbedfcc97fb2ed96b0ee078846d9f0fd1386",
+      "repeat": "identical"
+    },
+    "ui/shots/048-account-edit-password-editing.layout.json": {
+      "sha256": "f6d8375ec865854361ebdd8f6c2832721ab0fe94f58db9887b25909a3302aedf",
+      "repeat": "identical"
+    },
+    "ui/shots/049-account-edit-password-remove-confirm.layout.json": {
+      "sha256": "39106e33e0426b121d2eac23b0bdf1ace905742d85a37f148f1a0cc71f459b65",
+      "repeat": "identical"
+    },
+    "ui/shots/050-account-edit-copy-flash.layout.json": {
+      "sha256": "bc0813643716f38406ef5fc640c0cfd7b101bab85b1016e0d46f28b6db4b1b3b",
+      "repeat": "identical"
+    },
+    "ui/shots/051-account-edit-session-saved.layout.json": {
+      "sha256": "b10912fbdcb2cffcb25026877c0721ad46cf10894fe8340a0fc146c8f0c79d5f",
+      "repeat": "identical"
+    },
+    "ui/shots/052-account-edit-session-not-saved.layout.json": {
+      "sha256": "2fba28c9ae55a863614c81f8041d46b9d4c240d1dabe842f02c881127db2f05b",
+      "repeat": "identical"
+    },
+    "ui/shots/053-account-edit-session-stale.layout.json": {
+      "sha256": "e5625a5824e5e2460e974918eb27bfe40e56b89e99ee4999aecd6aadbc4c4e69",
+      "repeat": "identical"
+    },
+    "ui/shots/054-account-edit-session-unlinked.layout.json": {
+      "sha256": "5b0432713e5d72917d8f87f96f71974f4c51e940c2b60b33ec3b1639937d371a",
+      "repeat": "identical"
+    },
+    "ui/shots/055-account-edit-session-forget-confirm.layout.json": {
+      "sha256": "2cfcec45b1bfbb5484ec0a3a4ccd58da2bfef19852bb5951f43a9dcd7d9a8f02",
+      "repeat": "identical"
+    },
+    "ui/shots/056-account-edit-riot-stay-signed-in.layout.json": {
+      "sha256": "086689c9a888a1c7951631d7d0a5c8d02d8ee9cecfd24ea2bb449e95c5459aff",
+      "repeat": "identical"
+    },
+    "ui/shots/057-account-edit-switch-preview.layout.json": {
+      "sha256": "0cf049b678b955fb4078ee737d172d84cfd4d7a103490cbf7f3637c338c8e082",
+      "repeat": "identical"
+    },
+    "ui/shots/058-account-edit-switch-preview-credentials.layout.json": {
+      "sha256": "c9f520cd437a5ec93502af7ab2c07879944ed1d1a7bc0fd995109eddd7794090",
+      "repeat": "identical"
+    },
+    "ui/shots/059-account-edit-delete-confirm.layout.json": {
+      "sha256": "1d8640b0d04cea74807683d8d038a07b9c8ddefc2d07b63ab71f7be9bd95df6a",
+      "repeat": "identical"
+    },
+    "ui/shots/060-import-steam-list.layout.json": {
+      "sha256": "7043fb363d52691fa1206efc23ada6d7d149eb080c6ffbd5f45865dd42be876f",
+      "repeat": "identical"
+    },
+    "ui/shots/061-import-battlenet-list.layout.json": {
+      "sha256": "83b4ab6fda467a4aaa904da1d69c9d93889d20f301fb92cc919351333de6a371",
+      "repeat": "identical"
+    },
+    "ui/shots/062-import-loading.layout.json": {
+      "sha256": "3a6b5f19610fe8cd782b2fb4fc2c203bed9447d91491458dd2d7e24dc78eb8ee",
+      "repeat": "identical"
+    },
+    "ui/shots/063-import-empty.layout.json": {
+      "sha256": "a2cd49cf54f10f4e6973eecba91ded7100dd416e6d8cb05dcb616f964bad1da5",
+      "repeat": "identical"
+    },
+    "ui/shots/064-import-all-linked.layout.json": {
+      "sha256": "853e301510c17ff604ae5fc7f16bf0e3e7bf6127b92ff558d83741a0daf47cb1",
+      "repeat": "identical"
+    },
+    "ui/shots/065-import-error.layout.json": {
+      "sha256": "f0e558eeb430ff262192e47b1f2171388f827b2fb9381a54c2ffc26e4d68ea50",
+      "repeat": "identical"
+    }
+  }
+}

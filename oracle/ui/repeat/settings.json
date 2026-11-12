@@ -1,0 +1,189 @@
+{
+  "area": "settings",
+  "sidecars": {
+    "ui/shots/121-settings-general-960.layout.json": {
+      "sha256": "0bf13438d3e230a26cb77fea6d98cc84fb0967a943d69d910973bfa8ecbd1865",
+      "repeat": "identical"
+    },
+    "ui/shots/121-settings-general.layout.json": {
+      "sha256": "9338cbe1d453eb19349a8287913224ad5fc7537a5b2195c2dc6f927d3f370220",
+      "repeat": "identical"
+    },
+    "ui/shots/122-settings-general-autostart-disabled.layout.json": {
+      "sha256": "7d4b98f692ad5c2c849bfe43240bd23122e1f6796ff5696935470bea9a92398c",
+      "repeat": "identical"
+    },
+    "ui/shots/123-settings-general-autostart-on.layout.json": {
+      "sha256": "d2084d675db36ba7d1eae634454d907da9221efb49ab0bbf6c0977d143cc12fc",
+      "repeat": "identical"
+    },
+    "ui/shots/124-settings-updates-idle.layout.json": {
+      "sha256": "376d17251626de16b288134088d2a2fbe02ff98d9076ece4d57157710c841854",
+      "repeat": "identical"
+    },
+    "ui/shots/125-settings-updates-checking.layout.json": {
+      "sha256": "54a8f4e17cb4699f33578f6bb883a7686ccb58f9f67847794d44ea5046d67959",
+      "repeat": "identical"
+    },
+    "ui/shots/126-settings-updates-up-to-date.layout.json": {
+      "sha256": "8d220265b48ac56200363e6fcfc8e8de2ce30b1e27922a7432e6daaee8f2188d",
+      "repeat": "identical"
+    },
+    "ui/shots/127-settings-updates-downloading.layout.json": {
+      "sha256": "4a2ec1cc8eb228841b2bce83a7a39751d1b47919697bae786807dedc5eeb5ac1",
+      "repeat": "identical"
+    },
+    "ui/shots/128-settings-updates-ready.layout.json": {
+      "sha256": "1de40c4fab2ccc1bfa5f600cefb07b171553bec4a0925bea72ea50f462f4ccb3",
+      "repeat": "identical"
+    },
+    "ui/shots/129-settings-updates-failed.layout.json": {
+      "sha256": "5051663b212aa5eac334dd255fe35729489ec20168523ce49a4c262375ccf5b9",
+      "repeat": "identical"
+    },
+    "ui/shots/130-settings-updates-unavailable-dev.layout.json": {
+      "sha256": "a65df95cb42152cd83df1f1c4e5b85cfb573d6e97892c17d3cb9639498807315",
+      "repeat": "identical"
+    },
+    "ui/shots/132-settings-launchers-960.layout.json": {
+      "sha256": "405091afc033924caf00b559ef9895360578941c0ee0ec23b4f0947f79a21ff8",
+      "repeat": "identical"
+    },
+    "ui/shots/132-settings-launchers.layout.json": {
+      "sha256": "569ae735eece60de3279bee561f4e2264320a6c69d63b4f5b78d8588017304a2",
+      "repeat": "identical"
+    },
+    "ui/shots/133-settings-launchers-skeleton.layout.json": {
+      "sha256": "2e9357bb4865a27b00c6da9281aaca61bb115613ec6deb704ceb35245ecb327c",
+      "repeat": "identical"
+    },
+    "ui/shots/134-settings-launchers-row-expanded.layout.json": {
+      "sha256": "15bef3c2169761a040e4f814e6c420d0cd7fb46e33eb92da612f6204e4dd6ec7",
+      "repeat": "identical"
+    },
+    "ui/shots/135-settings-launchers-not-installed.layout.json": {
+      "sha256": "25d9da3614af036cb6ba73067c8868b536a1c1ef9f10114ab4182a0573148029",
+      "repeat": "identical"
+    },
+    "ui/shots/136-settings-launchers-needs-attention.layout.json": {
+      "sha256": "00f435db95ebaeef9d4176e7fc2f94ca08d0c87d68336e118fbc81dde177b676",
+      "repeat": "identical"
+    },
+    "ui/shots/137-settings-launchers-chosen-folder.layout.json": {
+      "sha256": "78f42be90131e3f916e80b1bf016cd60da384f8e6679ed709dd8ab4e96cf9055",
+      "repeat": "identical"
+    },
+    "ui/shots/138-settings-launchers-locate-error.layout.json": {
+      "sha256": "21e32cbe3b719bdb98c6aea5b4f354e0d6cdf8689824f871453233803fe9f1b4",
+      "repeat": "identical"
+    },
+    "ui/shots/139-settings-play-hide-disabled.layout.json": {
+      "sha256": "2e9ea6e5d565f864480f564a14568c98340e5d53eb773a2fb89b792914ba7aaa",
+      "repeat": "identical"
+    },
+    "ui/shots/140-settings-artwork-no-key-960.layout.json": {
+      "sha256": "43ce312441658587c58d6f7ae37129070d6a9fd5f138db863ad04e1209ffbc3f",
+      "repeat": "identical"
+    },
+    "ui/shots/140-settings-artwork-no-key.layout.json": {
+      "sha256": "19cdb1cb8553890f5421ae3ed386e8fb6efd90ed00bee6e8183b1d4499bd8925",
+      "repeat": "identical"
+    },
+    "ui/shots/141-settings-artwork-key-stored.layout.json": {
+      "sha256": "290254698e36c0ffbd09d525fc4d80745214d0e60f9e7268ffb2e5cbc4a60911",
+      "repeat": "identical"
+    },
+    "ui/shots/142-settings-artwork-key-invalid.layout.json": {
+      "sha256": "b997ddb106fb76c6cd917c38a9293a41dfb9f36c8d8576680821dd7b97b7d15b",
+      "repeat": "identical"
+    },
+    "ui/shots/143-settings-artwork-queue-busy.layout.json": {
+      "sha256": "285e56fe4d0158a8527e0ecc254c978fb364f807ec01935507e3233d5eff3cdc",
+      "repeat": "identical"
+    },
+    "ui/shots/144-settings-artwork-rescan-message.layout.json": {
+      "sha256": "dbc14413687842e0cac8c857aad3235534f0505ce6d32c8f71bfc254178ef99f",
+      "repeat": "identical"
+    },
+    "ui/shots/145-settings-backups-960.layout.json": {
+      "sha256": "8101c56dc13a37241b4152ad8596ca0978922b27d06b14041355f1354338bee4",
+      "repeat": "volatile"
+    },
+    "ui/shots/145-settings-backups.layout.json": {
+      "sha256": "fe5c7a6c80a5d8577df5d98493a009167f82a95c12e226f795b2cc47521b91ab",
+      "repeat": "volatile"
+    },
+    "ui/shots/146-settings-backups-empty.layout.json": {
+      "sha256": "cb1e0425bafffd2e60401a278233e9c32d5fde65fca5c3c792a5d568ce05ea38",
+      "repeat": "identical"
+    },
+    "ui/shots/147-settings-backups-kept-pinned.layout.json": {
+      "sha256": "f92deb225b681a4cfb260e4de477c33668df44882e527b94ac35e3350262bef1",
+      "repeat": "volatile"
+    },
+    "ui/shots/148-settings-backups-restore-dialog.layout.json": {
+      "sha256": "a1391a4e8ef830fffdb7a0b48eaf04524ded12a46a1c8fd36d8986483866b613",
+      "repeat": "volatile"
+    },
+    "ui/shots/149-settings-backups-restore-refused.layout.json": {
+      "sha256": "5d813c80feb5b66f265644979608bca8bb44de050d218577d7595ceef381c38b",
+      "repeat": "volatile"
+    },
+    "ui/shots/150-settings-backups-restored.layout.json": {
+      "sha256": "ea4b0e4edac145bc9611552430aadb34fb00877c0e969e7a8f8bc43fb4132188",
+      "repeat": "volatile"
+    },
+    "ui/shots/151-settings-backups-keep-dropdown.layout.json": {
+      "sha256": "16b4982741d0e36b5727941f44fc0643b4a86a930ceb35cc60481dbc37db9946",
+      "repeat": "identical"
+    },
+    "ui/shots/152-settings-advanced-960.layout.json": {
+      "sha256": "64c2cdb99316e31e8bc6a7a1e081d893fa03297c0b81534ea381e1e9c4c659a8",
+      "repeat": "identical"
+    },
+    "ui/shots/152-settings-advanced.layout.json": {
+      "sha256": "97d11568003cac357aacb926e9b2d35fc2fb83c953f635da69722ec7a7fc6e21",
+      "repeat": "identical"
+    },
+    "ui/shots/153-settings-advanced-preview-on.layout.json": {
+      "sha256": "b4c361d31390eb78a55d27ef69728d0d318c97b19a9b1bffa752a32ed37484ac",
+      "repeat": "identical"
+    },
+    "ui/shots/154-settings-advanced-epic-dropdown.layout.json": {
+      "sha256": "dacdee5895404e311d244f424fd418c2851c116296d6565f39e681990e373332",
+      "repeat": "identical"
+    },
+    "ui/shots/155-settings-advanced-battlenet-dropdown.layout.json": {
+      "sha256": "503b33296f1f6b073854887ee715d068451d2b9df02164a383256d3e421e28d6",
+      "repeat": "identical"
+    },
+    "ui/shots/156-settings-encryption-working.layout.json": {
+      "sha256": "60e251075de242ce079d32754a466e52ca3ef8578eeb793f172b48db7379cbbf",
+      "repeat": "volatile"
+    },
+    "ui/shots/157-settings-encryption-key-lost.layout.json": {
+      "sha256": "03e80251c97c26ff18dc153674e70442c7a58d6dbb5e62c230f5c67eb393d7f7",
+      "repeat": "identical"
+    },
+    "ui/shots/158-settings-vault-reset-confirm.layout.json": {
+      "sha256": "c8100a0b6df72af66bb49d8c62ca51030580549ca97e2acde27cb7a72c0d742b",
+      "repeat": "identical"
+    },
+    "ui/shots/159-settings-vault-reset-done.layout.json": {
+      "sha256": "2f69e582758c7dd5928cf25ab8b5534f64d7ca1063ce63de3a8e1e03da77466d",
+      "repeat": "identical"
+    },
+    "ui/shots/160-settings-encryption-unavailable.layout.json": {
+      "sha256": "9193c1eca143290588bed0405e3e4e05640a256e916f6a2dbc1749c408842db7",
+      "repeat": "identical"
+    },
+    "ui/shots/161-settings-diagnostics-log-level-dropdown.layout.json": {
+      "sha256": "2713c3c99a4073742713cabe9fa26830769d52b4669276fcb6bdd5570fbf6ea6",
+      "repeat": "volatile"
+    },
+    "ui/shots/162-settings-setting-save-error.layout.json": {
+      "sha256": "c93f4848a731d36ef5d6c84c7309f8ac557e3a826434c64c1be8a12438cfc2c0",
+      "repeat": "identical"
+    }
+  }
+}

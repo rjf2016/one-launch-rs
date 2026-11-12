@@ -1,0 +1,27 @@
+{
+  "id": 8,
+  "name": "shell-error-boundary",
+  "viewport": [1280,800],
+  "dpr": 1,
+  "locale": "en-US",
+  "tz": "UTC",
+  "clock": "2026-11-06T16:46:23.000Z",
+  "focus": null,
+  "paused": [],
+  "scroll": [],
+  "text": [
+    {"t":"Something went wrong in the interface","box":[480.14,309,319.7,24],"font":["Segoe UI Variable Text",18,600,28],"color":"#ffffff","volatile":false},
+    {"t":"The details are in the log. Reloading brings the interface back; nothing","box":[423.75,351,432.5,19],"font":["Segoe UI Variable Text",14,400,20],"color":"#8f97ab","volatile":false},
+    {"t":"you stored is affected, and any switch that was running continues on its","box":[419.88,371,440.23,19],"font":["Segoe UI Variable Text",14,400,20],"color":"#8f97ab","volatile":false},
+    {"t":"own.","box":[625.36,391,29.28,19],"font":["Segoe UI Variable Text",14,400,20],"color":"#8f97ab","volatile":false},
+    {"t":"Cannot read properties of undefined (reading 'name')","box":[457.19,428,365.63,14],"font":["Cascadia Code",12,400,16],"color":"#7f879b","volatile":false},
+    {"t":"Reload","box":[569.73,466,42.88,19],"font":["Segoe UI Variable Text",14,500,20],"color":"#ffffff","volatile":false},
+    {"t":"Open logs","box":[645.61,466,63.66,19],"font":["Segoe UI Variable Text",14,400,20],"color":"#e8eaf0","volatile":false}
+  ],
+  "elements": [
+    {"role":"generic","name":"","ord":0,"box":[0,0,1280,800],"state":{"disabled":false,"checked":null,"expanded":null},"style":{"bg":"#0b0d12","color":"#e8eaf0","padding":[32,32,32,32]},"cls":"flex h-full flex-col items-center justify-center gap-4 bg-bg p-8 text-center text-text","tag":"div"},
+    {"role":"heading","name":"Something went wrong in the interface","ord":0,"box":[480.14,307,319.7,28],"state":{"disabled":false,"checked":null,"expanded":null},"style":{"color":"#ffffff"},"cls":"text-lg font-semibold text-text-strong","tag":"h1"},
+    {"role":"button","name":"Reload","ord":0,"box":[557.73,460,66.88,32],"state":{"disabled":false,"checked":null,"expanded":null},"style":{"bg":"#8b5cf6","color":"#ffffff","radius":8,"padding":[6,12,6,12],"font":["Segoe UI Variable Text",14,500,20]},"cls":"rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover","tag":"button"},
+    {"role":"button","name":"Open logs","ord":0,"box":[632.61,459,89.66,34],"state":{"disabled":false,"checked":null,"expanded":null},"style":{"color":"#e8eaf0","border":[1,1,1,1],"borderColor":"#262b38","radius":8,"padding":[6,12,6,12],"font":["Segoe UI Variable Text",14,400,20]},"cls":"rounded-lg border border-border px-3 py-1.5 text-sm text-text hover:bg-surface-2","tag":"button"}
+  ]
+}
