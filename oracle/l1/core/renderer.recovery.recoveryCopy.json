@@ -1,0 +1,425 @@
+{
+  "function": "recoveryCopy",
+  "source": "src/renderer/src/lib/recovery.ts",
+  "note": "decode: none\narg0 is the SwitchRecovery's phase, accountName and snapshotAvailable, the only fields recoveryCopy reads; arg1 the launcher's display name. out is { title, body, recommend }, the prompt's exact words.\nA phase outside SwitchRecoveryPhase with the snapshot kept falls out of the switch and returns undefined.",
+  "cases": [
+    {
+      "id": "test-writing",
+      "origin": {
+        "kind": "test",
+        "ref": "test/recovery-copy.test.ts > recoveryCopy > leads with Restore when the files may be half-written or a rollback failed"
+      },
+      "args": [
+        {
+          "phase": "writing",
+          "accountName": "Alt",
+          "snapshotAvailable": true
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "It stopped while changing Steam's sign-in files for Alt, so Steam may be half-switched. Restoring puts Steam back the way it was before that switch.",
+        "recommend": "restore"
+      }
+    },
+    {
+      "id": "test-rollback-failed",
+      "origin": {
+        "kind": "test",
+        "ref": "test/recovery-copy.test.ts > recoveryCopy > leads with Restore when the files may be half-written or a rollback failed"
+      },
+      "args": [
+        {
+          "phase": "rollback-failed",
+          "accountName": "Alt",
+          "snapshotAvailable": true
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "The last switch could not be undone",
+        "body": "The switch to Alt failed, and putting Steam back failed too. Restoring tries again with the snapshot taken before that switch.",
+        "recommend": "restore"
+      }
+    },
+    {
+      "id": "test-signing-in",
+      "origin": {
+        "kind": "test",
+        "ref": "test/recovery-copy.test.ts > recoveryCopy > leads with Keep as is when the files were written and the launcher was already signing in"
+      },
+      "args": [
+        {
+          "phase": "signing-in",
+          "accountName": "Alt",
+          "snapshotAvailable": true
+        },
+        "Battle.net"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "Battle.net's files had already been changed for Alt, and Battle.net was starting or signing in. If it is signed in as Alt, keep it as it is. If it looks wrong, restore it to the way it was before the switch.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "test-no-snapshot-deleted-account",
+      "origin": {
+        "kind": "test",
+        "ref": "test/recovery-copy.test.ts > recoveryCopy > offers no restore when the snapshot is gone, and copes with a deleted account"
+      },
+      "args": [
+        {
+          "phase": "writing",
+          "accountName": null,
+          "snapshotAvailable": false
+        },
+        "Epic Games Launcher"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "It was switching Epic Games Launcher to an account that has since been removed. The snapshot taken before that switch is gone, so there is nothing to restore from here. Start Epic Games Launcher and check which account it signs in as; Settings › Backups lists the snapshots that are left.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "writing-snapshot-named",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase writing, snapshot kept, account named"
+      },
+      "args": [
+        {
+          "phase": "writing",
+          "accountName": "Alt",
+          "snapshotAvailable": true
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "It stopped while changing Steam's sign-in files for Alt, so Steam may be half-switched. Restoring puts Steam back the way it was before that switch.",
+        "recommend": "restore"
+      }
+    },
+    {
+      "id": "writing-snapshot-deleted",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase writing, snapshot kept, account deleted"
+      },
+      "args": [
+        {
+          "phase": "writing",
+          "accountName": null,
+          "snapshotAvailable": true
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "It stopped while changing Steam's sign-in files for an account that has since been removed, so Steam may be half-switched. Restoring puts Steam back the way it was before that switch.",
+        "recommend": "restore"
+      }
+    },
+    {
+      "id": "writing-no-snapshot-named",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase writing, snapshot gone, account named"
+      },
+      "args": [
+        {
+          "phase": "writing",
+          "accountName": "Alt",
+          "snapshotAvailable": false
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "It was switching Steam to Alt. The snapshot taken before that switch is gone, so there is nothing to restore from here. Start Steam and check which account it signs in as; Settings › Backups lists the snapshots that are left.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "writing-no-snapshot-deleted",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase writing, snapshot gone, account deleted"
+      },
+      "args": [
+        {
+          "phase": "writing",
+          "accountName": null,
+          "snapshotAvailable": false
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "It was switching Steam to an account that has since been removed. The snapshot taken before that switch is gone, so there is nothing to restore from here. Start Steam and check which account it signs in as; Settings › Backups lists the snapshots that are left.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "signing-in-snapshot-named",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase signing-in, snapshot kept, account named"
+      },
+      "args": [
+        {
+          "phase": "signing-in",
+          "accountName": "Alt",
+          "snapshotAvailable": true
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "Steam's files had already been changed for Alt, and Steam was starting or signing in. If it is signed in as Alt, keep it as it is. If it looks wrong, restore it to the way it was before the switch.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "signing-in-snapshot-deleted",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase signing-in, snapshot kept, account deleted"
+      },
+      "args": [
+        {
+          "phase": "signing-in",
+          "accountName": null,
+          "snapshotAvailable": true
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "Steam's files had already been changed for an account that has since been removed, and Steam was starting or signing in. If it is signed in as an account that has since been removed, keep it as it is. If it looks wrong, restore it to the way it was before the switch.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "signing-in-no-snapshot-named",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase signing-in, snapshot gone, account named"
+      },
+      "args": [
+        {
+          "phase": "signing-in",
+          "accountName": "Alt",
+          "snapshotAvailable": false
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "It was switching Steam to Alt. The snapshot taken before that switch is gone, so there is nothing to restore from here. Start Steam and check which account it signs in as; Settings › Backups lists the snapshots that are left.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "signing-in-no-snapshot-deleted",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase signing-in, snapshot gone, account deleted"
+      },
+      "args": [
+        {
+          "phase": "signing-in",
+          "accountName": null,
+          "snapshotAvailable": false
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "It was switching Steam to an account that has since been removed. The snapshot taken before that switch is gone, so there is nothing to restore from here. Start Steam and check which account it signs in as; Settings › Backups lists the snapshots that are left.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "rollback-failed-snapshot-named",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase rollback-failed, snapshot kept, account named"
+      },
+      "args": [
+        {
+          "phase": "rollback-failed",
+          "accountName": "Alt",
+          "snapshotAvailable": true
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "The last switch could not be undone",
+        "body": "The switch to Alt failed, and putting Steam back failed too. Restoring tries again with the snapshot taken before that switch.",
+        "recommend": "restore"
+      }
+    },
+    {
+      "id": "rollback-failed-snapshot-deleted",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase rollback-failed, snapshot kept, account deleted"
+      },
+      "args": [
+        {
+          "phase": "rollback-failed",
+          "accountName": null,
+          "snapshotAvailable": true
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "The last switch could not be undone",
+        "body": "The switch to an account that has since been removed failed, and putting Steam back failed too. Restoring tries again with the snapshot taken before that switch.",
+        "recommend": "restore"
+      }
+    },
+    {
+      "id": "rollback-failed-no-snapshot-named",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase rollback-failed, snapshot gone, account named"
+      },
+      "args": [
+        {
+          "phase": "rollback-failed",
+          "accountName": "Alt",
+          "snapshotAvailable": false
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "The last switch could not be undone",
+        "body": "It was switching Steam to Alt. The snapshot taken before that switch is gone, so there is nothing to restore from here. Start Steam and check which account it signs in as; Settings › Backups lists the snapshots that are left.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "rollback-failed-no-snapshot-deleted",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: recoveryCopy for phase rollback-failed, snapshot gone, account deleted"
+      },
+      "args": [
+        {
+          "phase": "rollback-failed",
+          "accountName": null,
+          "snapshotAvailable": false
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "The last switch could not be undone",
+        "body": "It was switching Steam to an account that has since been removed. The snapshot taken before that switch is gone, so there is nothing to restore from here. Start Steam and check which account it signs in as; Settings › Backups lists the snapshots that are left.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "empty-account-name",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty account name is not null: ?? keeps it, and the sentence has a gap"
+      },
+      "args": [
+        {
+          "phase": "writing",
+          "accountName": "",
+          "snapshotAvailable": true
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "It stopped while changing Steam's sign-in files for , so Steam may be half-switched. Restoring puts Steam back the way it was before that switch.",
+        "recommend": "restore"
+      }
+    },
+    {
+      "id": "riot-client",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a launcher name that reads mid-sentence starts no sentence here"
+      },
+      "args": [
+        {
+          "phase": "signing-in",
+          "accountName": "Alt",
+          "snapshotAvailable": true
+        },
+        "the Riot Client"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "the Riot Client's files had already been changed for Alt, and the Riot Client was starting or signing in. If it is signed in as Alt, keep it as it is. If it looks wrong, restore it to the way it was before the switch.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "unknown-phase-snapshot",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a phase outside the type with the snapshot kept: undefined"
+      },
+      "args": [
+        {
+          "phase": "finished",
+          "accountName": "Alt",
+          "snapshotAvailable": true
+        },
+        "Steam"
+      ],
+      "out": {
+        "$undefined": true
+      }
+    },
+    {
+      "id": "unknown-phase-no-snapshot",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a phase outside the type with the snapshot gone: the no-snapshot copy, with the writing title"
+      },
+      "args": [
+        {
+          "phase": "finished",
+          "accountName": "Alt",
+          "snapshotAvailable": false
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "It was switching Steam to Alt. The snapshot taken before that switch is gone, so there is nothing to restore from here. Start Steam and check which account it signs in as; Settings › Backups lists the snapshots that are left.",
+        "recommend": "keep"
+      }
+    },
+    {
+      "id": "astral-name",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an account name with an astral character"
+      },
+      "args": [
+        {
+          "phase": "writing",
+          "accountName": "Alt 🎮",
+          "snapshotAvailable": true
+        },
+        "Steam"
+      ],
+      "out": {
+        "title": "One Launch was closed during a switch",
+        "body": "It stopped while changing Steam's sign-in files for Alt 🎮, so Steam may be half-switched. Restoring puts Steam back the way it was before that switch.",
+        "recommend": "restore"
+      }
+    }
+  ]
+}

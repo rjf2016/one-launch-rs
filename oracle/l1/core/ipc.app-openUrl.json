@@ -1,0 +1,1320 @@
+{
+  "function": "registerIpcHandlers",
+  "source": "src/main/ipc/index.ts",
+  "note": "decode: none\narg0 is the channel, arg1 the payload, arg2 the context { trusted, busy }.\ncall reaches the real handler: electron is mocked (ipcMain.handle collects the handlers) and registerIpcHandlers from src/main/ipc/index.ts is run once, as test/ipc-validation.test.ts does, with every service a recording proxy that answers undefined, paths a proxy, rescan and the pickers recording stubs, and the logger a silent stub. Per case: isTrustedSender returns context.trusted, launch.isBusy returns context.busy (the only service a refused payload may reach), and the handler is invoked with the event { senderFrame: { url } } and arg1 as the request. A \"__proto__\" key in a payload is an own data key, as a structured clone over IPC delivers it. out is the envelope the handler layer returns, { ok: false, error: { code, message } }; the messages are exact.\nEvery case is refused before any service, shell call, picker or rescan is reached: call throws if one is, so a payload that passes validation can never be recorded here.\nThe matrix stops at validation: what a handler does once a payload passes (its service calls, the ?? defaults after a nullable field, the OPEN_FAILED, NO_PASSWORD, NOT_FOUND, NOT_A_LAUNCHER and UNAVAILABLE refusals) is hand-translated with the services, not recorded here.\nThe generated family comes from a transcription of the handler's validators (scripts/oracle/l1/core/ipc/schema.ts and model.ts), checked by the generator against the real handlers on every case; cases from test/ipc-validation.test.ts are its REFUSED table, copied as written.",
+  "cases": [
+    {
+      "id": "untrusted-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl from a frame that is not the app's renderer: refused before the handler runs"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "untrusted-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl with a well-formed payload from an untrusted frame: the sender check wins"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": "steamgriddb-api-key"
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "busy-ignored-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl does not wait for a running switch: a null payload is still BAD_REQUEST"
+      },
+      "args": [
+        "app:openUrl",
+        null,
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload no payload at all, as invoke(channel) sends"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload null"
+      },
+      "args": [
+        "app:openUrl",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload false"
+      },
+      "args": [
+        "app:openUrl",
+        false,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload true"
+      },
+      "args": [
+        "app:openUrl",
+        true,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload the number 0"
+      },
+      "args": [
+        "app:openUrl",
+        0,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload the number 7"
+      },
+      "args": [
+        "app:openUrl",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: app:openUrl payload NaN"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "$number": "NaN"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload an empty string"
+      },
+      "args": [
+        "app:openUrl",
+        "",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload a string"
+      },
+      "args": [
+        "app:openUrl",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload an empty array"
+      },
+      "args": [
+        "app:openUrl",
+        [],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-array-of-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload an array holding a well-formed payload"
+      },
+      "args": [
+        "app:openUrl",
+        [
+          {
+            "target": "steamgriddb-api-key"
+          }
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload a Date: an object to the check, with none of the fields"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "$date": "2026-01-02T03:04:05.000Z"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "top-empty-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl payload an empty object: every field missing"
+      },
+      "args": [
+        "app:openUrl",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: the key left out"
+      },
+      "args": [
+        "app:openUrl",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: the key present with the value undefined"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": {
+            "$undefined": true
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: null"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: the number 0"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": 0
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: the number 5"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: app:openUrl target: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": {
+            "$number": "NaN"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: app:openUrl target: Infinity"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": {
+            "$number": "Infinity"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: true"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: false"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": false
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: an empty array"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": []
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: an array of one string"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: an empty object"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": {}
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": {
+            "$bytes": "YQ=="
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.unknown",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: a value outside the allowed list"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": "nope"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: an empty string"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": ""
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.upper",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: app:openUrl target: steamgriddb-api-key upper-cased; the list is matched exactly"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": "STEAMGRIDDB-API-KEY"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.title",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: app:openUrl target: steamgriddb-api-key with a capital first letter"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": "Steamgriddb-api-key"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.leading-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: app:openUrl target: steamgriddb-api-key with a leading space; nothing is trimmed"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": " steamgriddb-api-key"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.trailing-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: app:openUrl target: steamgriddb-api-key with a trailing space"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": "steamgriddb-api-key "
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.trailing-nul",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: steamgriddb-api-key with a trailing NUL"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": "steamgriddb-api-key\u0000"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.trailing-lone",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: app:openUrl target: steamgriddb-api-key with a trailing lone surrogate"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": {
+            "$utf16": [
+              115,
+              116,
+              101,
+              97,
+              109,
+              103,
+              114,
+              105,
+              100,
+              100,
+              98,
+              45,
+              97,
+              112,
+              105,
+              45,
+              107,
+              101,
+              121,
+              55296
+            ]
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.proto",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:openUrl target: \"__proto__\" as the value; the list is an array, so includes() finds nothing"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": "__proto__"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.constructor",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:openUrl target: \"constructor\" as the value"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": "constructor"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.array-of-allowed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl target: [\"steamgriddb-api-key\"], an array holding an allowed value"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": [
+            "steamgriddb-api-key"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "extra-field",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openUrl: an unknown key next to a payload missing target; unknown keys are ignored, not refused"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "unexpected": "x"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "shadow-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:openUrl: keys named after Object.prototype members (toString, constructor, hasOwnProperty) next to a payload missing target"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "toString": "x",
+          "constructor": "x",
+          "hasOwnProperty": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "proto-own-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:openUrl: an own \"__proto__\" data key holding a well-formed payload (as JSON.parse and a structured clone make it); the fields are not read through it"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "__proto__": {
+            "target": "steamgriddb-api-key"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "proto-constructor-prototype",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:openUrl: a constructor.prototype path holding a well-formed payload"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "constructor": {
+            "prototype": {
+              "target": "steamgriddb-api-key"
+            }
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openUrl",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-str-text",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openUrl",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-number-7",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openUrl",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-arr1-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openUrl",
+        [
+          "a"
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openUrl: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-empty-object",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openUrl",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-target-str-https-example-com",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": "https://example.com"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-target-str-steamgriddb",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": "steamgriddb"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-target-number-5",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openUrl",
+        {
+          "target": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    }
+  ]
+}

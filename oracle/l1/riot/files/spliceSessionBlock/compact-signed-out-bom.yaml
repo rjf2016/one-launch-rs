@@ -1,0 +1,9 @@
+﻿psl:
+    authorization:
+        riot-client: null
+riot-login:
+    persist:
+        region: "NA"
+rso-authenticator:
+    tdid:
+        value: "placeholder-tdid"

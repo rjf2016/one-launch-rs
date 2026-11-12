@@ -1,0 +1,41 @@
+{
+  "condition": "update-ready",
+  "runs": 3,
+  "digests": [
+    "18f7e5003c044ef4f9724b6ebce8a11373b72b6f41e5bcd831466483acbf81da",
+    "18f7e5003c044ef4f9724b6ebce8a11373b72b6f41e5bcd831466483acbf81da",
+    "18f7e5003c044ef4f9724b6ebce8a11373b72b6f41e5bcd831466483acbf81da"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    },
+    {
+      "rule": "transient",
+      "path": "/steps/timer/states",
+      "runs": 3
+    },
+    {
+      "rule": "root",
+      "path": "/steps/*/log/*/text"
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    1,
+    1,
+    1
+  ]
+}

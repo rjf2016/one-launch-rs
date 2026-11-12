@@ -1,0 +1,235 @@
+{
+  "function": "planPhases",
+  "source": "src/renderer/src/lib/phases.ts",
+  "note": "decode: none\narg0 is a SwitchPlan reduced to the steps' id and skipped, the only fields planPhases reads (as test/phases.test.ts gives it); arg1 whether a game is launched.",
+  "cases": [
+    {
+      "id": "test-without-launch",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > planPhases > lists the phases a plan would run, in order, without the skipped ones"
+      },
+      "args": [
+        {
+          "steps": [
+            {
+              "id": "close",
+              "skipped": true
+            },
+            {
+              "id": "backup",
+              "skipped": false
+            },
+            {
+              "id": "file",
+              "skipped": false
+            },
+            {
+              "id": "start",
+              "skipped": false
+            },
+            {
+              "id": "verify",
+              "skipped": false
+            }
+          ]
+        },
+        false
+      ],
+      "out": [
+        "switch",
+        "start",
+        "signin"
+      ]
+    },
+    {
+      "id": "test-with-launch",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > planPhases > appends the launch phase when a game is being launched"
+      },
+      "args": [
+        {
+          "steps": [
+            {
+              "id": "close",
+              "skipped": true
+            },
+            {
+              "id": "backup",
+              "skipped": false
+            },
+            {
+              "id": "file",
+              "skipped": false
+            },
+            {
+              "id": "start",
+              "skipped": false
+            },
+            {
+              "id": "verify",
+              "skipped": false
+            }
+          ]
+        },
+        true
+      ],
+      "out": [
+        "switch",
+        "start",
+        "signin",
+        "launch"
+      ]
+    },
+    {
+      "id": "empty-no-launch",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: no steps and no launch: no phases"
+      },
+      "args": [
+        {
+          "steps": []
+        },
+        false
+      ],
+      "out": []
+    },
+    {
+      "id": "empty-with-launch",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: no steps with a launch: only launch"
+      },
+      "args": [
+        {
+          "steps": []
+        },
+        true
+      ],
+      "out": [
+        "launch"
+      ]
+    },
+    {
+      "id": "all-skipped",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: every step skipped"
+      },
+      "args": [
+        {
+          "steps": [
+            {
+              "id": "close",
+              "skipped": true
+            },
+            {
+              "id": "file",
+              "skipped": true
+            }
+          ]
+        },
+        false
+      ],
+      "out": []
+    },
+    {
+      "id": "launch-step-without-flag",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a launch step in the plan counts even when withLaunch is false"
+      },
+      "args": [
+        {
+          "steps": [
+            {
+              "id": "launch",
+              "skipped": false
+            }
+          ]
+        },
+        false
+      ],
+      "out": [
+        "launch"
+      ]
+    },
+    {
+      "id": "out-of-order",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: steps out of phase order come back in the fixed order"
+      },
+      "args": [
+        {
+          "steps": [
+            {
+              "id": "verify",
+              "skipped": false
+            },
+            {
+              "id": "close",
+              "skipped": false
+            },
+            {
+              "id": "start",
+              "skipped": false
+            }
+          ]
+        },
+        false
+      ],
+      "out": [
+        "close",
+        "start",
+        "signin"
+      ]
+    },
+    {
+      "id": "unknown-ids",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: unknown step ids count as switch, once"
+      },
+      "args": [
+        {
+          "steps": [
+            {
+              "id": "mystery",
+              "skipped": false
+            },
+            {
+              "id": "other",
+              "skipped": false
+            }
+          ]
+        },
+        false
+      ],
+      "out": [
+        "switch"
+      ]
+    },
+    {
+      "id": "proto-id",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a step id naming an Object.prototype member adds a function to the set, which matches no phase"
+      },
+      "args": [
+        {
+          "steps": [
+            {
+              "id": "toString",
+              "skipped": false
+            }
+          ]
+        },
+        false
+      ],
+      "out": []
+    }
+  ]
+}

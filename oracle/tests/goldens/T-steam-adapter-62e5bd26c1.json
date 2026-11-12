@@ -1,0 +1,38 @@
+{
+  "id": "T-steam-adapter-62e5bd26c1",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.switchAccount (real, remembered path)"
+  ],
+  "name": "refuses to close a running Steam without confirmation, naming the running game",
+  "calls": [
+    {
+      "launcher": "steam",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "Third",
+          "login": "user_3",
+          "launcherUid": "76561198000000003",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "ConfirmationRequiredError",
+        "message": "Steam is running Team Fortress 2. Switching closes Steam and the game; unsaved progress in the game is lost.",
+        "runningGame": {
+          "launcher": "steam",
+          "launcherGameId": "440",
+          "name": "Team Fortress 2",
+          "source": "launcher"
+        },
+        "code": "CONFIRM_REQUIRED"
+      }
+    }
+  ]
+}

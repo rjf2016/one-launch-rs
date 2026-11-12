@@ -1,0 +1,116 @@
+{
+  "id": "T-steam-adapter-c79704b1c1",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.switchAccount (real, remembered path)"
+  ],
+  "name": "stops without rollback when the caller cancels the wait",
+  "calls": [
+    {
+      "launcher": "steam",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "Third",
+          "login": "user_3",
+          "launcherUid": "76561198000000003",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false,
+          "signal": {
+            "$object": "AbortSignal",
+            "value": {}
+          },
+          "onAttention": {
+            "$function": "onAttention"
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "steam",
+        "account": {
+          "id": "acct-1",
+          "displayName": "Third",
+          "login": "user_3",
+          "launcherUid": "76561198000000003"
+        },
+        "strategy": "remembered",
+        "ok": false,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Steam",
+            "status": "skipped",
+            "detail": "Skipped: steam.exe is not running."
+          },
+          {
+            "id": "backup",
+            "title": "Back up Steam files",
+            "status": "done",
+            "detail": "{tmp}\\backups\\steam\\<ts>"
+          },
+          {
+            "id": "file",
+            "title": "Mark the account as most recent",
+            "status": "done",
+            "detail": "2 lines changed."
+          },
+          {
+            "id": "registry-user",
+            "title": "Point Steam at the account",
+            "status": "done",
+            "detail": "AutoLoginUser = user_3"
+          },
+          {
+            "id": "registry-remember",
+            "title": "Keep the session remembered",
+            "status": "done",
+            "detail": "RememberPassword = 1"
+          },
+          {
+            "id": "start",
+            "title": "Start Steam",
+            "status": "done",
+            "detail": "Steam started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for Steam to come up",
+            "status": "done",
+            "detail": "steam.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm Steam signed in",
+            "status": "failed",
+            "detail": "Steam did not report a sign-in in time."
+          },
+          {
+            "id": "login",
+            "title": "Fallback: sign in with the stored password",
+            "status": "skipped",
+            "detail": "Not available: no password is stored for this account. If Steam asks for credentials, One Launch waits for you to sign in by hand (next step)."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "failed",
+            "detail": "Stopped waiting."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": null,
+        "cancelled": true,
+        "needsSignIn": false,
+        "error": "Stopped waiting for the sign-in as user_3. Steam was left on its sign-in form; signing in there with \"Remember me\" ticked finishes the switch, and later switches are automatic."
+      }
+    }
+  ]
+}

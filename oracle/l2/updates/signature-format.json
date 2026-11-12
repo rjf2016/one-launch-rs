@@ -1,0 +1,240 @@
+{
+  "condition": "signature-format",
+  "title": "The signature is not 64 bytes of base64",
+  "group": "refusal",
+  "app": {
+    "version": "1.0.0-beta.3",
+    "mode": "unpackaged, fake launchers \"none\", test feed",
+    "clock": "2026-11-06T16:46:23.000Z"
+  },
+  "feed": {
+    "url": "http://127.0.0.1:{port}/",
+    "listening": true,
+    "keys": [
+      "3376dec30c48c71f"
+    ],
+    "manifest": "version: 1.0.0-beta.4\nfiles:\n  - url: OneLaunch-1.0.0-beta.4-setup.exe\n    sha512: TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n    size: 50\npath: OneLaunch-1.0.0-beta.4-setup.exe\nsha512: TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\nreleaseDate: '2026-11-20T00:00:00.000Z'\nsignature: 'not-a-signature'\nkeyId: '3376dec30c48c71f'\n",
+    "installer": {
+      "path": "/OneLaunch-1.0.0-beta.4-setup.exe",
+      "bytes": 50,
+      "text": "placeholder installer bytes, not a real executable",
+      "matchesManifest": true
+    }
+  },
+  "recorded": {
+    "condition": "signature-format",
+    "steps": [
+      {
+        "step": "start",
+        "by": "app start",
+        "actions": [
+          {
+            "invoke": "settings:set",
+            "req": {
+              "key": "logLevel",
+              "value": "debug"
+            },
+            "at": "before the first check, so that the engine lines reach the log"
+          }
+        ],
+        "states": [
+          {
+            "state": "idle"
+          }
+        ],
+        "requests": [],
+        "timers": [
+          {
+            "ev": "arm",
+            "ms": 15000
+          }
+        ],
+        "log": []
+      },
+      {
+        "step": "timer",
+        "by": "the first-check timer",
+        "states": [
+          {
+            "state": "checking"
+          },
+          {
+            "state": "failed",
+            "step": "verify",
+            "message": "the release signature is malformed"
+          }
+        ],
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/latest.yml",
+            "query": {
+              "noCache": "<t32>"
+            },
+            "headers": {
+              "cache-control": "no-cache",
+              "user-agent": "electron-builder",
+              "x-user-staging-id": "00000000-0000-0000-0000-000000000000"
+            },
+            "transport": {
+              "accept-encoding": "gzip, deflate, br, zstd",
+              "accept-language": "en-US",
+              "connection": "keep-alive",
+              "host": "127.0.0.1:{port}",
+              "sec-fetch-dest": "empty",
+              "sec-fetch-mode": "no-cors",
+              "sec-fetch-site": "none"
+            },
+            "answer": {
+              "status": 200,
+              "bytes": 416
+            }
+          }
+        ],
+        "timers": [
+          {
+            "ev": "fire",
+            "ms": 15000
+          },
+          {
+            "ev": "arm",
+            "ms": 21600000
+          }
+        ],
+        "log": [
+          {
+            "level": "INFO",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update check",
+            "meta": {
+              "origin": "background"
+            }
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Checking for update"
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Found version 1.0.0-beta.4 (url: OneLaunch-1.0.0-beta.4-setup.exe)"
+          },
+          {
+            "level": "WARN",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update verify failed",
+            "meta": {
+              "version": "1.0.0-beta.4",
+              "reason": "malformed",
+              "message": "the release signature is malformed"
+            }
+          }
+        ]
+      },
+      {
+        "step": "manual",
+        "by": "updates:check",
+        "answer": {
+          "state": "checking"
+        },
+        "states": [
+          {
+            "state": "checking"
+          },
+          {
+            "state": "failed",
+            "step": "verify",
+            "message": "the release signature is malformed"
+          }
+        ],
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/latest.yml",
+            "query": {
+              "noCache": "<t32>"
+            },
+            "headers": {
+              "cache-control": "no-cache",
+              "user-agent": "electron-builder",
+              "x-user-staging-id": "00000000-0000-0000-0000-000000000000"
+            },
+            "transport": {
+              "accept-encoding": "gzip, deflate, br, zstd",
+              "accept-language": "en-US",
+              "connection": "keep-alive",
+              "host": "127.0.0.1:{port}",
+              "sec-fetch-dest": "empty",
+              "sec-fetch-mode": "no-cors",
+              "sec-fetch-site": "none"
+            },
+            "answer": {
+              "status": 200,
+              "bytes": 416
+            }
+          }
+        ],
+        "timers": [],
+        "log": [
+          {
+            "level": "INFO",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update check",
+            "meta": {
+              "origin": "manual"
+            }
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Checking for update"
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Found version 1.0.0-beta.4 (url: OneLaunch-1.0.0-beta.4-setup.exe)"
+          },
+          {
+            "level": "WARN",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update verify failed",
+            "meta": {
+              "version": "1.0.0-beta.4",
+              "reason": "malformed",
+              "message": "the release signature is malformed"
+            }
+          }
+        ]
+      },
+      {
+        "step": "quit",
+        "by": "window close",
+        "exit": 0,
+        "states": [],
+        "requests": [],
+        "timers": [
+          {
+            "ev": "clear",
+            "ms": 21600000
+          }
+        ],
+        "log": []
+      }
+    ],
+    "dataFolder": {
+      "devAppUpdateYml": "provider: generic\nurl: \"http://127.0.0.1:{port}/\"\nupdaterCacheDirName: update-cache\n",
+      "updateCache": [],
+      "updateInfoJson": null,
+      "updaterIdFile": false
+    }
+  }
+}

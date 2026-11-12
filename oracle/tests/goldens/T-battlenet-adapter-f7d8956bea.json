@@ -1,0 +1,9 @@
+{
+  "id": "T-battlenet-adapter-f7d8956bea",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "leaves out a product whose Uninstall key cannot be read instead of failing the scan",
+  "calls": []
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-fdfcc1d524",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot captureSession"
+  ],
+  "name": "stores the whole file for its owner, links the Riot account id, and refuses it for anyone else",
+  "calls": []
+}

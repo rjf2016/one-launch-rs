@@ -1,0 +1,9 @@
+{
+  "id": "T-battlenet-adapter-bb4c771a05",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "finds the install through the Uninstall key, the URI handler, then the default folder",
+  "calls": []
+}

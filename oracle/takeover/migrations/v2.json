@@ -1,0 +1,576 @@
+{
+  "step": "2_library_artwork",
+  "user_version": 2,
+  "master": [
+    {
+      "type": "index",
+      "name": "idx_accounts_launcher",
+      "tbl_name": "accounts",
+      "sql": "CREATE INDEX idx_accounts_launcher ON accounts (launcher)"
+    },
+    {
+      "type": "index",
+      "name": "idx_games_launcher",
+      "tbl_name": "games",
+      "sql": "CREATE INDEX idx_games_launcher ON games (launcher)"
+    },
+    {
+      "type": "index",
+      "name": "idx_launch_history_launched_at",
+      "tbl_name": "launch_history",
+      "sql": "CREATE INDEX idx_launch_history_launched_at ON launch_history (launched_at DESC)"
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_accounts_1",
+      "tbl_name": "accounts",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_artwork_1",
+      "tbl_name": "artwork",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_artwork_attempts_1",
+      "tbl_name": "artwork_attempts",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_games_1",
+      "tbl_name": "games",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_games_2",
+      "tbl_name": "games",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_launch_history_1",
+      "tbl_name": "launch_history",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_secrets_1",
+      "tbl_name": "secrets",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_settings_1",
+      "tbl_name": "settings",
+      "sql": null
+    },
+    {
+      "type": "table",
+      "name": "accounts",
+      "tbl_name": "accounts",
+      "sql": "CREATE TABLE accounts (\n        id            TEXT PRIMARY KEY,\n        launcher      TEXT NOT NULL CHECK (launcher IN ('steam', 'epic', 'battlenet')),\n        display_name  TEXT NOT NULL,\n        login         TEXT NOT NULL,\n        secret_enc    BLOB,\n        launcher_uid  TEXT,\n        tags          TEXT NOT NULL DEFAULT '[]',\n        notes         TEXT NOT NULL DEFAULT '',\n        last_used_at  TEXT,\n        created_at    TEXT NOT NULL,\n        updated_at    TEXT NOT NULL\n      )"
+    },
+    {
+      "type": "table",
+      "name": "artwork",
+      "tbl_name": "artwork",
+      "sql": "CREATE TABLE artwork (\n        game_id     TEXT PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,\n        source      TEXT NOT NULL CHECK (source IN ('steamgriddb', 'steamcdn', 'manual')),\n        grid_path   TEXT,\n        hero_path   TEXT,\n        logo_path   TEXT,\n        fetched_at  TEXT\n      )"
+    },
+    {
+      "type": "table",
+      "name": "artwork_attempts",
+      "tbl_name": "artwork_attempts",
+      "sql": "CREATE TABLE artwork_attempts (\n        game_id      TEXT PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,\n        attempted_at TEXT NOT NULL,\n        error        TEXT NOT NULL\n      )"
+    },
+    {
+      "type": "table",
+      "name": "games",
+      "tbl_name": "games",
+      "sql": "CREATE TABLE games (\n        id               TEXT PRIMARY KEY,\n        launcher         TEXT NOT NULL CHECK (launcher IN ('steam', 'epic', 'battlenet')),\n        launcher_game_id TEXT NOT NULL,\n        name             TEXT NOT NULL,\n        install_path     TEXT,\n        installed        INTEGER NOT NULL DEFAULT 1,\n        last_seen_at     TEXT NOT NULL, needs_update INTEGER NOT NULL DEFAULT 0, last_played_at TEXT,\n        UNIQUE (launcher, launcher_game_id)\n      )"
+    },
+    {
+      "type": "table",
+      "name": "launch_history",
+      "tbl_name": "launch_history",
+      "sql": "CREATE TABLE launch_history (\n        id          TEXT PRIMARY KEY,\n        game_id     TEXT NOT NULL,\n        account_id  TEXT NOT NULL,\n        launched_at TEXT NOT NULL,\n        result      TEXT NOT NULL CHECK (result IN ('ok', 'failed', 'cancelled'))\n      )"
+    },
+    {
+      "type": "table",
+      "name": "secrets",
+      "tbl_name": "secrets",
+      "sql": "CREATE TABLE secrets (\n        key        TEXT PRIMARY KEY,\n        value_enc  BLOB NOT NULL,\n        updated_at TEXT NOT NULL\n      )"
+    },
+    {
+      "type": "table",
+      "name": "settings",
+      "tbl_name": "settings",
+      "sql": "CREATE TABLE settings (\n        key   TEXT PRIMARY KEY,\n        value TEXT NOT NULL\n      )"
+    }
+  ],
+  "tables": {
+    "accounts": {
+      "table_info": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "launcher",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "display_name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "login",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "secret_enc",
+          "type": "BLOB",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "launcher_uid",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "tags",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'[]'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "notes",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "''",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "last_used_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "index_list": [
+        {
+          "seq": 0,
+          "name": "idx_accounts_launcher",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_accounts_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ],
+      "foreign_key_list": []
+    },
+    "artwork": {
+      "table_info": [
+        {
+          "cid": 0,
+          "name": "game_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "source",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "grid_path",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "hero_path",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "logo_path",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "fetched_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "index_list": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_artwork_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ],
+      "foreign_key_list": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "games",
+          "from": "game_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ]
+    },
+    "artwork_attempts": {
+      "table_info": [
+        {
+          "cid": 0,
+          "name": "game_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "attempted_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "error",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "index_list": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_artwork_attempts_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ],
+      "foreign_key_list": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "games",
+          "from": "game_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ]
+    },
+    "games": {
+      "table_info": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "launcher",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "launcher_game_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "install_path",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "installed",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "1",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "last_seen_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "needs_update",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "last_played_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "index_list": [
+        {
+          "seq": 0,
+          "name": "idx_games_launcher",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_games_2",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0
+        },
+        {
+          "seq": 2,
+          "name": "sqlite_autoindex_games_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ],
+      "foreign_key_list": []
+    },
+    "launch_history": {
+      "table_info": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "game_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "account_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "launched_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "result",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "index_list": [
+        {
+          "seq": 0,
+          "name": "idx_launch_history_launched_at",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_launch_history_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ],
+      "foreign_key_list": []
+    },
+    "secrets": {
+      "table_info": [
+        {
+          "cid": 0,
+          "name": "key",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "value_enc",
+          "type": "BLOB",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "index_list": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_secrets_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ],
+      "foreign_key_list": []
+    },
+    "settings": {
+      "table_info": [
+        {
+          "cid": 0,
+          "name": "key",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "value",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "index_list": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_settings_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ],
+      "foreign_key_list": []
+    }
+  }
+}

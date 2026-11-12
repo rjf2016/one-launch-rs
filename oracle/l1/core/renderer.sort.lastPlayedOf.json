@@ -1,0 +1,363 @@
+{
+  "function": "lastPlayedOf",
+  "source": "src/renderer/src/components/GameCard.tsx",
+  "note": "decode: none\narg0 is a Game. lastPlayedOf is the key of the Library's recent order (LibraryView.tsx compares two keys with pb.localeCompare(pa) inside a useMemo that is not exported): the newer of the launcher's lastPlayedAt and the One Launch lastLaunch.launchedAt, by plain string >, which compares UTF-16 code units.",
+  "cases": [
+    {
+      "id": "neither",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: lastPlayedOf with never played anywhere: null"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": null,
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": null
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "launcher-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: lastPlayedOf with only the launcher's record"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": "2026-01-01T00:00:00.000Z",
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": null
+        }
+      ],
+      "out": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "one-launch-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: lastPlayedOf with only a One Launch launch"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": null,
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": {
+            "accountId": "a",
+            "accountName": "Alt",
+            "launchedAt": "2026-01-02T00:00:00.000Z"
+          }
+        }
+      ],
+      "out": "2026-01-02T00:00:00.000Z"
+    },
+    {
+      "id": "launcher-newer",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: lastPlayedOf with both, the launcher newer"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": "2026-02-01T00:00:00.000Z",
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": {
+            "accountId": "a",
+            "accountName": "Alt",
+            "launchedAt": "2026-01-01T00:00:00.000Z"
+          }
+        }
+      ],
+      "out": "2026-02-01T00:00:00.000Z"
+    },
+    {
+      "id": "one-launch-newer",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: lastPlayedOf with both, One Launch newer"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": "2026-01-01T00:00:00.000Z",
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": {
+            "accountId": "a",
+            "accountName": "Alt",
+            "launchedAt": "2026-02-01T00:00:00.000Z"
+          }
+        }
+      ],
+      "out": "2026-02-01T00:00:00.000Z"
+    },
+    {
+      "id": "equal",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: lastPlayedOf with both the same: b, by a > b being false"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": "2026-01-01T00:00:00.000Z",
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": {
+            "accountId": "a",
+            "accountName": "Alt",
+            "launchedAt": "2026-01-01T00:00:00.000Z"
+          }
+        }
+      ],
+      "out": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "ms-vs-none",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: lastPlayedOf with the same instant with and without milliseconds: 'Z' > '.' as text, so the shorter form wins"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": "2026-01-01T00:00:00Z",
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": {
+            "accountId": "a",
+            "accountName": "Alt",
+            "launchedAt": "2026-01-01T00:00:00.000Z"
+          }
+        }
+      ],
+      "out": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "launcher-empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: lastPlayedOf with an empty launcher record is falsy: One Launch's"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": "",
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": {
+            "accountId": "a",
+            "accountName": "Alt",
+            "launchedAt": "2026-01-01T00:00:00.000Z"
+          }
+        }
+      ],
+      "out": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "launched-empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: lastPlayedOf with an empty launchedAt is not null for ??, but falsy: the launcher's"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": "2026-01-01T00:00:00.000Z",
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": {
+            "accountId": "a",
+            "accountName": "Alt",
+            "launchedAt": ""
+          }
+        }
+      ],
+      "out": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "both-empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: lastPlayedOf with both empty: the empty launchedAt"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": "",
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": {
+            "accountId": "a",
+            "accountName": "Alt",
+            "launchedAt": ""
+          }
+        }
+      ],
+      "out": ""
+    },
+    {
+      "id": "launched-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: lastPlayedOf with a launch record with a null launchedAt"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": "2026-01-01T00:00:00.000Z",
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": {
+            "accountId": "a",
+            "accountName": "Alt",
+            "launchedAt": null
+          }
+        }
+      ],
+      "out": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "astral-vs-bmp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: lastPlayedOf with string > compares UTF-16 code units: U+FFFF is above the surrogate 0xD83D, so the BMP string wins; UTF-8 byte or code point order says the opposite"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": "a￿",
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": {
+            "accountId": "a",
+            "accountName": "Alt",
+            "launchedAt": "a😀"
+          }
+        }
+      ],
+      "out": "a￿"
+    },
+    {
+      "id": "offsets",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: lastPlayedOf with the same instant in two offsets: compared as text"
+      },
+      "args": [
+        {
+          "id": "g",
+          "launcher": "steam",
+          "launcherGameId": "570",
+          "name": "Dota 2",
+          "installPath": "D:\\Games\\Steam\\steamapps\\common\\dota 2 beta",
+          "installed": true,
+          "lastSeenAt": "2026-01-01T00:00:00.000Z",
+          "needsUpdate": false,
+          "lastPlayedAt": "2026-01-01T05:00:00+05:00",
+          "artwork": null,
+          "artworkError": null,
+          "lastLaunch": {
+            "accountId": "a",
+            "accountName": "Alt",
+            "launchedAt": "2026-01-01T00:00:00.000Z"
+          }
+        }
+      ],
+      "out": "2026-01-01T05:00:00+05:00"
+    }
+  ]
+}

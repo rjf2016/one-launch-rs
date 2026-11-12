@@ -1,0 +1,540 @@
+{
+  "function": "parseLockfile",
+  "source": "src/main/launchers/riot/local-launch.ts",
+  "note": "decode: arg0=utf8\narg0 is the Riot Client's Config\\lockfile as WindowsRiotLocalLaunch.launch in src/main/launchers/riot/local-launch.ts reads it (readFileSync utf8: a BOM stays as U+FEFF, invalid bytes become U+FFFD).\nNo lockfile is in the fixtures (a real one is never read here, docs/adapters/riot.md rule 4); every input is the test file's placeholder lockfile or a change to it, and every password is a placeholder.\nThe text is trimmed with JS String.prototype.trim (which removes U+FEFF and keeps U+0085) before it is split on \":\".\nThe port limits are the function's own: 1 to 65535, at most five ASCII digits; the cases sit at and one past each.",
+  "cases": [
+    {
+      "id": "client-lockfile",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBz"
+        }
+      ],
+      "out": {
+        "port": 51234,
+        "password": "placeholder-lockfile-password-0123456789"
+      }
+    },
+    {
+      "id": "trailing-crlf",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBzDQo="
+        }
+      ],
+      "out": {
+        "port": 51234,
+        "password": "placeholder-lockfile-password-0123456789"
+      }
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes"
+      },
+      "args": [
+        {
+          "$bytes": ""
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "four-parts",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpodHRwcw=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "other-name",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes"
+      },
+      "args": [
+        {
+          "$bytes": "TGVhZ3VlQ2xpZW50OjQyNDI6NTEyMzQ6cGxhY2Vob2xkZXItbG9ja2ZpbGUtcGFzc3dvcmQtMDEyMzQ1Njc4OTpodHRwcw=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "http",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHA="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "cap-port-low-over",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0MjowOnBsYWNlaG9sZGVyLWxvY2tmaWxlLXBhc3N3b3JkLTAxMjM0NTY3ODk6aHR0cHM="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "port-70000",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo3MDAwMDpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBz"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "no-password",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDo6aHR0cHM="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "pid-not-digits",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6cGlkOjUxMjM0OnBsYWNlaG9sZGVyLWxvY2tmaWxlLXBhc3N3b3JkLTAxMjM0NTY3ODk6aHR0cHM="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "garbage",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot local launch request > refuses an id that is not a product before reading anything, and a lockfile that is missing or not the client’s"
+      },
+      "args": [
+        {
+          "$bytes": "Z2FyYmFnZQ=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "cap-port-low-at",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | port 1, the lowest accepted"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0MjoxOnBsYWNlaG9sZGVyLWxvY2tmaWxlLXBhc3N3b3JkLTAxMjM0NTY3ODk6aHR0cHM="
+        }
+      ],
+      "out": {
+        "port": 1,
+        "password": "placeholder-lockfile-password-0123456789"
+      }
+    },
+    {
+      "id": "cap-port-high-at",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | port 65535, the highest accepted"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo2NTUzNTpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBz"
+        }
+      ],
+      "out": {
+        "port": 65535,
+        "password": "placeholder-lockfile-password-0123456789"
+      }
+    },
+    {
+      "id": "cap-port-high-over",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | port 65536, one past the highest"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo2NTUzNjpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBz"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "cap-port-digits-at",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | port 00001: five digits, leading zeros"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0MjowMDAwMTpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBz"
+        }
+      ],
+      "out": {
+        "port": 1,
+        "password": "placeholder-lockfile-password-0123456789"
+      }
+    },
+    {
+      "id": "cap-port-digits-over",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | port 000001: six digits"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0MjowMDAwMDE6cGxhY2Vob2xkZXItbG9ja2ZpbGUtcGFzc3dvcmQtMDEyMzQ1Njc4OTpodHRwcw=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "port-99999",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | port 99999: five digits, out of range"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo5OTk5OTpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBz"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "port-empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | port empty"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo6cGxhY2Vob2xkZXItbG9ja2ZpbGUtcGFzc3dvcmQtMDEyMzQ1Njc4OTpodHRwcw=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "pid-empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | pid empty"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6OjUxMjM0OnBsYWNlaG9sZGVyLWxvY2tmaWxlLXBhc3N3b3JkLTAxMjM0NTY3ODk6aHR0cHM="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "pid-huge",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | a pid of twenty digits: only its digits are checked"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6OTk5OTk5OTk5OTk5OTk5OTk5OTk6NTEyMzQ6cGxhY2Vob2xkZXItbG9ja2ZpbGUtcGFzc3dvcmQtMDEyMzQ1Njc4OTpodHRwcw=="
+        }
+      ],
+      "out": {
+        "port": 51234,
+        "password": "placeholder-lockfile-password-0123456789"
+      }
+    },
+    {
+      "id": "password-with-colon",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | a colon in the password makes six parts"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlcjpwYXNzd29yZDpodHRwcw=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "password-with-spaces",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | spaces inside the password are kept"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlciBwYXNzd29yZCAxOmh0dHBz"
+        }
+      ],
+      "out": {
+        "port": 51234,
+        "password": "placeholder password 1"
+      }
+    },
+    {
+      "id": "name-lower-case",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | the name in lower case"
+      },
+      "args": [
+        {
+          "$bytes": "cmlvdCBjbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBz"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "protocol-upper-case",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | the protocol in upper case"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5OkhUVFBT"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "outer-whitespace",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | spaces, tabs and blank lines around the line"
+      },
+      "args": [
+        {
+          "$bytes": "DQogCVJpb3QgQ2xpZW50OjQyNDI6NTEyMzQ6cGxhY2Vob2xkZXItbG9ja2ZpbGUtcGFzc3dvcmQtMDEyMzQ1Njc4OTpodHRwcwkgCgo="
+        }
+      ],
+      "out": {
+        "port": 51234,
+        "password": "placeholder-lockfile-password-0123456789"
+      }
+    },
+    {
+      "id": "second-line",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | a second line after the protocol"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBzClJpb3QgQ2xpZW50OjE6MjpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBz"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "inner-space-in-port",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-local-launch.test.ts > Riot lockfile > reads the port and the password from the client’s own https lockfile, and nothing else passes | a space before the port"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0MjogNTEyMzQ6cGxhY2Vob2xkZXItbG9ja2ZpbGUtcGFzc3dvcmQtMDEyMzQ1Njc4OTpodHRwcw=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "adv-bom",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a UTF-8 BOM before the lockfile: JS trim removes U+FEFF, so the name matches; Rust str::trim keeps U+FEFF"
+      },
+      "args": [
+        {
+          "$bytes": "77u/UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBz"
+        }
+      ],
+      "out": {
+        "port": 51234,
+        "password": "placeholder-lockfile-password-0123456789"
+      }
+    },
+    {
+      "id": "adv-nel",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a trailing U+0085: JS trim keeps it, so the protocol is not https; Rust str::trim removes U+0085"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBzwoU="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "adv-unicode-spaces",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+00A0, U+3000, U+2028 and U+205F around the line; both trims remove them"
+      },
+      "args": [
+        {
+          "$bytes": "wqDjgIBSaW90IENsaWVudDo0MjQyOjUxMjM0OnBsYWNlaG9sZGVyLWxvY2tmaWxlLXBhc3N3b3JkLTAxMjM0NTY3ODk6aHR0cHPigKjigZ8="
+        }
+      ],
+      "out": {
+        "port": 51234,
+        "password": "placeholder-lockfile-password-0123456789"
+      }
+    },
+    {
+      "id": "adv-arabic-indic-port",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: the port in Arabic-Indic digits: JS \\d is ASCII only and refuses it; a Unicode \\d would take it"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0MjrZpdmh2aLZo9mkOnBsYWNlaG9sZGVyLWxvY2tmaWxlLXBhc3N3b3JkLTAxMjM0NTY3ODk6aHR0cHM="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "adv-fullwidth-pid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: the pid in fullwidth digits: JS \\d refuses it"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ677yU77yS77yU77ySOjUxMjM0OnBsYWNlaG9sZGVyLWxvY2tmaWxlLXBhc3N3b3JkLTAxMjM0NTY3ODk6aHR0cHM="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "adv-plus-port",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: a port of +80: Number would take it, the digit check refuses it first"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0MjorODA6cGxhY2Vob2xkZXItbG9ja2ZpbGUtcGFzc3dvcmQtMDEyMzQ1Njc4OTpodHRwcw=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "adv-hex-port",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: a port of 0x50: Number would read 80, the digit check refuses it first"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0MjoweDUwOnBsYWNlaG9sZGVyLWxvY2tmaWxlLXBhc3N3b3JkLTAxMjM0NTY3ODk6aHR0cHM="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "adv-leading-zero-port",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: a port of 08080: Number reads it as decimal 8080, never octal"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0MjowODA4MDpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBz"
+        }
+      ],
+      "out": {
+        "port": 8080,
+        "password": "placeholder-lockfile-password-0123456789"
+      }
+    },
+    {
+      "id": "adv-invalid-utf8-password",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: a lone 0xFF and a CESU-encoded surrogate (ED A0 80) in the password; Node gives one U+FFFD for the first and three for the second"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlci3/Le2ggDpodHRwcw=="
+        }
+      ],
+      "out": {
+        "port": 51234,
+        "password": "placeholder-�-���"
+      }
+    },
+    {
+      "id": "adv-astral-password",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an astral character in the password is kept whole"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlci3wn5SROmh0dHBz"
+        }
+      ],
+      "out": {
+        "port": 51234,
+        "password": "placeholder-🔑"
+      }
+    },
+    {
+      "id": "adv-truncated-utf8-end",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: the placeholder lockfile ending in a truncated three-byte sequence after the protocol: Node gives one U+FFFD, which trim keeps, so the protocol is not https"
+      },
+      "args": [
+        {
+          "$bytes": "UmlvdCBDbGllbnQ6NDI0Mjo1MTIzNDpwbGFjZWhvbGRlci1sb2NrZmlsZS1wYXNzd29yZC0wMTIzNDU2Nzg5Omh0dHBz4oI="
+        }
+      ],
+      "out": null
+    }
+  ]
+}

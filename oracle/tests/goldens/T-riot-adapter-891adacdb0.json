@@ -1,0 +1,25 @@
+{
+  "id": "T-riot-adapter-891adacdb0",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "with the setting off, hands over as before and sends nothing to the local server",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "\"{tmp}\\Riot Games\\Riot Client\\RiotClientServices.exe\" --launch-product=valorant --launch-patchline=live (the Riot Client opened the game's page: Auto-launch is disabled)",
+        "handOff": "Press Play in the Riot Client window to start VALORANT; it is open on the game's page."
+      }
+    }
+  ]
+}

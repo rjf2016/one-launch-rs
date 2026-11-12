@@ -1,0 +1,281 @@
+{
+  "function": "phaseOf",
+  "source": "src/renderer/src/lib/phases.ts",
+  "note": "decode: none\ncall returns phaseOf's result when it is a string, and otherwise { notAString: typeof result, name } (name is the function's name, or null): PHASE_OF is a plain object literal, so a step id that names an Object.prototype member (constructor, toString, __proto__) is found on the prototype and its value comes back instead of the 'switch' fallback.\nStep ids come from the adapters, never from the user; the prototype cases record what the code does, not a reachable path.",
+  "cases": [
+    {
+      "id": "known-close",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id close"
+      },
+      "args": [
+        "close"
+      ],
+      "out": "close"
+    },
+    {
+      "id": "known-capture",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id capture"
+      },
+      "args": [
+        "capture"
+      ],
+      "out": "switch"
+    },
+    {
+      "id": "known-backup",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id backup"
+      },
+      "args": [
+        "backup"
+      ],
+      "out": "switch"
+    },
+    {
+      "id": "known-file",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id file"
+      },
+      "args": [
+        "file"
+      ],
+      "out": "switch"
+    },
+    {
+      "id": "known-registry",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id registry"
+      },
+      "args": [
+        "registry"
+      ],
+      "out": "switch"
+    },
+    {
+      "id": "known-registry-user",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id registry-user"
+      },
+      "args": [
+        "registry-user"
+      ],
+      "out": "switch"
+    },
+    {
+      "id": "known-registry-remember",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id registry-remember"
+      },
+      "args": [
+        "registry-remember"
+      ],
+      "out": "switch"
+    },
+    {
+      "id": "known-start",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id start"
+      },
+      "args": [
+        "start"
+      ],
+      "out": "start"
+    },
+    {
+      "id": "known-wait",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id wait"
+      },
+      "args": [
+        "wait"
+      ],
+      "out": "start"
+    },
+    {
+      "id": "known-verify",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id verify"
+      },
+      "args": [
+        "verify"
+      ],
+      "out": "signin"
+    },
+    {
+      "id": "known-login",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id login"
+      },
+      "args": [
+        "login"
+      ],
+      "out": "signin"
+    },
+    {
+      "id": "known-manual",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id manual"
+      },
+      "args": [
+        "manual"
+      ],
+      "out": "signin"
+    },
+    {
+      "id": "known-recapture",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id recapture"
+      },
+      "args": [
+        "recapture"
+      ],
+      "out": "signin"
+    },
+    {
+      "id": "known-launch",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: phaseOf of the known step id launch"
+      },
+      "args": [
+        "launch"
+      ],
+      "out": "launch"
+    },
+    {
+      "id": "unknown",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > groupSteps > files unknown step ids under the switch phase"
+      },
+      "args": [
+        "something-new"
+      ],
+      "out": "switch"
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty step id falls back to switch"
+      },
+      "args": [
+        ""
+      ],
+      "out": "switch"
+    },
+    {
+      "id": "upper",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: CLOSE: the lookup is case-sensitive"
+      },
+      "args": [
+        "CLOSE"
+      ],
+      "out": "switch"
+    },
+    {
+      "id": "padded",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a trailing space: nothing is trimmed"
+      },
+      "args": [
+        "close "
+      ],
+      "out": "switch"
+    },
+    {
+      "id": "lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate after a known id"
+      },
+      "args": [
+        {
+          "$utf16": [
+            99,
+            108,
+            111,
+            115,
+            101,
+            55296
+          ]
+        }
+      ],
+      "out": "switch"
+    },
+    {
+      "id": "proto-constructor",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: constructor is inherited from Object.prototype: the lookup returns the Object function"
+      },
+      "args": [
+        "constructor"
+      ],
+      "out": {
+        "notAString": "function",
+        "name": "Object"
+      }
+    },
+    {
+      "id": "proto-tostring",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: toString is inherited: the lookup returns a function"
+      },
+      "args": [
+        "toString"
+      ],
+      "out": {
+        "notAString": "function",
+        "name": "toString"
+      }
+    },
+    {
+      "id": "proto-proto",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: __proto__ returns Object.prototype itself"
+      },
+      "args": [
+        "__proto__"
+      ],
+      "out": {
+        "notAString": "object",
+        "name": null
+      }
+    },
+    {
+      "id": "proto-hasownproperty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: hasOwnProperty is inherited too"
+      },
+      "args": [
+        "hasOwnProperty"
+      ],
+      "out": {
+        "notAString": "function",
+        "name": "hasOwnProperty"
+      }
+    }
+  ]
+}

@@ -1,0 +1,2295 @@
+{
+  "function": "compareVersions",
+  "source": "src/shared/whats-new.ts",
+  "note": "decode: none\narg0 and arg1 are version strings (package.json versions and the What's New table; never file text). The function does not validate them: the adversarial pairs show what Number() and code-unit string order do with strings pickWhatsNew would refuse.\nEvery pair of the test's ordered list is a case (121), and every adversarial pair is run both ways (.ab and .ba).",
+  "cases": [
+    {
+      "id": "ordered.0_9_0.vs.0_9_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "0.9.0",
+        "0.9.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "ordered.0_9_0.vs.1_0_0_alpha",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "0.9.0",
+        "1.0.0-alpha"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.0_9_0.vs.1_0_0_beta_2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "0.9.0",
+        "1.0.0-beta.2"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.0_9_0.vs.1_0_0_beta_2_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "0.9.0",
+        "1.0.0-beta.2.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.0_9_0.vs.1_0_0_beta_10",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "0.9.0",
+        "1.0.0-beta.10"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.0_9_0.vs.1_0_0_rc_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "0.9.0",
+        "1.0.0-rc.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.0_9_0.vs.1_0_0_test",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "0.9.0",
+        "1.0.0-test"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.0_9_0.vs.1_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "0.9.0",
+        "1.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.0_9_0.vs.1_0_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "0.9.0",
+        "1.0.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.0_9_0.vs.1_10_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "0.9.0",
+        "1.10.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.0_9_0.vs.2_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "0.9.0",
+        "2.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_alpha.vs.0_9_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-alpha",
+        "0.9.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_alpha.vs.1_0_0_alpha",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-alpha",
+        "1.0.0-alpha"
+      ],
+      "out": 0
+    },
+    {
+      "id": "ordered.1_0_0_alpha.vs.1_0_0_beta_2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-alpha",
+        "1.0.0-beta.2"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_alpha.vs.1_0_0_beta_2_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-alpha",
+        "1.0.0-beta.2.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_alpha.vs.1_0_0_beta_10",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-alpha",
+        "1.0.0-beta.10"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_alpha.vs.1_0_0_rc_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-alpha",
+        "1.0.0-rc.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_alpha.vs.1_0_0_test",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-alpha",
+        "1.0.0-test"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_alpha.vs.1_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-alpha",
+        "1.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_alpha.vs.1_0_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-alpha",
+        "1.0.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_alpha.vs.1_10_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-alpha",
+        "1.10.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_alpha.vs.2_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-alpha",
+        "2.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2.vs.0_9_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        "0.9.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2.vs.1_0_0_alpha",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        "1.0.0-alpha"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2.vs.1_0_0_beta_2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        "1.0.0-beta.2"
+      ],
+      "out": 0
+    },
+    {
+      "id": "ordered.1_0_0_beta_2.vs.1_0_0_beta_2_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        "1.0.0-beta.2.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2.vs.1_0_0_beta_10",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        "1.0.0-beta.10"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2.vs.1_0_0_rc_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        "1.0.0-rc.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2.vs.1_0_0_test",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        "1.0.0-test"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2.vs.1_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        "1.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2.vs.1_0_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        "1.0.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2.vs.1_10_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        "1.10.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2.vs.2_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        "2.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2_1.vs.0_9_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2.1",
+        "0.9.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2_1.vs.1_0_0_alpha",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2.1",
+        "1.0.0-alpha"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2_1.vs.1_0_0_beta_2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2.1",
+        "1.0.0-beta.2"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2_1.vs.1_0_0_beta_2_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2.1",
+        "1.0.0-beta.2.1"
+      ],
+      "out": 0
+    },
+    {
+      "id": "ordered.1_0_0_beta_2_1.vs.1_0_0_beta_10",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2.1",
+        "1.0.0-beta.10"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2_1.vs.1_0_0_rc_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2.1",
+        "1.0.0-rc.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2_1.vs.1_0_0_test",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2.1",
+        "1.0.0-test"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2_1.vs.1_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2.1",
+        "1.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2_1.vs.1_0_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2.1",
+        "1.0.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2_1.vs.1_10_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2.1",
+        "1.10.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_2_1.vs.2_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.2.1",
+        "2.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_10.vs.0_9_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.10",
+        "0.9.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_beta_10.vs.1_0_0_alpha",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.10",
+        "1.0.0-alpha"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_beta_10.vs.1_0_0_beta_2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.10",
+        "1.0.0-beta.2"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_beta_10.vs.1_0_0_beta_2_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.10",
+        "1.0.0-beta.2.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_beta_10.vs.1_0_0_beta_10",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.10",
+        "1.0.0-beta.10"
+      ],
+      "out": 0
+    },
+    {
+      "id": "ordered.1_0_0_beta_10.vs.1_0_0_rc_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.10",
+        "1.0.0-rc.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_10.vs.1_0_0_test",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.10",
+        "1.0.0-test"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_10.vs.1_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.10",
+        "1.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_10.vs.1_0_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.10",
+        "1.0.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_10.vs.1_10_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.10",
+        "1.10.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_beta_10.vs.2_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-beta.10",
+        "2.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_rc_1.vs.0_9_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-rc.1",
+        "0.9.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_rc_1.vs.1_0_0_alpha",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-rc.1",
+        "1.0.0-alpha"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_rc_1.vs.1_0_0_beta_2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-rc.1",
+        "1.0.0-beta.2"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_rc_1.vs.1_0_0_beta_2_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-rc.1",
+        "1.0.0-beta.2.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_rc_1.vs.1_0_0_beta_10",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-rc.1",
+        "1.0.0-beta.10"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_rc_1.vs.1_0_0_rc_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-rc.1",
+        "1.0.0-rc.1"
+      ],
+      "out": 0
+    },
+    {
+      "id": "ordered.1_0_0_rc_1.vs.1_0_0_test",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-rc.1",
+        "1.0.0-test"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_rc_1.vs.1_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-rc.1",
+        "1.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_rc_1.vs.1_0_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-rc.1",
+        "1.0.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_rc_1.vs.1_10_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-rc.1",
+        "1.10.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_rc_1.vs.2_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-rc.1",
+        "2.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_test.vs.0_9_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-test",
+        "0.9.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_test.vs.1_0_0_alpha",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-test",
+        "1.0.0-alpha"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_test.vs.1_0_0_beta_2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-test",
+        "1.0.0-beta.2"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_test.vs.1_0_0_beta_2_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-test",
+        "1.0.0-beta.2.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_test.vs.1_0_0_beta_10",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-test",
+        "1.0.0-beta.10"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_test.vs.1_0_0_rc_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-test",
+        "1.0.0-rc.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0_test.vs.1_0_0_test",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-test",
+        "1.0.0-test"
+      ],
+      "out": 0
+    },
+    {
+      "id": "ordered.1_0_0_test.vs.1_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-test",
+        "1.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_test.vs.1_0_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-test",
+        "1.0.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_test.vs.1_10_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-test",
+        "1.10.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0_test.vs.2_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0-test",
+        "2.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0.vs.0_9_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0",
+        "0.9.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0.vs.1_0_0_alpha",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0",
+        "1.0.0-alpha"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0.vs.1_0_0_beta_2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0",
+        "1.0.0-beta.2"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0.vs.1_0_0_beta_2_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0",
+        "1.0.0-beta.2.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0.vs.1_0_0_beta_10",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0",
+        "1.0.0-beta.10"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0.vs.1_0_0_rc_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0",
+        "1.0.0-rc.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0.vs.1_0_0_test",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0",
+        "1.0.0-test"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_0.vs.1_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0",
+        "1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "ordered.1_0_0.vs.1_0_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0",
+        "1.0.1"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0.vs.1_10_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0",
+        "1.10.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_0.vs.2_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.0",
+        "2.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_1.vs.0_9_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.1",
+        "0.9.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_1.vs.1_0_0_alpha",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.1",
+        "1.0.0-alpha"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_1.vs.1_0_0_beta_2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.1",
+        "1.0.0-beta.2"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_1.vs.1_0_0_beta_2_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.1",
+        "1.0.0-beta.2.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_1.vs.1_0_0_beta_10",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.1",
+        "1.0.0-beta.10"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_1.vs.1_0_0_rc_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.1",
+        "1.0.0-rc.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_1.vs.1_0_0_test",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.1",
+        "1.0.0-test"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_1.vs.1_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.1",
+        "1.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_0_1.vs.1_0_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.1",
+        "1.0.1"
+      ],
+      "out": 0
+    },
+    {
+      "id": "ordered.1_0_1.vs.1_10_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.1",
+        "1.10.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_0_1.vs.2_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.0.1",
+        "2.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.1_10_0.vs.0_9_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.10.0",
+        "0.9.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_10_0.vs.1_0_0_alpha",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.10.0",
+        "1.0.0-alpha"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_10_0.vs.1_0_0_beta_2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.10.0",
+        "1.0.0-beta.2"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_10_0.vs.1_0_0_beta_2_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.10.0",
+        "1.0.0-beta.2.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_10_0.vs.1_0_0_beta_10",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.10.0",
+        "1.0.0-beta.10"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_10_0.vs.1_0_0_rc_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.10.0",
+        "1.0.0-rc.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_10_0.vs.1_0_0_test",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.10.0",
+        "1.0.0-test"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_10_0.vs.1_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.10.0",
+        "1.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_10_0.vs.1_0_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.10.0",
+        "1.0.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.1_10_0.vs.1_10_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.10.0",
+        "1.10.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "ordered.1_10_0.vs.2_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "1.10.0",
+        "2.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ordered.2_0_0.vs.0_9_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "2.0.0",
+        "0.9.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.2_0_0.vs.1_0_0_alpha",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "2.0.0",
+        "1.0.0-alpha"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.2_0_0.vs.1_0_0_beta_2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "2.0.0",
+        "1.0.0-beta.2"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.2_0_0.vs.1_0_0_beta_2_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "2.0.0",
+        "1.0.0-beta.2.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.2_0_0.vs.1_0_0_beta_10",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "2.0.0",
+        "1.0.0-beta.10"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.2_0_0.vs.1_0_0_rc_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "2.0.0",
+        "1.0.0-rc.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.2_0_0.vs.1_0_0_test",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "2.0.0",
+        "1.0.0-test"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.2_0_0.vs.1_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "2.0.0",
+        "1.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.2_0_0.vs.1_0_1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "2.0.0",
+        "1.0.1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.2_0_0.vs.1_10_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "2.0.0",
+        "1.10.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ordered.2_0_0.vs.2_0_0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > compareVersions > orders the numeric core, then a prerelease before its release, then prerelease ids numerically or alphabetically"
+      },
+      "args": [
+        "2.0.0",
+        "2.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "leading-zero-core.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"01\") is 1, so 01.0.0 equals 1.0.0"
+      },
+      "args": [
+        "01.0.0",
+        "1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "leading-zero-core.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"01\") is 1, so 01.0.0 equals 1.0.0"
+      },
+      "args": [
+        "1.0.0",
+        "01.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "leading-zero-pre.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: numeric prerelease ids compare by Number, so 01 equals 1"
+      },
+      "args": [
+        "1.0.0-01",
+        "1.0.0-1"
+      ],
+      "out": 0
+    },
+    {
+      "id": "leading-zero-pre.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: numeric prerelease ids compare by Number, so 01 equals 1"
+      },
+      "args": [
+        "1.0.0-1",
+        "1.0.0-01"
+      ],
+      "out": 0
+    },
+    {
+      "id": "beyond-safe-core.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: core numbers past 2^53 round to the same double and compare equal"
+      },
+      "args": [
+        "9007199254740993.0.0",
+        "9007199254740992.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "beyond-safe-core.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: core numbers past 2^53 round to the same double and compare equal"
+      },
+      "args": [
+        "9007199254740992.0.0",
+        "9007199254740993.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "beyond-safe-pre.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: prerelease numbers past 2^53 compare equal"
+      },
+      "args": [
+        "1.0.0-9007199254740993",
+        "1.0.0-9007199254740992"
+      ],
+      "out": 0
+    },
+    {
+      "id": "beyond-safe-pre.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: prerelease numbers past 2^53 compare equal"
+      },
+      "args": [
+        "1.0.0-9007199254740992",
+        "1.0.0-9007199254740993"
+      ],
+      "out": 0
+    },
+    {
+      "id": "huge-core.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"1e400\") is Infinity, so Infinity - 1 is Infinity: greater"
+      },
+      "args": [
+        "1e400.0.0",
+        "1.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "huge-core.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"1e400\") is Infinity, so Infinity - 1 is Infinity: greater"
+      },
+      "args": [
+        "1.0.0",
+        "1e400.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "huge-both.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: Infinity - Infinity is NaN, and a NaN difference returns 1 both ways"
+      },
+      "args": [
+        "1e400.0.0",
+        "1e401.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "huge-both.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: Infinity - Infinity is NaN, and a NaN difference returns 1 both ways"
+      },
+      "args": [
+        "1e401.0.0",
+        "1e400.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "not-a-number-a.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"v1\") is NaN; the NaN difference is not 0 and not below 0, so the answer is 1"
+      },
+      "args": [
+        "v1.0.0",
+        "1.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "not-a-number-a.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"v1\") is NaN; the NaN difference is not 0 and not below 0, so the answer is 1"
+      },
+      "args": [
+        "1.0.0",
+        "v1.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "not-a-number-b.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: the same pair the other way round is also 1: not antisymmetric"
+      },
+      "args": [
+        "1.0.0",
+        "v1.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "not-a-number-b.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: the same pair the other way round is also 1: not antisymmetric"
+      },
+      "args": [
+        "v1.0.0",
+        "1.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "space-core.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\" 1\") is 1: leading spaces are ignored"
+      },
+      "args": [
+        " 1.0.0",
+        "1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "space-core.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\" 1\") is 1: leading spaces are ignored"
+      },
+      "args": [
+        "1.0.0",
+        " 1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "nbsp-core.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: Number trims U+00A0 and U+FEFF too"
+      },
+      "args": [
+        " 1.0.0",
+        "1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "nbsp-core.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: Number trims U+00A0 and U+FEFF too"
+      },
+      "args": [
+        "1.0.0",
+        " 1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "hex-core.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"0x2\") is 2"
+      },
+      "args": [
+        "0x2.0.0",
+        "2.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "hex-core.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"0x2\") is 2"
+      },
+      "args": [
+        "2.0.0",
+        "0x2.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "plus-core.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"+1\") is 1"
+      },
+      "args": [
+        "+1.0.0",
+        "1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "plus-core.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"+1\") is 1"
+      },
+      "args": [
+        "1.0.0",
+        "+1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "exponent-core.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"1e1\") is 10"
+      },
+      "args": [
+        "1e1.0.0",
+        "10.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "exponent-core.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"1e1\") is 10"
+      },
+      "args": [
+        "10.0.0",
+        "1e1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "empty-core-part.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"\") is 0"
+      },
+      "args": [
+        "1..0",
+        "1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "empty-core-part.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: Number(\"\") is 0"
+      },
+      "args": [
+        "1.0.0",
+        "1..0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "two-part.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a missing third part counts as 0"
+      },
+      "args": [
+        "1.0",
+        "1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "two-part.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a missing third part counts as 0"
+      },
+      "args": [
+        "1.0.0",
+        "1.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "four-part.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a fourth part is ignored"
+      },
+      "args": [
+        "1.0.0.5",
+        "1.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "four-part.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a fourth part is ignored"
+      },
+      "args": [
+        "1.0.0",
+        "1.0.0.5"
+      ],
+      "out": 0
+    },
+    {
+      "id": "build-metadata.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: build metadata is not split off: Number(\"0+b1\") is NaN"
+      },
+      "args": [
+        "1.0.0+b1",
+        "1.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "build-metadata.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: build metadata is not split off: Number(\"0+b1\") is NaN"
+      },
+      "args": [
+        "1.0.0",
+        "1.0.0+b1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "empty-strings.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: two empty strings are equal"
+      },
+      "args": [
+        "",
+        ""
+      ],
+      "out": 0
+    },
+    {
+      "id": "empty-strings.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: two empty strings are equal"
+      },
+      "args": [
+        "",
+        ""
+      ],
+      "out": 0
+    },
+    {
+      "id": "empty-vs-zero.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the empty string reads as 0.0.0"
+      },
+      "args": [
+        "",
+        "0.0.0"
+      ],
+      "out": 0
+    },
+    {
+      "id": "empty-vs-zero.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the empty string reads as 0.0.0"
+      },
+      "args": [
+        "0.0.0",
+        ""
+      ],
+      "out": 0
+    },
+    {
+      "id": "dash-only.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a lone dash is a prerelease of 0.0.0"
+      },
+      "args": [
+        "-",
+        "0.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "dash-only.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a lone dash is a prerelease of 0.0.0"
+      },
+      "args": [
+        "0.0.0",
+        "-"
+      ],
+      "out": 1
+    },
+    {
+      "id": "empty-pre.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a trailing dash makes an empty prerelease, which sorts before the release"
+      },
+      "args": [
+        "1.0.0-",
+        "1.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "empty-pre.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a trailing dash makes an empty prerelease, which sorts before the release"
+      },
+      "args": [
+        "1.0.0",
+        "1.0.0-"
+      ],
+      "out": 1
+    },
+    {
+      "id": "empty-pre-id-vs-zero.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty prerelease id is not numeric, so it sorts after 0"
+      },
+      "args": [
+        "1.0.0-",
+        "1.0.0-0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "empty-pre-id-vs-zero.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty prerelease id is not numeric, so it sorts after 0"
+      },
+      "args": [
+        "1.0.0-0",
+        "1.0.0-"
+      ],
+      "out": -1
+    },
+    {
+      "id": "numeric-before-alpha.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: numeric ids sort before alphanumeric ones"
+      },
+      "args": [
+        "1.0.0-1",
+        "1.0.0-a"
+      ],
+      "out": -1
+    },
+    {
+      "id": "numeric-before-alpha.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: numeric ids sort before alphanumeric ones"
+      },
+      "args": [
+        "1.0.0-a",
+        "1.0.0-1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "ascii-order.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: alphanumeric ids compare by UTF-16 code unit, so B is before a"
+      },
+      "args": [
+        "1.0.0-B",
+        "1.0.0-a"
+      ],
+      "out": -1
+    },
+    {
+      "id": "ascii-order.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: alphanumeric ids compare by UTF-16 code unit, so B is before a"
+      },
+      "args": [
+        "1.0.0-a",
+        "1.0.0-B"
+      ],
+      "out": 1
+    },
+    {
+      "id": "hyphen-in-pre.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: only the first dash starts the prerelease; a-b is one id"
+      },
+      "args": [
+        "1.0.0-a-b",
+        "1.0.0-a"
+      ],
+      "out": 1
+    },
+    {
+      "id": "hyphen-in-pre.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: only the first dash starts the prerelease; a-b is one id"
+      },
+      "args": [
+        "1.0.0-a",
+        "1.0.0-a-b"
+      ],
+      "out": -1
+    },
+    {
+      "id": "dash-in-core.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a dash inside the core cuts it short"
+      },
+      "args": [
+        "1-0.0.0",
+        "1.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "dash-in-core.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a dash inside the core cuts it short"
+      },
+      "args": [
+        "1.0.0",
+        "1-0.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "longer-pre.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a longer prerelease with an equal prefix is greater"
+      },
+      "args": [
+        "1.0.0-a.b",
+        "1.0.0-a"
+      ],
+      "out": 1
+    },
+    {
+      "id": "longer-pre.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a longer prerelease with an equal prefix is greater"
+      },
+      "args": [
+        "1.0.0-a",
+        "1.0.0-a.b"
+      ],
+      "out": -1
+    },
+    {
+      "id": "arabic-digit-pre.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: JS \\d is ASCII, so ١ is an alphanumeric id and sorts after 2; a Unicode \\d would call it numeric"
+      },
+      "args": [
+        "1.0.0-١",
+        "1.0.0-2"
+      ],
+      "out": 1
+    },
+    {
+      "id": "arabic-digit-pre.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: JS \\d is ASCII, so ١ is an alphanumeric id and sorts after 2; a Unicode \\d would call it numeric"
+      },
+      "args": [
+        "1.0.0-2",
+        "1.0.0-١"
+      ],
+      "out": -1
+    },
+    {
+      "id": "fullwidth-digit-core.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: Number(\"１\") is NaN"
+      },
+      "args": [
+        "１.0.0",
+        "0.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "fullwidth-digit-core.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: Number(\"１\") is NaN"
+      },
+      "args": [
+        "0.0.0",
+        "１.0.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "astral-vs-bmp.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: code-unit order puts the emoji (D83D) before U+FF5E; UTF-8 byte order puts it after"
+      },
+      "args": [
+        "1.0.0-😀",
+        "1.0.0-～"
+      ],
+      "out": -1
+    },
+    {
+      "id": "astral-vs-bmp.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: code-unit order puts the emoji (D83D) before U+FF5E; UTF-8 byte order puts it after"
+      },
+      "args": [
+        "1.0.0-～",
+        "1.0.0-😀"
+      ],
+      "out": 1
+    },
+    {
+      "id": "non-ascii-pre.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: é (U+00E9) sorts after z by code unit"
+      },
+      "args": [
+        "1.0.0-é",
+        "1.0.0-z"
+      ],
+      "out": 1
+    },
+    {
+      "id": "non-ascii-pre.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: é (U+00E9) sorts after z by code unit"
+      },
+      "args": [
+        "1.0.0-z",
+        "1.0.0-é"
+      ],
+      "out": -1
+    },
+    {
+      "id": "lone-surrogate-pre.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate compares by its code unit"
+      },
+      "args": [
+        {
+          "$utf16": [
+            49,
+            46,
+            48,
+            46,
+            48,
+            45,
+            55296
+          ]
+        },
+        "1.0.0-￿"
+      ],
+      "out": -1
+    },
+    {
+      "id": "lone-surrogate-pre.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate compares by its code unit"
+      },
+      "args": [
+        "1.0.0-￿",
+        {
+          "$utf16": [
+            49,
+            46,
+            48,
+            46,
+            48,
+            45,
+            55296
+          ]
+        }
+      ],
+      "out": 1
+    },
+    {
+      "id": "negative-core.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: a dash inside the core starts the prerelease, so the core is 1 and -1.0 is the prerelease"
+      },
+      "args": [
+        "1.-1.0",
+        "1.0.0"
+      ],
+      "out": -1
+    },
+    {
+      "id": "negative-core.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: a dash inside the core starts the prerelease, so the core is 1 and -1.0 is the prerelease"
+      },
+      "args": [
+        "1.0.0",
+        "1.-1.0"
+      ],
+      "out": 1
+    },
+    {
+      "id": "whitespace-pre.ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a space makes the id non-numeric for /^\\d+$/"
+      },
+      "args": [
+        "1.0.0- 1",
+        "1.0.0-1"
+      ],
+      "out": 1
+    },
+    {
+      "id": "whitespace-pre.ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a space makes the id non-numeric for /^\\d+$/"
+      },
+      "args": [
+        "1.0.0-1",
+        "1.0.0- 1"
+      ],
+      "out": -1
+    }
+  ]
+}

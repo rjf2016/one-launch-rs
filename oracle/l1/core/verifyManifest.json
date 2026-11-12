@@ -1,0 +1,2336 @@
+{
+  "function": "verifyManifest",
+  "source": "src/main/updates/manifest.ts",
+  "note": "decode: arg0=utf8\narg0 is latest.yml as the update feed serves it. electron-updater's HTTP executor reads the body with setEncoding('utf8') (BOM kept, invalid bytes become U+FFFD) and its Provider.parseUpdateInfo loads it with js-yaml 4 (which drops one leading U+FEFF); src/main/updates/engine.ts hands the result to update-service.ts, which calls verifyManifest(info, keys).\ncall runs parseUpdateInfo(arg0, 'latest.yml', 'feed') from electron-updater/out/providers/Provider.js, then verifyManifest on the loaded value with arg1 as the trusted keys. The GitHub provider also adds tag, releaseName and releaseNotes to the loaded object; verifyManifest never reads them, so they are left out. The Rust port must load the YAML the way js-yaml 4 does (core schema: 0x hex, 0o octal, .inf, .nan, a leading U+FEFF dropped).\nSigned bytes come from fixtures/updates/latest.yml, signed once with the throwaway Ed25519 key whose public half is in fixtures/updates/README-keys.json; no key is generated here, so Ed25519's deterministic signatures keep the output fixed. Every refusal reason ('no-keys', 'malformed', 'unsupported', 'unsigned', 'unknown-key', 'bad-signature') has cases, with the exact detail text. The non-Ed25519 key is the P-256 generator point as a public key.\nGaps: a YAML document js-yaml refuses (a duplicate key, bad indentation) throws from parseUpdateInfo with its stack in the message, which is not verifyManifest and not repeatable, so no case has one.",
+  "cases": [
+    {
+      "id": "fixture-accepted",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml"
+      },
+      "args": [
+        {
+          "$file": "fixtures/updates/latest.yml",
+          "sha256": "bcebbbdc6a613a8420106e314b2c6e267757c4e292d8a6edc887b18c2da59fd2"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "fixture-accepted-among-pinned",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | trusted list is the pinned keys then the throwaway key"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "616ad3e53aac3ce4",
+            "spki": "MCowBQYDK2VwAyEAKLQyPjWzDVRwW/U6ta7+/qlzyv7jpTAB3TfJCCfhS9I="
+          },
+          {
+            "id": "35f13c45c6049dbe",
+            "spki": "MCowBQYDK2VwAyEAW8G8A0kpvLTfssEoZU26RlbEFrwCITH9wgCpPa3jR/A="
+          },
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "fixture-accepted-key-twice",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the throwaway key listed twice"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          },
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "accepted-extra-fields",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | unknown top-level and file-entry fields added"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MAogICAgYmxvY2tNYXBTaXplOiAxMjM0CiAgICBpc0FkbWluUmlnaHRzUmVxdWlyZWQ6IGZhbHNlCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwpzdGFnaW5nUGVyY2VudGFnZTogNTAKcmVsZWFzZU5vdGVzOiBub3Rlcwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "accepted-packages-null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | packages: null added"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicKcGFja2FnZXM6IG51bGwK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "accepted-packages-tilde",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | packages: ~ added"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicKcGFja2FnZXM6IH4K"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "accepted-crlf",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | LF made CRLF"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40DQpmaWxlczoNCiAgLSB1cmw6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlDQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09DQogICAgc2l6ZTogNTANCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlDQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0NCnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJw0Kc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScNCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicNCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "accepted-bom",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: fixtures/updates/latest.yml with a UTF-8 BOM: js-yaml drops a leading U+FEFF before parsing"
+      },
+      "args": [
+        {
+          "$bytes": "77u/dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "accepted-size-hex",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: fixtures/updates/latest.yml with size: 0x32; js-yaml reads it as the integer 50, so the signature still matches"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiAweDMyCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "accepted-size-float",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: fixtures/updates/latest.yml with size: 50.0; js-yaml reads a float 50, a safe integer, and the payload prints 50"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MC4wCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "accepted-size-exponent",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: fixtures/updates/latest.yml with size: 5e1; YAML 1.2 core schema reads 50"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1ZTEKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "size-plus-sign",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: fixtures/updates/latest.yml with size: +50; a leading plus is a YAML integer"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiArNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "size-leading-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: fixtures/updates/latest.yml with size: 050; js-yaml's reading of a leading zero"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiAwNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "size-underscore",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: fixtures/updates/latest.yml with size: 5_0; js-yaml's reading of an underscore"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1XzAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no size"
+      }
+    },
+    {
+      "id": "size-octal",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: fixtures/updates/latest.yml with size: 0o62 (50 in octal)"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiAwbzYyCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "size-quoted",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | size quoted as a string"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiAnNTAnCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no size"
+      }
+    },
+    {
+      "id": "no-keys",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses everything when the build pins no key"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        []
+      ],
+      "out": {
+        "ok": false,
+        "reason": "no-keys",
+        "detail": "this build trusts no release key"
+      }
+    },
+    {
+      "id": "no-keys-unsigned",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest-unsigned.yml | no trusted keys"
+      },
+      "args": [
+        {
+          "$file": "fixtures/updates/latest-unsigned.yml",
+          "sha256": "8b943945cbee66edd81955bc9c9f83c627502a3b9dbb6e1b900164485aa9bd80"
+        },
+        []
+      ],
+      "out": {
+        "ok": false,
+        "reason": "no-keys",
+        "detail": "this build trusts no release key"
+      }
+    },
+    {
+      "id": "not-object-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses fields that could smuggle a second line into the signed payload | the manifest is YAML null"
+      },
+      "args": [
+        {
+          "$bytes": "bnVsbAo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release manifest is not an object"
+      }
+    },
+    {
+      "id": "not-object-empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | an empty document, which js-yaml loads as undefined"
+      },
+      "args": [
+        {
+          "$bytes": ""
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release manifest is not an object"
+      }
+    },
+    {
+      "id": "not-object-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the whole document is the number 42"
+      },
+      "args": [
+        {
+          "$bytes": "NDIK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release manifest is not an object"
+      }
+    },
+    {
+      "id": "not-object-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the whole document is a string"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbiAxLjAuMAo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release manifest is not an object"
+      }
+    },
+    {
+      "id": "not-object-false",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the whole document is false"
+      },
+      "args": [
+        {
+          "$bytes": "ZmFsc2UK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release manifest is not an object"
+      }
+    },
+    {
+      "id": "array-document",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the whole document is a sequence"
+      },
+      "args": [
+        {
+          "$bytes": "LSAxCi0gMgo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release must list exactly one file"
+      }
+    },
+    {
+      "id": "packages-web-installer",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses shapes the updater would treat differently from what was signed"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicKcGFja2FnZXM6CiAgeDY0OgogICAgcGF0aDogcC43egogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09Cg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release uses a web installer"
+      }
+    },
+    {
+      "id": "packages-zero",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | packages: 0"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicKcGFja2FnZXM6IDAK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release uses a web installer"
+      }
+    },
+    {
+      "id": "packages-false",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | packages: false"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicKcGFja2FnZXM6IGZhbHNlCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release uses a web installer"
+      }
+    },
+    {
+      "id": "packages-empty-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | packages: ''"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicKcGFja2FnZXM6ICcnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release uses a web installer"
+      }
+    },
+    {
+      "id": "files-two",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses shapes the updater would treat differently from what was signed | two file entries"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MAogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release must list exactly one file"
+      }
+    },
+    {
+      "id": "files-empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses shapes the updater would treat differently from what was signed | files: []"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOiBbXQpwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release must list exactly one file"
+      }
+    },
+    {
+      "id": "files-missing",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the files list removed"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release must list exactly one file"
+      }
+    },
+    {
+      "id": "files-mapping",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | files is a mapping, not a list"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIHVybDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKICBzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release must list exactly one file"
+      }
+    },
+    {
+      "id": "files-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | files is a string"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release must list exactly one file"
+      }
+    },
+    {
+      "id": "entry-null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the one file entry is null"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gbnVsbApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file entry is not an object"
+      }
+    },
+    {
+      "id": "entry-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the one file entry is a string"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file entry is not an object"
+      }
+    },
+    {
+      "id": "entry-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the one file entry is a number"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gMApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file entry is not an object"
+      }
+    },
+    {
+      "id": "entry-sequence",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the one file entry is an empty sequence"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gW10KcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    },
+    {
+      "id": "entry-admin-rights",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses shapes the updater would treat differently from what was signed | isAdminRightsRequired: true"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MAogICAgaXNBZG1pblJpZ2h0c1JlcXVpcmVkOiB0cnVlCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release asks for administrator rights"
+      }
+    },
+    {
+      "id": "entry-admin-rights-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | isAdminRightsRequired: 'true', a string, is not true"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MAogICAgaXNBZG1pblJpZ2h0c1JlcXVpcmVkOiAndHJ1ZScKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "entry-admin-rights-before-version",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | isAdminRightsRequired: true and the version removed: unsupported wins"
+      },
+      "args": [
+        {
+          "$bytes": "ZmlsZXM6CiAgLSB1cmw6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCiAgICBzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KICAgIHNpemU6IDUwCiAgICBpc0FkbWluUmlnaHRzUmVxdWlyZWQ6IHRydWUKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsupported",
+        "detail": "the release asks for administrator rights"
+      }
+    },
+    {
+      "id": "version-changed",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses a manifest whose %s changed after signing | version"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS41CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad-signature",
+        "detail": "the release signature does not match"
+      }
+    },
+    {
+      "id": "version-missing",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | version removed"
+      },
+      "args": [
+        {
+          "$bytes": "ZmlsZXM6CiAgLSB1cmw6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCiAgICBzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KICAgIHNpemU6IDUwCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release version is not a plain version number"
+      }
+    },
+    {
+      "id": "version-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | version: 1.0, which YAML reads as a float"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wCmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release version is not a plain version number"
+      }
+    },
+    {
+      "id": "version-newline",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses fields that could smuggle a second line into the signed payload | version \"1.0.0\\n\""
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogIjEuMC4wXG4iCmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release version is not a plain version number"
+      }
+    },
+    {
+      "id": "version-v-prefix",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | version v1.0.0-beta.4"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogdjEuMC4wLWJldGEuNApmaWxlczoKICAtIHVybDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKICAgIHNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQogICAgc2l6ZTogNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release version is not a plain version number"
+      }
+    },
+    {
+      "id": "version-empty-pre",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | version 1.0.0-"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogJzEuMC4wLScKZmlsZXM6CiAgLSB1cmw6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCiAgICBzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KICAgIHNpemU6IDUwCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release version is not a plain version number"
+      }
+    },
+    {
+      "id": "version-build",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | version with build metadata 1.0.0-beta.4+b1"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40K2IxCmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release version is not a plain version number"
+      }
+    },
+    {
+      "id": "version-two-part",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | version '1.0'"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogJzEuMCcKZmlsZXM6CiAgLSB1cmw6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCiAgICBzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KICAgIHNpemU6IDUwCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release version is not a plain version number"
+      }
+    },
+    {
+      "id": "version-long",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | a 200-character prerelease: verifyManifest has no length cap, so it reaches the signature check"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEKZmlsZXM6CiAgLSB1cmw6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCiAgICBzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KICAgIHNpemU6IDUwCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad-signature",
+        "detail": "the release signature does not match"
+      }
+    },
+    {
+      "id": "version-arabic-digit",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: fixtures/updates/latest.yml with version ١.0.0: JS \\d is ASCII only, a Unicode \\d would accept it"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjog2aEuMC4wLWJldGEuNApmaWxlczoKICAtIHVybDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKICAgIHNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQogICAgc2l6ZTogNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release version is not a plain version number"
+      }
+    },
+    {
+      "id": "url-changed",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses a manifest whose %s changed after signing | file name"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtZXZpbC1zZXR1cC5leGUKICAgIHNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQogICAgc2l6ZTogNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad-signature",
+        "detail": "the release signature does not match"
+      }
+    },
+    {
+      "id": "url-newline",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses fields that could smuggle a second line into the signed payload | url \"a.exe\\n1.0.0\""
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiAiYS5leGVcbjEuMC4wIgogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    },
+    {
+      "id": "url-traversal",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses fields that could smuggle a second line into the signed payload | url ../OneLaunch.exe"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiAuLi9PbmVMYXVuY2guZXhlCiAgICBzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KICAgIHNpemU6IDUwCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    },
+    {
+      "id": "url-missing",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | url removed from the file entry"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    },
+    {
+      "id": "url-upper-ext",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | url with .EXE"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLkVYRQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    },
+    {
+      "id": "url-bare-ext",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | url .exe"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiAnLmV4ZScKICAgIHNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQogICAgc2l6ZTogNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    },
+    {
+      "id": "url-space",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | url with a space"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmUgTGF1bmNoLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    },
+    {
+      "id": "url-trailing-space-quoted",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | url with a quoted trailing space"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiAnT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUgJwogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    },
+    {
+      "id": "url-trailing-space-plain",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | url with an unquoted trailing space, which YAML drops"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZSAgIAogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "url-full-address",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | url as a full https address"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBodHRwczovL2V4YW1wbGUuY29tL09uZUxhdW5jaC5leGUKICAgIHNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQogICAgc2l6ZTogNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    },
+    {
+      "id": "url-non-ascii",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | url with a non-ASCII letter"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2jDqS5leGUKICAgIHNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQogICAgc2l6ZTogNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    },
+    {
+      "id": "url-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | url is a number"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiAxMgogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    },
+    {
+      "id": "sha-changed",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses a manifest whose %s changed after signing | hash"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQT09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad-signature",
+        "detail": "the release signature does not match"
+      }
+    },
+    {
+      "id": "sha-missing",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | sha512 removed from the file entry"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2l6ZTogNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no SHA-512"
+      }
+    },
+    {
+      "id": "sha-short",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | sha512 one character short"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiByVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KICAgIHNpemU6IDUwCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no SHA-512"
+      }
+    },
+    {
+      "id": "sha-no-padding",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | sha512 without its == padding"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdwogICAgc2l6ZTogNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no SHA-512"
+      }
+    },
+    {
+      "id": "sha-url-safe",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | sha512 in URL-safe base64"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YV9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUl9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no SHA-512"
+      }
+    },
+    {
+      "id": "sha-hex",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | sha512 as 128 hex characters"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiA0ZWI1NmIzYTA2YWNiMGQ2ZjBjNzliOTVlNjc1MTM4NTBlNmJkZDUwMjllZGEzMDJkNTcyMjJhZjBiZTZjNDJlNjE3NmM2MTBkMmQ5ZDdiMDAzOTU1ZjE2YmYzYjU5YzFiMDhhMTNiMGZkMzdhNTNiOTg5YjIzMzQ0YjY0N2ZhYgogICAgc2l6ZTogNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no SHA-512"
+      }
+    },
+    {
+      "id": "size-changed",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses a manifest whose %s changed after signing | size"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MQpwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad-signature",
+        "detail": "the release signature does not match"
+      }
+    },
+    {
+      "id": "size-negative",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses fields that could smuggle a second line into the signed payload | size -1"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiAtMQpwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no size"
+      }
+    },
+    {
+      "id": "size-zero",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | size 0"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiAwCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no size"
+      }
+    },
+    {
+      "id": "size-fraction",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | size 50.5"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MC41CnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no size"
+      }
+    },
+    {
+      "id": "size-missing",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | size removed"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no size"
+      }
+    },
+    {
+      "id": "cap-size-safe-at",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | size 9007199254740991, the largest safe integer"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA5MDA3MTk5MjU0NzQwOTkxCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad-signature",
+        "detail": "the release signature does not match"
+      }
+    },
+    {
+      "id": "cap-size-safe-over",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | size 9007199254740992, one over the largest safe integer"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA5MDA3MTk5MjU0NzQwOTkyCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no size"
+      }
+    },
+    {
+      "id": "size-infinity",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | size .inf"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiAuaW5mCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no size"
+      }
+    },
+    {
+      "id": "size-nan",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | size .nan"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiAubmFuCnBhdGg6IE9uZUxhdW5jaC0xLjAuMC1iZXRhLjQtc2V0dXAuZXhlCnNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQpyZWxlYXNlRGF0ZTogJzIwMjYtMTEtMjBUMDA6MDA6MDAuMDAwWicKc2lnbmF0dXJlOiAnV21hTnJtU2JrcDFDQTZTWnFoMUpLcmwrMHdaeHdDeDg4c05LcHo1aUNLWkljeDFZQzZUeWVxQmVhaXBlZ2MybkFRNmd0cnluWWY2R1Mydi9iVlNjQ0E9PScKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file has no size"
+      }
+    },
+    {
+      "id": "unsigned",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses an unsigned manifest and malformed signatures"
+      },
+      "args": [
+        {
+          "$file": "fixtures/updates/latest-unsigned.yml",
+          "sha256": "8b943945cbee66edd81955bc9c9f83c627502a3b9dbb6e1b900164485aa9bd80"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unsigned",
+        "detail": "the release is not signed"
+      }
+    },
+    {
+      "id": "signature-short",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses an unsigned manifest and malformed signatures | signature: 'abc'"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ2FiYycKa2V5SWQ6ICczMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release signature is malformed"
+      }
+    },
+    {
+      "id": "signature-missing-keyid-kept",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses an unsigned manifest and malformed signatures | signature removed, keyId kept"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release signature is malformed"
+      }
+    },
+    {
+      "id": "keyid-not-hex",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses an unsigned manifest and malformed signatures | keyId: 'NOT-HEX'"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnTk9ULUhFWCcK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release key id is malformed"
+      }
+    },
+    {
+      "id": "keyid-missing-signature-kept",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | keyId removed, signature kept"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release key id is malformed"
+      }
+    },
+    {
+      "id": "keyid-upper-hex",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | keyId in upper-case hex"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NkRFQzMwQzQ4QzcxRicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release key id is malformed"
+      }
+    },
+    {
+      "id": "keyid-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | keyId as an unquoted all-digit value, which YAML reads as a number"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAzMzc2MTIzMDEyMzQ1Njc4Cg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release key id is malformed"
+      }
+    },
+    {
+      "id": "keyid-null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | keyId: null with the signature kept"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiBudWxsCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release key id is malformed"
+      }
+    },
+    {
+      "id": "signature-null-keyid-null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | signature: null and keyId: null: present but not strings"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogbnVsbAprZXlJZDogbnVsbAo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release signature is malformed"
+      }
+    },
+    {
+      "id": "signature-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | signature is a number"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogNwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release signature is malformed"
+      }
+    },
+    {
+      "id": "signature-no-padding",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | signature without its == padding"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBJwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release signature is malformed"
+      }
+    },
+    {
+      "id": "keyid-short",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | keyId 15 hex characters"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzc2ZGVjMzBjNDhjNzFmJwo="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release key id is malformed"
+      }
+    },
+    {
+      "id": "unknown-key",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses a key it does not pin, even when it names a pinned key id | the throwaway key is not in the pinned list"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "616ad3e53aac3ce4",
+            "spki": "MCowBQYDK2VwAyEAKLQyPjWzDVRwW/U6ta7+/qlzyv7jpTAB3TfJCCfhS9I="
+          },
+          {
+            "id": "35f13c45c6049dbe",
+            "spki": "MCowBQYDK2VwAyEAW8G8A0kpvLTfssEoZU26RlbEFrwCITH9wgCpPa3jR/A="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "unknown-key",
+        "detail": "the release is signed with a key this build does not trust (3376dec30c48c71f)"
+      }
+    },
+    {
+      "id": "forged-pinned-keyid",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses a key it does not pin, even when it names a pinned key id | keyId set to the primary pinned id"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnNjE2YWQzZTUzYWFjM2NlNCcK"
+        },
+        [
+          {
+            "id": "616ad3e53aac3ce4",
+            "spki": "MCowBQYDK2VwAyEAKLQyPjWzDVRwW/U6ta7+/qlzyv7jpTAB3TfJCCfhS9I="
+          },
+          {
+            "id": "35f13c45c6049dbe",
+            "spki": "MCowBQYDK2VwAyEAW8G8A0kpvLTfssEoZU26RlbEFrwCITH9wgCpPa3jR/A="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad-signature",
+        "detail": "the release signature does not match"
+      }
+    },
+    {
+      "id": "signature-flipped",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the first signature character changed"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1htYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad-signature",
+        "detail": "the release signature does not match"
+      }
+    },
+    {
+      "id": "top-level-path-ignored",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the top-level path and sha512 changed: they are not signed and not read"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBvdGhlci5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "version": "1.0.0-beta.4",
+        "file": {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        },
+        "keyId": "3376dec30c48c71f"
+      }
+    },
+    {
+      "id": "trusted-key-garbage-spki",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the trusted key carries the throwaway id but an SPKI that is not a key"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "garbage"
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad-signature",
+        "detail": "the release signature does not match"
+      }
+    },
+    {
+      "id": "trusted-key-other-ed25519",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the trusted key carries the throwaway id but the primary pinned SPKI"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEAKLQyPjWzDVRwW/U6ta7+/qlzyv7jpTAB3TfJCCfhS9I="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad-signature",
+        "detail": "the release signature does not match"
+      }
+    },
+    {
+      "id": "trusted-key-not-ed25519",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the trusted key carries the throwaway id but a P-256 SPKI"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQogICAgc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CiAgICBzaXplOiA1MApwYXRoOiBPbmVMYXVuY2gtMS4wLjAtYmV0YS40LXNldHVwLmV4ZQpzaGE1MTI6IFRyVnJPZ2Fzc05id3g1dVY1blVUaFE1cjNWQXA3YU1DMVhJaXJ3dm14QzVoZHNZUTB0blhzQU9WWHhhL08xbkJzSW9Uc1AwM3BUdVlteU0wUzJSL3F3PT0KcmVsZWFzZURhdGU6ICcyMDI2LTExLTIwVDAwOjAwOjAwLjAwMFonCnNpZ25hdHVyZTogJ1dtYU5ybVNia3AxQ0E2U1pxaDFKS3JsKzB3Wnh3Q3g4OHNOS3B6NWlDS1pJY3gxWUM2VHllcUJlYWlwZWdjMm5BUTZndHJ5bllmNkdTMnYvYlZTY0NBPT0nCmtleUlkOiAnMzM3NmRlYzMwYzQ4YzcxZicK"
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li/hp/m47n60p8D54WK84zV2sxXs7LtkBoN79R9Q=="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad-signature",
+        "detail": "the release signature does not match"
+      }
+    },
+    {
+      "id": "invalid-utf8-in-url",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: fixtures/updates/latest.yml with a 0xFF byte in the url; the decode gives U+FFFD and the name check refuses it"
+      },
+      "args": [
+        {
+          "$bytes": "dmVyc2lvbjogMS4wLjAtYmV0YS40CmZpbGVzOgogIC0gdXJsOiBPbmVMYXVuY2j/LTEuMC4wLWJldGEuNC1zZXR1cC5leGUKICAgIHNoYTUxMjogVHJWck9nYXNzTmJ3eDV1VjVuVVRoUTVyM1ZBcDdhTUMxWElpcnd2bXhDNWhkc1lRMHRuWHNBT1ZYeGEvTzFuQnNJb1RzUDAzcFR1WW15TTBTMlIvcXc9PQogICAgc2l6ZTogNTAKcGF0aDogT25lTGF1bmNoLTEuMC4wLWJldGEuNC1zZXR1cC5leGUKc2hhNTEyOiBUclZyT2dhc3NOYnd4NXVWNW5VVGhRNXIzVkFwN2FNQzFYSWlyd3ZteEM1aGRzWVEwdG5Yc0FPVlh4YS9PMW5Cc0lvVHNQMDNwVHVZbXlNMFMyUi9xdz09CnJlbGVhc2VEYXRlOiAnMjAyNi0xMS0yMFQwMDowMDowMC4wMDBaJwpzaWduYXR1cmU6ICdXbWFOcm1TYmtwMUNBNlNacWgxSktybCswd1p4d0N4ODhzTktwejVpQ0taSWN4MVlDNlR5ZXFCZWFpcGVnYzJuQVE2Z3RyeW5ZZjZHUzJ2L2JWU2NDQT09JwprZXlJZDogJzMzNzZkZWMzMGM0OGM3MWYnCg=="
+        },
+        [
+          {
+            "id": "3376dec30c48c71f",
+            "spki": "MCowBQYDK2VwAyEADR4jyv5V/hvs19mFqJcbLj84zK3pbwLwiOZCqw7bcrQ="
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "malformed",
+        "detail": "the release file is not a plain .exe name"
+      }
+    }
+  ]
+}

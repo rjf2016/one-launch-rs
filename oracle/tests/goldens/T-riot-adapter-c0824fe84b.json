@@ -1,0 +1,41 @@
+{
+  "id": "T-riot-adapter-c0824fe84b",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "rejects an id that is not a product, and needs the client installed, before touching anything",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "Not a Riot product id: valorant"
+      }
+    },
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "LauncherNotInstalledError",
+        "message": "riot is not installed on this PC",
+        "code": "NOT_INSTALLED"
+      }
+    }
+  ]
+}

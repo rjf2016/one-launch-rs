@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-f63b5b08c9",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.detectInstall"
+  ],
+  "name": "falls back to HKLM, then the default location, then reports null",
+  "calls": []
+}

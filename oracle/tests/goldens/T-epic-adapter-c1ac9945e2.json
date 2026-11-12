@@ -1,0 +1,67 @@
+{
+  "id": "T-epic-adapter-c1ac9945e2",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.launchGame"
+  ],
+  "name": "sends the catalog triple by default, the app name on request, and rejects odd ids",
+  "calls": [
+    {
+      "launcher": "epic",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "Sugar",
+          "name": "Rocket League"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "com.epicgames.launcher://apps/0000000000000000000000000000000a%3A0000000000000000000000000000000b%3ASugar?action=launch&silent=true"
+      }
+    },
+    {
+      "launcher": "epic",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "Sugar",
+          "name": "Rocket League"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "com.epicgames.launcher://apps/Sugar?action=launch&silent=true"
+      }
+    },
+    {
+      "launcher": "epic",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "Unknown",
+          "name": "x"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "com.epicgames.launcher://apps/Unknown?action=launch&silent=true"
+      }
+    },
+    {
+      "launcher": "epic",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "a b",
+          "name": "x"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "Not an Epic app name: a b"
+      }
+    }
+  ]
+}

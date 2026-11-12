@@ -1,0 +1,574 @@
+{
+  "function": "sniffImage",
+  "source": "src/main/services/artwork-url.ts",
+  "note": "decode: arg0=bytes\narg0 is the downloaded or picked image as bytes (src/main/services/artwork.ts passes the Buffer it fetched or read).\nThe function enforces one limit, a minimum of 12 bytes (cap-length-at-*, cap-length-under-*); the download size cap is artwork.ts, not this function.",
+  "cases": [
+    {
+      "id": "jpeg",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > sniffImage > recognises jpeg, png, and webp and nothing else"
+      },
+      "args": [
+        {
+          "$bytes": "/9j/4AAAAAAAAAAAAAAAAAAAAAA="
+        }
+      ],
+      "out": "jpg"
+    },
+    {
+      "id": "png",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > sniffImage > recognises jpeg, png, and webp and nothing else"
+      },
+      "args": [
+        {
+          "$bytes": "iVBORw0KGgoAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "out": "png"
+    },
+    {
+      "id": "webp",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > sniffImage > recognises jpeg, png, and webp and nothing else"
+      },
+      "args": [
+        {
+          "$bytes": "UklGRgAAAABXRUJQVlA4IAAAAAA="
+        }
+      ],
+      "out": "webp"
+    },
+    {
+      "id": "gif",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > sniffImage > recognises jpeg, png, and webp and nothing else"
+      },
+      "args": [
+        {
+          "$bytes": "R0lGOAAAAAAAAAAAAAAAAAAAAAA="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "html",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > sniffImage > recognises jpeg, png, and webp and nothing else"
+      },
+      "args": [
+        {
+          "$bytes": "PCFkb2N0eXBlIGh0bWw+PGh0bWw+PC9odG1sPg=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "two-bytes",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > sniffImage > recognises jpeg, png, and webp and nothing else"
+      },
+      "args": [
+        {
+          "$bytes": "/9g="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "ico",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > sniffImage > tells a Windows icon file by its header, which sniffImage never accepts"
+      },
+      "args": [
+        {
+          "$bytes": "AAABAAEAAAAAAAAAAAAAAAAAAAAAAA=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "fixture-45973642-1c2e-49d3-bb17-13ba0ff75471-grid.webp",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/45973642-1c2e-49d3-bb17-13ba0ff75471/grid.webp"
+      },
+      "args": [
+        {
+          "$file": "fixtures/data-folder/artwork/45973642-1c2e-49d3-bb17-13ba0ff75471/grid.webp",
+          "sha256": "4d4595a822e3cae9085d85fd882367dec5b17e4f4a550da52276b229b3077054"
+        }
+      ],
+      "out": "webp"
+    },
+    {
+      "id": "fixture-7494eca8-f8d1-432f-92e2-714aeb48109b-grid.jpg",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/7494eca8-f8d1-432f-92e2-714aeb48109b/grid.jpg"
+      },
+      "args": [
+        {
+          "$file": "fixtures/data-folder/artwork/7494eca8-f8d1-432f-92e2-714aeb48109b/grid.jpg",
+          "sha256": "d20f6ffd523b78a86cd2f916fa34af5d1918d75f7b142237c752ad6b254213ab"
+        }
+      ],
+      "out": "jpg"
+    },
+    {
+      "id": "fixture-7494eca8-f8d1-432f-92e2-714aeb48109b-hero.jpg",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/7494eca8-f8d1-432f-92e2-714aeb48109b/hero.jpg"
+      },
+      "args": [
+        {
+          "$file": "fixtures/data-folder/artwork/7494eca8-f8d1-432f-92e2-714aeb48109b/hero.jpg",
+          "sha256": "d20f6ffd523b78a86cd2f916fa34af5d1918d75f7b142237c752ad6b254213ab"
+        }
+      ],
+      "out": "jpg"
+    },
+    {
+      "id": "fixture-7494eca8-f8d1-432f-92e2-714aeb48109b-logo.png",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/7494eca8-f8d1-432f-92e2-714aeb48109b/logo.png"
+      },
+      "args": [
+        {
+          "$file": "fixtures/data-folder/artwork/7494eca8-f8d1-432f-92e2-714aeb48109b/logo.png",
+          "sha256": "a930c2bb4e61c0682068f71c4ef427eefbb07098ecea9390e445e7af4b66a384"
+        }
+      ],
+      "out": "png"
+    },
+    {
+      "id": "fixture-a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad-grid.jpg",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad/grid.jpg"
+      },
+      "args": [
+        {
+          "$file": "fixtures/data-folder/artwork/a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad/grid.jpg",
+          "sha256": "d20f6ffd523b78a86cd2f916fa34af5d1918d75f7b142237c752ad6b254213ab"
+        }
+      ],
+      "out": "jpg"
+    },
+    {
+      "id": "fixture-a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad-hero.jpg",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad/hero.jpg"
+      },
+      "args": [
+        {
+          "$file": "fixtures/data-folder/artwork/a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad/hero.jpg",
+          "sha256": "d20f6ffd523b78a86cd2f916fa34af5d1918d75f7b142237c752ad6b254213ab"
+        }
+      ],
+      "out": "jpg"
+    },
+    {
+      "id": "fixture-b1da8942-3c88-4084-90fd-1cfdeeed454a-grid.png",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/b1da8942-3c88-4084-90fd-1cfdeeed454a/grid.png"
+      },
+      "args": [
+        {
+          "$file": "fixtures/data-folder/artwork/b1da8942-3c88-4084-90fd-1cfdeeed454a/grid.png",
+          "sha256": "a930c2bb4e61c0682068f71c4ef427eefbb07098ecea9390e445e7af4b66a384"
+        }
+      ],
+      "out": "png"
+    },
+    {
+      "id": "fixture-d48e5d4d-e887-4471-bab7-a5bc4d58ca17-grid.ico",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/d48e5d4d-e887-4471-bab7-a5bc4d58ca17/grid.ico"
+      },
+      "args": [
+        {
+          "$file": "fixtures/data-folder/artwork/d48e5d4d-e887-4471-bab7-a5bc4d58ca17/grid.ico",
+          "sha256": "b0e3f700bb21dccf2fd9d6c2012f3989c1252d28a57d61e7c12ca281e19e5fb5"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "cap-length-at-jpeg",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: exactly 12 bytes, the minimum, with a JPEG start"
+      },
+      "args": [
+        {
+          "$bytes": "/9j/AAAAAAAAAAAA"
+        }
+      ],
+      "out": "jpg"
+    },
+    {
+      "id": "cap-length-under-jpeg",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: 11 bytes with a JPEG start is refused"
+      },
+      "args": [
+        {
+          "$bytes": "/9j/AAAAAAAAAAA="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "cap-length-at-png",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: 12 bytes with the PNG signature"
+      },
+      "args": [
+        {
+          "$bytes": "iVBORw0KGgoAAAAA"
+        }
+      ],
+      "out": "png"
+    },
+    {
+      "id": "cap-length-under-png",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: 11 bytes with the whole PNG signature is still refused"
+      },
+      "args": [
+        {
+          "$bytes": "iVBORw0KGgoAAAA="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "cap-length-at-webp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: exactly RIFF....WEBP, 12 bytes"
+      },
+      "args": [
+        {
+          "$bytes": "UklGRgAAAABXRUJQ"
+        }
+      ],
+      "out": "webp"
+    },
+    {
+      "id": "cap-length-under-webp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: RIFF....WEB, 11 bytes"
+      },
+      "args": [
+        {
+          "$bytes": "UklGRgAAAABXRUI="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: no bytes"
+      },
+      "args": [
+        {
+          "$bytes": ""
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "jpeg-third-byte",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: FF D8 FE: the third JPEG byte wrong"
+      },
+      "args": [
+        {
+          "$bytes": "/9j+AAAAAAAAAAAAAAAAAAAAAA=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "jpeg-second-byte",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: FF D9 FF: the second JPEG byte wrong"
+      },
+      "args": [
+        {
+          "$bytes": "/9n/AAAAAAAAAAAAAAAAAAAAAA=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "jpeg-first-byte",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: FE D8 FF: the first JPEG byte wrong"
+      },
+      "args": [
+        {
+          "$bytes": "/tj/AAAAAAAAAAAAAAAAAAAAAA=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "png-byte-0-wrong",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the PNG signature with byte 0 changed"
+      },
+      "args": [
+        {
+          "$bytes": "iFBORw0KGgoAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "png-byte-1-wrong",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the PNG signature with byte 1 changed"
+      },
+      "args": [
+        {
+          "$bytes": "iVFORw0KGgoAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "png-byte-2-wrong",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the PNG signature with byte 2 changed"
+      },
+      "args": [
+        {
+          "$bytes": "iVBPRw0KGgoAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "png-byte-3-wrong",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the PNG signature with byte 3 changed"
+      },
+      "args": [
+        {
+          "$bytes": "iVBORg0KGgoAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "png-byte-4-wrong",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the PNG signature with byte 4 changed"
+      },
+      "args": [
+        {
+          "$bytes": "iVBORwwKGgoAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "png-byte-5-wrong",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the PNG signature with byte 5 changed"
+      },
+      "args": [
+        {
+          "$bytes": "iVBORw0LGgoAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "png-byte-6-wrong",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the PNG signature with byte 6 changed"
+      },
+      "args": [
+        {
+          "$bytes": "iVBORw0KGwoAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "png-byte-7-wrong",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the PNG signature with byte 7 changed"
+      },
+      "args": [
+        {
+          "$bytes": "iVBORw0KGgsAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "webp-lower-riff",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: riff in lower case is refused"
+      },
+      "args": [
+        {
+          "$bytes": "cmlmZgAAAABXRUJQAAAAAA=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "webp-other-form",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: RIFF....WAVE is not WebP"
+      },
+      "args": [
+        {
+          "$bytes": "UklGRgAAAABXQVZFAAAAAA=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "webp-tag-at-4",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: WEBP at offset 4 instead of 8"
+      },
+      "args": [
+        {
+          "$bytes": "UklGRldFQlAAAAAAAAAAAA=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "webp-high-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: bytes over 0x7F in the RIFF size field are read as char codes and do not matter"
+      },
+      "args": [
+        {
+          "$bytes": "UklGRv/+gIFXRUJQAAAAAA=="
+        }
+      ],
+      "out": "webp"
+    },
+    {
+      "id": "webp-latin1-lookalike",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: a byte 0xC5 is the char code 197, never part of a UTF-8 sequence"
+      },
+      "args": [
+        {
+          "$bytes": "UklGRgAAAABXRULFAAAAAA=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "jpeg-wins-over-webp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the checks run JPEG, PNG, WebP in order"
+      },
+      "args": [
+        {
+          "$bytes": "/9j/RgAAAABXRUJQAAAAAA=="
+        }
+      ],
+      "out": "jpg"
+    },
+    {
+      "id": "bom-then-png",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a UTF-8 BOM before a PNG signature is refused"
+      },
+      "args": [
+        {
+          "$bytes": "77u/iVBORw0KGgoAAAAAAAAAAA=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "svg",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an SVG document is not stored"
+      },
+      "args": [
+        {
+          "$bytes": "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjwvc3ZnPg=="
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "bmp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a BMP header is not stored"
+      },
+      "args": [
+        {
+          "$bytes": "Qk0AAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "avif",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an AVIF ftyp box is not stored"
+      },
+      "args": [
+        {
+          "$bytes": "AAAAHGZ0eXBhdmlmAAAAAAAAAAA="
+        }
+      ],
+      "out": null
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "condition": "file-size",
+  "runs": 3,
+  "digests": [
+    "3c36b1d70b01dd9bb7ca73bb3938e3adfba3e8800e17f28385716be6d29c7740",
+    "3c36b1d70b01dd9bb7ca73bb3938e3adfba3e8800e17f28385716be6d29c7740",
+    "3c36b1d70b01dd9bb7ca73bb3938e3adfba3e8800e17f28385716be6d29c7740"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

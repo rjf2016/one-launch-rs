@@ -1,0 +1,689 @@
+{
+  "id": "T-steam-adapter-a909b74c33",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.switchAccount (dry run)"
+  ],
+  "name": "does not call a running Steam already active when it is signed in as someone else, or sitting on its sign-in form",
+  "calls": [
+    {
+      "launcher": "steam",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "Main",
+          "login": "user_1",
+          "launcherUid": "76561198000000001",
+          "hasSecret": false
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "steam",
+        "account": {
+          "id": "acct-1",
+          "displayName": "Main",
+          "login": "user_1",
+          "launcherUid": "76561198000000001"
+        },
+        "strategy": "remembered",
+        "current": {
+          "mostRecentLogin": "user_1",
+          "autoLoginUser": "user_1",
+          "running": true
+        },
+        "steps": [
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "close",
+            "kind": "process",
+            "title": "Close Steam",
+            "target": "steam.exe",
+            "detail": "Run \"{tmp}\\steam\\steam.exe\" -shutdown and wait up to 0.04 s for steam.exe to exit. If it is still running after that, force-close steam.exe and every process it started. Any game running under Steam closes with it."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "backup",
+            "kind": "backup",
+            "title": "Back up Steam files",
+            "target": "{tmp}\\backups\\steam\\<timestamp>",
+            "detail": "Copy {tmp}\\steam\\config\\loginusers.vdf into a new snapshot folder and record the current HKCU\\Software\\Valve\\Steam\\AutoLoginUser and RememberPassword values in its manifest.json, so a failed switch can be rolled back. The newest 20 snapshots are kept."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "file",
+            "kind": "file",
+            "title": "Mark the account as most recent",
+            "target": "{tmp}\\steam\\config\\loginusers.vdf",
+            "detail": "No change: user_1 is already the most recent account in loginusers.vdf."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "registry-user",
+            "kind": "registry",
+            "title": "Point Steam at the account",
+            "target": "HKCU\\Software\\Valve\\Steam\\AutoLoginUser",
+            "detail": "No change: AutoLoginUser is already user_1."
+          },
+          {
+            "changes": [
+              {
+                "where": "RememberPassword",
+                "before": "(absent)",
+                "after": "1"
+              }
+            ],
+            "skipped": false,
+            "id": "registry-remember",
+            "kind": "registry",
+            "title": "Keep the session remembered",
+            "target": "HKCU\\Software\\Valve\\Steam\\RememberPassword",
+            "detail": "REG_DWORD set to 1. On this Steam build the value is normally absent and the per-account RememberPassword in loginusers.vdf does the work; writing it is harmless and matches the documented procedure."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "start",
+            "kind": "launch",
+            "title": "Start Steam",
+            "target": "\"{tmp}\\steam\\steam.exe\"",
+            "detail": "Start Steam normally. It signs in as user_1 without prompting because the session is remembered."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "wait",
+            "kind": "wait",
+            "title": "Wait for Steam to come up",
+            "target": "steam.exe",
+            "detail": "Poll the process list until steam.exe is running, up to 0.04 s."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "verify",
+            "kind": "wait",
+            "title": "Confirm Steam signed in",
+            "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+            "detail": "Poll until Steam reports the signed-in account id 39734273 (the SteamID3 of user_1), up to 0.04 s. Meanwhile {tmp}\\steam\\logs\\steamui_login.txt is read (Steam's own sign-in state log, no credentials in it) to learn at once whether Steam is instead asking for a password or a Steam Guard code, and {tmp}\\steam\\logs\\bootstrap_log.txt (its updater log) to see whether Steam is updating itself first; then the wait starts over when the update ends, up to 15 min in all. A game launch (steam://rungameid/<appid>) happens only after the sign-in is confirmed."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "login",
+            "kind": "launch",
+            "title": "Fallback: sign in with the stored password",
+            "target": "\"{tmp}\\steam\\steam.exe\" -login user_1 <password>",
+            "detail": "Not available: no password is stored for this account. If Steam asks for credentials, One Launch waits for you to sign in by hand (next step)."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "manual",
+            "kind": "wait",
+            "title": "Wait for you to sign in",
+            "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+            "detail": "Runs only if Steam still asks for something One Launch cannot supply: a Steam Guard code for a PC this account has not used before, an expired session with no stored password, or a session Steam simply refuses. The Steam window stays open on its sign-in form; you sign in there once with \"Remember me\" ticked and One Launch continues with the game as soon as Steam reports the sign-in, up to 0.0006666666666666666 min. A wrong stored password ends the switch instead."
+          }
+        ],
+        "warnings": [
+          "Steam's files already name user_1, but the Steam that is running is signed in as user_2. It will be closed, along with any game running under it, and started again as user_1."
+        ],
+        "notes": [],
+        "executable": true,
+        "generatedAt": "<ts>"
+      }
+    },
+    {
+      "launcher": "steam",
+      "method": "preflight",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "Main",
+          "login": "user_1",
+          "launcherUid": "76561198000000001",
+          "hasSecret": false
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "plan": {
+          "launcher": "steam",
+          "account": {
+            "id": "acct-1",
+            "displayName": "Main",
+            "login": "user_1",
+            "launcherUid": "76561198000000001"
+          },
+          "strategy": "remembered",
+          "current": {
+            "mostRecentLogin": "user_1",
+            "autoLoginUser": "user_1",
+            "running": true
+          },
+          "steps": [
+            {
+              "changes": [],
+              "skipped": false,
+              "id": "close",
+              "kind": "process",
+              "title": "Close Steam",
+              "target": "steam.exe",
+              "detail": "Run \"{tmp}\\steam\\steam.exe\" -shutdown and wait up to 0.04 s for steam.exe to exit. If it is still running after that, force-close steam.exe and every process it started. Any game running under Steam closes with it."
+            },
+            {
+              "changes": [],
+              "skipped": false,
+              "id": "backup",
+              "kind": "backup",
+              "title": "Back up Steam files",
+              "target": "{tmp}\\backups\\steam\\<timestamp>",
+              "detail": "Copy {tmp}\\steam\\config\\loginusers.vdf into a new snapshot folder and record the current HKCU\\Software\\Valve\\Steam\\AutoLoginUser and RememberPassword values in its manifest.json, so a failed switch can be rolled back. The newest 20 snapshots are kept."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "file",
+              "kind": "file",
+              "title": "Mark the account as most recent",
+              "target": "{tmp}\\steam\\config\\loginusers.vdf",
+              "detail": "No change: user_1 is already the most recent account in loginusers.vdf."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "registry-user",
+              "kind": "registry",
+              "title": "Point Steam at the account",
+              "target": "HKCU\\Software\\Valve\\Steam\\AutoLoginUser",
+              "detail": "No change: AutoLoginUser is already user_1."
+            },
+            {
+              "changes": [
+                {
+                  "where": "RememberPassword",
+                  "before": "(absent)",
+                  "after": "1"
+                }
+              ],
+              "skipped": false,
+              "id": "registry-remember",
+              "kind": "registry",
+              "title": "Keep the session remembered",
+              "target": "HKCU\\Software\\Valve\\Steam\\RememberPassword",
+              "detail": "REG_DWORD set to 1. On this Steam build the value is normally absent and the per-account RememberPassword in loginusers.vdf does the work; writing it is harmless and matches the documented procedure."
+            },
+            {
+              "changes": [],
+              "skipped": false,
+              "id": "start",
+              "kind": "launch",
+              "title": "Start Steam",
+              "target": "\"{tmp}\\steam\\steam.exe\"",
+              "detail": "Start Steam normally. It signs in as user_1 without prompting because the session is remembered."
+            },
+            {
+              "changes": [],
+              "skipped": false,
+              "id": "wait",
+              "kind": "wait",
+              "title": "Wait for Steam to come up",
+              "target": "steam.exe",
+              "detail": "Poll the process list until steam.exe is running, up to 0.04 s."
+            },
+            {
+              "changes": [],
+              "skipped": false,
+              "id": "verify",
+              "kind": "wait",
+              "title": "Confirm Steam signed in",
+              "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+              "detail": "Poll until Steam reports the signed-in account id 39734273 (the SteamID3 of user_1), up to 0.04 s. Meanwhile {tmp}\\steam\\logs\\steamui_login.txt is read (Steam's own sign-in state log, no credentials in it) to learn at once whether Steam is instead asking for a password or a Steam Guard code, and {tmp}\\steam\\logs\\bootstrap_log.txt (its updater log) to see whether Steam is updating itself first; then the wait starts over when the update ends, up to 15 min in all. A game launch (steam://rungameid/<appid>) happens only after the sign-in is confirmed."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "login",
+              "kind": "launch",
+              "title": "Fallback: sign in with the stored password",
+              "target": "\"{tmp}\\steam\\steam.exe\" -login user_1 <password>",
+              "detail": "Not available: no password is stored for this account. If Steam asks for credentials, One Launch waits for you to sign in by hand (next step)."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "manual",
+              "kind": "wait",
+              "title": "Wait for you to sign in",
+              "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+              "detail": "Runs only if Steam still asks for something One Launch cannot supply: a Steam Guard code for a PC this account has not used before, an expired session with no stored password, or a session Steam simply refuses. The Steam window stays open on its sign-in form; you sign in there once with \"Remember me\" ticked and One Launch continues with the game as soon as Steam reports the sign-in, up to 0.0006666666666666666 min. A wrong stored password ends the switch instead."
+            }
+          ],
+          "warnings": [],
+          "notes": [],
+          "executable": true,
+          "generatedAt": "<ts>"
+        },
+        "launcherRunning": true,
+        "runningGame": null,
+        "alreadyActive": false,
+        "closeMessage": "Steam is running. Switching closes it."
+      }
+    },
+    {
+      "launcher": "steam",
+      "method": "preflight",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "Main",
+          "login": "user_1",
+          "launcherUid": "76561198000000001",
+          "hasSecret": false
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "plan": {
+          "launcher": "steam",
+          "account": {
+            "id": "acct-1",
+            "displayName": "Main",
+            "login": "user_1",
+            "launcherUid": "76561198000000001"
+          },
+          "strategy": "remembered",
+          "current": {
+            "mostRecentLogin": "user_1",
+            "autoLoginUser": "user_1",
+            "running": true
+          },
+          "steps": [
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "close",
+              "kind": "process",
+              "title": "Close Steam",
+              "target": "steam.exe",
+              "detail": "Skipped: Steam is already signed in as this account, so it is left running."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "backup",
+              "kind": "backup",
+              "title": "Back up Steam files",
+              "target": "{tmp}\\backups\\steam\\<timestamp>",
+              "detail": "Skipped: nothing will be modified."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "file",
+              "kind": "file",
+              "title": "Mark the account as most recent",
+              "target": "{tmp}\\steam\\config\\loginusers.vdf",
+              "detail": "No change: user_1 is already the most recent account in loginusers.vdf."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "registry-user",
+              "kind": "registry",
+              "title": "Point Steam at the account",
+              "target": "HKCU\\Software\\Valve\\Steam\\AutoLoginUser",
+              "detail": "No change: AutoLoginUser is already user_1."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "registry-remember",
+              "kind": "registry",
+              "title": "Keep the session remembered",
+              "target": "HKCU\\Software\\Valve\\Steam\\RememberPassword",
+              "detail": "Skipped: no switch is needed, so the value is left as it is."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "start",
+              "kind": "launch",
+              "title": "Start Steam",
+              "target": "\"{tmp}\\steam\\steam.exe\"",
+              "detail": "Skipped: Steam is already running as this account."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "wait",
+              "kind": "wait",
+              "title": "Wait for Steam to come up",
+              "target": "steam.exe",
+              "detail": "Poll the process list until steam.exe is running, up to 0.04 s."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "verify",
+              "kind": "wait",
+              "title": "Confirm Steam signed in",
+              "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+              "detail": "Skipped: Steam is already signed in as this account."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "login",
+              "kind": "launch",
+              "title": "Fallback: sign in with the stored password",
+              "target": "\"{tmp}\\steam\\steam.exe\" -login user_1 <password>",
+              "detail": "Not available: no password is stored for this account. If Steam asks for credentials, One Launch waits for you to sign in by hand (next step)."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "manual",
+              "kind": "wait",
+              "title": "Wait for you to sign in",
+              "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+              "detail": "Runs only if Steam still asks for something One Launch cannot supply: a Steam Guard code for a PC this account has not used before, an expired session with no stored password, or a session Steam simply refuses. The Steam window stays open on its sign-in form; you sign in there once with \"Remember me\" ticked and One Launch continues with the game as soon as Steam reports the sign-in, up to 0.0006666666666666666 min. A wrong stored password ends the switch instead."
+            }
+          ],
+          "warnings": [],
+          "notes": [
+            "Steam is already set to sign in as user_1. The real switch would change nothing and would leave Steam running."
+          ],
+          "executable": true,
+          "generatedAt": "<ts>"
+        },
+        "launcherRunning": true,
+        "runningGame": null,
+        "alreadyActive": true,
+        "closeMessage": "Steam is running. Switching closes it."
+      }
+    },
+    {
+      "launcher": "steam",
+      "method": "preflight",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "Main",
+          "login": "user_1",
+          "launcherUid": "76561198000000001",
+          "hasSecret": false
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "plan": {
+          "launcher": "steam",
+          "account": {
+            "id": "acct-1",
+            "displayName": "Main",
+            "login": "user_1",
+            "launcherUid": "76561198000000001"
+          },
+          "strategy": "remembered",
+          "current": {
+            "mostRecentLogin": "user_1",
+            "autoLoginUser": "user_1",
+            "running": true
+          },
+          "steps": [
+            {
+              "changes": [],
+              "skipped": false,
+              "id": "close",
+              "kind": "process",
+              "title": "Close Steam",
+              "target": "steam.exe",
+              "detail": "Run \"{tmp}\\steam\\steam.exe\" -shutdown and wait up to 0.04 s for steam.exe to exit. If it is still running after that, force-close steam.exe and every process it started. Any game running under Steam closes with it."
+            },
+            {
+              "changes": [],
+              "skipped": false,
+              "id": "backup",
+              "kind": "backup",
+              "title": "Back up Steam files",
+              "target": "{tmp}\\backups\\steam\\<timestamp>",
+              "detail": "Copy {tmp}\\steam\\config\\loginusers.vdf into a new snapshot folder and record the current HKCU\\Software\\Valve\\Steam\\AutoLoginUser and RememberPassword values in its manifest.json, so a failed switch can be rolled back. The newest 20 snapshots are kept."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "file",
+              "kind": "file",
+              "title": "Mark the account as most recent",
+              "target": "{tmp}\\steam\\config\\loginusers.vdf",
+              "detail": "No change: user_1 is already the most recent account in loginusers.vdf."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "registry-user",
+              "kind": "registry",
+              "title": "Point Steam at the account",
+              "target": "HKCU\\Software\\Valve\\Steam\\AutoLoginUser",
+              "detail": "No change: AutoLoginUser is already user_1."
+            },
+            {
+              "changes": [
+                {
+                  "where": "RememberPassword",
+                  "before": "(absent)",
+                  "after": "1"
+                }
+              ],
+              "skipped": false,
+              "id": "registry-remember",
+              "kind": "registry",
+              "title": "Keep the session remembered",
+              "target": "HKCU\\Software\\Valve\\Steam\\RememberPassword",
+              "detail": "REG_DWORD set to 1. On this Steam build the value is normally absent and the per-account RememberPassword in loginusers.vdf does the work; writing it is harmless and matches the documented procedure."
+            },
+            {
+              "changes": [],
+              "skipped": false,
+              "id": "start",
+              "kind": "launch",
+              "title": "Start Steam",
+              "target": "\"{tmp}\\steam\\steam.exe\"",
+              "detail": "Start Steam normally. It signs in as user_1 without prompting because the session is remembered."
+            },
+            {
+              "changes": [],
+              "skipped": false,
+              "id": "wait",
+              "kind": "wait",
+              "title": "Wait for Steam to come up",
+              "target": "steam.exe",
+              "detail": "Poll the process list until steam.exe is running, up to 0.04 s."
+            },
+            {
+              "changes": [],
+              "skipped": false,
+              "id": "verify",
+              "kind": "wait",
+              "title": "Confirm Steam signed in",
+              "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+              "detail": "Poll until Steam reports the signed-in account id 39734273 (the SteamID3 of user_1), up to 0.04 s. Meanwhile {tmp}\\steam\\logs\\steamui_login.txt is read (Steam's own sign-in state log, no credentials in it) to learn at once whether Steam is instead asking for a password or a Steam Guard code, and {tmp}\\steam\\logs\\bootstrap_log.txt (its updater log) to see whether Steam is updating itself first; then the wait starts over when the update ends, up to 15 min in all. A game launch (steam://rungameid/<appid>) happens only after the sign-in is confirmed."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "login",
+              "kind": "launch",
+              "title": "Fallback: sign in with the stored password",
+              "target": "\"{tmp}\\steam\\steam.exe\" -login user_1 <password>",
+              "detail": "Not available: no password is stored for this account. If Steam asks for credentials, One Launch waits for you to sign in by hand (next step)."
+            },
+            {
+              "changes": [],
+              "skipped": true,
+              "id": "manual",
+              "kind": "wait",
+              "title": "Wait for you to sign in",
+              "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+              "detail": "Runs only if Steam still asks for something One Launch cannot supply: a Steam Guard code for a PC this account has not used before, an expired session with no stored password, or a session Steam simply refuses. The Steam window stays open on its sign-in form; you sign in there once with \"Remember me\" ticked and One Launch continues with the game as soon as Steam reports the sign-in, up to 0.0006666666666666666 min. A wrong stored password ends the switch instead."
+            }
+          ],
+          "warnings": [],
+          "notes": [],
+          "executable": true,
+          "generatedAt": "<ts>"
+        },
+        "launcherRunning": true,
+        "runningGame": null,
+        "alreadyActive": false,
+        "closeMessage": "Steam is running. Switching closes it."
+      }
+    },
+    {
+      "launcher": "steam",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "Main",
+          "login": "user_1",
+          "launcherUid": "76561198000000001",
+          "hasSecret": false
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "steam",
+        "account": {
+          "id": "acct-1",
+          "displayName": "Main",
+          "login": "user_1",
+          "launcherUid": "76561198000000001"
+        },
+        "strategy": "remembered",
+        "current": {
+          "mostRecentLogin": "user_1",
+          "autoLoginUser": "user_1",
+          "running": true
+        },
+        "steps": [
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "close",
+            "kind": "process",
+            "title": "Close Steam",
+            "target": "steam.exe",
+            "detail": "Run \"{tmp}\\steam\\steam.exe\" -shutdown and wait up to 0.04 s for steam.exe to exit. If it is still running after that, force-close steam.exe and every process it started. Any game running under Steam closes with it."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "backup",
+            "kind": "backup",
+            "title": "Back up Steam files",
+            "target": "{tmp}\\backups\\steam\\<timestamp>",
+            "detail": "Copy {tmp}\\steam\\config\\loginusers.vdf into a new snapshot folder and record the current HKCU\\Software\\Valve\\Steam\\AutoLoginUser and RememberPassword values in its manifest.json, so a failed switch can be rolled back. The newest 20 snapshots are kept."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "file",
+            "kind": "file",
+            "title": "Mark the account as most recent",
+            "target": "{tmp}\\steam\\config\\loginusers.vdf",
+            "detail": "No change: user_1 is already the most recent account in loginusers.vdf."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "registry-user",
+            "kind": "registry",
+            "title": "Point Steam at the account",
+            "target": "HKCU\\Software\\Valve\\Steam\\AutoLoginUser",
+            "detail": "No change: AutoLoginUser is already user_1."
+          },
+          {
+            "changes": [
+              {
+                "where": "RememberPassword",
+                "before": "(absent)",
+                "after": "1"
+              }
+            ],
+            "skipped": false,
+            "id": "registry-remember",
+            "kind": "registry",
+            "title": "Keep the session remembered",
+            "target": "HKCU\\Software\\Valve\\Steam\\RememberPassword",
+            "detail": "REG_DWORD set to 1. On this Steam build the value is normally absent and the per-account RememberPassword in loginusers.vdf does the work; writing it is harmless and matches the documented procedure."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "start",
+            "kind": "launch",
+            "title": "Start Steam",
+            "target": "\"{tmp}\\steam\\steam.exe\"",
+            "detail": "Start Steam normally. It signs in as user_1 without prompting because the session is remembered."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "wait",
+            "kind": "wait",
+            "title": "Wait for Steam to come up",
+            "target": "steam.exe",
+            "detail": "Poll the process list until steam.exe is running, up to 0.04 s."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "verify",
+            "kind": "wait",
+            "title": "Confirm Steam signed in",
+            "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+            "detail": "Poll until Steam reports the signed-in account id 39734273 (the SteamID3 of user_1), up to 0.04 s. Meanwhile {tmp}\\steam\\logs\\steamui_login.txt is read (Steam's own sign-in state log, no credentials in it) to learn at once whether Steam is instead asking for a password or a Steam Guard code, and {tmp}\\steam\\logs\\bootstrap_log.txt (its updater log) to see whether Steam is updating itself first; then the wait starts over when the update ends, up to 15 min in all. A game launch (steam://rungameid/<appid>) happens only after the sign-in is confirmed."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "login",
+            "kind": "launch",
+            "title": "Fallback: sign in with the stored password",
+            "target": "\"{tmp}\\steam\\steam.exe\" -login user_1 <password>",
+            "detail": "Not available: no password is stored for this account. If Steam asks for credentials, One Launch waits for you to sign in by hand (next step)."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "manual",
+            "kind": "wait",
+            "title": "Wait for you to sign in",
+            "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+            "detail": "Runs only if Steam still asks for something One Launch cannot supply: a Steam Guard code for a PC this account has not used before, an expired session with no stored password, or a session Steam simply refuses. The Steam window stays open on its sign-in form; you sign in there once with \"Remember me\" ticked and One Launch continues with the game as soon as Steam reports the sign-in, up to 0.0006666666666666666 min. A wrong stored password ends the switch instead."
+          }
+        ],
+        "warnings": [
+          "Steam's files already name user_1, but the Steam that is running is not signed in as user_1. It will be closed, along with any game running under it, and started again as user_1."
+        ],
+        "notes": [],
+        "executable": true,
+        "generatedAt": "<ts>"
+      }
+    }
+  ]
+}

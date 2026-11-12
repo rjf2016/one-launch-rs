@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-109d517c79",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.launchGame / shutdown"
+  ],
+  "name": "shutdown is a no-op when Steam is closed and graceful when it listens",
+  "calls": []
+}

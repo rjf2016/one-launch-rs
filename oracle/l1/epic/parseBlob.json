@@ -1,0 +1,1005 @@
+{
+  "function": "parseBlob",
+  "source": "src/main/launchers/epic/session.ts",
+  "note": "decode: none\narg0 is the blob JSON as LauncherSessionStore.decrypt (src/main/services/sessions.ts) hands it to the Epic adapter: a string from the vault, not file bytes, so it is a plain value. Every Data value is a placeholder.\nRefusals: JSON.parse errors are recorded with V8's SyntaxError message exactly as Node prints it (a Rust port must map its parser errors to these texts or to the same name and message); every shape refusal is Error \"Stored Epic session has an unexpected shape\".\nNo size or depth cap in the function. JSON.parse has no nesting limit at these depths; see adv-depth-200 (serde_json stops at 128 by default).",
+  "cases": [
+    {
+      "id": "test-round-trip-fixture",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic session blobs > reads the remembered session with a fingerprint and never echoes the blob in change descriptions"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"yBlFvOv94gZKCMyYxCc6ugG/pCCogaaN+fVoJ4QyIFqTyYv9RjP12lvPQBHh4Ix/ocSmZlmGBkZzuMP1lLuBGOhxBPucPHTOysrF2EGUrBho6IW/i7oADcJEio5v/0Wg\"},\"offline\":{\"data\":\"Tigpb9uR42RQ2JyOwS4F3guqjas1wYwtcPc5WLLlXsuFJYoZaz091gUgb7IeckyTPqyCxXGZaoyb+/7kWIqyannQCZuj7HPO\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "yBlFvOv94gZKCMyYxCc6ugG/pCCogaaN+fVoJ4QyIFqTyYv9RjP12lvPQBHh4Ix/ocSmZlmGBkZzuMP1lLuBGOhxBPucPHTOysrF2EGUrBho6IW/i7oADcJEio5v/0Wg"
+        },
+        "offline": {
+          "data": "Tigpb9uR42RQ2JyOwS4F3guqjas1wYwtcPc5WLLlXsuFJYoZaz091gUgb7IeckyTPqyCxXGZaoyb+/7kWIqyannQCZuj7HPO"
+        }
+      }
+    },
+    {
+      "id": "test-v2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic session blobs > reads the remembered session with a fingerprint and never echoes the blob in change descriptions"
+      },
+      "args": [
+        "{\"v\":2}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "round-trip-alt",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-adapter.test.ts > EpicAdapter.listRememberedAccounts and sessionState > reports what the launcher remembers and whose it is, by fingerprint first and the log second | the B account blob of the top-level beforeEach"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"YmxvYi1mb3ItYWx0LWJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYg==\"},\"offline\":{\"data\":\"b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "YmxvYi1mb3ItYWx0LWJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYg=="
+        },
+        "offline": {
+          "data": "b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0"
+        }
+      }
+    },
+    {
+      "id": "round-trip-no-offline",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | a placeholder blob without offline data"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"},\"offline\":null}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "round-trip-enable-false",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | a placeholder blob with Enable False"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"False\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"},\"offline\":{\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLW9mZmxpbmUtcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "False",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": {
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLW9mZmxpbmUtcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        }
+      }
+    },
+    {
+      "id": "enable-missing",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | rememberMe without enable gets True"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "enable-not-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | enable false (a boolean) gets True"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":false,\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "enable-empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | an empty enable string is kept"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "offline-missing",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | no offline key"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "offline-empty-data",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | offline data empty"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"},\"offline\":{\"data\":\"\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "offline-data-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | offline data a number"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"},\"offline\":{\"data\":5}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "offline-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | offline a string"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"},\"offline\":\"x\"}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "offline-array",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | offline an array"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"},\"offline\":[]}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "offline-false",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | offline false"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"},\"offline\":false}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "offline-extra-keys",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | offline with an extra key"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"},\"offline\":{\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLW9mZmxpbmUtcHBwcHBwcHBwcHBwcHBwcHBwcHA=\",\"x\":1}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": {
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLW9mZmxpbmUtcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        }
+      }
+    },
+    {
+      "id": "extra-keys-dropped",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | unknown keys everywhere"
+      },
+      "args": [
+        "{\"x\":0,\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\",\"y\":2},\"offline\":null,\"z\":[1]}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "whitespace-around",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | JSON whitespace around the value"
+      },
+      "args": [
+        " \t\r\n{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}\n "
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "v-float-one",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | v written 1.0"
+      },
+      "args": [
+        "{\"v\":1.0,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "v-exponent-one",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | v written 1e0"
+      },
+      "args": [
+        "{\"v\":1e0,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "v-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | v the string \"1\""
+      },
+      "args": [
+        "{\"v\":\"1\",\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "v-true",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | v true"
+      },
+      "args": [
+        "{\"v\":true,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "v-missing",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | no v"
+      },
+      "args": [
+        "{\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "v-zero",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | v 0"
+      },
+      "args": [
+        "{\"v\":0,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "remember-missing",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | no rememberMe"
+      },
+      "args": [
+        "{\"v\":1}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "remember-null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | rememberMe null"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":null}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "remember-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | rememberMe a string"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":\"abc\"}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "remember-true",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | rememberMe true"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":true}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "remember-array",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | rememberMe an array"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":[\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"]}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "remember-empty-object",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | rememberMe empty"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "data-empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | rememberMe data empty"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "data-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | rememberMe data a number"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":12345}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "data-null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | rememberMe data null"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":null}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "json-null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | the JSON null"
+      },
+      "args": [
+        "null"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "json-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | the JSON 1"
+      },
+      "args": [
+        "1"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "json-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | a JSON string"
+      },
+      "args": [
+        "\"x\""
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "json-true",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | the JSON true"
+      },
+      "args": [
+        "true"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "json-false",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | the JSON false"
+      },
+      "args": [
+        "false"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "json-array",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | an empty JSON array"
+      },
+      "args": [
+        "[]"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "json-empty-object",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | an empty JSON object"
+      },
+      "args": [
+        "{}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "syntax-empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | an empty string"
+      },
+      "args": [
+        ""
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Unexpected end of JSON input"
+      }
+    },
+    {
+      "id": "syntax-not-json",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | not JSON"
+      },
+      "args": [
+        "not json"
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Unexpected token 'o', \"not json\" is not valid JSON"
+      }
+    },
+    {
+      "id": "syntax-trailing-comma",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | a trailing comma"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"},}"
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Expected double-quoted property name in JSON at position 132 (line 1 column 133)"
+      }
+    },
+    {
+      "id": "syntax-truncated",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | cut short"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Unterminated string in JSON at position 129 (line 1 column 130)"
+      }
+    },
+    {
+      "id": "syntax-single-quotes",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | single quotes"
+      },
+      "args": [
+        "{'v':1}"
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+      }
+    },
+    {
+      "id": "syntax-trailing-junk",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | a second value after the object"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}} x"
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Unexpected non-whitespace character after JSON at position 133 (line 1 column 134)"
+      }
+    },
+    {
+      "id": "syntax-bom",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | a BOM before the object"
+      },
+      "args": [
+        "﻿{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Unexpected token '﻿', \"﻿{\"v\":1,\"r\"... is not valid JSON"
+      }
+    },
+    {
+      "id": "adv-nbsp-around",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+00A0 before the object is not JSON whitespace: JSON.parse refuses it, as serde_json must"
+      },
+      "args": [
+        " {\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Unexpected token ' ', \" {\"v\":1,\"r\"... is not valid JSON"
+      }
+    },
+    {
+      "id": "adv-duplicate-v",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: duplicate keys: JSON.parse keeps the last, so v 2 then v 1 is accepted"
+      },
+      "args": [
+        "{\"v\":2,\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "adv-duplicate-data",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: duplicate data keys inside rememberMe: the last one wins"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"first-placeholder\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "adv-duplicate-v-last-bad",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: duplicate keys: v 1 then v 2 is refused, the last wins"
+      },
+      "args": [
+        "{\"v\":1,\"v\":2,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "adv-proto-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a __proto__ key from JSON.parse is an own property, never the prototype, so its v and rememberMe are not seen"
+      },
+      "args": [
+        "{\"__proto__\":{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "adv-proto-key-ignored",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a __proto__ key beside a valid blob is ignored"
+      },
+      "args": [
+        "{\"__proto__\":{\"v\":2},\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "adv-v-near-one",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: v 1.0000000000000001 parses to the double 1, so it is accepted; an integer-only check would refuse it"
+      },
+      "args": [
+        "{\"v\":1.0000000000000001,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "adv-v-big-exponent",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: v 1e400 parses to Infinity in JSON.parse and is refused; serde_json refuses the number itself"
+      },
+      "args": [
+        "{\"v\":1e400,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "adv-v-negative-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: v -0 is not 1"
+      },
+      "args": [
+        "{\"v\":-0,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Epic session has an unexpected shape"
+      }
+    },
+    {
+      "id": "adv-lone-surrogate-escape",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a \\ud800 escape in data: JSON.parse gives a lone surrogate and the blob is accepted; serde_json refuses the escape"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"abc\\ud800def\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": {
+            "$utf16": [
+              97,
+              98,
+              99,
+              55296,
+              100,
+              101,
+              102
+            ]
+          }
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "adv-escaped-astral",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: an escaped surrogate pair \\ud83d\\ude00 decodes to one astral character"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"abc\\ud83d\\ude00def\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "abc😀def"
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "adv-depth-129",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: an ignored key nested 129 arrays deep: JSON.parse accepts it; serde_json stops at 128 by default"
+      },
+      "args": [
+        "{\"x\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "adv-depth-200",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: an ignored key nested 200 arrays deep: JSON.parse accepts it"
+      },
+      "args": [
+        "{\"x\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "adv-depth-5000",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: an ignored key nested 5000 arrays deep: JSON.parse accepts it"
+      },
+      "args": [
+        "{\"x\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "adv-big-integer",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: an ignored integer beyond 2^64 is parsed as a double and the blob accepted"
+      },
+      "args": [
+        "{\"x\":123456789012345678901234567890,\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "rememberMe": {
+          "enable": "True",
+          "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+        },
+        "offline": null
+      }
+    },
+    {
+      "id": "adv-control-char",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a raw tab inside a JSON string is refused by JSON.parse"
+      },
+      "args": [
+        "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"a\tb\"}}"
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Bad control character in string literal in JSON at position 46 (line 1 column 47)"
+      }
+    }
+  ]
+}

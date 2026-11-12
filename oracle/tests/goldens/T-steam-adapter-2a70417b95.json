@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-2a70417b95",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.runningGame"
+  ],
+  "name": "reads Steam's RunningAppID and the app name",
+  "calls": []
+}

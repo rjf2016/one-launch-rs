@@ -1,0 +1,30 @@
+{
+  "id": "T-riot-adapter-0a04121378",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "stops watching when the signal aborts during the press, with the request already sent",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        },
+        {
+          "signal": {
+            "$object": "AbortSignal",
+            "value": {}
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "\"{tmp}\\Riot Games\\Riot Client\\RiotClientServices.exe\" --launch-product=valorant --launch-patchline=live (stopped watching for the game start)"
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-1bcbc71d8f",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot library"
+  ],
+  "name": "suggests the Riot ID as the name for an id no account holds, and lists nobody for a signed-out client",
+  "calls": []
+}

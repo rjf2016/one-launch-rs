@@ -1,0 +1,2191 @@
+{
+  "function": "registerIpcHandlers",
+  "source": "src/main/ipc/index.ts",
+  "note": "decode: none\narg0 is the channel, arg1 the payload, arg2 the context { trusted, busy }.\ncall reaches the real handler: electron is mocked (ipcMain.handle collects the handlers) and registerIpcHandlers from src/main/ipc/index.ts is run once, as test/ipc-validation.test.ts does, with every service a recording proxy that answers undefined, paths a proxy, rescan and the pickers recording stubs, and the logger a silent stub. Per case: isTrustedSender returns context.trusted, launch.isBusy returns context.busy (the only service a refused payload may reach), and the handler is invoked with the event { senderFrame: { url } } and arg1 as the request. A \"__proto__\" key in a payload is an own data key, as a structured clone over IPC delivers it. out is the envelope the handler layer returns, { ok: false, error: { code, message } }; the messages are exact.\nEvery case is refused before any service, shell call, picker or rescan is reached: call throws if one is, so a payload that passes validation can never be recorded here.\nThe matrix stops at validation: what a handler does once a payload passes (its service calls, the ?? defaults after a nullable field, the OPEN_FAILED, NO_PASSWORD, NOT_FOUND, NOT_A_LAUNCHER and UNAVAILABLE refusals) is hand-translated with the services, not recorded here.\nThe generated family comes from a transcription of the handler's validators (scripts/oracle/l1/core/ipc/schema.ts and model.ts), checked by the generator against the real handlers on every case; cases from test/ipc-validation.test.ts are its REFUSED table, copied as written.",
+  "cases": [
+    {
+      "id": "untrusted-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual from a frame that is not the app's renderer: refused before the handler runs"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "untrusted-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual with a well-formed payload from an untrusted frame: the sender check wins"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": "grid"
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "busy-ignored-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual does not wait for a running switch: a null payload is still BAD_REQUEST"
+      },
+      "args": [
+        "artwork:setManual",
+        null,
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload no payload at all, as invoke(channel) sends"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload null"
+      },
+      "args": [
+        "artwork:setManual",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload false"
+      },
+      "args": [
+        "artwork:setManual",
+        false,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload true"
+      },
+      "args": [
+        "artwork:setManual",
+        true,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload the number 0"
+      },
+      "args": [
+        "artwork:setManual",
+        0,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload the number 7"
+      },
+      "args": [
+        "artwork:setManual",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: artwork:setManual payload NaN"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "$number": "NaN"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload an empty string"
+      },
+      "args": [
+        "artwork:setManual",
+        "",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload a string"
+      },
+      "args": [
+        "artwork:setManual",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload an empty array"
+      },
+      "args": [
+        "artwork:setManual",
+        [],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-array-of-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload an array holding a well-formed payload"
+      },
+      "args": [
+        "artwork:setManual",
+        [
+          {
+            "gameId": "a",
+            "kind": "grid"
+          }
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload a Date: an object to the check, with none of the fields"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "$date": "2026-01-02T03:04:05.000Z"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "top-empty-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual payload an empty object: every field missing"
+      },
+      "args": [
+        "artwork:setManual",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: the key left out"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: the key present with the value undefined"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": {
+            "$undefined": true
+          },
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: null"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": null,
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: the number 0"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": 0,
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: the number 5"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": 5,
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: artwork:setManual gameId: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": {
+            "$number": "NaN"
+          },
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: artwork:setManual gameId: Infinity"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": {
+            "$number": "Infinity"
+          },
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: true"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": true,
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: false"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": false,
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: an empty array"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": [],
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: an array of one string"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": [
+            "a"
+          ],
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: an empty object"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": {},
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          },
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": {
+            "$bytes": "YQ=="
+          },
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: an empty string, which the validators do not refuse; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "",
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "gameid.space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: artwork:setManual gameId: a single space; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": " ",
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "gameid.nbsp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: artwork:setManual gameId: a no-break space, which trim() removes; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": " ",
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "gameid.lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: artwork:setManual gameId: a lone high surrogate; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": {
+            "$utf16": [
+              55296
+            ]
+          },
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "gameid.nul",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: a NUL inside the string; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a\u0000b",
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "cap-gameid-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: artwork:setManual gameId: 65 ASCII characters, one over the limit of 64 UTF-16 code units"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-gameid-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: artwork:setManual gameId: 64 ASCII characters, exactly at the limit; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "cap-gameid-astral-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: artwork:setManual gameId: 63 ASCII characters and one astral character: 64 code points but 65 UTF-16 code units"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀",
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-gameid-astral-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: artwork:setManual gameId: 62 ASCII characters and one astral character: 64 UTF-16 code units, 63 code points; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀",
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "cap-gameid-lone-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: artwork:setManual gameId: 64 ASCII characters and a lone high surrogate: one unit over the limit"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": {
+            "$utf16": [
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              55296
+            ]
+          },
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-gameid-lone-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: artwork:setManual gameId: 63 ASCII characters and a lone high surrogate, exactly at the limit; the string is not well-formed and still accepted; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": {
+            "$utf16": [
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              55296
+            ]
+          },
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "gameid.id-traversal",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: a path-like id; ids are not shape-checked at the IPC layer; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "..\\..\\elsewhere",
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "gameid.id-alias",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: an id that is not a UUID; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "@acct:steam:user_3",
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "gameid.id-padded",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: artwork:setManual gameId: an id with spaces around it; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": " a ",
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "gameid.id-accented",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual gameId: a non-ASCII id; accepted, so kind is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "é",
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: the key left out"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: the key present with the value undefined"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": {
+            "$undefined": true
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: null"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: the number 0"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": 0
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: the number 5"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: artwork:setManual kind: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": {
+            "$number": "NaN"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: artwork:setManual kind: Infinity"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": {
+            "$number": "Infinity"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: true"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: false"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": false
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: an empty array"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": []
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: an array of one string"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: an empty object"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": {}
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": {
+            "$bytes": "YQ=="
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.unknown",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: a value outside the allowed list"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": "nope"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: an empty string"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": ""
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.upper",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: artwork:setManual kind: grid upper-cased; the list is matched exactly"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": "GRID"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.title",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: artwork:setManual kind: grid with a capital first letter"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": "Grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.leading-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: artwork:setManual kind: grid with a leading space; nothing is trimmed"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": " grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.trailing-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: artwork:setManual kind: grid with a trailing space"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": "grid "
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.trailing-nul",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: grid with a trailing NUL"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": "grid\u0000"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.trailing-lone",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: artwork:setManual kind: grid with a trailing lone surrogate"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": {
+            "$utf16": [
+              103,
+              114,
+              105,
+              100,
+              55296
+            ]
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.proto",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: artwork:setManual kind: \"__proto__\" as the value; the list is an array, so includes() finds nothing"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": "__proto__"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.constructor",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: artwork:setManual kind: \"constructor\" as the value"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": "constructor"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "kind.array-of-allowed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual kind: [\"grid\"], an array holding an allowed value"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "a",
+          "kind": [
+            "grid"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "extra-field",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: artwork:setManual: an unknown key next to a payload missing gameId; unknown keys are ignored, not refused"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "kind": "grid",
+          "unexpected": "x"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "shadow-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: artwork:setManual: keys named after Object.prototype members (toString, constructor, hasOwnProperty) next to a payload missing gameId"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "kind": "grid",
+          "toString": "x",
+          "constructor": "x",
+          "hasOwnProperty": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-own-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: artwork:setManual: an own \"__proto__\" data key holding a well-formed payload (as JSON.parse and a structured clone make it); the fields are not read through it"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "__proto__": {
+            "gameId": "a",
+            "kind": "grid"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-constructor-prototype",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: artwork:setManual: a constructor.prototype path holding a well-formed payload"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "constructor": {
+            "prototype": {
+              "gameId": "a",
+              "kind": "grid"
+            }
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "artwork:setManual",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-str-text",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "artwork:setManual",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-number-7",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "artwork:setManual",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-arr1-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "artwork:setManual",
+        [
+          "a"
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "artwork:setManual: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-gameid-str-g",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "g"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-gameid-str-g.kind-str-banner",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "gameId": "g",
+          "kind": "banner"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "kind is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-kind-str-grid",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "artwork:setManual",
+        {
+          "kind": "grid"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    }
+  ]
+}

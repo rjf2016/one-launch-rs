@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-f70fe94054",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.listInstalledGames"
+  ],
+  "name": "still scans the main folder when libraryfolders.vdf is unreadable",
+  "calls": []
+}

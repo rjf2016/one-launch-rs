@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-39c55b7486",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.healthCheck"
+  ],
+  "name": "is all green on the expected layout",
+  "calls": []
+}

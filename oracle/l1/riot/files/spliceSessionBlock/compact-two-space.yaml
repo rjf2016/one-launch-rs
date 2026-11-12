@@ -1,0 +1,12 @@
+psl:
+  authorization:
+    riot-client:
+      id_token: "placeholder.eyJzdWIiOiJCQkJCQkJCQi1CQkJCLTRCQkItOEJCQi1CQkJCQkJCQkJCQkIifQ.s"
+      claims:
+        nested: 1
+
+      refresh_token: 'placeholder-refresh-2-placeholder'
+      refresh_token_write_count: 999999999
+    other: x
+riot-login: null
+

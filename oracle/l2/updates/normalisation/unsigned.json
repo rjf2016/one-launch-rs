@@ -1,0 +1,32 @@
+{
+  "condition": "unsigned",
+  "runs": 3,
+  "digests": [
+    "d28bee1e20cc846db517711a0862b5daf7df0722da958f1f046035349221b5e5",
+    "d28bee1e20cc846db517711a0862b5daf7df0722da958f1f046035349221b5e5",
+    "d28bee1e20cc846db517711a0862b5daf7df0722da958f1f046035349221b5e5"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

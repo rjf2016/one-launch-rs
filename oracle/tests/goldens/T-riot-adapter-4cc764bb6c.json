@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-4cc764bb6c",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot shutdown"
+  ],
+  "name": "ends a process that ignores its window close, without its tree, and only after the polite close ran out",
+  "calls": []
+}

@@ -1,0 +1,1970 @@
+{
+  "function": "registerIpcHandlers",
+  "source": "src/main/ipc/index.ts",
+  "note": "decode: none\narg0 is the channel, arg1 the payload, arg2 the context { trusted, busy }.\ncall reaches the real handler: electron is mocked (ipcMain.handle collects the handlers) and registerIpcHandlers from src/main/ipc/index.ts is run once, as test/ipc-validation.test.ts does, with every service a recording proxy that answers undefined, paths a proxy, rescan and the pickers recording stubs, and the logger a silent stub. Per case: isTrustedSender returns context.trusted, launch.isBusy returns context.busy (the only service a refused payload may reach), and the handler is invoked with the event { senderFrame: { url } } and arg1 as the request. A \"__proto__\" key in a payload is an own data key, as a structured clone over IPC delivers it. out is the envelope the handler layer returns, { ok: false, error: { code, message } }; the messages are exact.\nEvery case is refused before any service, shell call, picker or rescan is reached: call throws if one is, so a payload that passes validation can never be recorded here.\nThe matrix stops at validation: what a handler does once a payload passes (its service calls, the ?? defaults after a nullable field, the OPEN_FAILED, NO_PASSWORD, NOT_FOUND, NOT_A_LAUNCHER and UNAVAILABLE refusals) is hand-translated with the services, not recorded here.\nThe generated family comes from a transcription of the handler's validators (scripts/oracle/l1/core/ipc/schema.ts and model.ts), checked by the generator against the real handlers on every case; cases from test/ipc-validation.test.ts are its REFUSED table, copied as written.\nLeft out, because the handler accepts them and no later field can be made bad, so they would reach the handler's work: gameId missing; gameId undefined; gameId type-null; gameId empty; gameId space; gameId nbsp; gameId lone-surrogate; gameId nul; gameId cap-gameid-at; gameId cap-gameid-astral-at; gameId cap-gameid-lone-at; gameId id-traversal; gameId id-alias; gameId id-padded; gameId id-accented.",
+  "cases": [
+    {
+      "id": "untrusted-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight from a frame that is not the app's renderer: refused before the handler runs"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "untrusted-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight with a well-formed payload from an untrusted frame: the sender check wins"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": null
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "busy-ignored-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight does not wait for a running switch: a null payload is still BAD_REQUEST"
+      },
+      "args": [
+        "launch:preflight",
+        null,
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload no payload at all, as invoke(channel) sends"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload null"
+      },
+      "args": [
+        "launch:preflight",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload false"
+      },
+      "args": [
+        "launch:preflight",
+        false,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload true"
+      },
+      "args": [
+        "launch:preflight",
+        true,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload the number 0"
+      },
+      "args": [
+        "launch:preflight",
+        0,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload the number 7"
+      },
+      "args": [
+        "launch:preflight",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launch:preflight payload NaN"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "$number": "NaN"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload an empty string"
+      },
+      "args": [
+        "launch:preflight",
+        "",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload a string"
+      },
+      "args": [
+        "launch:preflight",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload an empty array"
+      },
+      "args": [
+        "launch:preflight",
+        [],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-array-of-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload an array holding a well-formed payload"
+      },
+      "args": [
+        "launch:preflight",
+        [
+          {
+            "accountId": "a",
+            "gameId": null
+          }
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload a Date: an object to the check, with none of the fields"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "$date": "2026-01-02T03:04:05.000Z"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "top-empty-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight payload an empty object: every field missing"
+      },
+      "args": [
+        "launch:preflight",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: the key left out"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: the key present with the value undefined"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": {
+            "$undefined": true
+          },
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: null"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": null,
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: the number 0"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": 0,
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: the number 5"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": 5,
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launch:preflight accountId: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": {
+            "$number": "NaN"
+          },
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launch:preflight accountId: Infinity"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": {
+            "$number": "Infinity"
+          },
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: true"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": true,
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: false"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": false,
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: an empty array"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": [],
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: an array of one string"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": [
+            "a"
+          ],
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: an empty object"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": {},
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          },
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": {
+            "$bytes": "YQ=="
+          },
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: an empty string, which the validators do not refuse; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "",
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: launch:preflight accountId: a single space; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": " ",
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.nbsp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: launch:preflight accountId: a no-break space, which trim() removes; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": " ",
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: launch:preflight accountId: a lone high surrogate; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": {
+            "$utf16": [
+              55296
+            ]
+          },
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.nul",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: a NUL inside the string; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a\u0000b",
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "cap-accountid-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: launch:preflight accountId: 65 ASCII characters, one over the limit of 64 UTF-16 code units"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-accountid-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: launch:preflight accountId: 64 ASCII characters, exactly at the limit; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "cap-accountid-astral-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: launch:preflight accountId: 63 ASCII characters and one astral character: 64 code points but 65 UTF-16 code units"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀",
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-accountid-astral-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: launch:preflight accountId: 62 ASCII characters and one astral character: 64 UTF-16 code units, 63 code points; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀",
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "cap-accountid-lone-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: launch:preflight accountId: 64 ASCII characters and a lone high surrogate: one unit over the limit"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": {
+            "$utf16": [
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              55296
+            ]
+          },
+          "gameId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-accountid-lone-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: launch:preflight accountId: 63 ASCII characters and a lone high surrogate, exactly at the limit; the string is not well-formed and still accepted; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": {
+            "$utf16": [
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              55296
+            ]
+          },
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.id-traversal",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: a path-like id; ids are not shape-checked at the IPC layer; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "..\\..\\elsewhere",
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.id-alias",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: an id that is not a UUID; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "@acct:steam:user_3",
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.id-padded",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: launch:preflight accountId: an id with spaces around it; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": " a ",
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.id-accented",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight accountId: a non-ASCII id; accepted, so gameId is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "é",
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight gameId: the number 0"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": 0
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight gameId: the number 5"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launch:preflight gameId: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": {
+            "$number": "NaN"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launch:preflight gameId: Infinity"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": {
+            "$number": "Infinity"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight gameId: true"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight gameId: false"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": false
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight gameId: an empty array"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": []
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight gameId: an array of one string"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight gameId: an empty object"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": {}
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight gameId: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "gameid.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight gameId: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": {
+            "$bytes": "YQ=="
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId must be a string"
+        }
+      }
+    },
+    {
+      "id": "cap-gameid-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: launch:preflight gameId: 65 ASCII characters, one over the limit of 64 UTF-16 code units"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-gameid-astral-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: launch:preflight gameId: 63 ASCII characters and one astral character: 64 code points but 65 UTF-16 code units"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-gameid-lone-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: launch:preflight gameId: 64 ASCII characters and a lone high surrogate: one unit over the limit"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "a",
+          "gameId": {
+            "$utf16": [
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              55296
+            ]
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "gameId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "extra-field",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:preflight: an unknown key next to a payload missing accountId; unknown keys are ignored, not refused"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "gameId": null,
+          "unexpected": "x"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "shadow-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: launch:preflight: keys named after Object.prototype members (toString, constructor, hasOwnProperty) next to a payload missing accountId"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "gameId": null,
+          "toString": "x",
+          "constructor": "x",
+          "hasOwnProperty": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-own-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: launch:preflight: an own \"__proto__\" data key holding a well-formed payload (as JSON.parse and a structured clone make it); the fields are not read through it"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "__proto__": {
+            "accountId": "a",
+            "gameId": null
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-constructor-prototype",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: launch:preflight: a constructor.prototype path holding a well-formed payload"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "constructor": {
+            "prototype": {
+              "accountId": "a",
+              "gameId": null
+            }
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:preflight",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-str-text",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:preflight",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-number-7",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:preflight",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-arr1-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:preflight",
+        [
+          "a"
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:preflight: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-empty-object",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:preflight",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-accountid-number-5",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-accountid-len65",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:preflight",
+        {
+          "accountId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId exceeds 64 characters"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-ef8bcb0006",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.detectInstall"
+  ],
+  "name": "ignores a registry path that no longer holds steam.exe",
+  "calls": []
+}

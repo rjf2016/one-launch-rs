@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-3e02263c5b",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot captureSession"
+  ],
+  "name": "reads the session file and nothing else: no write to it, the registry, a process, or a backup",
+  "calls": []
+}

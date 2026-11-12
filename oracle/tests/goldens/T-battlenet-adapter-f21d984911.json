@@ -1,0 +1,9 @@
+{
+  "id": "T-battlenet-adapter-f21d984911",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "session state and capture"
+  ],
+  "name": "while running, only the current log decides who is signed in",
+  "calls": []
+}

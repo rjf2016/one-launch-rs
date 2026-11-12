@@ -1,0 +1,478 @@
+{
+  "function": "launchUri",
+  "source": "src/main/launchers/epic/manifests.ts",
+  "note": "decode: none\narg0 is the manifest fields the function reads ({ appName, catalogNamespace, catalogItemId }, or the whole parsed fixture manifest), arg1 the form: catalog or appname (any other string takes the appname branch).\nThe app name goes through encodeURIComponent: every byte of its UTF-8 encoding is %XX-escaped (upper-case hex) except A-Z a-z 0-9 - _ . ! ~ * ' ( ); a lone surrogate throws URIError \"URI malformed\". The catalog ids are put in raw, never escaped; an empty catalog id falls back to the appname form.",
+  "cases": [
+    {
+      "id": "test-catalog",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > builds both launch URI forms and falls back to the app name without catalog ids"
+      },
+      "args": [
+        {
+          "installationGuid": "A0000000000000000000000000000001",
+          "appName": "Sugar",
+          "displayName": "Rocket League®",
+          "catalogNamespace": "0000000000000000000000000000000a",
+          "catalogItemId": "0000000000000000000000000000000b",
+          "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+          "launchExecutable": "Binaries\\Win64\\Launcher.exe",
+          "installSize": 42793420249,
+          "incomplete": false,
+          "mainGameAppName": "Sugar",
+          "categories": [
+            "public",
+            "games",
+            "applications"
+          ]
+        },
+        "catalog"
+      ],
+      "out": "com.epicgames.launcher://apps/0000000000000000000000000000000a%3A0000000000000000000000000000000b%3ASugar?action=launch&silent=true"
+    },
+    {
+      "id": "test-appname",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > builds both launch URI forms and falls back to the app name without catalog ids"
+      },
+      "args": [
+        {
+          "installationGuid": "A0000000000000000000000000000001",
+          "appName": "Sugar",
+          "displayName": "Rocket League®",
+          "catalogNamespace": "0000000000000000000000000000000a",
+          "catalogItemId": "0000000000000000000000000000000b",
+          "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+          "launchExecutable": "Binaries\\Win64\\Launcher.exe",
+          "installSize": 42793420249,
+          "incomplete": false,
+          "mainGameAppName": "Sugar",
+          "categories": [
+            "public",
+            "games",
+            "applications"
+          ]
+        },
+        "appname"
+      ],
+      "out": "com.epicgames.launcher://apps/Sugar?action=launch&silent=true"
+    },
+    {
+      "id": "test-no-catalog-ids",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > builds both launch URI forms and falls back to the app name without catalog ids"
+      },
+      "args": [
+        {
+          "appName": "Sugar",
+          "catalogNamespace": null,
+          "catalogItemId": null
+        },
+        "catalog"
+      ],
+      "out": "com.epicgames.launcher://apps/Sugar?action=launch&silent=true"
+    },
+    {
+      "id": "only-namespace",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | catalog form with only the namespace"
+      },
+      "args": [
+        {
+          "appName": "Sugar",
+          "catalogNamespace": "ns",
+          "catalogItemId": null
+        },
+        "catalog"
+      ],
+      "out": "com.epicgames.launcher://apps/Sugar?action=launch&silent=true"
+    },
+    {
+      "id": "only-item",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | catalog form with only the item id"
+      },
+      "args": [
+        {
+          "appName": "Sugar",
+          "catalogNamespace": null,
+          "catalogItemId": "item"
+        },
+        "catalog"
+      ],
+      "out": "com.epicgames.launcher://apps/Sugar?action=launch&silent=true"
+    },
+    {
+      "id": "empty-ids",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | catalog form with empty ids"
+      },
+      "args": [
+        {
+          "appName": "Sugar",
+          "catalogNamespace": "",
+          "catalogItemId": ""
+        },
+        "catalog"
+      ],
+      "out": "com.epicgames.launcher://apps/Sugar?action=launch&silent=true"
+    },
+    {
+      "id": "appname-form-with-ids",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | appname form ignores the catalog ids"
+      },
+      "args": [
+        {
+          "appName": "Sugar",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "appname"
+      ],
+      "out": "com.epicgames.launcher://apps/Sugar?action=launch&silent=true"
+    },
+    {
+      "id": "other-form",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | a form that is neither"
+      },
+      "args": [
+        {
+          "appName": "Sugar",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "Catalog"
+      ],
+      "out": "com.epicgames.launcher://apps/Sugar?action=launch&silent=true"
+    },
+    {
+      "id": "empty-appname",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | an empty app name"
+      },
+      "args": [
+        {
+          "appName": "",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "appname"
+      ],
+      "out": "com.epicgames.launcher://apps/?action=launch&silent=true"
+    },
+    {
+      "id": "empty-appname-catalog",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | an empty app name, catalog form"
+      },
+      "args": [
+        {
+          "appName": "",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "catalog"
+      ],
+      "out": "com.epicgames.launcher://apps/ns%3Aitem%3A?action=launch&silent=true"
+    },
+    {
+      "id": "reserved-chars",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | an app name with URI-reserved characters"
+      },
+      "args": [
+        {
+          "appName": "a b/c?d#e&f=g%h:i@j+k,l;m",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "catalog"
+      ],
+      "out": "com.epicgames.launcher://apps/ns%3Aitem%3Aa%20b%2Fc%3Fd%23e%26f%3Dg%25h%3Ai%40j%2Bk%2Cl%3Bm?action=launch&silent=true"
+    },
+    {
+      "id": "reserved-chars-appname",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | an app name with URI-reserved characters, appname form"
+      },
+      "args": [
+        {
+          "appName": "a b/c?d#e&f=g%h:i@j+k,l;m",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "appname"
+      ],
+      "out": "com.epicgames.launcher://apps/a%20b%2Fc%3Fd%23e%26f%3Dg%25h%3Ai%40j%2Bk%2Cl%3Bm?action=launch&silent=true"
+    },
+    {
+      "id": "unreserved-chars",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | every character encodeURIComponent leaves alone"
+      },
+      "args": [
+        {
+          "appName": "AZaz09-_.!~*'()",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "appname"
+      ],
+      "out": "com.epicgames.launcher://apps/AZaz09-_.!~*'()?action=launch&silent=true"
+    },
+    {
+      "id": "printable-ascii",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | every printable ASCII character"
+      },
+      "args": [
+        {
+          "appName": " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "appname"
+      ],
+      "out": "com.epicgames.launcher://apps/%20!%22%23%24%25%26'()*%2B%2C-.%2F0123456789%3A%3B%3C%3D%3E%3F%40ABCDEFGHIJKLMNOPQRSTUVWXYZ%5B%5C%5D%5E_%60abcdefghijklmnopqrstuvwxyz%7B%7C%7D~?action=launch&silent=true"
+    },
+    {
+      "id": "control-chars",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | control characters"
+      },
+      "args": [
+        {
+          "appName": "a\u0000b\tc\nd",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "appname"
+      ],
+      "out": "com.epicgames.launcher://apps/a%00b%09c%0Ad%7F?action=launch&silent=true"
+    },
+    {
+      "id": "ids-not-escaped",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | catalog ids holding reserved characters go in raw"
+      },
+      "args": [
+        {
+          "appName": "Sugar",
+          "catalogNamespace": "n s?x",
+          "catalogItemId": "i#d&y"
+        },
+        "catalog"
+      ],
+      "out": "com.epicgames.launcher://apps/n s?x%3Ai#d&y%3ASugar?action=launch&silent=true"
+    },
+    {
+      "id": "fixture-dlc-name",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | a DLC app name with a colon"
+      },
+      "args": [
+        {
+          "appName": "Sugar:DLC",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "catalog"
+      ],
+      "out": "com.epicgames.launcher://apps/ns%3Aitem%3ASugar%3ADLC?action=launch&silent=true"
+    },
+    {
+      "id": "adv-non-ascii",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: non-ASCII app name: escaped as its UTF-8 bytes, upper-case hex"
+      },
+      "args": [
+        {
+          "appName": "Résumé 中",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "appname"
+      ],
+      "out": "com.epicgames.launcher://apps/R%C3%A9sum%C3%A9%20%E4%B8%AD?action=launch&silent=true"
+    },
+    {
+      "id": "adv-astral",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: an astral character is one 4-byte UTF-8 sequence, %F0%9F%98%80"
+      },
+      "args": [
+        {
+          "appName": "a😀b",
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "catalog"
+      ],
+      "out": "com.epicgames.launcher://apps/ns%3Aitem%3Aa%F0%9F%98%80b?action=launch&silent=true"
+    },
+    {
+      "id": "adv-lone-high-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone high surrogate makes encodeURIComponent throw URIError"
+      },
+      "args": [
+        {
+          "appName": {
+            "$utf16": [
+              97,
+              55296,
+              98
+            ]
+          },
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "appname"
+      ],
+      "error": {
+        "name": "URIError",
+        "message": "URI malformed"
+      }
+    },
+    {
+      "id": "adv-lone-low-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone low surrogate in the catalog form makes encodeURIComponent throw URIError"
+      },
+      "args": [
+        {
+          "appName": {
+            "$utf16": [
+              56320
+            ]
+          },
+          "catalogNamespace": "ns",
+          "catalogItemId": "item"
+        },
+        "catalog"
+      ],
+      "error": {
+        "name": "URIError",
+        "message": "URI malformed"
+      }
+    },
+    {
+      "id": "adv-lone-surrogate-in-ids",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate in a catalog id is not encoded, so it is returned raw"
+      },
+      "args": [
+        {
+          "appName": "Sugar",
+          "catalogNamespace": {
+            "$utf16": [
+              55296
+            ]
+          },
+          "catalogItemId": "item"
+        },
+        "catalog"
+      ],
+      "out": {
+        "$utf16": [
+          99,
+          111,
+          109,
+          46,
+          101,
+          112,
+          105,
+          99,
+          103,
+          97,
+          109,
+          101,
+          115,
+          46,
+          108,
+          97,
+          117,
+          110,
+          99,
+          104,
+          101,
+          114,
+          58,
+          47,
+          47,
+          97,
+          112,
+          112,
+          115,
+          47,
+          55296,
+          37,
+          51,
+          65,
+          105,
+          116,
+          101,
+          109,
+          37,
+          51,
+          65,
+          83,
+          117,
+          103,
+          97,
+          114,
+          63,
+          97,
+          99,
+          116,
+          105,
+          111,
+          110,
+          61,
+          108,
+          97,
+          117,
+          110,
+          99,
+          104,
+          38,
+          115,
+          105,
+          108,
+          101,
+          110,
+          116,
+          61,
+          116,
+          114,
+          117,
+          101
+        ]
+      }
+    }
+  ]
+}

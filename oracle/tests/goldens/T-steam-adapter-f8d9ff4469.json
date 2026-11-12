@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-f8d9ff4469",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.listRememberedAccounts"
+  ],
+  "name": "reports a missing or unparseable file as a LAUNCHER_FILE error",
+  "calls": []
+}

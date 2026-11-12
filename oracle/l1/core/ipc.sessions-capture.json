@@ -1,0 +1,1219 @@
+{
+  "function": "registerIpcHandlers",
+  "source": "src/main/ipc/index.ts",
+  "note": "decode: none\narg0 is the channel, arg1 the payload, arg2 the context { trusted, busy }.\ncall reaches the real handler: electron is mocked (ipcMain.handle collects the handlers) and registerIpcHandlers from src/main/ipc/index.ts is run once, as test/ipc-validation.test.ts does, with every service a recording proxy that answers undefined, paths a proxy, rescan and the pickers recording stubs, and the logger a silent stub. Per case: isTrustedSender returns context.trusted, launch.isBusy returns context.busy (the only service a refused payload may reach), and the handler is invoked with the event { senderFrame: { url } } and arg1 as the request. A \"__proto__\" key in a payload is an own data key, as a structured clone over IPC delivers it. out is the envelope the handler layer returns, { ok: false, error: { code, message } }; the messages are exact.\nEvery case is refused before any service, shell call, picker or rescan is reached: call throws if one is, so a payload that passes validation can never be recorded here.\nThe matrix stops at validation: what a handler does once a payload passes (its service calls, the ?? defaults after a nullable field, the OPEN_FAILED, NO_PASSWORD, NOT_FOUND, NOT_A_LAUNCHER and UNAVAILABLE refusals) is hand-translated with the services, not recorded here.\nThe generated family comes from a transcription of the handler's validators (scripts/oracle/l1/core/ipc/schema.ts and model.ts), checked by the generator against the real handlers on every case; cases from test/ipc-validation.test.ts are its REFUSED table, copied as written.\nLeft out, because the handler accepts them and no later field can be made bad, so they would reach the handler's work: accountId empty; accountId space; accountId nbsp; accountId lone-surrogate; accountId nul; accountId cap-accountid-at; accountId cap-accountid-astral-at; accountId cap-accountid-lone-at; accountId id-traversal; accountId id-alias; accountId id-padded; accountId id-accented.",
+  "cases": [
+    {
+      "id": "untrusted-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture from a frame that is not the app's renderer: refused before the handler runs"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "untrusted-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture with a well-formed payload from an untrusted frame: the sender check wins"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": "a"
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "untrusted-busy",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture from an untrusted frame while a switch runs: the sender check comes first"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": false,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "busy-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture while a switch runs: the busy check comes before any validation"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BUSY",
+          "message": "Another switch or launch is still running"
+        }
+      }
+    },
+    {
+      "id": "busy-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture with a null payload while a switch runs: BUSY, not BAD_REQUEST"
+      },
+      "args": [
+        "sessions:capture",
+        null,
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BUSY",
+          "message": "Another switch or launch is still running"
+        }
+      }
+    },
+    {
+      "id": "busy-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture with a well-formed payload while a switch runs: refused before the payload is read"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": "a"
+        },
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BUSY",
+          "message": "Another switch or launch is still running"
+        }
+      }
+    },
+    {
+      "id": "top-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload no payload at all, as invoke(channel) sends"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload null"
+      },
+      "args": [
+        "sessions:capture",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload false"
+      },
+      "args": [
+        "sessions:capture",
+        false,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload true"
+      },
+      "args": [
+        "sessions:capture",
+        true,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload the number 0"
+      },
+      "args": [
+        "sessions:capture",
+        0,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload the number 7"
+      },
+      "args": [
+        "sessions:capture",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: sessions:capture payload NaN"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "$number": "NaN"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload an empty string"
+      },
+      "args": [
+        "sessions:capture",
+        "",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload a string"
+      },
+      "args": [
+        "sessions:capture",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload an empty array"
+      },
+      "args": [
+        "sessions:capture",
+        [],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-array-of-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload an array holding a well-formed payload"
+      },
+      "args": [
+        "sessions:capture",
+        [
+          {
+            "accountId": "a"
+          }
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload a Date: an object to the check, with none of the fields"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "$date": "2026-01-02T03:04:05.000Z"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "top-empty-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture payload an empty object: every field missing"
+      },
+      "args": [
+        "sessions:capture",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: the key left out"
+      },
+      "args": [
+        "sessions:capture",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: the key present with the value undefined"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": {
+            "$undefined": true
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: null"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: the number 0"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": 0
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: the number 5"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: sessions:capture accountId: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": {
+            "$number": "NaN"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: sessions:capture accountId: Infinity"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": {
+            "$number": "Infinity"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: true"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: false"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": false
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: an empty array"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": []
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: an array of one string"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: an empty object"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": {}
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "accountid.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture accountId: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": {
+            "$bytes": "YQ=="
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "cap-accountid-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: sessions:capture accountId: 65 ASCII characters, one over the limit of 64 UTF-16 code units"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-accountid-astral-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: sessions:capture accountId: 63 ASCII characters and one astral character: 64 code points but 65 UTF-16 code units"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-accountid-lone-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: sessions:capture accountId: 64 ASCII characters and a lone high surrogate: one unit over the limit"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": {
+            "$utf16": [
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              55296
+            ]
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "extra-field",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: sessions:capture: an unknown key next to a payload missing accountId; unknown keys are ignored, not refused"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "unexpected": "x"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "shadow-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: sessions:capture: keys named after Object.prototype members (toString, constructor, hasOwnProperty) next to a payload missing accountId"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "toString": "x",
+          "constructor": "x",
+          "hasOwnProperty": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-own-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: sessions:capture: an own \"__proto__\" data key holding a well-formed payload (as JSON.parse and a structured clone make it); the fields are not read through it"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "__proto__": {
+            "accountId": "a"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-constructor-prototype",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: sessions:capture: a constructor.prototype path holding a well-formed payload"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "constructor": {
+            "prototype": {
+              "accountId": "a"
+            }
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "sessions:capture",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-str-text",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "sessions:capture",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-number-7",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "sessions:capture",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-arr1-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "sessions:capture",
+        [
+          "a"
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "sessions:capture: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-empty-object",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "sessions:capture",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-accountid-number-5",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-accountid-len65",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "sessions:capture",
+        {
+          "accountId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accountId exceeds 64 characters"
+        }
+      }
+    }
+  ]
+}

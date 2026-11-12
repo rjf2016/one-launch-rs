@@ -1,0 +1,326 @@
+{
+  "function": "isSessionRejection",
+  "source": "src/main/launchers/epic/launcher-log.ts",
+  "note": "decode: none\narg0 is a failure reason as maskReason leaves it (src/main/launchers/epic/adapter.ts passes the reason of a failed sign-in). The test is /TOKEN_EXPIRED|refresh token|invalid_grant|token (is |was |has )?(invalid|expired|revoked)/i.\nThe i flag without u folds case by JS Canonicalize: a non-ASCII character never matches an ASCII one, so KELVIN SIGN is not k and LONG S is not s, where a Rust (?i) regex with Unicode case folding matches them.",
+  "cases": [
+    {
+      "id": "test-expired-reason",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > launcher log > extracts sign-in outcomes with the account id, masking token ids in failures"
+      },
+      "args": [
+        "Sorry the refresh token '…' is invalid. Reason: TOKEN_EXPIRED errorcode=18036"
+      ],
+      "out": true
+    },
+    {
+      "id": "test-nope",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > launcher log > reading only what the launcher appends, across log rotation > reads from the mark within one run and from the start once the launcher started a new log"
+      },
+      "args": [
+        "nope"
+      ],
+      "out": false
+    },
+    {
+      "id": "test-expired-word",
+      "origin": {
+        "kind": "test",
+        "ref": "test/parse-limits.test.ts > launcher files of a size or shape no launcher writes (H16) > skips a log line longer than any launcher writes and still reads the lines around it"
+      },
+      "args": [
+        "expired"
+      ],
+      "out": false
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | an empty reason"
+      },
+      "args": [
+        ""
+      ],
+      "out": false
+    },
+    {
+      "id": "token-expired-only",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | only TOKEN_EXPIRED"
+      },
+      "args": [
+        "TOKEN_EXPIRED"
+      ],
+      "out": true
+    },
+    {
+      "id": "token-expired-lower",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | token_expired in lower case"
+      },
+      "args": [
+        "errorcode token_expired"
+      ],
+      "out": true
+    },
+    {
+      "id": "refresh-token-upper",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | REFRESH TOKEN in upper case"
+      },
+      "args": [
+        "REFRESH TOKEN gone"
+      ],
+      "out": true
+    },
+    {
+      "id": "refresh-token-two-spaces",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | refresh and token two spaces apart"
+      },
+      "args": [
+        "refresh  token"
+      ],
+      "out": false
+    },
+    {
+      "id": "refresh-token-glued",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | refreshtoken without the space"
+      },
+      "args": [
+        "refreshtoken"
+      ],
+      "out": false
+    },
+    {
+      "id": "invalid-grant",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | invalid_grant"
+      },
+      "args": [
+        "error=invalid_grant"
+      ],
+      "out": true
+    },
+    {
+      "id": "invalid-grant-hyphen",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | invalid-grant with a hyphen"
+      },
+      "args": [
+        "invalid-grant"
+      ],
+      "out": false
+    },
+    {
+      "id": "token-invalid",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | token invalid"
+      },
+      "args": [
+        "the token invalid"
+      ],
+      "out": true
+    },
+    {
+      "id": "token-is-invalid",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | token is invalid"
+      },
+      "args": [
+        "token is invalid"
+      ],
+      "out": true
+    },
+    {
+      "id": "token-was-expired",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | token was expired"
+      },
+      "args": [
+        "Token Was Expired"
+      ],
+      "out": true
+    },
+    {
+      "id": "token-has-revoked",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | token has revoked"
+      },
+      "args": [
+        "token has revoked"
+      ],
+      "out": true
+    },
+    {
+      "id": "token-has-been-revoked",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | token has been revoked: no match"
+      },
+      "args": [
+        "token has been revoked"
+      ],
+      "out": false
+    },
+    {
+      "id": "token-two-spaces",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | token and invalid two spaces apart"
+      },
+      "args": [
+        "token  invalid"
+      ],
+      "out": false
+    },
+    {
+      "id": "token-tab",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | a tab between token and invalid"
+      },
+      "args": [
+        "token\tinvalid"
+      ],
+      "out": false
+    },
+    {
+      "id": "tokens-invalid",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | tokens invalid: no match"
+      },
+      "args": [
+        "tokens invalid"
+      ],
+      "out": false
+    },
+    {
+      "id": "token-invalidated",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | token invalidated matches on its prefix"
+      },
+      "args": [
+        "token invalidated"
+      ],
+      "out": true
+    },
+    {
+      "id": "auth-token-invalid-path",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | a masked errorpath-free reason with token.invalid"
+      },
+      "args": [
+        "auth_token.invalid"
+      ],
+      "out": false
+    },
+    {
+      "id": "service-error",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | a service error the session survives"
+      },
+      "args": [
+        "Service unavailable errorcode=1041"
+      ],
+      "out": false
+    },
+    {
+      "id": "network-error",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher-expired-then-manual.log | a network error"
+      },
+      "args": [
+        "errors.com.epicgames.common.server_error"
+      ],
+      "out": false
+    },
+    {
+      "id": "adv-kelvin-sign",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: TO\\u212AEN_EXPIRED with KELVIN SIGN: JS /i without u does not fold it to k; Rust (?i) does"
+      },
+      "args": [
+        "TOKEN_EXPIRED"
+      ],
+      "out": false
+    },
+    {
+      "id": "adv-long-s",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: refre\\u017Fh token with LONG S: JS /i without u does not fold it to s; Rust (?i) does"
+      },
+      "args": [
+        "refreſh token"
+      ],
+      "out": false
+    },
+    {
+      "id": "adv-dotless-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: \\u0131nvalid_grant with DOTLESS I: not i in JS /i; not in Rust simple folding either"
+      },
+      "args": [
+        "ınvalid_grant"
+      ],
+      "out": false
+    },
+    {
+      "id": "adv-dotted-capital-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: token \\u0130nvalid with CAPITAL I WITH DOT: not i in JS /i"
+      },
+      "args": [
+        "token İnvalid"
+      ],
+      "out": false
+    },
+    {
+      "id": "adv-nbsp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: token, U+00A0, invalid: the pattern has a literal space, so no match in either"
+      },
+      "args": [
+        "token invalid"
+      ],
+      "out": false
+    },
+    {
+      "id": "adv-fullwidth",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: TOKEN_EXPIRED in fullwidth letters: no match"
+      },
+      "args": [
+        "ＴＯＫＥＮ_EXPIRED"
+      ],
+      "out": false
+    }
+  ]
+}

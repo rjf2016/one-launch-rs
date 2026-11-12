@@ -1,0 +1,240 @@
+{
+  "id": "T-epic-adapter-7c99beb6df",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter: a session that no One Launch account owns (B23)"
+  ],
+  "name": "says in the plan that the backup keeps it, and pins the snapshot the switch takes",
+  "calls": [
+    {
+      "launcher": "epic",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:epic:alt@example.com",
+          "displayName": "Alt",
+          "login": "alt@example.com",
+          "launcherUid": "22222222222222222222222222222222",
+          "hasSecret": false
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "epic",
+        "account": {
+          "id": "@acct:epic:alt@example.com",
+          "displayName": "Alt",
+          "login": "alt@example.com",
+          "launcherUid": "22222222222222222222222222222222"
+        },
+        "strategy": "remembered",
+        "current": {
+          "mostRecentLogin": null,
+          "autoLoginUser": null,
+          "running": false
+        },
+        "steps": [
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "close",
+            "kind": "process",
+            "title": "Close Epic Games Launcher",
+            "target": "EpicGamesLauncher.exe",
+            "detail": "Skipped: EpicGamesLauncher.exe is not running."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "capture",
+            "kind": "backup",
+            "title": "Save the outgoing session",
+            "target": "{tmp}\\Local\\EpicGamesLauncher\\Saved\\Config\\Windows\\GameUserSettings.ini",
+            "detail": "Skipped: the launcher remembers a session (fingerprint ce5ea629) that no One Launch account owns, so it is left alone and not saved. To keep it, capture it from that account's page before switching."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "backup",
+            "kind": "backup",
+            "title": "Back up GameUserSettings.ini",
+            "target": "{tmp}\\backups\\epic\\<timestamp>",
+            "detail": "Copy {tmp}\\Local\\EpicGamesLauncher\\Saved\\Config\\Windows\\GameUserSettings.ini into a new snapshot folder so a failed switch can be rolled back. The newest 20 snapshots are kept."
+          },
+          {
+            "changes": [
+              {
+                "where": "[RememberMe] Enable",
+                "before": "True",
+                "after": "True"
+              },
+              {
+                "where": "[RememberMe] Data",
+                "before": "(108 characters, fingerprint ce5ea629)",
+                "after": "(stored snapshot, fingerprint 79a15d60, captured <ts>)"
+              },
+              {
+                "where": "[Offline] Data",
+                "before": "(absent)",
+                "after": "(from the same snapshot, or removed when it has none)"
+              }
+            ],
+            "skipped": false,
+            "id": "file",
+            "kind": "file",
+            "title": "Put the account's session in place",
+            "target": "{tmp}\\Local\\EpicGamesLauncher\\Saved\\Config\\Windows\\GameUserSettings.ini",
+            "detail": "Decrypt Alt's session snapshot from the vault and write it into [RememberMe] (Enable=True and Data) and [Offline] (Data) of GameUserSettings.ini. The new content is written to a temp file and renamed over the original. Every other line, including the per-account [<id>_*] sections, stays byte for byte. The blob itself is never shown or logged."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "start",
+            "kind": "launch",
+            "title": "Start Epic Games Launcher",
+            "target": "\"{tmp}\\Epic Games\\Launcher\\Portal\\Binaries\\Win64\\EpicGamesLauncher.exe\"",
+            "detail": "Start the launcher normally (no arguments, as the com.epicgames.launcher:// handler does). It signs in as alt@example.com on its own from [RememberMe]."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "wait",
+            "kind": "wait",
+            "title": "Wait for the launcher to come up",
+            "target": "EpicGamesLauncher.exe",
+            "detail": "Poll the process list until EpicGamesLauncher.exe is running, up to 0.04 s."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "verify",
+            "kind": "wait",
+            "title": "Confirm the launcher signed in",
+            "target": "{tmp}\\Local\\EpicGamesLauncher\\Saved\\Logs\\EpicGamesLauncher.log",
+            "detail": "Read what the launcher appends to its own log (no tokens in it) until FAccountService::OnLoginComplete reports TRUE with the Epic account id …222222, up to 0.04 s. A FALSE line means the launcher did not sign in and the next step hands over to you; when the reason is a refused token (for example TOKEN_EXPIRED) the snapshot is also marked stale."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "manual",
+            "kind": "wait",
+            "title": "Wait for you to sign in",
+            "target": "{tmp}\\Local\\EpicGamesLauncher\\Saved\\Logs\\EpicGamesLauncher.log",
+            "detail": "Runs only if the launcher rejects the stored session (expired token) or does not sign in within 0.04 s. The launcher stays open on its sign-in page; you sign in there once as alt@example.com and One Launch continues with the game as soon as the log reports the sign-in, up to 0.0013333333333333333 min."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "recapture",
+            "kind": "backup",
+            "title": "Save the new session",
+            "target": "{tmp}\\Local\\EpicGamesLauncher\\Saved\\Config\\Windows\\GameUserSettings.ini",
+            "detail": "Runs only after a manual sign-in: the fresh [RememberMe] replaces the stale snapshot."
+          }
+        ],
+        "warnings": [
+          "The launcher currently remembers a session that no One Launch account owns (fingerprint ce5ea629). It will be replaced. The backup taken before this switch keeps a copy and is left out of the usual clean-up, so restoring it from Settings › Backups brings that sign-in back."
+        ],
+        "notes": [],
+        "executable": true,
+        "generatedAt": "<ts>"
+      }
+    },
+    {
+      "launcher": "epic",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:epic:alt@example.com",
+          "displayName": "Alt",
+          "login": "alt@example.com",
+          "launcherUid": "22222222222222222222222222222222",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "epic",
+        "account": {
+          "id": "@acct:epic:alt@example.com",
+          "displayName": "Alt",
+          "login": "alt@example.com",
+          "launcherUid": "22222222222222222222222222222222"
+        },
+        "strategy": "remembered",
+        "ok": true,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Epic Games Launcher",
+            "status": "skipped",
+            "detail": "Skipped: EpicGamesLauncher.exe is not running."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing session",
+            "status": "skipped",
+            "detail": "Skipped: the launcher remembers a session (fingerprint ce5ea629) that no One Launch account owns, so it is left alone and not saved. To keep it, capture it from that account's page before switching."
+          },
+          {
+            "id": "backup",
+            "title": "Back up GameUserSettings.ini",
+            "status": "done",
+            "detail": "{tmp}\\backups\\epic\\<ts>"
+          },
+          {
+            "id": "file",
+            "title": "Put the account's session in place",
+            "status": "done",
+            "detail": "[RememberMe] now holds the snapshot (fingerprint 79a15d60) in 1 file."
+          },
+          {
+            "id": "start",
+            "title": "Start Epic Games Launcher",
+            "status": "done",
+            "detail": "Launcher started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the launcher to come up",
+            "status": "done",
+            "detail": "EpicGamesLauncher.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the launcher signed in",
+            "status": "done",
+            "detail": "Signed in as alt@example.com."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "skipped",
+            "detail": "Runs only if the launcher rejects the stored session (expired token) or does not sign in within 0.04 s. The launcher stays open on its sign-in page; you sign in there once as alt@example.com and One Launch continues with the game as soon as the log reports the sign-in, up to 0.0013333333333333333 min."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new session",
+            "status": "skipped",
+            "detail": "Runs only after a manual sign-in: the fresh [RememberMe] replaces the stale snapshot."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": "<ts>",
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": null,
+        "error": null,
+        "needsSignIn": false,
+        "cancelled": false
+      }
+    }
+  ]
+}

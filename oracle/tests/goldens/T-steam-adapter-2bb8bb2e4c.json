@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-2bb8bb2e4c",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.runningGame"
+  ],
+  "name": "falls back to a process running out of a game folder, and reports none otherwise",
+  "calls": []
+}

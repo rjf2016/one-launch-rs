@@ -1,0 +1,618 @@
+{
+  "function": "parseLauncherInstalled",
+  "source": "src/main/launchers/epic/manifests.ts",
+  "note": "decode: arg0=utf8\narg0 is the file as the Epic adapter reads it (src/main/launchers/epic/adapter.ts readLauncherText: readLauncherBytes, then toString utf8, so a BOM is kept and invalid bytes become U+FFFD); the function strips one leading U+FEFF itself.\nPaths go through normalizeLauncherPath (src/main/platform/fs-path.ts): trim, a doubled backslash made single, separators unified to \\ by path.win32.normalize (which also resolves . and ..), a trailing separator dropped except on a drive root.\nA JSON.parse failure is recorded with V8's message inside the function's own text, exactly as Node prints it; the error is EpicManifestError with the own property code MANIFEST_FORMAT.\nAn entry needs AppName (or, when that is missing or blank, ArtifactId) and InstallLocation; any other entry is skipped without an error.\nNo size cap in the function: it relies on readLauncherBytes (MAX_LAUNCHER_FILE_BYTES, 4 MiB) in the adapter.\ngap: src/main/launchers/epic/manifests.ts:102:114 ?: false arm, JSON.parse only ever throws a SyntaxError (an Error), so String(err) is never reached.\nnot measured: src/main/launchers/epic/manifests.ts:104:49 ?: true arm (no source mapping); the cases with an object, an array, a string and null reach both arms.",
+  "cases": [
+    {
+      "id": "test-fixture",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > parses LauncherInstalled.dat as a cross-check list"
+      },
+      "args": [
+        {
+          "$file": "fixtures/launchers/epic/LauncherInstalled.dat",
+          "sha256": "8cff11c4b6b346fee486318abdaa52910ff5ce559123036b38b18a433a006726"
+        }
+      ],
+      "out": [
+        {
+          "appName": "Sugar",
+          "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+          "namespaceId": "0000000000000000000000000000000a",
+          "itemId": "0000000000000000000000000000000b"
+        }
+      ]
+    },
+    {
+      "id": "test-empty-object",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > parses LauncherInstalled.dat as a cross-check list"
+      },
+      "args": [
+        {
+          "$bytes": "e30="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat has no InstallationList",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "bom",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | UTF-8 BOM added"
+      },
+      "args": [
+        {
+          "$bytes": "77u/ew0KCSJJbnN0YWxsYXRpb25MaXN0IjogWw0KCQl7DQoJCQkiSW5zdGFsbExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUiLA0KCQkJIk5hbWVzcGFjZUlkIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBhIiwNCgkJCSJJdGVtSWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGIiLA0KCQkJIkFydGlmYWN0SWQiOiAiU3VnYXIiLA0KCQkJIkFwcFZlcnNpb24iOiAiKytQcmltZStVcGRhdGU1OS4xLUNMLTUyNjUzMSIsDQoJCQkiQXBwTmFtZSI6ICJTdWdhciINCgkJfQ0KCV0NCn0="
+        }
+      ],
+      "out": [
+        {
+          "appName": "Sugar",
+          "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+          "namespaceId": "0000000000000000000000000000000a",
+          "itemId": "0000000000000000000000000000000b"
+        }
+      ]
+    },
+    {
+      "id": "double-bom",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | two UTF-8 BOMs"
+      },
+      "args": [
+        {
+          "$bytes": "77u/77u/ew0KCSJJbnN0YWxsYXRpb25MaXN0IjogWw0KCQl7DQoJCQkiSW5zdGFsbExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUiLA0KCQkJIk5hbWVzcGFjZUlkIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBhIiwNCgkJCSJJdGVtSWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGIiLA0KCQkJIkFydGlmYWN0SWQiOiAiU3VnYXIiLA0KCQkJIkFwcFZlcnNpb24iOiAiKytQcmltZStVcGRhdGU1OS4xLUNMLTUyNjUzMSIsDQoJCQkiQXBwTmFtZSI6ICJTdWdhciINCgkJfQ0KCV0NCn0="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat is not valid JSON (Unexpected token '﻿', \"﻿{\r\n\t\"Inst\"... is not valid JSON)",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "not-json",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | not JSON"
+      },
+      "args": [
+        {
+          "$bytes": "bm90IGpzb24="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat is not valid JSON (Unexpected token 'o', \"not json\" is not valid JSON)",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | an empty file"
+      },
+      "args": [
+        {
+          "$bytes": ""
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat is not valid JSON (Unexpected end of JSON input)",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "truncated",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | cut in half"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KCSJJbnN0YWxsYXRpb25MaXN0IjogWw0KCQl7DQoJCQkiSW5zdGFsbExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUiLA0KCQ=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat is not valid JSON (Expected double-quoted property name in JSON at position 100 (line 5 column 2))",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "json-null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | the JSON null"
+      },
+      "args": [
+        {
+          "$bytes": "bnVsbA=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat has no InstallationList",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "json-array",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | a JSON array"
+      },
+      "args": [
+        {
+          "$bytes": "W10="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat has no InstallationList",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "json-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | a JSON string"
+      },
+      "args": [
+        {
+          "$bytes": "Ikluc3RhbGxhdGlvbkxpc3Qi"
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat has no InstallationList",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "json-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | a JSON number"
+      },
+      "args": [
+        {
+          "$bytes": "MQ=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat has no InstallationList",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "list-object",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | InstallationList an object"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0Ijp7fX0="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat has no InstallationList",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "list-null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | InstallationList null"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpudWxsfQ=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat has no InstallationList",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "list-empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | InstallationList empty"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbXX0="
+        }
+      ],
+      "out": []
+    },
+    {
+      "id": "items-not-objects",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | entries that are not objects are skipped"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbbnVsbCwxLCJ4Iix0cnVlLGZhbHNlLFtdLFt7Ikluc3RhbGxMb2NhdGlvbiI6IkQ6XFxHYW1lc1xcU3VnYXIiLCJBcHBOYW1lIjoiU3VnYXIifV1dfQ=="
+        }
+      ],
+      "out": []
+    },
+    {
+      "id": "artifact-fallback",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | no AppName: ArtifactId is used"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiJEOlxceCIsIkFydGlmYWN0SWQiOiJBcnQifV19"
+        }
+      ],
+      "out": [
+        {
+          "appName": "Art",
+          "installLocation": "D:\\x",
+          "namespaceId": null,
+          "itemId": null
+        }
+      ]
+    },
+    {
+      "id": "artifact-fallback-blank",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | blank AppName: ArtifactId is used"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwTmFtZSI6IiAiLCJBcnRpZmFjdElkIjoiQXJ0In1dfQ=="
+        }
+      ],
+      "out": [
+        {
+          "appName": "Art",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": null,
+          "itemId": null
+        }
+      ]
+    },
+    {
+      "id": "no-names",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | neither AppName nor ArtifactId: skipped"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiJEOlxceCJ9XX0="
+        }
+      ],
+      "out": []
+    },
+    {
+      "id": "no-location",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | no InstallLocation: skipped"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJBcHBOYW1lIjoiU3VnYXIifV19"
+        }
+      ],
+      "out": []
+    },
+    {
+      "id": "blank-location",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | blank InstallLocation: skipped"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiIgICIsIkFwcE5hbWUiOiJTdWdhciJ9XX0="
+        }
+      ],
+      "out": []
+    },
+    {
+      "id": "location-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | InstallLocation a number: skipped"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOjUsIkFwcE5hbWUiOiJTdWdhciJ9XX0="
+        }
+      ],
+      "out": []
+    },
+    {
+      "id": "ids-missing",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | no NamespaceId or ItemId"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwTmFtZSI6IlN1Z2FyIn1dfQ=="
+        }
+      ],
+      "out": [
+        {
+          "appName": "Sugar",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": null,
+          "itemId": null
+        }
+      ]
+    },
+    {
+      "id": "ids-blank",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | blank NamespaceId and ItemId"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwTmFtZSI6IlN1Z2FyIiwiTmFtZXNwYWNlSWQiOiIgIiwiSXRlbUlkIjoiIn1dfQ=="
+        }
+      ],
+      "out": [
+        {
+          "appName": "Sugar",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": null,
+          "itemId": null
+        }
+      ]
+    },
+    {
+      "id": "ids-trimmed",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | ids and names with spaces around them"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwTmFtZSI6IiBTdWdhciAiLCJOYW1lc3BhY2VJZCI6IiBucyAiLCJJdGVtSWQiOiJcdGlkXG4ifV19"
+        }
+      ],
+      "out": [
+        {
+          "appName": "Sugar",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": "ns",
+          "itemId": "id"
+        }
+      ]
+    },
+    {
+      "id": "duplicates-kept",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | the same entry twice is listed twice"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwTmFtZSI6IlN1Z2FyIn0seyJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwTmFtZSI6IlN1Z2FyIn1dfQ=="
+        }
+      ],
+      "out": [
+        {
+          "appName": "Sugar",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": null,
+          "itemId": null
+        },
+        {
+          "appName": "Sugar",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": null,
+          "itemId": null
+        }
+      ]
+    },
+    {
+      "id": "order-kept",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | three entries keep their order"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwTmFtZSI6IkMifSx7Ikluc3RhbGxMb2NhdGlvbiI6IkQ6XFxHYW1lc1xcU3VnYXIiLCJBcHBOYW1lIjoiQSJ9LHsiSW5zdGFsbExvY2F0aW9uIjoiRDpcXEdhbWVzXFxTdWdhciIsIkFwcE5hbWUiOiJCIn1dfQ=="
+        }
+      ],
+      "out": [
+        {
+          "appName": "C",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": null,
+          "itemId": null
+        },
+        {
+          "appName": "A",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": null,
+          "itemId": null
+        },
+        {
+          "appName": "B",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": null,
+          "itemId": null
+        }
+      ]
+    },
+    {
+      "id": "paths",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | entries with paths to normalise"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiJEOi9HYW1lcy8vU3VnYXIvIiwiQXBwTmFtZSI6IlN1Z2FyIn0seyJJbnN0YWxsTG9jYXRpb24iOiJcXFxcc2VydmVyXFxzaGFyZSIsIkFwcE5hbWUiOiJVIn0seyJJbnN0YWxsTG9jYXRpb24iOiJDOi8iLCJBcHBOYW1lIjoiUiJ9XX0="
+        }
+      ],
+      "out": [
+        {
+          "appName": "Sugar",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": null,
+          "itemId": null
+        },
+        {
+          "appName": "U",
+          "installLocation": "\\server\\share",
+          "namespaceId": null,
+          "itemId": null
+        },
+        {
+          "appName": "R",
+          "installLocation": "C:\\",
+          "namespaceId": null,
+          "itemId": null
+        }
+      ]
+    },
+    {
+      "id": "crlf",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/LauncherInstalled.dat | LF made CRLF"
+      },
+      "args": [
+        {
+          "$bytes": "ew0NCgkiSW5zdGFsbGF0aW9uTGlzdCI6IFsNDQoJCXsNDQoJCQkiSW5zdGFsbExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUiLA0NCgkJCSJOYW1lc3BhY2VJZCI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYSIsDQ0KCQkJIkl0ZW1JZCI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYiIsDQ0KCQkJIkFydGlmYWN0SWQiOiAiU3VnYXIiLA0NCgkJCSJBcHBWZXJzaW9uIjogIisrUHJpbWUrVXBkYXRlNTkuMS1DTC01MjY1MzEiLA0NCgkJCSJBcHBOYW1lIjogIlN1Z2FyIg0NCgkJfQ0NCgldDQ0KfQ=="
+        }
+      ],
+      "out": [
+        {
+          "appName": "Sugar",
+          "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+          "namespaceId": "0000000000000000000000000000000a",
+          "itemId": "0000000000000000000000000000000b"
+        }
+      ]
+    },
+    {
+      "id": "adv-trim-feff",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: AppName only U+FEFF: JS trim() empties it, so ArtifactId is used; Rust str::trim keeps it"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwTmFtZSI6Iu+7vyIsIkFydGlmYWN0SWQiOiJBcnQifV19"
+        }
+      ],
+      "out": [
+        {
+          "appName": "Art",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": null,
+          "itemId": null
+        }
+      ]
+    },
+    {
+      "id": "adv-trim-nel",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: AppName only U+0085: JS trim() keeps it, so it is the name; Rust str::trim empties it"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwTmFtZSI6IsKFIiwiQXJ0aWZhY3RJZCI6IkFydCJ9XX0="
+        }
+      ],
+      "out": [
+        {
+          "appName": "",
+          "installLocation": "D:\\Games\\Sugar",
+          "namespaceId": null,
+          "itemId": null
+        }
+      ]
+    },
+    {
+      "id": "adv-duplicate-list",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: InstallationList twice: the last wins"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJBcHBOYW1lIjoiQSIsIkluc3RhbGxMb2NhdGlvbiI6IkQ6XFxhIn1dLCJJbnN0YWxsYXRpb25MaXN0IjpbXX0="
+        }
+      ],
+      "out": []
+    },
+    {
+      "id": "adv-proto-list",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: InstallationList under __proto__ is an own property of that key and is not seen"
+      },
+      "args": [
+        {
+          "$bytes": "eyJfX3Byb3RvX18iOnsiSW5zdGFsbGF0aW9uTGlzdCI6W119fQ=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "LauncherInstalled.dat has no InstallationList",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "adv-lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: AppName holding the escape \\udc00: JSON.parse gives a lone surrogate"
+      },
+      "args": [
+        {
+          "$bytes": "eyJJbnN0YWxsYXRpb25MaXN0IjpbeyJBcHBOYW1lIjoiYVx1ZGMwMCIsIkluc3RhbGxMb2NhdGlvbiI6IkQ6XFxhIn1dfQ=="
+        }
+      ],
+      "out": [
+        {
+          "appName": {
+            "$utf16": [
+              97,
+              56320
+            ]
+          },
+          "installLocation": "D:\\a",
+          "namespaceId": null,
+          "itemId": null
+        }
+      ]
+    }
+  ]
+}

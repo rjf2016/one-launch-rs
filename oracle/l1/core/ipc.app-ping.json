@@ -1,0 +1,2083 @@
+{
+  "function": "registerIpcHandlers",
+  "source": "src/main/ipc/index.ts",
+  "note": "decode: none\narg0 is the channel, arg1 the payload, arg2 the context { trusted, busy }.\ncall reaches the real handler: electron is mocked (ipcMain.handle collects the handlers) and registerIpcHandlers from src/main/ipc/index.ts is run once, as test/ipc-validation.test.ts does, with every service a recording proxy that answers undefined, paths a proxy, rescan and the pickers recording stubs, and the logger a silent stub. Per case: isTrustedSender returns context.trusted, launch.isBusy returns context.busy (the only service a refused payload may reach), and the handler is invoked with the event { senderFrame: { url } } and arg1 as the request. A \"__proto__\" key in a payload is an own data key, as a structured clone over IPC delivers it. out is the envelope the handler layer returns, { ok: false, error: { code, message } }; the messages are exact.\nEvery case is refused before any service, shell call, picker or rescan is reached: call throws if one is, so a payload that passes validation can never be recorded here.\nThe matrix stops at validation: what a handler does once a payload passes (its service calls, the ?? defaults after a nullable field, the OPEN_FAILED, NO_PASSWORD, NOT_FOUND, NOT_A_LAUNCHER and UNAVAILABLE refusals) is hand-translated with the services, not recorded here.\nThe generated family comes from a transcription of the handler's validators (scripts/oracle/l1/core/ipc/schema.ts and model.ts), checked by the generator against the real handlers on every case; cases from test/ipc-validation.test.ts are its REFUSED table, copied as written.\nLeft out, because the handler accepts them and no later field can be made bad, so they would reach the handler's work: message empty; message space; message nbsp; message lone-surrogate; message nul; message cap-message-at; message cap-message-astral-at; message cap-message-lone-at.",
+  "cases": [
+    {
+      "id": "untrusted-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping from a frame that is not the app's renderer: refused before the handler runs"
+      },
+      "args": [
+        "app:ping",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "untrusted-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping with a well-formed payload from an untrusted frame: the sender check wins"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": "hello"
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "busy-ignored-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping does not wait for a running switch: a null payload is still BAD_REQUEST"
+      },
+      "args": [
+        "app:ping",
+        null,
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload no payload at all, as invoke(channel) sends"
+      },
+      "args": [
+        "app:ping",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload null"
+      },
+      "args": [
+        "app:ping",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload false"
+      },
+      "args": [
+        "app:ping",
+        false,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload true"
+      },
+      "args": [
+        "app:ping",
+        true,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload the number 0"
+      },
+      "args": [
+        "app:ping",
+        0,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload the number 7"
+      },
+      "args": [
+        "app:ping",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: app:ping payload NaN"
+      },
+      "args": [
+        "app:ping",
+        {
+          "$number": "NaN"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload an empty string"
+      },
+      "args": [
+        "app:ping",
+        "",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload a string"
+      },
+      "args": [
+        "app:ping",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload an empty array"
+      },
+      "args": [
+        "app:ping",
+        [],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-array-of-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload an array holding a well-formed payload"
+      },
+      "args": [
+        "app:ping",
+        [
+          {
+            "message": "hello"
+          }
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload a Date: an object to the check, with none of the fields"
+      },
+      "args": [
+        "app:ping",
+        {
+          "$date": "2026-01-02T03:04:05.000Z"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "top-empty-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping payload an empty object: every field missing"
+      },
+      "args": [
+        "app:ping",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: the key left out"
+      },
+      "args": [
+        "app:ping",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: the key present with the value undefined"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": {
+            "$undefined": true
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: null"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: the number 0"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": 0
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: the number 5"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: app:ping message: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": {
+            "$number": "NaN"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: app:ping message: Infinity"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": {
+            "$number": "Infinity"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: true"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: false"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": false
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: an empty array"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": []
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: an array of one string"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: an empty object"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": {}
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "message.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping message: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": {
+            "$bytes": "YQ=="
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "cap-message-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: app:ping message: 1001 ASCII characters, one over the limit of 1000 UTF-16 code units"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message exceeds 1000 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-message-astral-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: app:ping message: 999 ASCII characters and one astral character: 1000 code points but 1001 UTF-16 code units"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message exceeds 1000 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-message-lone-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: app:ping message: 1000 ASCII characters and a lone high surrogate: one unit over the limit"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": {
+            "$utf16": [
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              55296
+            ]
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message exceeds 1000 characters"
+        }
+      }
+    },
+    {
+      "id": "extra-field",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:ping: an unknown key next to a payload missing message; unknown keys are ignored, not refused"
+      },
+      "args": [
+        "app:ping",
+        {
+          "unexpected": "x"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "shadow-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:ping: keys named after Object.prototype members (toString, constructor, hasOwnProperty) next to a payload missing message"
+      },
+      "args": [
+        "app:ping",
+        {
+          "toString": "x",
+          "constructor": "x",
+          "hasOwnProperty": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-own-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:ping: an own \"__proto__\" data key holding a well-formed payload (as JSON.parse and a structured clone make it); the fields are not read through it"
+      },
+      "args": [
+        "app:ping",
+        {
+          "__proto__": {
+            "message": "hello"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-constructor-prototype",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:ping: a constructor.prototype path holding a well-formed payload"
+      },
+      "args": [
+        "app:ping",
+        {
+          "constructor": {
+            "prototype": {
+              "message": "hello"
+            }
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:ping",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:ping",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-str-text",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:ping",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-number-7",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:ping",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-arr1-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:ping",
+        [
+          "a"
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:ping: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-empty-object",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:ping",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-message-number-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": 1
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-message-len1001",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:ping",
+        {
+          "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "message exceeds 1000 characters"
+        }
+      }
+    }
+  ]
+}

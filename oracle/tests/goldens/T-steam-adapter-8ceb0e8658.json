@@ -1,0 +1,39 @@
+{
+  "id": "T-steam-adapter-8ceb0e8658",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.launchGame / shutdown"
+  ],
+  "name": "launches through the steam:// protocol and rejects non-numeric ids",
+  "calls": [
+    {
+      "launcher": "steam",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "252950",
+          "name": "Rocket League"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "steam://rungameid/252950"
+      }
+    },
+    {
+      "launcher": "steam",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "../evil",
+          "name": "x"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "Not a Steam app id: ../evil"
+      }
+    }
+  ]
+}

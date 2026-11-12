@@ -1,0 +1,198 @@
+{
+  "id": "T-steam-adapter-0783e39980",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.switchAccount (dry run)"
+  ],
+  "name": "plans the credentials path for an unknown account without any password in the plan",
+  "calls": [
+    {
+      "launcher": "steam",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "New",
+          "login": "nobody",
+          "launcherUid": null,
+          "hasSecret": false
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "steam",
+        "account": {
+          "id": "acct-1",
+          "displayName": "New",
+          "login": "nobody",
+          "launcherUid": null
+        },
+        "strategy": "credentials",
+        "current": {
+          "mostRecentLogin": "user_1",
+          "autoLoginUser": "user_1",
+          "running": false
+        },
+        "steps": [
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "close",
+            "kind": "process",
+            "title": "Close Steam",
+            "target": "steam.exe",
+            "detail": "Skipped: steam.exe is not running."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "backup",
+            "kind": "backup",
+            "title": "Back up Steam files",
+            "target": "{tmp}\\backups\\steam\\<timestamp>",
+            "detail": "Copy {tmp}\\steam\\config\\loginusers.vdf into a new snapshot folder and record the current HKCU\\Software\\Valve\\Steam\\AutoLoginUser and RememberPassword values in its manifest.json, so a failed switch can be rolled back. The newest 20 snapshots are kept."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "login",
+            "kind": "launch",
+            "title": "Start Steam on its sign-in form",
+            "target": "\"{tmp}\\steam\\steam.exe\" -login nobody",
+            "detail": "Steam has never signed in as nobody on this PC, so Steam is started with -login and only the account name, which makes it open its sign-in form instead of signing in as the previous account. You enter the password there; nothing secret goes on the command line. Afterwards Steam adds the account to loginusers.vdf and later switches use the remembered path."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "wait",
+            "kind": "wait",
+            "title": "Wait for Steam to come up",
+            "target": "steam.exe",
+            "detail": "Poll the process list until steam.exe is running, up to 0.04 s."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "verify",
+            "kind": "wait",
+            "title": "Confirm Steam signed in",
+            "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+            "detail": "Poll until Steam reports a signed-in account, up to 0.04 s. Meanwhile {tmp}\\steam\\logs\\steamui_login.txt is read (Steam's own sign-in state log, no credentials in it) to learn at once whether Steam is instead asking for a password or a Steam Guard code, and {tmp}\\steam\\logs\\bootstrap_log.txt (its updater log) to see whether Steam is updating itself first; then the wait starts over when the update ends, up to 15 min in all. A game launch (steam://rungameid/<appid>) happens only after the sign-in is confirmed."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "manual",
+            "kind": "wait",
+            "title": "Wait for you to sign in",
+            "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+            "detail": "Runs only if Steam still asks for something One Launch cannot supply: a Steam Guard code for a PC this account has not used before, an expired session with no stored password, or a session Steam simply refuses. The Steam window stays open on its sign-in form; you sign in there once with \"Remember me\" ticked and One Launch continues with the game as soon as Steam reports the sign-in, up to 0.0006666666666666666 min. A wrong stored password ends the switch instead."
+          }
+        ],
+        "warnings": [
+          "Steam will open its sign-in form for nobody. One Launch waits up to 0.0006666666666666666 min while you sign in there with \"Remember me\" ticked and offers to copy the login; later switches are automatic."
+        ],
+        "notes": [],
+        "executable": true,
+        "generatedAt": "<ts>"
+      }
+    },
+    {
+      "launcher": "steam",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "Third",
+          "login": "nobody",
+          "launcherUid": null,
+          "hasSecret": true
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "steam",
+        "account": {
+          "id": "acct-1",
+          "displayName": "Third",
+          "login": "nobody",
+          "launcherUid": null
+        },
+        "strategy": "credentials",
+        "current": {
+          "mostRecentLogin": "user_1",
+          "autoLoginUser": "user_1",
+          "running": false
+        },
+        "steps": [
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "close",
+            "kind": "process",
+            "title": "Close Steam",
+            "target": "steam.exe",
+            "detail": "Skipped: steam.exe is not running."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "backup",
+            "kind": "backup",
+            "title": "Back up Steam files",
+            "target": "{tmp}\\backups\\steam\\<timestamp>",
+            "detail": "Copy {tmp}\\steam\\config\\loginusers.vdf into a new snapshot folder and record the current HKCU\\Software\\Valve\\Steam\\AutoLoginUser and RememberPassword values in its manifest.json, so a failed switch can be rolled back. The newest 20 snapshots are kept."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "login",
+            "kind": "launch",
+            "title": "Start Steam with credentials",
+            "target": "\"{tmp}\\steam\\steam.exe\" -login nobody <password>",
+            "detail": "Steam has never signed in as nobody on this PC, so Steam is started with -login. The password is decrypted from the vault at that moment and passed only as a process argument; it is never written anywhere by One Launch, but it is visible on the command line to other processes on this PC while Steam runs. Afterwards Steam adds the account to loginusers.vdf and later switches use the remembered path."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "wait",
+            "kind": "wait",
+            "title": "Wait for Steam to come up",
+            "target": "steam.exe",
+            "detail": "Poll the process list until steam.exe is running, up to 0.04 s."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "verify",
+            "kind": "wait",
+            "title": "Confirm Steam signed in",
+            "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+            "detail": "Poll until Steam reports a signed-in account, up to 0.04 s. Meanwhile {tmp}\\steam\\logs\\steamui_login.txt is read (Steam's own sign-in state log, no credentials in it) to learn at once whether Steam is instead asking for a password or a Steam Guard code, and {tmp}\\steam\\logs\\bootstrap_log.txt (its updater log) to see whether Steam is updating itself first; then the wait starts over when the update ends, up to 15 min in all. A game launch (steam://rungameid/<appid>) happens only after the sign-in is confirmed."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "manual",
+            "kind": "wait",
+            "title": "Wait for you to sign in",
+            "target": "HKCU\\Software\\Valve\\Steam\\ActiveProcess\\ActiveUser",
+            "detail": "Runs only if Steam still asks for something One Launch cannot supply: a Steam Guard code for a PC this account has not used before, an expired session with no stored password, or a session Steam simply refuses. The Steam window stays open on its sign-in form; you sign in there once with \"Remember me\" ticked (the password can be copied from One Launch) and One Launch continues with the game as soon as Steam reports the sign-in, up to 0.0006666666666666666 min. A wrong stored password ends the switch instead."
+          }
+        ],
+        "warnings": [
+          "If this PC has never signed in as nobody, Steam Guard will ask for an emailed code once. One Launch then waits up to 0.0006666666666666666 min while you sign in in the Steam window, and continues on its own."
+        ],
+        "notes": [],
+        "executable": true,
+        "generatedAt": "<ts>"
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-b5d09a583c",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.listRememberedAccounts"
+  ],
+  "name": "refuses a loginusers.vdf far larger than Steam writes, before parsing it (H16)",
+  "calls": []
+}

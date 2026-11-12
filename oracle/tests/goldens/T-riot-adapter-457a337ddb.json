@@ -1,0 +1,106 @@
+{
+  "id": "T-riot-adapter-457a337ddb",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot switch (real)"
+  ],
+  "name": "rolls the file back when something else starts the client while it is being written",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false,
+          "onProgress": {
+            "$function": "onProgress"
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "riot",
+        "account": {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333"
+        },
+        "strategy": "remembered",
+        "ok": false,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close the Riot Client",
+            "status": "skipped",
+            "detail": "Skipped: RiotClientServices.exe is not running."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing sign-in",
+            "status": "done",
+            "detail": "Saved Main's sign-in (fingerprint acd093bd)."
+          },
+          {
+            "id": "backup",
+            "title": "Back up RiotGamesPrivateSettings.yaml",
+            "status": "done",
+            "detail": "{tmp}\\backups\\riot\\<ts>"
+          },
+          {
+            "id": "file",
+            "title": "Put the account's sign-in in place",
+            "status": "done",
+            "detail": "RiotGamesPrivateSettings.yaml now holds the saved copy (fingerprint 4b8ad0db)."
+          },
+          {
+            "id": "start",
+            "title": "Start the Riot Client",
+            "status": "failed",
+            "detail": "The Riot Client was started by something else while One Launch was switching accounts, so the switch was stopped. Try again."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the client to come up",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the client signed in",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "skipped",
+            "detail": "Runs only if the client refuses the saved sign-in or does not sign in within 0.04 s. The client stays on its login page; you sign in there once as riot_alt with “Stay signed in” ticked and One Launch continues as soon as the log reports the sign-in, up to 0.0013333333333333333 min."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new sign-in",
+            "status": "skipped",
+            "detail": "Runs only after a manual sign-in: the fresh sign-in replaces the stale saved copy."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": true,
+        "error": "The Riot Client was started by something else while One Launch was switching accounts, so the switch was stopped. Try again.",
+        "needsSignIn": false,
+        "cancelled": false
+      }
+    }
+  ]
+}

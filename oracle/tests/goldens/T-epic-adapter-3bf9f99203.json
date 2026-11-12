@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-3bf9f99203",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.captureSession"
+  ],
+  "name": "stores the current session for its owner, refuses it for another account, and needs a remembered session",
+  "calls": []
+}

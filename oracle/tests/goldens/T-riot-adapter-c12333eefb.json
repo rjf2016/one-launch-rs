@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-c12333eefb",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot captureSession"
+  ],
+  "name": "refuses an account linked to another Riot id when nobody owns the saved sign-in",
+  "calls": []
+}

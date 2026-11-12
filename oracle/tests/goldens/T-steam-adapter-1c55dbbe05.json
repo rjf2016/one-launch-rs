@@ -1,0 +1,85 @@
+{
+  "id": "T-steam-adapter-1c55dbbe05",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.switchAccount (real, credentials path)"
+  ],
+  "name": "runs without a stored password or a password getter: Steam opens its sign-in form and the job parks there",
+  "calls": [
+    {
+      "launcher": "steam",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "Third",
+          "login": "nobody",
+          "launcherUid": null,
+          "hasSecret": false
+        },
+        {
+          "dryRun": false
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "steam",
+        "account": {
+          "id": "acct-1",
+          "displayName": "Third",
+          "login": "nobody",
+          "launcherUid": null
+        },
+        "strategy": "credentials",
+        "ok": false,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Steam",
+            "status": "skipped",
+            "detail": "Skipped: steam.exe is not running."
+          },
+          {
+            "id": "backup",
+            "title": "Back up Steam files",
+            "status": "done",
+            "detail": "{tmp}\\backups\\steam\\<ts>"
+          },
+          {
+            "id": "login",
+            "title": "Start Steam on its sign-in form",
+            "status": "done",
+            "detail": "Steam started on its sign-in form."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for Steam to come up",
+            "status": "done",
+            "detail": "steam.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm Steam signed in",
+            "status": "skipped",
+            "detail": "Handed over to you."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "failed",
+            "detail": "No sign-in after 0.0006666666666666666 min."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": null,
+        "cancelled": false,
+        "needsSignIn": true,
+        "error": "One Launch waited 0.0006666666666666666 min for the sign-in as nobody and gave up. Steam is still on its sign-in form: sign in there with \"Remember me\" ticked, and later switches are automatic."
+      }
+    }
+  ]
+}

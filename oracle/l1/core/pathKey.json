@@ -1,0 +1,547 @@
+{
+  "function": "pathKey",
+  "source": "src/main/platform/fs-path.ts",
+  "note": "decode: none\narg0 is a path string a launcher adapter read (a registry value, a VDF or JSON field, an INI line), already decoded by its caller. The module is node:path on Windows, so normalize and sep are win32 (sep is a backslash). Plain values, no decode.\npathKey is normalizeLauncherPath then String.prototype.toLowerCase (full Unicode lowercase mapping, final sigma included); samePath(a, b) is pathKey(a) === pathKey(b), so the samepath-* cases give the keys test/fs-path.test.ts compares.",
+  "cases": [
+    {
+      "id": "epic-mixed",
+      "origin": {
+        "kind": "test",
+        "ref": "test/fs-path.test.ts > normalizeLauncherPath > unifies mixed separators from Epic manifests"
+      },
+      "args": [
+        "C:\\Program Files\\Epic Games/rocketleague"
+      ],
+      "out": "c:\\program files\\epic games\\rocketleague"
+    },
+    {
+      "id": "relative-forward",
+      "origin": {
+        "kind": "test",
+        "ref": "test/fs-path.test.ts > normalizeLauncherPath > unifies mixed separators from Epic manifests"
+      },
+      "args": [
+        "Binaries/Win64/Launcher.exe"
+      ],
+      "out": "binaries\\win64\\launcher.exe"
+    },
+    {
+      "id": "steam-registry",
+      "origin": {
+        "kind": "test",
+        "ref": "test/fs-path.test.ts > normalizeLauncherPath > handles forward-slash Steam registry values"
+      },
+      "args": [
+        "d:/games/steam"
+      ],
+      "out": "d:\\games\\steam"
+    },
+    {
+      "id": "vdf-escaped",
+      "origin": {
+        "kind": "test",
+        "ref": "test/fs-path.test.ts > normalizeLauncherPath > unescapes VDF double backslashes"
+      },
+      "args": [
+        "D:\\\\Games\\\\Steam"
+      ],
+      "out": "d:\\games\\steam"
+    },
+    {
+      "id": "trailing-separator",
+      "origin": {
+        "kind": "test",
+        "ref": "test/fs-path.test.ts > normalizeLauncherPath > strips trailing separators but keeps drive roots"
+      },
+      "args": [
+        "C:\\ProgramData\\Epic\\EpicGamesLauncher\\Data\\"
+      ],
+      "out": "c:\\programdata\\epic\\epicgameslauncher\\data"
+    },
+    {
+      "id": "drive-root",
+      "origin": {
+        "kind": "test",
+        "ref": "test/fs-path.test.ts > normalizeLauncherPath > strips trailing separators but keeps drive roots"
+      },
+      "args": [
+        "C:\\"
+      ],
+      "out": "c:\\"
+    },
+    {
+      "id": "samepath-steam-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/fs-path.test.ts > samePath > compares case- and separator-insensitively"
+      },
+      "args": [
+        "d:/games/steam"
+      ],
+      "out": "d:\\games\\steam"
+    },
+    {
+      "id": "samepath-steam-b",
+      "origin": {
+        "kind": "test",
+        "ref": "test/fs-path.test.ts > samePath > compares case- and separator-insensitively"
+      },
+      "args": [
+        "D:\\Games\\Steam\\"
+      ],
+      "out": "d:\\games\\steam"
+    },
+    {
+      "id": "samepath-steam2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/fs-path.test.ts > samePath > compares case- and separator-insensitively"
+      },
+      "args": [
+        "D:\\Games\\Steam2"
+      ],
+      "out": "d:\\games\\steam2"
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the empty string normalises to \".\""
+      },
+      "args": [
+        ""
+      ],
+      "out": "."
+    },
+    {
+      "id": "blank",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: only spaces: trimmed to empty, then \".\""
+      },
+      "args": [
+        "   "
+      ],
+      "out": "."
+    },
+    {
+      "id": "trim-ascii",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: spaces, tabs and line breaks around a path are trimmed"
+      },
+      "args": [
+        " \t\r\nD:\\Games\\Steam \n"
+      ],
+      "out": "d:\\games\\steam"
+    },
+    {
+      "id": "trim-nbsp-feff",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: JS trim removes U+00A0, U+FEFF and U+3000; Rust trim keeps U+FEFF"
+      },
+      "args": [
+        " ﻿D:\\Games\\Steam　﻿"
+      ],
+      "out": "d:\\games\\steam"
+    },
+    {
+      "id": "trim-nel-kept",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: JS trim keeps U+0085 (NEL) and U+180E; Rust trim removes U+0085"
+      },
+      "args": [
+        "D:\\Games\\Steam᠎"
+      ],
+      "out": ".\\d:\\games\\steam᠎"
+    },
+    {
+      "id": "trim-line-separator",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+2028 and U+2029 are trimmed in JS"
+      },
+      "args": [
+        " D:\\Games\\Steam "
+      ],
+      "out": "d:\\games\\steam"
+    },
+    {
+      "id": "drive-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a bare drive letter: win32 normalize gives \"C:.\""
+      },
+      "args": [
+        "C:"
+      ],
+      "out": "c:."
+    },
+    {
+      "id": "drive-forward-root",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: C:/ is the drive root"
+      },
+      "args": [
+        "C:/"
+      ],
+      "out": "c:\\"
+    },
+    {
+      "id": "drive-relative",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a drive-relative path keeps its form"
+      },
+      "args": [
+        "D:Games\\Steam"
+      ],
+      "out": "d:games\\steam"
+    },
+    {
+      "id": "dot-segments",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \".\" and \"..\" are resolved"
+      },
+      "args": [
+        "D:\\Games\\.\\Steam\\..\\Epic\\.\\"
+      ],
+      "out": "d:\\games\\epic"
+    },
+    {
+      "id": "dotdot-above-root",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"..\" above the drive root stays at the root"
+      },
+      "args": [
+        "C:\\..\\..\\Windows"
+      ],
+      "out": "c:\\windows"
+    },
+    {
+      "id": "relative-dotdot",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: leading \"..\" of a relative path is kept"
+      },
+      "args": [
+        "..\\..\\x\\..\\y"
+      ],
+      "out": "..\\..\\y"
+    },
+    {
+      "id": "unc-share",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a UNC path: the VDF unescape turns its leading \\\\ into \\, so it ends up rooted on the current drive"
+      },
+      "args": [
+        "\\\\server\\share\\Games"
+      ],
+      "out": "\\server\\share\\games"
+    },
+    {
+      "id": "unc-escaped",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a VDF-escaped UNC path (four backslashes) becomes a true UNC path"
+      },
+      "args": [
+        "\\\\\\\\server\\\\share\\\\Games"
+      ],
+      "out": "\\server\\share\\games"
+    },
+    {
+      "id": "long-path-prefix",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the \\\\?\\ prefix"
+      },
+      "args": [
+        "\\\\?\\C:\\Games\\Steam"
+      ],
+      "out": "\\?\\c:\\games\\steam"
+    },
+    {
+      "id": "three-backslashes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: three backslashes in a row: one pair is unescaped, then the separators collapse"
+      },
+      "args": [
+        "D:\\\\\\Games"
+      ],
+      "out": "d:\\games"
+    },
+    {
+      "id": "many-separators",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: runs of mixed separators collapse to one"
+      },
+      "args": [
+        "D:/\\//Games\\\\//Steam///"
+      ],
+      "out": "d:\\games\\steam"
+    },
+    {
+      "id": "short-trailing-two",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: a two-unit relative path with a trailing separator keeps it: the trailing cut needs more than 3 units"
+      },
+      "args": [
+        "a\\"
+      ],
+      "out": "a\\"
+    },
+    {
+      "id": "short-trailing-three",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: a three-unit path with a trailing separator keeps it"
+      },
+      "args": [
+        "ab\\"
+      ],
+      "out": "ab\\"
+    },
+    {
+      "id": "short-trailing-four",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: a four-unit path with a trailing separator loses it"
+      },
+      "args": [
+        "abc\\"
+      ],
+      "out": "abc"
+    },
+    {
+      "id": "astral-trailing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an emoji counts two units towards the more-than-3 test"
+      },
+      "args": [
+        "😀\\"
+      ],
+      "out": "😀\\"
+    },
+    {
+      "id": "root-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a lone backslash"
+      },
+      "args": [
+        "\\"
+      ],
+      "out": "\\"
+    },
+    {
+      "id": "forward-root-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a lone forward slash"
+      },
+      "args": [
+        "/"
+      ],
+      "out": "\\"
+    },
+    {
+      "id": "dot",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a lone dot"
+      },
+      "args": [
+        "."
+      ],
+      "out": "."
+    },
+    {
+      "id": "trailing-dot-segment",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: trailing dots and spaces in a segment are kept"
+      },
+      "args": [
+        "D:\\Games. \\Steam."
+      ],
+      "out": "d:\\games. \\steam."
+    },
+    {
+      "id": "stream-colon",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a colon later in the path is kept"
+      },
+      "args": [
+        "D:\\Games\\file.txt:stream"
+      ],
+      "out": "d:\\games\\file.txt:stream"
+    },
+    {
+      "id": "non-ascii",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: non-ASCII letters pass through normalisation as they are"
+      },
+      "args": [
+        "E:\\Spiele\\ÄÖÜ\\İstanbul\\Straße"
+      ],
+      "out": "e:\\spiele\\äöü\\i̇stanbul\\straße"
+    },
+    {
+      "id": "lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate in a segment is kept"
+      },
+      "args": [
+        {
+          "$utf16": [
+            69,
+            58,
+            92,
+            120,
+            55296,
+            92,
+            121
+          ]
+        }
+      ],
+      "out": {
+        "$utf16": [
+          101,
+          58,
+          92,
+          120,
+          55296,
+          92,
+          121
+        ]
+      }
+    },
+    {
+      "id": "env-placeholder",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an unexpanded %VAR% is left as text"
+      },
+      "args": [
+        "%ProgramFiles%\\Epic Games"
+      ],
+      "out": "%programfiles%\\epic games"
+    },
+    {
+      "id": "lower-dotted-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: İ (U+0130) lowercases to i + U+0307, two units"
+      },
+      "args": [
+        "E:\\İstanbul"
+      ],
+      "out": "e:\\i̇stanbul"
+    },
+    {
+      "id": "lower-dotless-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ı (U+0131) has no lower form change; I lowercases to i"
+      },
+      "args": [
+        "E:\\ıI"
+      ],
+      "out": "e:\\ıi"
+    },
+    {
+      "id": "lower-sharp-s",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ẞ (U+1E9E) lowercases to ß; ß stays"
+      },
+      "args": [
+        "E:\\STRAẞE\\Straße"
+      ],
+      "out": "e:\\straße\\straße"
+    },
+    {
+      "id": "lower-final-sigma",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: JS lowercases a word-final Σ to ς and an inner one to σ"
+      },
+      "args": [
+        "E:\\ΟΔΟΣ\\ΣΑ"
+      ],
+      "out": "e:\\οδος\\σα"
+    },
+    {
+      "id": "lower-kelvin",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: the Kelvin sign U+212A lowercases to k"
+      },
+      "args": [
+        "E:\\Kelvin"
+      ],
+      "out": "e:\\kelvin"
+    },
+    {
+      "id": "lower-fullwidth",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: fullwidth letters lowercase to fullwidth"
+      },
+      "args": [
+        "E:\\ＡＢＣ"
+      ],
+      "out": "e:\\ａｂｃ"
+    },
+    {
+      "id": "lower-cherokee",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: Cherokee capital letters lowercase to the small block added in Unicode 8"
+      },
+      "args": [
+        "E:\\Ꭰ"
+      ],
+      "out": "e:\\ꭰ"
+    },
+    {
+      "id": "lower-astral",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: an astral capital (Deseret) lowercases to an astral small letter"
+      },
+      "args": [
+        "E:\\𐐀"
+      ],
+      "out": "e:\\𐐨"
+    },
+    {
+      "id": "not-a-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a non-string throws from trim being missing"
+      },
+      "args": [
+        42
+      ],
+      "error": {
+        "name": "TypeError",
+        "message": "raw.trim is not a function"
+      }
+    }
+  ]
+}

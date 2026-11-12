@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-37515f26c3",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot shutdown"
+  ],
+  "name": "waits out a client that restarts itself after the close, closes it again, and gives up after three rounds",
+  "calls": []
+}

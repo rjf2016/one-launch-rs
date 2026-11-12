@@ -1,0 +1,9 @@
+{
+  "id": "T-battlenet-adapter-fd852667e0",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "looks in the folder chosen in Settings first, and says so when the client is no longer in it",
+  "calls": []
+}

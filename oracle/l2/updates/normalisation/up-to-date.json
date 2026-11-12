@@ -1,0 +1,38 @@
+{
+  "condition": "up-to-date",
+  "runs": 3,
+  "digests": [
+    "5d507499f9ef30bdaf9940d638d74c0ce268053aad676485d03439e248b0b9c0",
+    "5d507499f9ef30bdaf9940d638d74c0ce268053aad676485d03439e248b0b9c0",
+    "5d507499f9ef30bdaf9940d638d74c0ce268053aad676485d03439e248b0b9c0"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    },
+    {
+      "rule": "ts",
+      "path": "/steps/*/states/*/checkedAt"
+    }
+  ],
+  "volatile": [
+    "/steps/*/states/*/checkedAt"
+  ],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

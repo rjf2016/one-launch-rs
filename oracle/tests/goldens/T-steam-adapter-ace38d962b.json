@@ -1,0 +1,91 @@
+{
+  "id": "T-steam-adapter-ace38d962b",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter with Steam automatic sign-in off (the default)"
+  ],
+  "name": "opens the sign-in form with only the account name, hands over, and finishes once the user signs in",
+  "calls": [
+    {
+      "launcher": "steam",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "New",
+          "login": "nobody",
+          "launcherUid": null,
+          "hasSecret": true
+        },
+        {
+          "dryRun": false,
+          "getPassword": {
+            "$function": "getPassword"
+          },
+          "onAttention": {
+            "$function": "onAttention"
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "steam",
+        "account": {
+          "id": "acct-1",
+          "displayName": "New",
+          "login": "nobody",
+          "launcherUid": null
+        },
+        "strategy": "credentials",
+        "ok": true,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Steam",
+            "status": "skipped",
+            "detail": "Skipped: steam.exe is not running."
+          },
+          {
+            "id": "backup",
+            "title": "Back up Steam files",
+            "status": "done",
+            "detail": "{tmp}\\backups\\steam\\<ts>"
+          },
+          {
+            "id": "login",
+            "title": "Start Steam on its sign-in form",
+            "status": "done",
+            "detail": "Steam started on its sign-in form."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for Steam to come up",
+            "status": "done",
+            "detail": "steam.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm Steam signed in",
+            "status": "skipped",
+            "detail": "Handed over to you."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "done",
+            "detail": "Steam signed in as nobody."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": null,
+        "error": null,
+        "needsSignIn": false,
+        "cancelled": false
+      }
+    }
+  ]
+}

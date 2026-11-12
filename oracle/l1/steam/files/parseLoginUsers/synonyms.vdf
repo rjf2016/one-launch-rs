@@ -1,0 +1,16 @@
+"users"
+{
+	"76561198000000009"
+	{
+		"AccountName"		"old_client"
+		"MostRecent"		"1"
+	}
+	"not-a-steamid"
+	{
+		"AccountName"		"ignored"
+	}
+	"76561198000000010"
+	{
+		"PersonaName"		"no account name"
+	}
+}

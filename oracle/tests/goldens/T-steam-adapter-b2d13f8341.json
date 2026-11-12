@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-b2d13f8341",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.listRememberedAccounts"
+  ],
+  "name": "returns names and IDs only, most recent first",
+  "calls": []
+}

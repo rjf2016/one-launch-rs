@@ -1,0 +1,315 @@
+{
+  "function": "parseProductSettings",
+  "source": "src/main/launchers/riot/products.ts",
+  "note": "decode: arg0=utf8\narg0 is <product>.<patchline>.product_settings.yaml as src/main/launchers/riot/adapter.ts reads it (readLauncherText: readFileSync, then toString utf8; a BOM stays as U+FEFF, invalid bytes become U+FFFD).\nThe function relies on readLauncherText for its size cap (4 MiB) and enforces none itself.\nLines split on \\r?\\n only: a lone CR stays inside a line, where the JS `.` of TOP_LEVEL_SCALAR does not match it (nor U+2028 or U+2029), so such a line reads as no key at all.",
+  "cases": [
+    {
+      "id": "fixture-valorant",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-adapter.test.ts > Riot metadata parsers > reads the top-level scalars of a product settings file"
+      },
+      "args": [
+        {
+          "$file": "fixtures/launchers/riot/valorant.live.product_settings.yaml",
+          "sha256": "a7199aee4c3551dbf32ef285e7ec4cd3e926d1a999bd7f1c8d94df2579a510e2"
+        }
+      ],
+      "out": {
+        "installPath": "D:/Games/Riot Games/VALORANT/live",
+        "installRoot": "D:/Games/Riot Games",
+        "dependency": null
+      }
+    },
+    {
+      "id": "fixture-league",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-adapter.test.ts > Riot metadata parsers > reads the top-level scalars of a product settings file"
+      },
+      "args": [
+        {
+          "$file": "fixtures/launchers/riot/league_of_legends.live.product_settings.yaml",
+          "sha256": "a0e539d9d4efecc984203a3728755bc8a5348099ff6d1a4ec1ec6ef41f0bb034"
+        }
+      ],
+      "out": {
+        "installPath": "D:/Games/Riot Games/League of Legends",
+        "installRoot": "D:/Games/Riot Games",
+        "dependency": "teamfighttactics.live"
+      }
+    },
+    {
+      "id": "empty-value-and-nested",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-adapter.test.ts > Riot metadata parsers > reads the top-level scalars of a product settings file"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDogIiIKbmVzdGVkOgogICAgcHJvZHVjdF9pbnN0YWxsX3Jvb3Q6ICJ4Igo="
+        }
+      ],
+      "out": {
+        "installPath": null,
+        "installRoot": null,
+        "dependency": null
+      }
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/valorant.live.product_settings.yaml | emptied"
+      },
+      "args": [
+        {
+          "$bytes": ""
+        }
+      ],
+      "out": {
+        "installPath": null,
+        "installRoot": null,
+        "dependency": null
+      }
+    },
+    {
+      "id": "crlf",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/valorant.live.product_settings.yaml | LF made CRLF"
+      },
+      "args": [
+        {
+          "$bytes": "YXV0b19wYXRjaGluZ19lbmFibGVkX2J5X3BsYXllcjogZmFsc2UNCmRlcGVuZGVuY2llczoNCiAgICBEaXJlY3RYOg0KICAgICAgICBoYXNoOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCINCiAgICAgICAgcGhhc2U6ICJTdWNjZWVkZWQiDQogICAgICAgIHZlcnNpb246ICIxLjAuMCINCiAgICB2YW5ndWFyZDogdHJ1ZQ0KbG9jYWxlX2RhdGE6DQogICAgYXZhaWxhYmxlX2xvY2FsZXM6DQogICAgLSAiZW5fVVMiDQogICAgLSAiZGVfREUiDQogICAgZGVmYXVsdF9sb2NhbGU6ICJlbl9VUyINCnBhdGNoaW5nX3BvbGljeTogIm1hbnVhbCINCnBhdGNobGluZV9wYXRjaGluZ19hc2tfcG9saWN5OiAiYXNrIg0KcHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDogIkQ6L0dhbWVzL1Jpb3QgR2FtZXMvVkFMT1JBTlQvbGl2ZSINCnByb2R1Y3RfaW5zdGFsbF9yb290OiAiRDovR2FtZXMvUmlvdCBHYW1lcyINCnNldHRpbmdzOg0KICAgIGNyZWF0ZV9zaG9ydGN1dDogZmFsc2UNCiAgICBjcmVhdGVfdW5pbnN0YWxsX2tleTogdHJ1ZQ0KICAgIGxvY2FsZTogImVuX1VTIg0Kc2hvcnRjdXRfbmFtZTogIlZBTE9SQU5ULmxuayINCnNob3VsZF9yZXBhaXI6IGZhbHNlDQo="
+        }
+      ],
+      "out": {
+        "installPath": "D:/Games/Riot Games/VALORANT/live",
+        "installRoot": "D:/Games/Riot Games",
+        "dependency": null
+      }
+    },
+    {
+      "id": "bom",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/valorant.live.product_settings.yaml | UTF-8 BOM added: the first line keeps U+FEFF and its key no longer matches"
+      },
+      "args": [
+        {
+          "$bytes": "77u/cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDogIkQ6L0dhbWVzL1Jpb3QgR2FtZXMvVkFMT1JBTlQvbGl2ZSIKcHJvZHVjdF9pbnN0YWxsX3Jvb3Q6ICJEOi9HYW1lcy9SaW90IEdhbWVzIgo="
+        }
+      ],
+      "out": {
+        "installPath": null,
+        "installRoot": "D:/Games/Riot Games",
+        "dependency": null
+      }
+    },
+    {
+      "id": "skipped-prefixes",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/valorant.live.product_settings.yaml | the three keys behind a space, a tab, a comment and a list dash"
+      },
+      "args": [
+        {
+          "$bytes": "IHByb2R1Y3RfaW5zdGFsbF9mdWxsX3BhdGg6ICJEOi9hIgoJcHJvZHVjdF9pbnN0YWxsX3Jvb3Q6ICJEOi9iIgojcHJvZHVjdF9kZXBlbmRlbmN5OiAiYyIKLXByb2R1Y3RfZGVwZW5kZW5jeTogImQiCnByb2R1Y3RfZGVwZW5kZW5jeTogInRlYW1maWdodHRhY3RpY3MubGl2ZSIK"
+        }
+      ],
+      "out": {
+        "installPath": null,
+        "installRoot": null,
+        "dependency": "teamfighttactics.live"
+      }
+    },
+    {
+      "id": "quotes",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/league_of_legends.live.product_settings.yaml | single quotes, a bare value, inner quotes, an unmatched quote"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDogJ0Q6L0dhbWVzL1Jpb3QgR2FtZXMvTGVhZ3VlIG9mIExlZ2VuZHMnCnByb2R1Y3RfaW5zdGFsbF9yb290OiBEOi9HYW1lcy9SaW90IEdhbWVzCnByb2R1Y3RfZGVwZW5kZW5jeTogImEiYiIK"
+        }
+      ],
+      "out": {
+        "installPath": "D:/Games/Riot Games/League of Legends",
+        "installRoot": "D:/Games/Riot Games",
+        "dependency": "a\"b"
+      }
+    },
+    {
+      "id": "unmatched-quote",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/league_of_legends.live.product_settings.yaml | a value with an opening quote only, and one of two single quotes"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDogIkQ6L0dhbWVzCnByb2R1Y3RfaW5zdGFsbF9yb290OiAnJwpwcm9kdWN0X2RlcGVuZGVuY3k6ICcK"
+        }
+      ],
+      "out": {
+        "installPath": "\"D:/Games",
+        "installRoot": null,
+        "dependency": "'"
+      }
+    },
+    {
+      "id": "no-space-after-colon",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/valorant.live.product_settings.yaml | key:value with no space, and trailing spaces and tabs"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDpEOi94CnByb2R1Y3RfaW5zdGFsbF9yb290OiAgICJEOi95IiAJIApwcm9kdWN0X2RlcGVuZGVuY3k6Cg=="
+        }
+      ],
+      "out": {
+        "installPath": "D:/x",
+        "installRoot": "D:/y",
+        "dependency": null
+      }
+    },
+    {
+      "id": "duplicate-keys-last-wins",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/valorant.live.product_settings.yaml | product_install_full_path given twice, then emptied"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDogIkQ6L2ZpcnN0Igpwcm9kdWN0X2luc3RhbGxfZnVsbF9wYXRoOiAiRDovc2Vjb25kIgpwcm9kdWN0X2luc3RhbGxfcm9vdDogIkQ6L3IiCnByb2R1Y3RfaW5zdGFsbF9yb290Ogo="
+        }
+      ],
+      "out": {
+        "installPath": "D:/second",
+        "installRoot": null,
+        "dependency": null
+      }
+    },
+    {
+      "id": "comment-in-value",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/valorant.live.product_settings.yaml | a trailing # comment, which YAML would drop and the parser keeps"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDogRDovR2FtZXMvUmlvdCBHYW1lcy9WQUxPUkFOVC9saXZlICMgbW92ZWQK"
+        }
+      ],
+      "out": {
+        "installPath": "D:/Games/Riot Games/VALORANT/live # moved",
+        "installRoot": null,
+        "dependency": null
+      }
+    },
+    {
+      "id": "key-charset",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/valorant.live.product_settings.yaml | a key with a space and one with dots and dashes before the real keys"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdCBpbnN0YWxsOiAieCIKcHJvZHVjdC5pbnN0YWxsLXJvb3RfMjogInkiCnByb2R1Y3RfaW5zdGFsbF9yb290OiAiRDovR2FtZXMvUmlvdCBHYW1lcyIK"
+        }
+      ],
+      "out": {
+        "installPath": null,
+        "installRoot": "D:/Games/Riot Games",
+        "dependency": null
+      }
+    },
+    {
+      "id": "adv-lone-cr",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "regex: a lone CR inside a line: JS `.` stops at CR so the line reads as no key; a Rust regex `.` matches CR"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDogIkQ6L2EiDXByb2R1Y3RfaW5zdGFsbF9yb290OiAiRDovYiIKcHJvZHVjdF9kZXBlbmRlbmN5OiAieA15Igo="
+        }
+      ],
+      "out": {
+        "installPath": null,
+        "installRoot": null,
+        "dependency": null
+      }
+    },
+    {
+      "id": "adv-line-separator",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "regex: U+2028 and U+2029 inside a value: JS `.` does not match them, so the line is skipped; Rust `.` matches them"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDogIkQ6L2HigKhiIgpwcm9kdWN0X2luc3RhbGxfcm9vdDogIkQ6L2PigKlkIgpwcm9kdWN0X2RlcGVuZGVuY3k6ICJlwoVmIgo="
+        }
+      ],
+      "out": {
+        "installPath": null,
+        "installRoot": null,
+        "dependency": "ef"
+      }
+    },
+    {
+      "id": "adv-unicode-space-around",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: only space and tab are trimmed around a value ([ \\t]*); U+00A0, U+3000 and U+FEFF stay in it"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDrCoCJEOi9hIgpwcm9kdWN0X2luc3RhbGxfcm9vdDogIkQ6L2Ii44CACnByb2R1Y3RfZGVwZW5kZW5jeTog77u/ImMiCg=="
+        }
+      ],
+      "out": {
+        "installPath": " \"D:/a\"",
+        "installRoot": "\"D:/b\"　",
+        "dependency": "﻿\"c\""
+      }
+    },
+    {
+      "id": "adv-invalid-utf8",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: fixtures/launchers/riot/valorant.live.product_settings.yaml with a lone 0xFF and a truncated sequence in the install path; Node gives one U+FFFD each"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDogIkQ6L0dhbWVzL/9WQUxPUkFOVC/igmxpdmUiCg=="
+        }
+      ],
+      "out": {
+        "installPath": "D:/Games/�VALORANT/�live",
+        "installRoot": null,
+        "dependency": null
+      }
+    },
+    {
+      "id": "adv-astral-key-value",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an astral character in a value and before a key; the value is kept whole"
+      },
+      "args": [
+        {
+          "$bytes": "cHJvZHVjdF9pbnN0YWxsX2Z1bGxfcGF0aDogIkQ6L/Cfjq4vbGl2ZSIK8J+OrnByb2R1Y3RfaW5zdGFsbF9yb290OiAieCIK"
+        }
+      ],
+      "out": {
+        "installPath": "D:/🎮/live",
+        "installRoot": null,
+        "dependency": null
+      }
+    }
+  ]
+}

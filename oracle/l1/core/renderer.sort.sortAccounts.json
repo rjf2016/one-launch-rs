@@ -1,0 +1,5587 @@
+{
+  "function": "sortAccounts",
+  "source": "src/renderer/src/views/AccountsView.tsx",
+  "note": "decode: none\nLocale and time zone are pinned by scripts/oracle/l1/core/renderer/locale.ts, loaded before the app module: process.env.TZ = 'UTC', and Intl.RelativeTimeFormat, Date.prototype.toLocaleString and String.prototype.localeCompare get 'en-US' when the app passes undefined (toLocaleString also gets timeZone 'UTC'), as the UI captures run. Node's own ICU (Node 24.13.1, ICU 78.2, CLDR 48.0) produces the text.\ncall returns the ids of the sorted list (sortAccounts copies the list and returns the same account objects, reordered). The comparator: both used, b.lastUsedAt.localeCompare(a.lastUsedAt) with default sensitivity; one used, it goes first; neither, a.displayName.localeCompare(b.displayName, undefined, { sensitivity: \"base\" }). Array.prototype.sort is stable, so a 0 keeps the input order.\nEach pair is given in both orders (-ab, -ba): the same order back twice means the comparator ranks them, the input order back twice means it returns 0.\nThe Library's name order (LibraryView.tsx, byName inside a useMemo) is the same localeCompare call but is not exported, so it has no vector of its own; its recent order breaks lastPlayed ties by name, which sortAccounts does not do for lastUsedAt.",
+  "cases": [
+    {
+      "id": "name-case-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"alpha\" against \"Alpha\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "alpha",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Alpha",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-case-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"alpha\" against \"Alpha\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Alpha",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "alpha",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-case-order-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"b\" against \"A\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "A",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-case-order-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"b\" against \"A\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "A",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-upper-lower-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"B\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "B",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-upper-lower-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"B\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "B",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-accent-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"e\" against \"é\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "e",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "é",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-accent-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"e\" against \"é\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "é",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "e",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-accent-word-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"resume\" against \"résumé\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "resume",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "résumé",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-accent-word-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"resume\" against \"résumé\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "résumé",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "resume",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-combining-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"é\" against \"é\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "é",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "é",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-combining-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"é\" against \"é\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "é",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "é",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-digits-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"Account 2\" against \"Account 10\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Account 2",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Account 10",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-digits-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"Account 2\" against \"Account 10\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Account 10",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Account 2",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-digit-letter-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"9\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "9",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-digit-letter-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"9\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "9",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-arabic-indic-digit-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: displayName \"3\" against \"٣\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "3",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "٣",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-arabic-indic-digit-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: displayName \"3\" against \"٣\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "٣",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "3",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-fullwidth-digit-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: displayName \"3\" against \"３\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "3",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "３",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-fullwidth-digit-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: displayName \"3\" against \"３\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "３",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "3",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-hyphen-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"a-b\" against \"ab\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "a-b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "ab",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-hyphen-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"a-b\" against \"ab\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "ab",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "a-b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-space-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"a b\" against \"ab\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "a b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "ab",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-space-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"a b\" against \"ab\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "ab",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "a b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-underscore-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"_x\" against \"x\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "_x",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "x",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-underscore-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"_x\" against \"x\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "x",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "_x",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-punctuation-order-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"!\" against \"#\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "!",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "#",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-punctuation-order-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"!\" against \"#\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "#",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "!",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-dot-vs-letter-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \".a\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": ".a",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-dot-vs-letter-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \".a\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": ".a",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-sharp-s-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"straße\" against \"strasse\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "straße",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "strasse",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-sharp-s-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"straße\" against \"strasse\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "strasse",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "straße",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-ae-ligature-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"Æ\" against \"AE\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Æ",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "AE",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-ae-ligature-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"Æ\" against \"AE\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "AE",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Æ",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-fi-ligature-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"ﬁ\" against \"fi\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "ﬁ",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "fi",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-fi-ligature-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"ﬁ\" against \"fi\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "fi",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "ﬁ",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-dotted-capital-i-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"İ\" against \"I\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "İ",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "I",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-dotted-capital-i-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"İ\" against \"I\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "I",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "İ",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-dotless-i-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"ı\" against \"i\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "ı",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "i",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-dotless-i-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"ı\" against \"i\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "i",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "ı",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-fullwidth-letter-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"ａ\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "ａ",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-fullwidth-letter-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"ａ\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "ａ",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-math-script-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"𝒜\" against \"A\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "𝒜",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "A",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-math-script-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"𝒜\" against \"A\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "A",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "𝒜",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-emoji-letter-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"😀\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "😀",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-emoji-letter-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"😀\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "😀",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-two-emoji-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"😀\" against \"😁\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "😀",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "😁",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-two-emoji-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"😀\" against \"😁\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "😁",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "😀",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-astral-vs-bmp-high-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: displayName \"😀\" against \"�\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "😀",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "�",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-astral-vs-bmp-high-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: displayName \"😀\" against \"�\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "�",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "😀",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-cjk-latin-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"中\" against \"z\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "中",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "z",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-cjk-latin-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"中\" against \"z\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "z",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "中",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-hiragana-katakana-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"あ\" against \"ア\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "あ",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "ア",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-hiragana-katakana-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"あ\" against \"ア\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "ア",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "あ",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-cyrillic-latin-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"а\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "а",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-cyrillic-latin-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"а\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "а",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-zero-width-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"a​b\" against \"ab\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "a​b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "ab",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-zero-width-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"a​b\" against \"ab\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "ab",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "a​b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-nul-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"a\\u0000b\" against \"ab\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "a\u0000b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "ab",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-nul-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"a\\u0000b\" against \"ab\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "ab",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "a\u0000b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-empty-letter-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-empty-letter-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-empty-empty-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"\" against \"\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-empty-empty-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"\" against \"\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-empty-space-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"\" against \" \", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": " ",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-empty-space-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"\" against \" \", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": " ",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-nbsp-space-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: displayName \"a b\" against \"a b\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "a b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a b",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-nbsp-space-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: displayName \"a b\" against \"a b\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a b",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "a b",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-prefix-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"Main\" against \"Main 2\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Main",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Main 2",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-prefix-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: displayName \"Main\" against \"Main 2\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Main 2",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Main",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-identical-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: displayName \"Main\" against \"Main\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Main",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Main",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-identical-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: displayName \"Main\" against \"Main\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Main",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Main",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-lone-surrogate-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: displayName \"a\\ud800\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": {
+              "$utf16": [
+                97,
+                55296
+              ]
+            },
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-lone-surrogate-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: displayName \"a\\ud800\" against \"a\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "a",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": {
+              "$utf16": [
+                97,
+                55296
+              ]
+            },
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "name-lone-vs-replacement-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: displayName \"\\ud800\" against \"�\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given in that order"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": {
+              "$utf16": [
+                55296
+              ]
+            },
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "�",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "name-lone-vs-replacement-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: displayName \"\\ud800\" against \"�\", both never used: localeCompare(undefined, { sensitivity: 'base' }), given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "�",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": {
+              "$utf16": [
+                55296
+              ]
+            },
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "used-order-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: lastUsedAt both used: the later first, by localeCompare with default sensitivity"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-02T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "used-order-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: lastUsedAt both used: the later first, by localeCompare with default sensitivity, given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-02T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "used-equal-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: lastUsedAt the same lastUsedAt: 0, so the input order stays and the name is not consulted"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "used-equal-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: lastUsedAt the same lastUsedAt: 0, so the input order stays and the name is not consulted, given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "used-ms-vs-none-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: lastUsedAt the same instant written with and without milliseconds: compared as text"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "used-ms-vs-none-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: lastUsedAt the same instant written with and without milliseconds: compared as text, given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "used-vs-never-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: lastUsedAt one used, one never: the used one first"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "used-vs-never-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: lastUsedAt one used, one never: the used one first, given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "used-empty-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: lastUsedAt an empty lastUsedAt is falsy: treated as never used"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "used-empty-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: lastUsedAt an empty lastUsedAt is falsy: treated as never used, given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "id": "used-unpadded-day-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: lastUsedAt non-ISO text: localeCompare is not numeric, so 9 sorts after 10 when descending"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-9",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-10",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "used-unpadded-day-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "locale-compare: lastUsedAt non-ISO text: localeCompare is not numeric, so 9 sorts after 10 when descending, given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-10",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-9",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "used-offset-ab",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: lastUsedAt the same instant in two offsets: compared as text, not as time"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T05:00:00+05:00",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "used-offset-ba",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: lastUsedAt the same instant in two offsets: compared as text, not as time, given reversed"
+      },
+      "args": [
+        [
+          {
+            "id": "b",
+            "launcher": "steam",
+            "displayName": "Amy",
+            "login": "login_b",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Zed",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-01-01T05:00:00+05:00",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": "list-mixed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: twenty accounts mixing case, accents, digits, punctuation, astral, empty and used ones"
+      },
+      "args": [
+        [
+          {
+            "id": "a01",
+            "launcher": "steam",
+            "displayName": "zeta",
+            "login": "login_a01",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a02",
+            "launcher": "steam",
+            "displayName": "Alpha",
+            "login": "login_a02",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a03",
+            "launcher": "steam",
+            "displayName": "alpha",
+            "login": "login_a03",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a04",
+            "launcher": "steam",
+            "displayName": "Álpha",
+            "login": "login_a04",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a05",
+            "launcher": "steam",
+            "displayName": "Account 10",
+            "login": "login_a05",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a06",
+            "launcher": "steam",
+            "displayName": "Account 2",
+            "login": "login_a06",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a07",
+            "launcher": "steam",
+            "displayName": "_admin",
+            "login": "login_a07",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a08",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_a08",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a09",
+            "launcher": "steam",
+            "displayName": "😀 smile",
+            "login": "login_a09",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a10",
+            "launcher": "steam",
+            "displayName": "中文",
+            "login": "login_a10",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a11",
+            "launcher": "steam",
+            "displayName": "résumé",
+            "login": "login_a11",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a12",
+            "launcher": "steam",
+            "displayName": "resume",
+            "login": "login_a12",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a13",
+            "launcher": "steam",
+            "displayName": "Main",
+            "login": "login_a13",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-03-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a14",
+            "launcher": "steam",
+            "displayName": "Alt",
+            "login": "login_a14",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-05-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a15",
+            "launcher": "steam",
+            "displayName": "Smurf",
+            "login": "login_a15",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-05-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a16",
+            "launcher": "steam",
+            "displayName": "Old",
+            "login": "login_a16",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2025-12-31T23:59:59.999Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a17",
+            "launcher": "steam",
+            "displayName": "Blank",
+            "login": "login_a17",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a18",
+            "launcher": "steam",
+            "displayName": "straße",
+            "login": "login_a18",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a19",
+            "launcher": "steam",
+            "displayName": "strasse",
+            "login": "login_a19",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a20",
+            "launcher": "steam",
+            "displayName": "İstanbul",
+            "login": "login_a20",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a14",
+        "a15",
+        "a13",
+        "a16",
+        "a08",
+        "a07",
+        "a09",
+        "a05",
+        "a06",
+        "a02",
+        "a03",
+        "a04",
+        "a17",
+        "a20",
+        "a11",
+        "a12",
+        "a18",
+        "a19",
+        "a01",
+        "a10"
+      ]
+    },
+    {
+      "id": "list-mixed-reversed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: the same list reversed: ties come back in the new input order"
+      },
+      "args": [
+        [
+          {
+            "id": "a20",
+            "launcher": "steam",
+            "displayName": "İstanbul",
+            "login": "login_a20",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a19",
+            "launcher": "steam",
+            "displayName": "strasse",
+            "login": "login_a19",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a18",
+            "launcher": "steam",
+            "displayName": "straße",
+            "login": "login_a18",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a17",
+            "launcher": "steam",
+            "displayName": "Blank",
+            "login": "login_a17",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a16",
+            "launcher": "steam",
+            "displayName": "Old",
+            "login": "login_a16",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2025-12-31T23:59:59.999Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a15",
+            "launcher": "steam",
+            "displayName": "Smurf",
+            "login": "login_a15",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-05-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a14",
+            "launcher": "steam",
+            "displayName": "Alt",
+            "login": "login_a14",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-05-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a13",
+            "launcher": "steam",
+            "displayName": "Main",
+            "login": "login_a13",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-03-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a12",
+            "launcher": "steam",
+            "displayName": "resume",
+            "login": "login_a12",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a11",
+            "launcher": "steam",
+            "displayName": "résumé",
+            "login": "login_a11",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a10",
+            "launcher": "steam",
+            "displayName": "中文",
+            "login": "login_a10",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a09",
+            "launcher": "steam",
+            "displayName": "😀 smile",
+            "login": "login_a09",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a08",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_a08",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a07",
+            "launcher": "steam",
+            "displayName": "_admin",
+            "login": "login_a07",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a06",
+            "launcher": "steam",
+            "displayName": "Account 2",
+            "login": "login_a06",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a05",
+            "launcher": "steam",
+            "displayName": "Account 10",
+            "login": "login_a05",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a04",
+            "launcher": "steam",
+            "displayName": "Álpha",
+            "login": "login_a04",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a03",
+            "launcher": "steam",
+            "displayName": "alpha",
+            "login": "login_a03",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a02",
+            "launcher": "steam",
+            "displayName": "Alpha",
+            "login": "login_a02",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a01",
+            "launcher": "steam",
+            "displayName": "zeta",
+            "login": "login_a01",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a15",
+        "a14",
+        "a13",
+        "a16",
+        "a08",
+        "a07",
+        "a09",
+        "a05",
+        "a06",
+        "a04",
+        "a03",
+        "a02",
+        "a17",
+        "a20",
+        "a12",
+        "a11",
+        "a19",
+        "a18",
+        "a01",
+        "a10"
+      ]
+    },
+    {
+      "id": "list-mixed-shuffle-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: the same list shuffled with Rng(1) (Fisher-Yates): stable order among ties"
+      },
+      "args": [
+        [
+          {
+            "id": "a04",
+            "launcher": "steam",
+            "displayName": "Álpha",
+            "login": "login_a04",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a07",
+            "launcher": "steam",
+            "displayName": "_admin",
+            "login": "login_a07",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a14",
+            "launcher": "steam",
+            "displayName": "Alt",
+            "login": "login_a14",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-05-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a12",
+            "launcher": "steam",
+            "displayName": "resume",
+            "login": "login_a12",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a19",
+            "launcher": "steam",
+            "displayName": "strasse",
+            "login": "login_a19",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a08",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_a08",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a03",
+            "launcher": "steam",
+            "displayName": "alpha",
+            "login": "login_a03",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a02",
+            "launcher": "steam",
+            "displayName": "Alpha",
+            "login": "login_a02",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a20",
+            "launcher": "steam",
+            "displayName": "İstanbul",
+            "login": "login_a20",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a15",
+            "launcher": "steam",
+            "displayName": "Smurf",
+            "login": "login_a15",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-05-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a11",
+            "launcher": "steam",
+            "displayName": "résumé",
+            "login": "login_a11",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a06",
+            "launcher": "steam",
+            "displayName": "Account 2",
+            "login": "login_a06",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a18",
+            "launcher": "steam",
+            "displayName": "straße",
+            "login": "login_a18",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a09",
+            "launcher": "steam",
+            "displayName": "😀 smile",
+            "login": "login_a09",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a05",
+            "launcher": "steam",
+            "displayName": "Account 10",
+            "login": "login_a05",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a16",
+            "launcher": "steam",
+            "displayName": "Old",
+            "login": "login_a16",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2025-12-31T23:59:59.999Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a17",
+            "launcher": "steam",
+            "displayName": "Blank",
+            "login": "login_a17",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a10",
+            "launcher": "steam",
+            "displayName": "中文",
+            "login": "login_a10",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a01",
+            "launcher": "steam",
+            "displayName": "zeta",
+            "login": "login_a01",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a13",
+            "launcher": "steam",
+            "displayName": "Main",
+            "login": "login_a13",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-03-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a14",
+        "a15",
+        "a13",
+        "a16",
+        "a08",
+        "a07",
+        "a09",
+        "a05",
+        "a06",
+        "a04",
+        "a03",
+        "a02",
+        "a17",
+        "a20",
+        "a12",
+        "a11",
+        "a19",
+        "a18",
+        "a01",
+        "a10"
+      ]
+    },
+    {
+      "id": "list-mixed-shuffle-2",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: the same list shuffled with Rng(2) (Fisher-Yates): stable order among ties"
+      },
+      "args": [
+        [
+          {
+            "id": "a13",
+            "launcher": "steam",
+            "displayName": "Main",
+            "login": "login_a13",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-03-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a14",
+            "launcher": "steam",
+            "displayName": "Alt",
+            "login": "login_a14",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-05-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a09",
+            "launcher": "steam",
+            "displayName": "😀 smile",
+            "login": "login_a09",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a03",
+            "launcher": "steam",
+            "displayName": "alpha",
+            "login": "login_a03",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a01",
+            "launcher": "steam",
+            "displayName": "zeta",
+            "login": "login_a01",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a12",
+            "launcher": "steam",
+            "displayName": "resume",
+            "login": "login_a12",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a18",
+            "launcher": "steam",
+            "displayName": "straße",
+            "login": "login_a18",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a04",
+            "launcher": "steam",
+            "displayName": "Álpha",
+            "login": "login_a04",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a11",
+            "launcher": "steam",
+            "displayName": "résumé",
+            "login": "login_a11",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a08",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_a08",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a02",
+            "launcher": "steam",
+            "displayName": "Alpha",
+            "login": "login_a02",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a16",
+            "launcher": "steam",
+            "displayName": "Old",
+            "login": "login_a16",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2025-12-31T23:59:59.999Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a05",
+            "launcher": "steam",
+            "displayName": "Account 10",
+            "login": "login_a05",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a19",
+            "launcher": "steam",
+            "displayName": "strasse",
+            "login": "login_a19",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a17",
+            "launcher": "steam",
+            "displayName": "Blank",
+            "login": "login_a17",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a20",
+            "launcher": "steam",
+            "displayName": "İstanbul",
+            "login": "login_a20",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a10",
+            "launcher": "steam",
+            "displayName": "中文",
+            "login": "login_a10",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a06",
+            "launcher": "steam",
+            "displayName": "Account 2",
+            "login": "login_a06",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a07",
+            "launcher": "steam",
+            "displayName": "_admin",
+            "login": "login_a07",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a15",
+            "launcher": "steam",
+            "displayName": "Smurf",
+            "login": "login_a15",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-05-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a14",
+        "a15",
+        "a13",
+        "a16",
+        "a08",
+        "a07",
+        "a09",
+        "a05",
+        "a06",
+        "a03",
+        "a04",
+        "a02",
+        "a17",
+        "a20",
+        "a12",
+        "a11",
+        "a18",
+        "a19",
+        "a01",
+        "a10"
+      ]
+    },
+    {
+      "id": "list-mixed-shuffle-3",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: the same list shuffled with Rng(3) (Fisher-Yates): stable order among ties"
+      },
+      "args": [
+        [
+          {
+            "id": "a11",
+            "launcher": "steam",
+            "displayName": "résumé",
+            "login": "login_a11",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a18",
+            "launcher": "steam",
+            "displayName": "straße",
+            "login": "login_a18",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a16",
+            "launcher": "steam",
+            "displayName": "Old",
+            "login": "login_a16",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2025-12-31T23:59:59.999Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a10",
+            "launcher": "steam",
+            "displayName": "中文",
+            "login": "login_a10",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a20",
+            "launcher": "steam",
+            "displayName": "İstanbul",
+            "login": "login_a20",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a05",
+            "launcher": "steam",
+            "displayName": "Account 10",
+            "login": "login_a05",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a12",
+            "launcher": "steam",
+            "displayName": "resume",
+            "login": "login_a12",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a06",
+            "launcher": "steam",
+            "displayName": "Account 2",
+            "login": "login_a06",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a19",
+            "launcher": "steam",
+            "displayName": "strasse",
+            "login": "login_a19",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a17",
+            "launcher": "steam",
+            "displayName": "Blank",
+            "login": "login_a17",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a14",
+            "launcher": "steam",
+            "displayName": "Alt",
+            "login": "login_a14",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-05-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a04",
+            "launcher": "steam",
+            "displayName": "Álpha",
+            "login": "login_a04",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a03",
+            "launcher": "steam",
+            "displayName": "alpha",
+            "login": "login_a03",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a07",
+            "launcher": "steam",
+            "displayName": "_admin",
+            "login": "login_a07",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a08",
+            "launcher": "steam",
+            "displayName": "",
+            "login": "login_a08",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a13",
+            "launcher": "steam",
+            "displayName": "Main",
+            "login": "login_a13",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-03-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a02",
+            "launcher": "steam",
+            "displayName": "Alpha",
+            "login": "login_a02",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a09",
+            "launcher": "steam",
+            "displayName": "😀 smile",
+            "login": "login_a09",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a01",
+            "launcher": "steam",
+            "displayName": "zeta",
+            "login": "login_a01",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "a15",
+            "launcher": "steam",
+            "displayName": "Smurf",
+            "login": "login_a15",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": "2026-05-01T00:00:00.000Z",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a14",
+        "a15",
+        "a13",
+        "a16",
+        "a08",
+        "a07",
+        "a09",
+        "a05",
+        "a06",
+        "a04",
+        "a03",
+        "a02",
+        "a17",
+        "a20",
+        "a11",
+        "a12",
+        "a18",
+        "a19",
+        "a01",
+        "a10"
+      ]
+    },
+    {
+      "id": "list-empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: no accounts"
+      },
+      "args": [
+        []
+      ],
+      "out": []
+    },
+    {
+      "id": "list-one",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: one account"
+      },
+      "args": [
+        [
+          {
+            "id": "a",
+            "launcher": "steam",
+            "displayName": "Solo",
+            "login": "login_a",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "a"
+      ]
+    },
+    {
+      "id": "list-all-equal",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: five names equal under base sensitivity: input order kept"
+      },
+      "args": [
+        [
+          {
+            "id": "e1",
+            "launcher": "steam",
+            "displayName": "alpha",
+            "login": "login_e1",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "e2",
+            "launcher": "steam",
+            "displayName": "ALPHA",
+            "login": "login_e2",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "e3",
+            "launcher": "steam",
+            "displayName": "álpha",
+            "login": "login_e3",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "e4",
+            "launcher": "steam",
+            "displayName": "Alpha",
+            "login": "login_e4",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          },
+          {
+            "id": "e5",
+            "launcher": "steam",
+            "displayName": "ÀLPHA",
+            "login": "login_e5",
+            "hasSecret": false,
+            "hasSession": false,
+            "launcherUid": null,
+            "tags": [],
+            "notes": "",
+            "lastUsedAt": null,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ],
+      "out": [
+        "e1",
+        "e2",
+        "e3",
+        "e4",
+        "e5"
+      ]
+    }
+  ]
+}

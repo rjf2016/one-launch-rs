@@ -1,0 +1,675 @@
+{
+  "function": "findLoginUser",
+  "source": "src/main/launchers/steam/loginusers.ts",
+  "note": "decode: none\narg0 is a list of SteamLoginUser as parseLoginUsers returns it; arg1 is the account reference { launcherUid, login }. The result is the matching user object, or null.",
+  "cases": [
+    {
+      "id": "by-id",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-files.test.ts > findLoginUser > prefers the SteamID64, then falls back to a case-insensitive login"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000001",
+            "accountName": "user_1",
+            "personaName": "Persona One",
+            "rememberPassword": true,
+            "mostRecent": true,
+            "timestamp": 1789145779,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000002",
+            "accountName": "user_2",
+            "personaName": "Persona Two",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1759203770,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000003",
+            "accountName": "user_3",
+            "personaName": "Persona Three",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1755130895,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000004",
+            "accountName": "user_4",
+            "personaName": "Persona Four",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1716245512,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          }
+        ],
+        {
+          "launcherUid": "76561198000000003",
+          "login": "wrong"
+        }
+      ],
+      "out": {
+        "steamId64": "76561198000000003",
+        "accountName": "user_3",
+        "personaName": "Persona Three",
+        "rememberPassword": true,
+        "mostRecent": false,
+        "timestamp": 1755130895,
+        "mostRecentKeys": [
+          "AutoLogin"
+        ]
+      }
+    },
+    {
+      "id": "by-login-case",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-files.test.ts > findLoginUser > prefers the SteamID64, then falls back to a case-insensitive login"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000001",
+            "accountName": "user_1",
+            "personaName": "Persona One",
+            "rememberPassword": true,
+            "mostRecent": true,
+            "timestamp": 1789145779,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000002",
+            "accountName": "user_2",
+            "personaName": "Persona Two",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1759203770,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000003",
+            "accountName": "user_3",
+            "personaName": "Persona Three",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1755130895,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000004",
+            "accountName": "user_4",
+            "personaName": "Persona Four",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1716245512,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          }
+        ],
+        {
+          "launcherUid": null,
+          "login": "USER_2"
+        }
+      ],
+      "out": {
+        "steamId64": "76561198000000002",
+        "accountName": "user_2",
+        "personaName": "Persona Two",
+        "rememberPassword": true,
+        "mostRecent": false,
+        "timestamp": 1759203770,
+        "mostRecentKeys": [
+          "AutoLogin"
+        ]
+      }
+    },
+    {
+      "id": "id-missing-login-hit",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-files.test.ts > findLoginUser > prefers the SteamID64, then falls back to a case-insensitive login"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000001",
+            "accountName": "user_1",
+            "personaName": "Persona One",
+            "rememberPassword": true,
+            "mostRecent": true,
+            "timestamp": 1789145779,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000002",
+            "accountName": "user_2",
+            "personaName": "Persona Two",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1759203770,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000003",
+            "accountName": "user_3",
+            "personaName": "Persona Three",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1755130895,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000004",
+            "accountName": "user_4",
+            "personaName": "Persona Four",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1716245512,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          }
+        ],
+        {
+          "launcherUid": "76561198000000099",
+          "login": "user_4"
+        }
+      ],
+      "out": {
+        "steamId64": "76561198000000004",
+        "accountName": "user_4",
+        "personaName": "Persona Four",
+        "rememberPassword": true,
+        "mostRecent": false,
+        "timestamp": 1716245512,
+        "mostRecentKeys": [
+          "AutoLogin"
+        ]
+      }
+    },
+    {
+      "id": "nobody",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-files.test.ts > findLoginUser > prefers the SteamID64, then falls back to a case-insensitive login"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000001",
+            "accountName": "user_1",
+            "personaName": "Persona One",
+            "rememberPassword": true,
+            "mostRecent": true,
+            "timestamp": 1789145779,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000002",
+            "accountName": "user_2",
+            "personaName": "Persona Two",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1759203770,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000003",
+            "accountName": "user_3",
+            "personaName": "Persona Three",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1755130895,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000004",
+            "accountName": "user_4",
+            "personaName": "Persona Four",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1716245512,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          }
+        ],
+        {
+          "launcherUid": null,
+          "login": "nobody"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "empty-uid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty launcherUid is falsy, so the login decides"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000001",
+            "accountName": "user_1",
+            "personaName": "Persona One",
+            "rememberPassword": true,
+            "mostRecent": true,
+            "timestamp": 1789145779,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000002",
+            "accountName": "user_2",
+            "personaName": "Persona Two",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1759203770,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000003",
+            "accountName": "user_3",
+            "personaName": "Persona Three",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1755130895,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000004",
+            "accountName": "user_4",
+            "personaName": "Persona Four",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1716245512,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          }
+        ],
+        {
+          "launcherUid": "",
+          "login": "user_1"
+        }
+      ],
+      "out": {
+        "steamId64": "76561198000000001",
+        "accountName": "user_1",
+        "personaName": "Persona One",
+        "rememberPassword": true,
+        "mostRecent": true,
+        "timestamp": 1789145779,
+        "mostRecentKeys": [
+          "AutoLogin"
+        ]
+      }
+    },
+    {
+      "id": "login-trimmed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: the login is trimmed with the JS trim (NBSP, U+FEFF) before comparing"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000001",
+            "accountName": "user_1",
+            "personaName": "Persona One",
+            "rememberPassword": true,
+            "mostRecent": true,
+            "timestamp": 1789145779,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000002",
+            "accountName": "user_2",
+            "personaName": "Persona Two",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1759203770,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000003",
+            "accountName": "user_3",
+            "personaName": "Persona Three",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1755130895,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000004",
+            "accountName": "user_4",
+            "personaName": "Persona Four",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1716245512,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          }
+        ],
+        {
+          "launcherUid": null,
+          "login": " User_3﻿ "
+        }
+      ],
+      "out": {
+        "steamId64": "76561198000000003",
+        "accountName": "user_3",
+        "personaName": "Persona Three",
+        "rememberPassword": true,
+        "mostRecent": false,
+        "timestamp": 1755130895,
+        "mostRecentKeys": [
+          "AutoLogin"
+        ]
+      }
+    },
+    {
+      "id": "login-nel-kept",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: JS trim keeps U+0085, so the login does not match"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000001",
+            "accountName": "user_1",
+            "personaName": "Persona One",
+            "rememberPassword": true,
+            "mostRecent": true,
+            "timestamp": 1789145779,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000002",
+            "accountName": "user_2",
+            "personaName": "Persona Two",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1759203770,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000003",
+            "accountName": "user_3",
+            "personaName": "Persona Three",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1755130895,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          },
+          {
+            "steamId64": "76561198000000004",
+            "accountName": "user_4",
+            "personaName": "Persona Four",
+            "rememberPassword": true,
+            "mostRecent": false,
+            "timestamp": 1716245512,
+            "mostRecentKeys": [
+              "AutoLogin"
+            ]
+          }
+        ],
+        {
+          "launcherUid": null,
+          "login": "user_3"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "empty-list",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: no users"
+      },
+      "args": [
+        [],
+        {
+          "launcherUid": "76561198000000001",
+          "login": "user_1"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "kelvin",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: U+212A KELVIN SIGN lower-cases to k on both sides"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000050",
+            "accountName": "kelvin_1",
+            "personaName": "",
+            "rememberPassword": false,
+            "mostRecent": false,
+            "timestamp": null,
+            "mostRecentKeys": []
+          }
+        ],
+        {
+          "launcherUid": null,
+          "login": "KELVIN_1"
+        }
+      ],
+      "out": {
+        "steamId64": "76561198000000050",
+        "accountName": "kelvin_1",
+        "personaName": "",
+        "rememberPassword": false,
+        "mostRecent": false,
+        "timestamp": null,
+        "mostRecentKeys": []
+      }
+    },
+    {
+      "id": "sharp-s",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ß is not ss under toLowerCase"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000050",
+            "accountName": "straße",
+            "personaName": "",
+            "rememberPassword": false,
+            "mostRecent": false,
+            "timestamp": null,
+            "mostRecentKeys": []
+          }
+        ],
+        {
+          "launcherUid": null,
+          "login": "STRASSE"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "dotted-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: İ lower-cases to i plus U+0307, which is not i"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000050",
+            "accountName": "id_1",
+            "personaName": "",
+            "rememberPassword": false,
+            "mostRecent": false,
+            "timestamp": null,
+            "mostRecentKeys": []
+          }
+        ],
+        {
+          "launcherUid": null,
+          "login": "İD_1"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "first-match-wins",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: two users with the same login in different case: the first in list order wins"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000051",
+            "accountName": "Dup",
+            "personaName": "",
+            "rememberPassword": false,
+            "mostRecent": false,
+            "timestamp": null,
+            "mostRecentKeys": []
+          },
+          {
+            "steamId64": "76561198000000052",
+            "accountName": "dup",
+            "personaName": "",
+            "rememberPassword": false,
+            "mostRecent": false,
+            "timestamp": null,
+            "mostRecentKeys": []
+          }
+        ],
+        {
+          "launcherUid": null,
+          "login": "DUP"
+        }
+      ],
+      "out": {
+        "steamId64": "76561198000000051",
+        "accountName": "Dup",
+        "personaName": "",
+        "rememberPassword": false,
+        "mostRecent": false,
+        "timestamp": null,
+        "mostRecentKeys": []
+      }
+    },
+    {
+      "id": "account-name-untrimmed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: only the login is trimmed, not the stored account name"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000050",
+            "accountName": " padded ",
+            "personaName": "",
+            "rememberPassword": false,
+            "mostRecent": false,
+            "timestamp": null,
+            "mostRecentKeys": []
+          }
+        ],
+        {
+          "launcherUid": null,
+          "login": "padded"
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "empty-login",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty login matches a user whose name is empty"
+      },
+      "args": [
+        [
+          {
+            "steamId64": "76561198000000050",
+            "accountName": "",
+            "personaName": "",
+            "rememberPassword": false,
+            "mostRecent": false,
+            "timestamp": null,
+            "mostRecentKeys": []
+          }
+        ],
+        {
+          "launcherUid": null,
+          "login": "  "
+        }
+      ],
+      "out": {
+        "steamId64": "76561198000000050",
+        "accountName": "",
+        "personaName": "",
+        "rememberPassword": false,
+        "mostRecent": false,
+        "timestamp": null,
+        "mostRecentKeys": []
+      }
+    }
+  ]
+}

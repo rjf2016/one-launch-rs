@@ -1,0 +1,120 @@
+{
+  "id": "T-pipeline-6392b1b79c",
+  "file": "test/pipeline.test.ts",
+  "suite": [
+    "switch/launch pipeline through IPC, real services and adapters, launcher simulators"
+  ],
+  "name": "3a. Cancel (Epic) while the launcher is closing: nothing changed, no snapshot",
+  "calls": [
+    {
+      "launcher": "epic",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:epic:alt@example.com",
+          "displayName": "Alt",
+          "login": "alt@example.com",
+          "launcherUid": "22222222222222222222222222222222",
+          "hasSecret": false
+        },
+        {
+          "confirmClose": true,
+          "signal": {
+            "$object": "AbortSignal",
+            "value": {}
+          },
+          "onProgress": {
+            "$function": "onProgress"
+          },
+          "onBackup": {
+            "$function": "onBackup"
+          },
+          "onAttention": {
+            "$function": "onAttention"
+          },
+          "getPassword": {
+            "$function": "getPassword"
+          },
+          "dryRun": false
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "epic",
+        "account": {
+          "id": "@acct:epic:alt@example.com",
+          "displayName": "Alt",
+          "login": "alt@example.com",
+          "launcherUid": "22222222222222222222222222222222"
+        },
+        "strategy": "remembered",
+        "ok": false,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Epic Games Launcher",
+            "status": "failed",
+            "detail": "Stopped."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing session",
+            "status": "skipped",
+            "detail": "Skipped: the launcher remembers a session (fingerprint 39cdeb2f) that no One Launch account owns, so it is left alone and not saved. To keep it, capture it from that account's page before switching."
+          },
+          {
+            "id": "backup",
+            "title": "Back up GameUserSettings.ini",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "title": "Put the account's session in place",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "start",
+            "title": "Start Epic Games Launcher",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the launcher to come up",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the launcher signed in",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "skipped",
+            "detail": "Runs only if the launcher rejects the stored session (expired token) or does not sign in within 0.2 s. The launcher stays open on its sign-in page; you sign in there once as alt@example.com and One Launch continues with the game as soon as the log reports the sign-in, up to 0.03333333333333333 min."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new session",
+            "status": "skipped",
+            "detail": "Runs only after a manual sign-in: the fresh [RememberMe] replaces the stale snapshot."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": null,
+        "restored": null,
+        "error": "Stopped before Epic Games Launcher was started as alt@example.com. Nothing had been changed.",
+        "needsSignIn": false,
+        "cancelled": true
+      }
+    }
+  ]
+}

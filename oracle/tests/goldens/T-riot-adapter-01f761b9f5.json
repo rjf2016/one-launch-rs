@@ -1,0 +1,106 @@
+{
+  "id": "T-riot-adapter-01f761b9f5",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot hand-over"
+  ],
+  "name": "fails and rolls back when the user signs in as another One Launch account, storing that sign-in for its owner first",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:riot:riot_new",
+          "displayName": "New",
+          "login": "riot_new",
+          "launcherUid": null,
+          "hasSecret": true
+        },
+        {
+          "dryRun": false,
+          "onAttention": {
+            "$function": "onAttention"
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "riot",
+        "account": {
+          "id": "@acct:riot:riot_new",
+          "displayName": "New",
+          "login": "riot_new",
+          "launcherUid": null
+        },
+        "strategy": "credentials",
+        "ok": false,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close the Riot Client",
+            "status": "skipped",
+            "detail": "Skipped: RiotClientServices.exe is not running."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing sign-in",
+            "status": "done",
+            "detail": "Saved Main's sign-in (fingerprint acd093bd)."
+          },
+          {
+            "id": "backup",
+            "title": "Back up RiotGamesPrivateSettings.yaml",
+            "status": "done",
+            "detail": "{tmp}\\backups\\riot\\<ts>"
+          },
+          {
+            "id": "file",
+            "title": "Sign the client out",
+            "status": "done",
+            "detail": "RiotGamesPrivateSettings.yaml now holds the client's signed-out state; everything else in it is as it was."
+          },
+          {
+            "id": "start",
+            "title": "Start the Riot Client",
+            "status": "done",
+            "detail": "Client started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the client to come up",
+            "status": "done",
+            "detail": "RiotClientServices.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the client signed in",
+            "status": "failed",
+            "detail": "The client ended on its login page: no saved sign-in."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "failed",
+            "detail": "Signed in as a different account."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new sign-in",
+            "status": "pending",
+            "detail": ""
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": true,
+        "error": "The Riot Client signed in as Main (Riot account …1111), which is another One Launch account, instead of New. Sign in to the client as riot_new.",
+        "needsSignIn": false,
+        "cancelled": false
+      }
+    }
+  ]
+}

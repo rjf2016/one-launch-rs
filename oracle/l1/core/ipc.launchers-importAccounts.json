@@ -1,0 +1,2198 @@
+{
+  "function": "registerIpcHandlers",
+  "source": "src/main/ipc/index.ts",
+  "note": "decode: none\narg0 is the channel, arg1 the payload, arg2 the context { trusted, busy }.\ncall reaches the real handler: electron is mocked (ipcMain.handle collects the handlers) and registerIpcHandlers from src/main/ipc/index.ts is run once, as test/ipc-validation.test.ts does, with every service a recording proxy that answers undefined, paths a proxy, rescan and the pickers recording stubs, and the logger a silent stub. Per case: isTrustedSender returns context.trusted, launch.isBusy returns context.busy (the only service a refused payload may reach), and the handler is invoked with the event { senderFrame: { url } } and arg1 as the request. A \"__proto__\" key in a payload is an own data key, as a structured clone over IPC delivers it. out is the envelope the handler layer returns, { ok: false, error: { code, message } }; the messages are exact.\nEvery case is refused before any service, shell call, picker or rescan is reached: call throws if one is, so a payload that passes validation can never be recorded here.\nThe matrix stops at validation: what a handler does once a payload passes (its service calls, the ?? defaults after a nullable field, the OPEN_FAILED, NO_PASSWORD, NOT_FOUND, NOT_A_LAUNCHER and UNAVAILABLE refusals) is hand-translated with the services, not recorded here.\nThe generated family comes from a transcription of the handler's validators (scripts/oracle/l1/core/ipc/schema.ts and model.ts), checked by the generator against the real handlers on every case; cases from test/ipc-validation.test.ts are its REFUSED table, copied as written.\nLeft out, because the handler accepts them and no later field can be made bad, so they would reach the handler's work: launcherUids empty-array; launcherUids cap-launcheruids-items-at; launcherUids cap-launcheruids-item-at; launcherUids cap-launcheruids-item-astral-at; launcherUids item-lone.",
+  "cases": [
+    {
+      "id": "untrusted-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts from a frame that is not the app's renderer: refused before the handler runs"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "untrusted-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts with a well-formed payload from an untrusted frame: the sender check wins"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "busy-ignored-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts does not wait for a running switch: a null payload is still BAD_REQUEST"
+      },
+      "args": [
+        "launchers:importAccounts",
+        null,
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload no payload at all, as invoke(channel) sends"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload null"
+      },
+      "args": [
+        "launchers:importAccounts",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload false"
+      },
+      "args": [
+        "launchers:importAccounts",
+        false,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload true"
+      },
+      "args": [
+        "launchers:importAccounts",
+        true,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload the number 0"
+      },
+      "args": [
+        "launchers:importAccounts",
+        0,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload the number 7"
+      },
+      "args": [
+        "launchers:importAccounts",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launchers:importAccounts payload NaN"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "$number": "NaN"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload an empty string"
+      },
+      "args": [
+        "launchers:importAccounts",
+        "",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload a string"
+      },
+      "args": [
+        "launchers:importAccounts",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload an empty array"
+      },
+      "args": [
+        "launchers:importAccounts",
+        [],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-array-of-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload an array holding a well-formed payload"
+      },
+      "args": [
+        "launchers:importAccounts",
+        [
+          {
+            "launcher": "steam",
+            "launcherUids": [
+              "a"
+            ]
+          }
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload a Date: an object to the check, with none of the fields"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "$date": "2026-01-02T03:04:05.000Z"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "top-empty-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts payload an empty object: every field missing"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: the key left out"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: the key present with the value undefined"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": {
+            "$undefined": true
+          },
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: null"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": null,
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: the number 0"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": 0,
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: the number 5"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": 5,
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launchers:importAccounts launcher: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": {
+            "$number": "NaN"
+          },
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launchers:importAccounts launcher: Infinity"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": {
+            "$number": "Infinity"
+          },
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: true"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": true,
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: false"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": false,
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: an empty array"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": [],
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: an array of one string"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": [
+            "a"
+          ],
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: an empty object"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": {},
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          },
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": {
+            "$bytes": "YQ=="
+          },
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.unknown",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: a value outside the allowed list"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "nope",
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: an empty string"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "",
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.upper",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: launchers:importAccounts launcher: steam upper-cased; the list is matched exactly"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "STEAM",
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.title",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: launchers:importAccounts launcher: steam with a capital first letter"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "Steam",
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.leading-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: launchers:importAccounts launcher: steam with a leading space; nothing is trimmed"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": " steam",
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.trailing-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: launchers:importAccounts launcher: steam with a trailing space"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam ",
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.trailing-nul",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: steam with a trailing NUL"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam\u0000",
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.trailing-lone",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: launchers:importAccounts launcher: steam with a trailing lone surrogate"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": {
+            "$utf16": [
+              115,
+              116,
+              101,
+              97,
+              109,
+              55296
+            ]
+          },
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.proto",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: launchers:importAccounts launcher: \"__proto__\" as the value; the list is an array, so includes() finds nothing"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "__proto__",
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.constructor",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: launchers:importAccounts launcher: \"constructor\" as the value"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "constructor",
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.array-of-allowed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcher: [\"steam\"], an array holding an allowed value"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": [
+            "steam"
+          ],
+          "launcherUids": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: the key left out"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: the key present with the value undefined"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": {
+            "$undefined": true
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: null"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: the number 0"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": 0
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: the number 5"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launchers:importAccounts launcherUids: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": {
+            "$number": "NaN"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launchers:importAccounts launcherUids: Infinity"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": {
+            "$number": "Infinity"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: true"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: false"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": false
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: an empty object"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": {}
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": {
+            "$bytes": "YQ=="
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.not-array-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: a string where an array is expected"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": "a"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.not-array-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: an object"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": {}
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.array-like",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: an array-like object, which Array.isArray refuses"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": {
+            "0": "a",
+            "length": 1
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.item-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: an item that is a number"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            1
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids[0] must be a string"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.item-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: an item that is null"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            null
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids[0] must be a string"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.item-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: an item that is undefined"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            {
+              "$undefined": true
+            }
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids[0] must be a string"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.item-nested",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: an item that is an array"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            [
+              "a"
+            ]
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids[0] must be a string"
+        }
+      }
+    },
+    {
+      "id": "launcheruids.second-item-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: a good first item and a bad second one: the message names the index"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            "a",
+            5
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids[1] must be a string"
+        }
+      }
+    },
+    {
+      "id": "cap-launcheruids-items-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts launcherUids: 65 items, one over the limit of 64"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            "t0",
+            "t1",
+            "t2",
+            "t3",
+            "t4",
+            "t5",
+            "t6",
+            "t7",
+            "t8",
+            "t9",
+            "t10",
+            "t11",
+            "t12",
+            "t13",
+            "t14",
+            "t15",
+            "t16",
+            "t17",
+            "t18",
+            "t19",
+            "t20",
+            "t21",
+            "t22",
+            "t23",
+            "t24",
+            "t25",
+            "t26",
+            "t27",
+            "t28",
+            "t29",
+            "t30",
+            "t31",
+            "t32",
+            "t33",
+            "t34",
+            "t35",
+            "t36",
+            "t37",
+            "t38",
+            "t39",
+            "t40",
+            "t41",
+            "t42",
+            "t43",
+            "t44",
+            "t45",
+            "t46",
+            "t47",
+            "t48",
+            "t49",
+            "t50",
+            "t51",
+            "t52",
+            "t53",
+            "t54",
+            "t55",
+            "t56",
+            "t57",
+            "t58",
+            "t59",
+            "t60",
+            "t61",
+            "t62",
+            "t63",
+            "t64"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids has more than 64 items"
+        }
+      }
+    },
+    {
+      "id": "cap-launcheruids-item-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: launchers:importAccounts launcherUids: an item of 257 characters, one over the limit of 256"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids[0] exceeds 256 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-launcheruids-item-astral-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: launchers:importAccounts launcherUids: an item of 256 code points and 257 UTF-16 units"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids[0] exceeds 256 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-launcheruids-second-item-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: launchers:importAccounts launcherUids: the second item over the length limit: the message names index 1"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            "a",
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids[1] exceeds 256 characters"
+        }
+      }
+    },
+    {
+      "id": "extra-field",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launchers:importAccounts: an unknown key next to a payload missing launcher; unknown keys are ignored, not refused"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcherUids": [
+            "a"
+          ],
+          "unexpected": "x"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "shadow-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: launchers:importAccounts: keys named after Object.prototype members (toString, constructor, hasOwnProperty) next to a payload missing launcher"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcherUids": [
+            "a"
+          ],
+          "toString": "x",
+          "constructor": "x",
+          "hasOwnProperty": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "proto-own-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: launchers:importAccounts: an own \"__proto__\" data key holding a well-formed payload (as JSON.parse and a structured clone make it); the fields are not read through it"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "__proto__": {
+            "launcher": "steam",
+            "launcherUids": [
+              "a"
+            ]
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "proto-constructor-prototype",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: launchers:importAccounts: a constructor.prototype path holding a well-formed payload"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "constructor": {
+            "prototype": {
+              "launcher": "steam",
+              "launcherUids": [
+                "a"
+              ]
+            }
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launchers:importAccounts",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-str-text",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launchers:importAccounts",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-number-7",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launchers:importAccounts",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-arr1-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launchers:importAccounts",
+        [
+          "a"
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launchers:importAccounts: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-launcher-str-steam",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "test-launcher-str-origin.launcheruids-arr0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "origin",
+          "launcherUids": []
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-launcher-str-steam.launcheruids-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": "a"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids must be an array"
+        }
+      }
+    },
+    {
+      "id": "test-launcher-str-steam.launcheruids-arr1-number-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            1
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids[0] must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-launcher-str-steam.launcheruids-arr65",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launchers:importAccounts",
+        {
+          "launcher": "steam",
+          "launcherUids": [
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a",
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcherUids has more than 64 items"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1281 @@
+{
+  "function": "registerIpcHandlers",
+  "source": "src/main/ipc/index.ts",
+  "note": "decode: none\narg0 is the channel, arg1 the payload, arg2 the context { trusted, busy }.\ncall reaches the real handler: electron is mocked (ipcMain.handle collects the handlers) and registerIpcHandlers from src/main/ipc/index.ts is run once, as test/ipc-validation.test.ts does, with every service a recording proxy that answers undefined, paths a proxy, rescan and the pickers recording stubs, and the logger a silent stub. Per case: isTrustedSender returns context.trusted, launch.isBusy returns context.busy (the only service a refused payload may reach), and the handler is invoked with the event { senderFrame: { url } } and arg1 as the request. A \"__proto__\" key in a payload is an own data key, as a structured clone over IPC delivers it. out is the envelope the handler layer returns, { ok: false, error: { code, message } }; the messages are exact.\nEvery case is refused before any service, shell call, picker or rescan is reached: call throws if one is, so a payload that passes validation can never be recorded here.\nThe matrix stops at validation: what a handler does once a payload passes (its service calls, the ?? defaults after a nullable field, the OPEN_FAILED, NO_PASSWORD, NOT_FOUND, NOT_A_LAUNCHER and UNAVAILABLE refusals) is hand-translated with the services, not recorded here.\nThe generated family comes from a transcription of the handler's validators (scripts/oracle/l1/core/ipc/schema.ts and model.ts), checked by the generator against the real handlers on every case; cases from test/ipc-validation.test.ts are its REFUSED table, copied as written.",
+  "cases": [
+    {
+      "id": "untrusted-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath from a frame that is not the app's renderer: refused before the handler runs"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "untrusted-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath with a well-formed payload from an untrusted frame: the sender check wins"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": "logs"
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "busy-ignored-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath does not wait for a running switch: a null payload is still BAD_REQUEST"
+      },
+      "args": [
+        "app:openPath",
+        null,
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload no payload at all, as invoke(channel) sends"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload null"
+      },
+      "args": [
+        "app:openPath",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload false"
+      },
+      "args": [
+        "app:openPath",
+        false,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload true"
+      },
+      "args": [
+        "app:openPath",
+        true,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload the number 0"
+      },
+      "args": [
+        "app:openPath",
+        0,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload the number 7"
+      },
+      "args": [
+        "app:openPath",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: app:openPath payload NaN"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "$number": "NaN"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload an empty string"
+      },
+      "args": [
+        "app:openPath",
+        "",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload a string"
+      },
+      "args": [
+        "app:openPath",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload an empty array"
+      },
+      "args": [
+        "app:openPath",
+        [],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-array-of-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload an array holding a well-formed payload"
+      },
+      "args": [
+        "app:openPath",
+        [
+          {
+            "target": "logs"
+          }
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload a Date: an object to the check, with none of the fields"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "$date": "2026-01-02T03:04:05.000Z"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "top-empty-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath payload an empty object: every field missing"
+      },
+      "args": [
+        "app:openPath",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: the key left out"
+      },
+      "args": [
+        "app:openPath",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: the key present with the value undefined"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": {
+            "$undefined": true
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: null"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: the number 0"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": 0
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: the number 5"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: app:openPath target: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": {
+            "$number": "NaN"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: app:openPath target: Infinity"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": {
+            "$number": "Infinity"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: true"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: false"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": false
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: an empty array"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": []
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: an array of one string"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: an empty object"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": {}
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": {
+            "$bytes": "YQ=="
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.unknown",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: a value outside the allowed list"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": "nope"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: an empty string"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": ""
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.upper",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: app:openPath target: logs upper-cased; the list is matched exactly"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": "LOGS"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.title",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: app:openPath target: logs with a capital first letter"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": "Logs"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.leading-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: app:openPath target: logs with a leading space; nothing is trimmed"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": " logs"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.trailing-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: app:openPath target: logs with a trailing space"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": "logs "
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.trailing-nul",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: logs with a trailing NUL"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": "logs\u0000"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.trailing-lone",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: app:openPath target: logs with a trailing lone surrogate"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": {
+            "$utf16": [
+              108,
+              111,
+              103,
+              115,
+              55296
+            ]
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.proto",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:openPath target: \"__proto__\" as the value; the list is an array, so includes() finds nothing"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": "__proto__"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.constructor",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:openPath target: \"constructor\" as the value"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": "constructor"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "target.array-of-allowed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath target: [\"logs\"], an array holding an allowed value"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": [
+            "logs"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "extra-field",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: app:openPath: an unknown key next to a payload missing target; unknown keys are ignored, not refused"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "unexpected": "x"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "shadow-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:openPath: keys named after Object.prototype members (toString, constructor, hasOwnProperty) next to a payload missing target"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "toString": "x",
+          "constructor": "x",
+          "hasOwnProperty": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "proto-own-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:openPath: an own \"__proto__\" data key holding a well-formed payload (as JSON.parse and a structured clone make it); the fields are not read through it"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "__proto__": {
+            "target": "logs"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "proto-constructor-prototype",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: app:openPath: a constructor.prototype path holding a well-formed payload"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "constructor": {
+            "prototype": {
+              "target": "logs"
+            }
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openPath",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-str-text",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openPath",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-number-7",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openPath",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-arr1-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openPath",
+        [
+          "a"
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "app:openPath: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-empty-object",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openPath",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-target-str-secrets",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": "secrets"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-target-str-c-windows",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "app:openPath",
+        {
+          "target": "C:\\Windows"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "target is not an allowed value"
+        }
+      }
+    }
+  ]
+}

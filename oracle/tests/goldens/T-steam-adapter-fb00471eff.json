@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-fb00471eff",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.detectInstall"
+  ],
+  "name": "prefers HKCU SteamPath and normalizes its forward slashes",
+  "calls": []
+}

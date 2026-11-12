@@ -1,0 +1,26 @@
+{
+  "id": "T-riot-adapter-ca9b4f9ac8",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "refuses a product the client’s newest log reports out of date, and the library and health say so too",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "GameNotPlayableError",
+        "message": "VALORANT needs an update before it can start. Update it in the Riot Client window, then press Play again.",
+        "code": "GAME_NOT_PLAYABLE"
+      }
+    }
+  ]
+}

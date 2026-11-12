@@ -1,0 +1,661 @@
+{
+  "function": "productCodes",
+  "source": "src/main/launchers/battlenet/products.ts",
+  "note": "decode: none\narg0 is a product codename (from the Uninstall --uid), arg1 the TACT code product.db gave for it or null/undefined; in memory.\nPRODUCTS is a plain object, so a codename that names an Object.prototype member finds that member: __proto__ returns Object.prototype itself (recorded as {}), and constructor, toString and the like return a function.\ncall projects a function result to { function: <its name> } because a function cannot be recorded; every other result is recorded as returned.",
+  "cases": [
+    {
+      "id": "test-prometheus",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms"
+      },
+      "args": [
+        "prometheus"
+      ],
+      "out": {
+        "programCode": "Pro",
+        "tactCode": "pro",
+        "name": "Overwatch",
+        "verified": true,
+        "steamAppId": "2357570"
+      }
+    },
+    {
+      "id": "test-hs-beta-same-tact",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms"
+      },
+      "args": [
+        "hs_beta",
+        "hsb"
+      ],
+      "out": {
+        "programCode": "WTCG",
+        "tactCode": "hsb",
+        "name": "Hearthstone",
+        "verified": true
+      }
+    },
+    {
+      "id": "test-new-game",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms"
+      },
+      "args": [
+        "newgame",
+        "ngm"
+      ],
+      "out": {
+        "programCode": "NGM",
+        "tactCode": "ngm",
+        "name": "newgame",
+        "verified": false
+      }
+    },
+    {
+      "id": "test-unknown",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms"
+      },
+      "args": [
+        "newgame"
+      ],
+      "out": null
+    },
+    {
+      "id": "table-prometheus",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, prometheus"
+      },
+      "args": [
+        "prometheus",
+        null
+      ],
+      "out": {
+        "programCode": "Pro",
+        "tactCode": "pro",
+        "name": "Overwatch",
+        "verified": true,
+        "steamAppId": "2357570"
+      }
+    },
+    {
+      "id": "table-hs-beta",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, hs_beta"
+      },
+      "args": [
+        "hs_beta",
+        null
+      ],
+      "out": {
+        "programCode": "WTCG",
+        "tactCode": "hsb",
+        "name": "Hearthstone",
+        "verified": true
+      }
+    },
+    {
+      "id": "table-wow",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, wow"
+      },
+      "args": [
+        "wow",
+        null
+      ],
+      "out": {
+        "programCode": "WoW",
+        "tactCode": "wow",
+        "name": "World of Warcraft",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-wow-classic",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, wow_classic"
+      },
+      "args": [
+        "wow_classic",
+        null
+      ],
+      "out": {
+        "programCode": "WoWC",
+        "tactCode": "wow_classic",
+        "name": "World of Warcraft Classic",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-wow-classic-era",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, wow_classic_era"
+      },
+      "args": [
+        "wow_classic_era",
+        null
+      ],
+      "out": {
+        "programCode": "WoWC",
+        "tactCode": "wow_classic_era",
+        "name": "World of Warcraft Classic Era",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-diablo3",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, diablo3"
+      },
+      "args": [
+        "diablo3",
+        null
+      ],
+      "out": {
+        "programCode": "D3",
+        "tactCode": "d3",
+        "name": "Diablo III",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-fenris",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, fenris"
+      },
+      "args": [
+        "fenris",
+        null
+      ],
+      "out": {
+        "programCode": "Fen",
+        "tactCode": "fenris",
+        "name": "Diablo IV",
+        "verified": false,
+        "steamAppId": "2344520"
+      }
+    },
+    {
+      "id": "table-osi",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, osi"
+      },
+      "args": [
+        "osi",
+        null
+      ],
+      "out": {
+        "programCode": "OSI",
+        "tactCode": "osi",
+        "name": "Diablo II: Resurrected",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-anbs",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, anbs"
+      },
+      "args": [
+        "anbs",
+        null
+      ],
+      "out": {
+        "programCode": "ANBS",
+        "tactCode": "anbs",
+        "name": "Diablo Immortal",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-s2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, s2"
+      },
+      "args": [
+        "s2",
+        null
+      ],
+      "out": {
+        "programCode": "S2",
+        "tactCode": "s2",
+        "name": "StarCraft II",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-s1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, s1"
+      },
+      "args": [
+        "s1",
+        null
+      ],
+      "out": {
+        "programCode": "S1",
+        "tactCode": "s1",
+        "name": "StarCraft",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-heroes",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, heroes"
+      },
+      "args": [
+        "heroes",
+        null
+      ],
+      "out": {
+        "programCode": "Hero",
+        "tactCode": "hero",
+        "name": "Heroes of the Storm",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-w3",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, w3"
+      },
+      "args": [
+        "w3",
+        null
+      ],
+      "out": {
+        "programCode": "W3",
+        "tactCode": "w3",
+        "name": "Warcraft III: Reforged",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-odin",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, odin"
+      },
+      "args": [
+        "odin",
+        null
+      ],
+      "out": {
+        "programCode": "ODIN",
+        "tactCode": "odin",
+        "name": "Call of Duty: Modern Warfare",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-zeus",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, zeus"
+      },
+      "args": [
+        "zeus",
+        null
+      ],
+      "out": {
+        "programCode": "ZEUS",
+        "tactCode": "zeus",
+        "name": "Call of Duty: Black Ops Cold War",
+        "verified": false,
+        "steamAppId": "1985810"
+      }
+    },
+    {
+      "id": "table-fore",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, fore"
+      },
+      "args": [
+        "fore",
+        null
+      ],
+      "out": {
+        "programCode": "FORE",
+        "tactCode": "fore",
+        "name": "Call of Duty: Vanguard",
+        "verified": false,
+        "steamAppId": "1985820"
+      }
+    },
+    {
+      "id": "table-lazr",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, lazr"
+      },
+      "args": [
+        "lazr",
+        null
+      ],
+      "out": {
+        "programCode": "LAZR",
+        "tactCode": "lazr",
+        "name": "Call of Duty: Modern Warfare II",
+        "verified": false,
+        "steamAppId": "1938090"
+      }
+    },
+    {
+      "id": "table-auks",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, auks"
+      },
+      "args": [
+        "auks",
+        null
+      ],
+      "out": {
+        "programCode": "AUKS",
+        "tactCode": "auks",
+        "name": "Call of Duty",
+        "verified": false,
+        "steamAppId": "1938090"
+      }
+    },
+    {
+      "id": "table-viper",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, viper"
+      },
+      "args": [
+        "viper",
+        null
+      ],
+      "out": {
+        "programCode": "VIPR",
+        "tactCode": "viper",
+        "name": "Call of Duty: Black Ops 4",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-rtro",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, rtro"
+      },
+      "args": [
+        "rtro",
+        null
+      ],
+      "out": {
+        "programCode": "RTRO",
+        "tactCode": "rtro",
+        "name": "Blizzard Arcade Collection",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-wlby",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, wlby"
+      },
+      "args": [
+        "wlby",
+        null
+      ],
+      "out": {
+        "programCode": "WLBY",
+        "tactCode": "wlby",
+        "name": "Warcraft III",
+        "verified": false
+      }
+    },
+    {
+      "id": "table-gryphon",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table codename, gryphon"
+      },
+      "args": [
+        "gryphon",
+        null
+      ],
+      "out": {
+        "programCode": "GRY",
+        "tactCode": "gryphon",
+        "name": "Warcraft Rumble",
+        "verified": false
+      }
+    },
+    {
+      "id": "tact-differs",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | product.db names another TACT code for a known product"
+      },
+      "args": [
+        "prometheus",
+        "prot"
+      ],
+      "out": {
+        "programCode": "Pro",
+        "tactCode": "prot",
+        "name": "Overwatch",
+        "verified": true,
+        "steamAppId": "2357570"
+      }
+    },
+    {
+      "id": "tact-empty-known",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | an empty TACT code is ignored"
+      },
+      "args": [
+        "prometheus",
+        ""
+      ],
+      "out": {
+        "programCode": "Pro",
+        "tactCode": "pro",
+        "name": "Overwatch",
+        "verified": true,
+        "steamAppId": "2357570"
+      }
+    },
+    {
+      "id": "tact-empty-unknown",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | an unknown product with an empty TACT code"
+      },
+      "args": [
+        "newgame",
+        ""
+      ],
+      "out": null
+    },
+    {
+      "id": "tact-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | the TACT code left out"
+      },
+      "args": [
+        "wow",
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "programCode": "WoW",
+        "tactCode": "wow",
+        "name": "World of Warcraft",
+        "verified": false
+      }
+    },
+    {
+      "id": "case-differs",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | the table is keyed case-sensitively"
+      },
+      "args": [
+        "Prometheus",
+        null
+      ],
+      "out": null
+    },
+    {
+      "id": "tact-upper-program-code",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | the program code is the TACT code upper-cased"
+      },
+      "args": [
+        "newgame",
+        "w3_classic"
+      ],
+      "out": {
+        "programCode": "W3_CLASSIC",
+        "tactCode": "w3_classic",
+        "name": "newgame",
+        "verified": false
+      }
+    },
+    {
+      "id": "tact-sharp-s",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: toUpperCase maps ß to SS, two characters, and ﬁ to FI"
+      },
+      "args": [
+        "newgame",
+        "straßeﬁ"
+      ],
+      "out": {
+        "programCode": "STRASSEFI",
+        "tactCode": "straßeﬁ",
+        "name": "newgame",
+        "verified": false
+      }
+    },
+    {
+      "id": "tact-dotless-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: toUpperCase maps the dotless ı to an ASCII I"
+      },
+      "args": [
+        "newgame",
+        "ıx"
+      ],
+      "out": {
+        "programCode": "IX",
+        "tactCode": "ıx",
+        "name": "newgame",
+        "verified": false
+      }
+    },
+    {
+      "id": "proto",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the codename __proto__ finds Object.prototype in the table and returns it"
+      },
+      "args": [
+        "__proto__",
+        null
+      ],
+      "out": {}
+    },
+    {
+      "id": "proto-tact",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the codename __proto__ with a TACT code: a copy of Object.prototype (no own keys) plus the TACT code"
+      },
+      "args": [
+        "__proto__",
+        "x"
+      ],
+      "out": {
+        "tactCode": "x"
+      }
+    },
+    {
+      "id": "constructor",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the codename constructor finds the Object function in the table"
+      },
+      "args": [
+        "constructor",
+        null
+      ],
+      "out": {
+        "function": "Object"
+      }
+    },
+    {
+      "id": "constructor-tact",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the codename constructor with a TACT code: a spread of the Object function (no own enumerable keys) plus the TACT code"
+      },
+      "args": [
+        "constructor",
+        "x"
+      ],
+      "out": {
+        "tactCode": "x"
+      }
+    },
+    {
+      "id": "to-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the codename toString finds Object.prototype.toString"
+      },
+      "args": [
+        "toString",
+        null
+      ],
+      "out": {
+        "function": "toString"
+      }
+    },
+    {
+      "id": "has-own-property-unknown",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: hasOwnProperty is found the same way"
+      },
+      "args": [
+        "hasOwnProperty",
+        null
+      ],
+      "out": {
+        "function": "hasOwnProperty"
+      }
+    }
+  ]
+}

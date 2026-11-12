@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-360f846828",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.listInstalledGames"
+  ],
+  "name": "throws NOT_INSTALLED when Steam is absent",
+  "calls": []
+}

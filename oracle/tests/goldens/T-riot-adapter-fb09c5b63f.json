@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-fb09c5b63f",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot shutdown"
+  ],
+  "name": "needs the client installed",
+  "calls": []
+}

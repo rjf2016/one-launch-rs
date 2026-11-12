@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-ef2062e97b",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot shutdown"
+  ],
+  "name": "stops at once when the signal aborts, without ending the process",
+  "calls": []
+}

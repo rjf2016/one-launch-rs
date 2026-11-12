@@ -1,0 +1,32 @@
+{
+  "condition": "no-keys",
+  "runs": 3,
+  "digests": [
+    "f18fc9ad30a5d81991aeaa31ab28521fa25827c9f06525edcd252a98468dfe6e",
+    "f18fc9ad30a5d81991aeaa31ab28521fa25827c9f06525edcd252a98468dfe6e",
+    "f18fc9ad30a5d81991aeaa31ab28521fa25827c9f06525edcd252a98468dfe6e"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

@@ -1,0 +1,1147 @@
+{
+  "function": "registerIpcHandlers",
+  "source": "src/main/ipc/index.ts",
+  "note": "decode: none\narg0 is the channel, arg1 the payload, arg2 the context { trusted, busy }.\ncall reaches the real handler: electron is mocked (ipcMain.handle collects the handlers) and registerIpcHandlers from src/main/ipc/index.ts is run once, as test/ipc-validation.test.ts does, with every service a recording proxy that answers undefined, paths a proxy, rescan and the pickers recording stubs, and the logger a silent stub. Per case: isTrustedSender returns context.trusted, launch.isBusy returns context.busy (the only service a refused payload may reach), and the handler is invoked with the event { senderFrame: { url } } and arg1 as the request. A \"__proto__\" key in a payload is an own data key, as a structured clone over IPC delivers it. out is the envelope the handler layer returns, { ok: false, error: { code, message } }; the messages are exact.\nEvery case is refused before any service, shell call, picker or rescan is reached: call throws if one is, so a payload that passes validation can never be recorded here.\nThe matrix stops at validation: what a handler does once a payload passes (its service calls, the ?? defaults after a nullable field, the OPEN_FAILED, NO_PASSWORD, NOT_FOUND, NOT_A_LAUNCHER and UNAVAILABLE refusals) is hand-translated with the services, not recorded here.\nThe generated family comes from a transcription of the handler's validators (scripts/oracle/l1/core/ipc/schema.ts and model.ts), checked by the generator against the real handlers on every case; cases from test/ipc-validation.test.ts are its REFUSED table, copied as written.\nLeft out, because the handler accepts them and no later field can be made bad, so they would reach the handler's work: jobId empty; jobId space; jobId nbsp; jobId lone-surrogate; jobId nul; jobId cap-jobid-at; jobId cap-jobid-astral-at; jobId cap-jobid-lone-at; jobId id-traversal; jobId id-alias; jobId id-padded; jobId id-accented.",
+  "cases": [
+    {
+      "id": "untrusted-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status from a frame that is not the app's renderer: refused before the handler runs"
+      },
+      "args": [
+        "launch:status",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "untrusted-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status with a well-formed payload from an untrusted frame: the sender check wins"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": "a"
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "busy-ignored-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status does not wait for a running switch: a null payload is still BAD_REQUEST"
+      },
+      "args": [
+        "launch:status",
+        null,
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload no payload at all, as invoke(channel) sends"
+      },
+      "args": [
+        "launch:status",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload null"
+      },
+      "args": [
+        "launch:status",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload false"
+      },
+      "args": [
+        "launch:status",
+        false,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload true"
+      },
+      "args": [
+        "launch:status",
+        true,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload the number 0"
+      },
+      "args": [
+        "launch:status",
+        0,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload the number 7"
+      },
+      "args": [
+        "launch:status",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launch:status payload NaN"
+      },
+      "args": [
+        "launch:status",
+        {
+          "$number": "NaN"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload an empty string"
+      },
+      "args": [
+        "launch:status",
+        "",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload a string"
+      },
+      "args": [
+        "launch:status",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload an empty array"
+      },
+      "args": [
+        "launch:status",
+        [],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-array-of-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload an array holding a well-formed payload"
+      },
+      "args": [
+        "launch:status",
+        [
+          {
+            "jobId": "a"
+          }
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload a Date: an object to the check, with none of the fields"
+      },
+      "args": [
+        "launch:status",
+        {
+          "$date": "2026-01-02T03:04:05.000Z"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "top-empty-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status payload an empty object: every field missing"
+      },
+      "args": [
+        "launch:status",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: the key left out"
+      },
+      "args": [
+        "launch:status",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: the key present with the value undefined"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": {
+            "$undefined": true
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: null"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: the number 0"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": 0
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: the number 5"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launch:status jobId: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": {
+            "$number": "NaN"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: launch:status jobId: Infinity"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": {
+            "$number": "Infinity"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: true"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: false"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": false
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: an empty array"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": []
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: an array of one string"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: an empty object"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": {}
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "jobid.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status jobId: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": {
+            "$bytes": "YQ=="
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "cap-jobid-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: launch:status jobId: 65 ASCII characters, one over the limit of 64 UTF-16 code units"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-jobid-astral-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: launch:status jobId: 63 ASCII characters and one astral character: 64 code points but 65 UTF-16 code units"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-jobid-lone-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: launch:status jobId: 64 ASCII characters and a lone high surrogate: one unit over the limit"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": {
+            "$utf16": [
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              55296
+            ]
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "extra-field",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: launch:status: an unknown key next to a payload missing jobId; unknown keys are ignored, not refused"
+      },
+      "args": [
+        "launch:status",
+        {
+          "unexpected": "x"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "shadow-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: launch:status: keys named after Object.prototype members (toString, constructor, hasOwnProperty) next to a payload missing jobId"
+      },
+      "args": [
+        "launch:status",
+        {
+          "toString": "x",
+          "constructor": "x",
+          "hasOwnProperty": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-own-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: launch:status: an own \"__proto__\" data key holding a well-formed payload (as JSON.parse and a structured clone make it); the fields are not read through it"
+      },
+      "args": [
+        "launch:status",
+        {
+          "__proto__": {
+            "jobId": "a"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-constructor-prototype",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: launch:status: a constructor.prototype path holding a well-formed payload"
+      },
+      "args": [
+        "launch:status",
+        {
+          "constructor": {
+            "prototype": {
+              "jobId": "a"
+            }
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:status",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:status",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-str-text",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:status",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-number-7",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:status",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-arr1-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:status",
+        [
+          "a"
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launch:status: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-empty-object",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:status",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-jobid-number-5",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-jobid-len65",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "launch:status",
+        {
+          "jobId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "jobId exceeds 64 characters"
+        }
+      }
+    }
+  ]
+}

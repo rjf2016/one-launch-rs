@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-d867ef26fd",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot library"
+  ],
+  "name": "lists the one account the session file names, and never writes to the registry or the process list",
+  "calls": []
+}

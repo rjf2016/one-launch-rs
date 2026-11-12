@@ -1,0 +1,33 @@
+{
+  "id": "T-riot-adapter-12a857bf5e",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot switch (real)"
+  ],
+  "name": "refuses to close a running client without confirmation",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "ConfirmationRequiredError",
+        "message": "The Riot Client is running. Switching closes it.",
+        "runningGame": null,
+        "code": "CONFIRM_REQUIRED"
+      }
+    }
+  ]
+}

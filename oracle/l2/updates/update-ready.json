@@ -1,0 +1,271 @@
+{
+  "condition": "update-ready",
+  "title": "A signed newer release: downloaded, verified, ready; then Restart to update",
+  "group": "core",
+  "app": {
+    "version": "1.0.0-beta.3",
+    "mode": "unpackaged, fake launchers \"none\", test feed",
+    "clock": "2026-11-06T16:46:23.000Z"
+  },
+  "feed": {
+    "url": "http://127.0.0.1:{port}/",
+    "listening": true,
+    "keys": [
+      "3376dec30c48c71f"
+    ],
+    "manifest": "version: 1.0.0-beta.4\nfiles:\n  - url: OneLaunch-1.0.0-beta.4-setup.exe\n    sha512: TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n    size: 50\npath: OneLaunch-1.0.0-beta.4-setup.exe\nsha512: TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\nreleaseDate: '2026-11-20T00:00:00.000Z'\nsignature: 'WmaNrmSbkp1CA6SZqh1JKrl+0wZxwCx88sNKpz5iCKZIcx1YC6TyeqBeaipegc2nAQ6gtrynYf6GS2v/bVScCA=='\nkeyId: '3376dec30c48c71f'\n",
+    "installer": {
+      "path": "/OneLaunch-1.0.0-beta.4-setup.exe",
+      "bytes": 50,
+      "text": "placeholder installer bytes, not a real executable",
+      "matchesManifest": true
+    },
+    "paced": "the installer is sent in three parts: the first third, 1.2 s later the second third, then the rest once a progress report has been seen"
+  },
+  "recorded": {
+    "condition": "update-ready",
+    "steps": [
+      {
+        "step": "start",
+        "by": "app start",
+        "actions": [
+          {
+            "invoke": "settings:set",
+            "req": {
+              "key": "logLevel",
+              "value": "debug"
+            },
+            "at": "before the first check, so that the engine lines reach the log"
+          }
+        ],
+        "states": [
+          {
+            "state": "idle"
+          }
+        ],
+        "requests": [],
+        "timers": [
+          {
+            "ev": "arm",
+            "ms": 15000
+          }
+        ],
+        "log": []
+      },
+      {
+        "step": "timer",
+        "by": "the first-check timer",
+        "states": [
+          {
+            "state": "checking"
+          },
+          {
+            "state": "downloading",
+            "version": "1.0.0-beta.4",
+            "percent": 0
+          },
+          {
+            "state": "downloading",
+            "version": "1.0.0-beta.4",
+            "percent": 64
+          },
+          {
+            "state": "ready",
+            "version": "1.0.0-beta.4"
+          }
+        ],
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/latest.yml",
+            "query": {
+              "noCache": "<t32>"
+            },
+            "headers": {
+              "cache-control": "no-cache",
+              "user-agent": "electron-builder",
+              "x-user-staging-id": "00000000-0000-0000-0000-000000000000"
+            },
+            "transport": {
+              "accept-encoding": "gzip, deflate, br, zstd",
+              "accept-language": "en-US",
+              "connection": "keep-alive",
+              "host": "127.0.0.1:{port}",
+              "sec-fetch-dest": "empty",
+              "sec-fetch-mode": "no-cors",
+              "sec-fetch-site": "none"
+            },
+            "answer": {
+              "status": 200,
+              "bytes": 489
+            }
+          },
+          {
+            "method": "GET",
+            "path": "/OneLaunch-1.0.0-beta.4-setup.exe",
+            "query": {},
+            "headers": {
+              "accept": "*/*",
+              "cache-control": "no-cache",
+              "user-agent": "electron-builder"
+            },
+            "transport": {
+              "accept-encoding": "gzip, deflate, br, zstd",
+              "accept-language": "en-US",
+              "connection": "keep-alive",
+              "host": "127.0.0.1:{port}",
+              "sec-fetch-dest": "empty",
+              "sec-fetch-mode": "no-cors",
+              "sec-fetch-site": "none"
+            },
+            "answer": {
+              "status": 200,
+              "bytes": 50
+            }
+          }
+        ],
+        "timers": [
+          {
+            "ev": "fire",
+            "ms": 15000
+          }
+        ],
+        "log": [
+          {
+            "level": "INFO",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update check",
+            "meta": {
+              "origin": "background"
+            }
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Checking for update"
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Found version 1.0.0-beta.4 (url: OneLaunch-1.0.0-beta.4-setup.exe)"
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Downloading update from OneLaunch-1.0.0-beta.4-setup.exe"
+          },
+          {
+            "level": "INFO",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update available",
+            "meta": {
+              "version": "1.0.0-beta.4",
+              "keyId": "3376dec30c48c71f",
+              "size": 50
+            }
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "updater cache dir: {data}\\update-cache"
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "New version 1.0.0-beta.4 has been downloaded to {data}\\update-cache\\pending\\OneLaunch-1.0.0-beta.4-setup.exe"
+          },
+          {
+            "level": "INFO",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update ready",
+            "meta": {
+              "version": "1.0.0-beta.4",
+              "sha512": "TrVrOgassNbw"
+            }
+          }
+        ]
+      },
+      {
+        "step": "manual",
+        "by": "updates:check",
+        "answer": {
+          "state": "ready",
+          "version": "1.0.0-beta.4"
+        },
+        "states": [],
+        "requests": [],
+        "timers": [],
+        "log": []
+      },
+      {
+        "step": "install",
+        "by": "updates:install",
+        "exit": 0,
+        "states": [],
+        "requests": [],
+        "timers": [],
+        "log": [
+          {
+            "level": "INFO",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update install requested",
+            "meta": {
+              "version": "1.0.0-beta.4"
+            }
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Install: isSilent: true, isForceRunAfter: true"
+          },
+          {
+            "level": "INFO",
+            "scope": "main:updater",
+            "exact": true,
+            "message": "update install (test feed, installer not run)"
+          },
+          {
+            "level": "INFO",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update install",
+            "meta": {
+              "version": "1.0.0-beta.4",
+              "relaunch": true,
+              "started": true
+            }
+          }
+        ]
+      }
+    ],
+    "dataFolder": {
+      "devAppUpdateYml": "provider: generic\nurl: \"http://127.0.0.1:{port}/\"\nupdaterCacheDirName: update-cache\n",
+      "updateCache": [
+        {
+          "path": "update-cache/pending/OneLaunch-1.0.0-beta.4-setup.exe",
+          "size": 50
+        },
+        {
+          "path": "update-cache/pending/update-info.json",
+          "size": 178
+        }
+      ],
+      "updateInfoJson": {
+        "fileName": "OneLaunch-1.0.0-beta.4-setup.exe",
+        "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+        "isAdminRightsRequired": false
+      },
+      "updaterIdFile": false
+    }
+  }
+}

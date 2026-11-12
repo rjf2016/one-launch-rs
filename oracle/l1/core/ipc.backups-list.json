@@ -1,0 +1,1282 @@
+{
+  "function": "registerIpcHandlers",
+  "source": "src/main/ipc/index.ts",
+  "note": "decode: none\narg0 is the channel, arg1 the payload, arg2 the context { trusted, busy }.\ncall reaches the real handler: electron is mocked (ipcMain.handle collects the handlers) and registerIpcHandlers from src/main/ipc/index.ts is run once, as test/ipc-validation.test.ts does, with every service a recording proxy that answers undefined, paths a proxy, rescan and the pickers recording stubs, and the logger a silent stub. Per case: isTrustedSender returns context.trusted, launch.isBusy returns context.busy (the only service a refused payload may reach), and the handler is invoked with the event { senderFrame: { url } } and arg1 as the request. A \"__proto__\" key in a payload is an own data key, as a structured clone over IPC delivers it. out is the envelope the handler layer returns, { ok: false, error: { code, message } }; the messages are exact.\nEvery case is refused before any service, shell call, picker or rescan is reached: call throws if one is, so a payload that passes validation can never be recorded here.\nThe matrix stops at validation: what a handler does once a payload passes (its service calls, the ?? defaults after a nullable field, the OPEN_FAILED, NO_PASSWORD, NOT_FOUND, NOT_A_LAUNCHER and UNAVAILABLE refusals) is hand-translated with the services, not recorded here.\nThe generated family comes from a transcription of the handler's validators (scripts/oracle/l1/core/ipc/schema.ts and model.ts), checked by the generator against the real handlers on every case; cases from test/ipc-validation.test.ts are its REFUSED table, copied as written.",
+  "cases": [
+    {
+      "id": "untrusted-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list from a frame that is not the app's renderer: refused before the handler runs"
+      },
+      "args": [
+        "backups:list",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "untrusted-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list with a well-formed payload from an untrusted frame: the sender check wins"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": "steam"
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "busy-ignored-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list does not wait for a running switch: a null payload is still BAD_REQUEST"
+      },
+      "args": [
+        "backups:list",
+        null,
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload no payload at all, as invoke(channel) sends"
+      },
+      "args": [
+        "backups:list",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload null"
+      },
+      "args": [
+        "backups:list",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload false"
+      },
+      "args": [
+        "backups:list",
+        false,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload true"
+      },
+      "args": [
+        "backups:list",
+        true,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload the number 0"
+      },
+      "args": [
+        "backups:list",
+        0,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload the number 7"
+      },
+      "args": [
+        "backups:list",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: backups:list payload NaN"
+      },
+      "args": [
+        "backups:list",
+        {
+          "$number": "NaN"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload an empty string"
+      },
+      "args": [
+        "backups:list",
+        "",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload a string"
+      },
+      "args": [
+        "backups:list",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload an empty array"
+      },
+      "args": [
+        "backups:list",
+        [],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-array-of-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload an array holding a well-formed payload"
+      },
+      "args": [
+        "backups:list",
+        [
+          {
+            "launcher": "steam"
+          }
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload a Date: an object to the check, with none of the fields"
+      },
+      "args": [
+        "backups:list",
+        {
+          "$date": "2026-01-02T03:04:05.000Z"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "top-empty-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list payload an empty object: every field missing"
+      },
+      "args": [
+        "backups:list",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: the key left out"
+      },
+      "args": [
+        "backups:list",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: the key present with the value undefined"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": {
+            "$undefined": true
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: null"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: the number 0"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": 0
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: the number 5"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: backups:list launcher: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": {
+            "$number": "NaN"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: backups:list launcher: Infinity"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": {
+            "$number": "Infinity"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: true"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: false"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": false
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: an empty array"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": []
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: an array of one string"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: an empty object"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": {}
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": {
+            "$bytes": "YQ=="
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.unknown",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: a value outside the allowed list"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": "nope"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: an empty string"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": ""
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.upper",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: backups:list launcher: steam upper-cased; the list is matched exactly"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": "STEAM"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.title",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: backups:list launcher: steam with a capital first letter"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": "Steam"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.leading-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: backups:list launcher: steam with a leading space; nothing is trimmed"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": " steam"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.trailing-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: backups:list launcher: steam with a trailing space"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": "steam "
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.trailing-nul",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: steam with a trailing NUL"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": "steam\u0000"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.trailing-lone",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: backups:list launcher: steam with a trailing lone surrogate"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": {
+            "$utf16": [
+              115,
+              116,
+              101,
+              97,
+              109,
+              55296
+            ]
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.proto",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: backups:list launcher: \"__proto__\" as the value; the list is an array, so includes() finds nothing"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": "__proto__"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.constructor",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: backups:list launcher: \"constructor\" as the value"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": "constructor"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "launcher.array-of-allowed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list launcher: [\"steam\"], an array holding an allowed value"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": [
+            "steam"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "extra-field",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backups:list: an unknown key next to a payload missing launcher; unknown keys are ignored, not refused"
+      },
+      "args": [
+        "backups:list",
+        {
+          "unexpected": "x"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "shadow-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: backups:list: keys named after Object.prototype members (toString, constructor, hasOwnProperty) next to a payload missing launcher"
+      },
+      "args": [
+        "backups:list",
+        {
+          "toString": "x",
+          "constructor": "x",
+          "hasOwnProperty": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "proto-own-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: backups:list: an own \"__proto__\" data key holding a well-formed payload (as JSON.parse and a structured clone make it); the fields are not read through it"
+      },
+      "args": [
+        "backups:list",
+        {
+          "__proto__": {
+            "launcher": "steam"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "proto-constructor-prototype",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: backups:list: a constructor.prototype path holding a well-formed payload"
+      },
+      "args": [
+        "backups:list",
+        {
+          "constructor": {
+            "prototype": {
+              "launcher": "steam"
+            }
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "backups:list",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "backups:list",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-str-text",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "backups:list",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-number-7",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "backups:list",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-arr1-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "backups:list",
+        [
+          "a"
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "backups:list: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-empty-object",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "backups:list",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-launcher-str-origin",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": "origin"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-launcher-number-5",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "backups:list",
+        {
+          "launcher": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "launcher is not an allowed value"
+        }
+      }
+    }
+  ]
+}

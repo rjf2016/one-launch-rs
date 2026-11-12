@@ -1,0 +1,142 @@
+{
+  "id": "T-battlenet-adapter-1d583a9797",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "restore"
+  ],
+  "name": "refuses while the client runs, then puts the file and the recorded token back",
+  "calls": [
+    {
+      "launcher": "battlenet",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:battlenet:saved3@example.com",
+          "displayName": "Alt",
+          "login": "saved3@example.com",
+          "launcherUid": "0b2c3d4e",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "battlenet",
+        "account": {
+          "id": "@acct:battlenet:saved3@example.com",
+          "displayName": "Alt",
+          "login": "saved3@example.com",
+          "launcherUid": "0b2c3d4e"
+        },
+        "strategy": "remembered",
+        "ok": true,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Battle.net",
+            "status": "skipped",
+            "detail": "Skipped: Battle.net.exe is not running."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing session",
+            "status": "done",
+            "detail": "Main's stored session is already current."
+          },
+          {
+            "id": "backup",
+            "title": "Back up Battle.net.config and the UnifiedAuth value",
+            "status": "done",
+            "detail": "{tmp}\\backups\\battlenet\\<ts>"
+          },
+          {
+            "id": "registry",
+            "title": "Put the account's session token in place",
+            "status": "done",
+            "detail": "UnifiedAuth now holds the snapshot (fingerprint 59028191)."
+          },
+          {
+            "id": "file",
+            "title": "Put the login first in the saved-accounts list",
+            "status": "done",
+            "detail": "saved3@example.com is now first of 5 saved accounts."
+          },
+          {
+            "id": "start",
+            "title": "Start Battle.net",
+            "status": "done",
+            "detail": "Client started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the client to come up",
+            "status": "done",
+            "detail": "Battle.net.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the client signed in",
+            "status": "done",
+            "detail": "Signed in as saved3@example.com."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "skipped",
+            "detail": "Runs only if the client rejects the stored token or does not sign in within 0.5 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.016666666666666666 min."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new session",
+            "status": "done",
+            "detail": "The stored session is current."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": "<ts>",
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": null,
+        "error": null,
+        "needsSignIn": false,
+        "cancelled": false
+      }
+    },
+    {
+      "launcher": "battlenet",
+      "method": "restoreBackup",
+      "args": [
+        "<ts>"
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "LauncherRunningError",
+        "message": "Close Battle.net before restoring: it rewrites its token at sign-in and Battle.net.config at exit, which would undo the restore.",
+        "code": "LAUNCHER_RUNNING"
+      }
+    },
+    {
+      "launcher": "battlenet",
+      "method": "restoreBackup",
+      "args": [
+        "<ts>"
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "battlenet",
+        "id": "<ts>",
+        "files": [
+          "{tmp}\\Roaming\\Battle.net\\Battle.net.config"
+        ],
+        "registry": [
+          "UnifiedAuth\\AA11BB22 = (34 bytes, fingerprint d4a156d2)",
+          "UnifiedAuth\\B1B1B1B1 (removed)",
+          "UnifiedAuth\\Other (removed)"
+        ]
+      }
+    }
+  ]
+}

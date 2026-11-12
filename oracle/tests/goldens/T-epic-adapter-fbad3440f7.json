@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-fbad3440f7",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter with a non-UTF-8 settings file"
+  ],
+  "name": "fails the settings health row instead of reading the file as empty",
+  "calls": []
+}

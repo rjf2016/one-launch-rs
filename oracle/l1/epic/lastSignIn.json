@@ -1,0 +1,365 @@
+{
+  "function": "lastSignIn",
+  "source": "src/main/launchers/epic/launcher-log.ts",
+  "note": "decode: none\narg0 is a LogEvent array as a plain value. The fixture and test cases use the events the real parseLogEvents gives for that log (computed when the vector is made); the rest are hand-built.\nThe function judges no time: at is passed through from the event, so no clock is involved.",
+  "cases": [
+    {
+      "id": "test-ok-log",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > launcher log > extracts sign-in outcomes with the account id, masking token ids in failures"
+      },
+      "args": [
+        [
+          {
+            "kind": "auto-sign-in"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "33333333333333333333333333333333",
+            "at": "2026-09-11T17:09:08.138Z"
+          },
+          {
+            "kind": "ready"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "33333333333333333333333333333333",
+        "at": "2026-09-11T17:09:08.138Z"
+      }
+    },
+    {
+      "id": "test-expired-first-two",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > launcher log > extracts sign-in outcomes with the account id, masking token ids in failures"
+      },
+      "args": [
+        [
+          {
+            "kind": "auto-sign-in"
+          },
+          {
+            "kind": "sign-in-failed",
+            "reason": "Sorry the refresh token '…' is invalid. Reason: TOKEN_EXPIRED errorcode=18036"
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "Sorry the refresh token '…' is invalid. Reason: TOKEN_EXPIRED errorcode=18036"
+      }
+    },
+    {
+      "id": "test-expired-all",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > launcher log > extracts sign-in outcomes with the account id, masking token ids in failures"
+      },
+      "args": [
+        [
+          {
+            "kind": "auto-sign-in"
+          },
+          {
+            "kind": "sign-in-failed",
+            "reason": "Sorry the refresh token '…' is invalid. Reason: TOKEN_EXPIRED errorcode=18036"
+          },
+          {
+            "kind": "ready"
+          },
+          {
+            "kind": "manual-sign-in"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "33333333333333333333333333333333",
+            "at": "2026-09-11T17:08:59.278Z"
+          },
+          {
+            "kind": "exit"
+          },
+          {
+            "kind": "exit"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "33333333333333333333333333333333",
+        "at": "2026-09-11T17:08:59.278Z"
+      }
+    },
+    {
+      "id": "test-auto-only",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > launcher log > extracts sign-in outcomes with the account id, masking token ids in failures"
+      },
+      "args": [
+        [
+          {
+            "kind": "auto-sign-in"
+          }
+        ]
+      ],
+      "out": null
+    },
+    {
+      "id": "test-shutdown",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > launcher log > extracts sign-in outcomes with the account id, masking token ids in failures"
+      },
+      "args": [
+        [
+          {
+            "kind": "signed-in",
+            "accountId": "33333333333333333333333333333333",
+            "at": "2026-09-13T00:02:57.351Z"
+          },
+          {
+            "kind": "exit"
+          },
+          {
+            "kind": "restart"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "33333333333333333333333333333333",
+        "at": "2026-09-13T00:02:57.351Z"
+      }
+    },
+    {
+      "id": "test-mark",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > launcher log > reading only what the launcher appends, across log rotation > reads from the mark within one run and from the start once the launcher started a new log"
+      },
+      "args": [
+        [
+          {
+            "kind": "signed-in",
+            "accountId": "33333333333333333333333333333333",
+            "at": null
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "33333333333333333333333333333333",
+        "at": null
+      }
+    },
+    {
+      "id": "test-new-run-failed",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > launcher log > reading only what the launcher appends, across log rotation > reads from the mark within one run and from the start once the launcher started a new log"
+      },
+      "args": [
+        [
+          {
+            "kind": "auto-sign-in"
+          },
+          {
+            "kind": "sign-in-failed",
+            "reason": "nope"
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "nope"
+      }
+    },
+    {
+      "id": "test-empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > launcher log > reading only what the launcher appends, across log rotation > reads from the mark within one run and from the start once the launcher started a new log"
+      },
+      "args": [
+        []
+      ],
+      "out": null
+    },
+    {
+      "id": "no-decisive",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher.log | only events that decide nothing"
+      },
+      "args": [
+        [
+          {
+            "kind": "auto-sign-in"
+          },
+          {
+            "kind": "manual-sign-in"
+          },
+          {
+            "kind": "ready"
+          },
+          {
+            "kind": "restart"
+          },
+          {
+            "kind": "exit"
+          }
+        ]
+      ],
+      "out": null
+    },
+    {
+      "id": "failure-after-success",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher.log | a success, then a failure"
+      },
+      "args": [
+        [
+          {
+            "kind": "signed-in",
+            "accountId": "33333333333333333333333333333333",
+            "at": "2026-09-11T17:09:08.138Z"
+          },
+          {
+            "kind": "sign-in-failed",
+            "reason": "Sorry the refresh token '…' is invalid. Reason: TOKEN_EXPIRED errorcode=18036"
+          },
+          {
+            "kind": "exit"
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "Sorry the refresh token '…' is invalid. Reason: TOKEN_EXPIRED errorcode=18036"
+      }
+    },
+    {
+      "id": "success-after-failure",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher.log | a failure, then a success"
+      },
+      "args": [
+        [
+          {
+            "kind": "sign-in-failed",
+            "reason": "nope"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "33333333333333333333333333333333",
+            "at": "2026-09-11T17:09:08.138Z"
+          },
+          {
+            "kind": "ready"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "33333333333333333333333333333333",
+        "at": "2026-09-11T17:09:08.138Z"
+      }
+    },
+    {
+      "id": "empty-account-id",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher.log | a success with an empty account id"
+      },
+      "args": [
+        [
+          {
+            "kind": "signed-in",
+            "accountId": "",
+            "at": null
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "",
+        "at": null
+      }
+    },
+    {
+      "id": "two-successes",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher.log | two successes: the last one wins"
+      },
+      "args": [
+        [
+          {
+            "kind": "signed-in",
+            "accountId": "11111111111111111111111111111111",
+            "at": "2026-09-11T17:00:00.000Z"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "22222222222222222222222222222222",
+            "at": "2026-09-11T18:00:00.000Z"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "22222222222222222222222222222222",
+        "at": "2026-09-11T18:00:00.000Z"
+      }
+    },
+    {
+      "id": "two-failures",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/EpicGamesLauncher.log | two failures: the last one wins"
+      },
+      "args": [
+        [
+          {
+            "kind": "sign-in-failed",
+            "reason": "first"
+          },
+          {
+            "kind": "sign-in-failed",
+            "reason": ""
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": ""
+      }
+    },
+    {
+      "id": "adv-bad-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: an at that is no real date (month 13) is passed through as a string, never parsed"
+      },
+      "args": [
+        [
+          {
+            "kind": "signed-in",
+            "accountId": "33333333333333333333333333333333",
+            "at": "2026-13-45T99:99:99.999Z"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "33333333333333333333333333333333",
+        "at": "2026-13-45T99:99:99.999Z"
+      }
+    }
+  ]
+}

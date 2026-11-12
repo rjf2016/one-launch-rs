@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-7c51f4e3fc",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot metadata parsers"
+  ],
+  "name": "reads the last-session timestamps and nothing else from the client settings",
+  "calls": []
+}

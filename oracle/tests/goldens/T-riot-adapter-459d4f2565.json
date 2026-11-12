@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-459d4f2565",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot metadata parsers"
+  ],
+  "name": "tells product folders from the rest and games from their process names",
+  "calls": []
+}

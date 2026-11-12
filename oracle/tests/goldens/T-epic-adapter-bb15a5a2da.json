@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-bb15a5a2da",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.listRememberedAccounts and sessionState"
+  ],
+  "name": "lists every account id that signed in here, marking the remembered one and its linked account",
+  "calls": []
+}

@@ -1,0 +1,153 @@
+{
+  "function": "sentence",
+  "source": "src/renderer/src/lib/phases.ts",
+  "note": "decode: none\ncharAt(0).toUpperCase() + slice(1): the first UTF-16 code unit is upper-cased with the default (locale-independent) mapping, so an astral first letter is left alone and a letter whose upper case is longer (ß) grows.",
+  "cases": [
+    {
+      "id": "test-riot-client",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > starts its sentences properly when the program is \"the Riot Client\""
+      },
+      "args": [
+        "the Riot Client"
+      ],
+      "out": "The Riot Client"
+    },
+    {
+      "id": "test-steam",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > starts its sentences properly when the program is \"the Riot Client\""
+      },
+      "args": [
+        "Steam"
+      ],
+      "out": "Steam"
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an empty string: charAt(0) is ''"
+      },
+      "args": [
+        ""
+      ],
+      "out": ""
+    },
+    {
+      "id": "accented",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: é upper-cases to É"
+      },
+      "args": [
+        "éclair"
+      ],
+      "out": "Éclair"
+    },
+    {
+      "id": "sharp-s",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ß upper-cases to SS: the string grows by one"
+      },
+      "args": [
+        "ßtrasse"
+      ],
+      "out": "SStrasse"
+    },
+    {
+      "id": "dz-digraph",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ǆ upper-cases to Ǆ, not the title-case ǅ"
+      },
+      "args": [
+        "ǆungla"
+      ],
+      "out": "Ǆungla"
+    },
+    {
+      "id": "dotless-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: i upper-cases to I whatever the locale; Turkish would give İ"
+      },
+      "args": [
+        "istanbul"
+      ],
+      "out": "Istanbul"
+    },
+    {
+      "id": "n-apostrophe",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ŉ upper-cases to two characters, ʼN"
+      },
+      "args": [
+        "ŉx"
+      ],
+      "out": "ʼNx"
+    },
+    {
+      "id": "astral-lower",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: Deseret 𐐨 (U+10428) first: charAt(0) is its high surrogate alone, so nothing is upper-cased; a char-based port would give 𐐀"
+      },
+      "args": [
+        "𐐨x"
+      ],
+      "out": "𐐨x"
+    },
+    {
+      "id": "leading-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a leading space is not skipped"
+      },
+      "args": [
+        " steam"
+      ],
+      "out": " steam"
+    },
+    {
+      "id": "digit-first",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a digit first"
+      },
+      "args": [
+        "7 Days"
+      ],
+      "out": "7 Days"
+    },
+    {
+      "id": "lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone high surrogate first"
+      },
+      "args": [
+        {
+          "$utf16": [
+            55296,
+            97,
+            98,
+            99
+          ]
+        }
+      ],
+      "out": {
+        "$utf16": [
+          55296,
+          97,
+          98,
+          99
+        ]
+      }
+    }
+  ]
+}

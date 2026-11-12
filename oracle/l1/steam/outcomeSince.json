@@ -1,0 +1,239 @@
+{
+  "function": "outcomeSince",
+  "source": "src/main/launchers/steam/login-log.ts",
+  "note": "decode: none\narg0 stands for the log file: { file: <bytes> } when <SteamPath>\\logs\\steamui_login.txt exists, {} when it does not. call writes the bytes to steamui_login.txt in a fresh temporary folder, passes that path, and removes the folder; the path never reaches the result.\narg1 is the mark, the byte size of the log when the wait began. The function reads at most the last MAX_TAIL_BYTES (512 KiB) appended since the mark (a log smaller than the mark was rotated and is read from its start), decodes it with toString(utf8), and returns latestOutcome(parseLoginStates(text)).\nCaps: MAX_TAIL_BYTES, one file l1/steam/files/outcomeSince/tail-512k-plus-1.txt of 524289 bytes read from mark 1 (cap-tail-at) and mark 0 (cap-tail-over).\ngap: src/main/launchers/steam/login-log.ts:85:11 catch (in readLoginLogSince), reached only when stat or read fails on a path that exists (a folder named like the log, a locked or unreadable file); no file content reaches it.",
+  "cases": [
+    {
+      "id": "history-before-mark",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > reading only what Steam appends > ignores history before the mark and sees lines added after it"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "WzIwMjYtMDktMTIgMTU6MDA6NDNdIENsaWVudCB2ZXJzaW9uOiAxNzg4NjUyMjE1DQpbMjAyNi0wOS0xMiAxNTowMDo0M10gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4NClsyMDI2LTA5LTEyIDE1OjAwOjQzXSBbIE5vbmUgXSBTZXRMb2dpblN0YXRlOiBXYWl0aW5nRm9yTmV0d29yayAtIE9LDQpbMjAyNi0wOS0xMiAxNTowMDo0M10gWyBXYWl0aW5nRm9yTmV0d29yayBdIFNldExvZ2luU3RhdGU6IFdhaXRpbmdGb3JTZXJ2ZXJSZXNwb25zZSAtIE9LDQpbMjAyNi0wOS0xMiAxNTowMDo0NV0gWyBXYWl0aW5nRm9yU2VydmVyUmVzcG9uc2UgXSBSZWNlaXZlZCBsb2dvbiBmYWlsdXJlIHJlc3BvbnNlDQpbMjAyNi0wOS0xMiAxNTowMDo0NV0gWyBXYWl0aW5nRm9yU2VydmVyUmVzcG9uc2UgXSBTZXRMb2dpblN0YXRlOiBXYWl0aW5nRm9yQ3JlZGVudGlhbHMgLSBBY2NvdW50IExvZ29uIERlbmllZA0KWzIwMjYtMDktMTIgMTU6MDA6NDVdIFsgV2FpdGluZ0ZvckNyZWRlbnRpYWxzIF0gVUkgUmVxdWVzdDogY29ubmVjdAo="
+          }
+        },
+        521
+      ],
+      "out": null
+    },
+    {
+      "id": "line-after-mark",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > reading only what Steam appends > ignores history before the mark and sees lines added after it"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "WzIwMjYtMDktMTIgMTU6MDA6NDNdIENsaWVudCB2ZXJzaW9uOiAxNzg4NjUyMjE1DQpbMjAyNi0wOS0xMiAxNTowMDo0M10gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4NClsyMDI2LTA5LTEyIDE1OjAwOjQzXSBbIE5vbmUgXSBTZXRMb2dpblN0YXRlOiBXYWl0aW5nRm9yTmV0d29yayAtIE9LDQpbMjAyNi0wOS0xMiAxNTowMDo0M10gWyBXYWl0aW5nRm9yTmV0d29yayBdIFNldExvZ2luU3RhdGU6IFdhaXRpbmdGb3JTZXJ2ZXJSZXNwb25zZSAtIE9LDQpbMjAyNi0wOS0xMiAxNTowMDo0NV0gWyBXYWl0aW5nRm9yU2VydmVyUmVzcG9uc2UgXSBSZWNlaXZlZCBsb2dvbiBmYWlsdXJlIHJlc3BvbnNlDQpbMjAyNi0wOS0xMiAxNTowMDo0NV0gWyBXYWl0aW5nRm9yU2VydmVyUmVzcG9uc2UgXSBTZXRMb2dpblN0YXRlOiBXYWl0aW5nRm9yQ3JlZGVudGlhbHMgLSBBY2NvdW50IExvZ29uIERlbmllZA0KWzIwMjYtMDktMTIgMTU6MDA6NDVdIFsgV2FpdGluZ0ZvckNyZWRlbnRpYWxzIF0gVUkgUmVxdWVzdDogY29ubmVjdApbeF0gWyBXYWl0aW5nRm9yTGlicmFyeVJlYWR5IF0gU2V0TG9naW5TdGF0ZTogU3VjY2VzcyAtIE9LCg=="
+          }
+        },
+        521
+      ],
+      "out": {
+        "kind": "success"
+      }
+    },
+    {
+      "id": "larger-than-one-read",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > reading only what Steam appends > reads the end of a log that is larger than one read, not its start"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "W3hdIFsgV2FpdGluZ0ZvclNlcnZlclJlc3BvbnNlIF0gU2V0TG9naW5TdGF0ZTogV2FpdGluZ0ZvckNyZWRlbnRpYWxzIC0gSW52YWxpZCBQYXNzd29yZApbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgV2FpdGluZ0ZvckxpYnJhcnlSZWFkeSBdIFNldExvZ2luU3RhdGU6IFN1Y2Nlc3MgLSBPSwo="
+          }
+        },
+        0
+      ],
+      "out": {
+        "kind": "success"
+      }
+    },
+    {
+      "id": "missing-file",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > reading only what Steam appends > copes with a missing file and with a log that was rotated"
+      },
+      "args": [
+        {},
+        0
+      ],
+      "out": null
+    },
+    {
+      "id": "rotated",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > reading only what Steam appends > copes with a missing file and with a log that was rotated"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "W3hdIFsgV2FpdGluZ0ZvclNlcnZlclJlc3BvbnNlIF0gU2V0TG9naW5TdGF0ZTogV2FpdGluZ0ZvckNyZWRlbnRpYWxzIC0gSW52YWxpZCBQYXNzd29yZAo="
+          }
+        },
+        521
+      ],
+      "out": {
+        "kind": "credentials",
+        "reason": "Invalid Password",
+        "cause": "password"
+      }
+    },
+    {
+      "id": "whole-sample",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > reports the last decisive state, or null while Steam is still working"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "WzIwMjYtMDktMTIgMTU6MDA6NDNdIENsaWVudCB2ZXJzaW9uOiAxNzg4NjUyMjE1DQpbMjAyNi0wOS0xMiAxNTowMDo0M10gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4NClsyMDI2LTA5LTEyIDE1OjAwOjQzXSBbIE5vbmUgXSBTZXRMb2dpblN0YXRlOiBXYWl0aW5nRm9yTmV0d29yayAtIE9LDQpbMjAyNi0wOS0xMiAxNTowMDo0M10gWyBXYWl0aW5nRm9yTmV0d29yayBdIFNldExvZ2luU3RhdGU6IFdhaXRpbmdGb3JTZXJ2ZXJSZXNwb25zZSAtIE9LDQpbMjAyNi0wOS0xMiAxNTowMDo0NV0gWyBXYWl0aW5nRm9yU2VydmVyUmVzcG9uc2UgXSBSZWNlaXZlZCBsb2dvbiBmYWlsdXJlIHJlc3BvbnNlDQpbMjAyNi0wOS0xMiAxNTowMDo0NV0gWyBXYWl0aW5nRm9yU2VydmVyUmVzcG9uc2UgXSBTZXRMb2dpblN0YXRlOiBXYWl0aW5nRm9yQ3JlZGVudGlhbHMgLSBBY2NvdW50IExvZ29uIERlbmllZA0KWzIwMjYtMDktMTIgMTU6MDA6NDVdIFsgV2FpdGluZ0ZvckNyZWRlbnRpYWxzIF0gVUkgUmVxdWVzdDogY29ubmVjdA=="
+          }
+        },
+        0
+      ],
+      "out": {
+        "kind": "credentials",
+        "reason": "Account Logon Denied",
+        "cause": "guard-email"
+      }
+    },
+    {
+      "id": "empty-file",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty log"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": ""
+          }
+        },
+        0
+      ],
+      "out": null
+    },
+    {
+      "id": "mark-at-end",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a mark at the end of the file reads nothing"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "W3hdIFsgV2FpdGluZ0ZvckxpYnJhcnlSZWFkeSBdIFNldExvZ2luU3RhdGU6IFN1Y2Nlc3MgLSBPSwo="
+          }
+        },
+        59
+      ],
+      "out": null
+    },
+    {
+      "id": "mark-mid-line",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a mark in the middle of a line reads from there; the unanchored pattern still matches the rest"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "W3hdIFsgV2FpdGluZ0ZvckxpYnJhcnlSZWFkeSBdIFNldExvZ2luU3RhdGU6IFN1Y2Nlc3MgLSBPSwo="
+          }
+        },
+        4
+      ],
+      "out": {
+        "kind": "success"
+      }
+    },
+    {
+      "id": "mark-mid-character",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: a mark inside a multi-byte character: the read starts with continuation bytes, each one U+FFFD, and the line is kept"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "w6lTZXRMb2dpblN0YXRlOiBXYWl0aW5nRm9yQ3JlZGVudGlhbHMgLSBJbnZhbGlkIFBhc3N3b3JkCg=="
+          }
+        },
+        1
+      ],
+      "out": {
+        "kind": "credentials",
+        "reason": "Invalid Password",
+        "cause": "password"
+      }
+    },
+    {
+      "id": "cap-tail-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: exactly MAX_TAIL_BYTES (524288) after the mark: no clip, so the first line (Invalid Password) is read"
+      },
+      "args": [
+        {
+          "file": {
+            "$file": "l1/steam/files/outcomeSince/tail-512k-plus-1.txt",
+            "sha256": "8cad447b914b237d32837755e400fc80d94f7ad7ac99ca01eaae51dd26672986"
+          }
+        },
+        1
+      ],
+      "out": {
+        "kind": "credentials",
+        "reason": "Invalid Password",
+        "cause": "password"
+      }
+    },
+    {
+      "id": "cap-tail-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: one byte more than MAX_TAIL_BYTES after the mark: the read is clipped and its first, partial line dropped, so no state is left"
+      },
+      "args": [
+        {
+          "file": {
+            "$file": "l1/steam/files/outcomeSince/tail-512k-plus-1.txt",
+            "sha256": "8cad447b914b237d32837755e400fc80d94f7ad7ac99ca01eaae51dd26672986"
+          }
+        },
+        0
+      ],
+      "out": null
+    },
+    {
+      "id": "invalid-utf8",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: invalid bytes in the reason"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "U2V0TG9naW5TdGF0ZTogV2FpdGluZ0ZvckNyZWRlbnRpYWxzIC0gQmFkwIAK"
+          }
+        },
+        0
+      ],
+      "out": {
+        "kind": "credentials",
+        "reason": "Bad��",
+        "cause": "other"
+      }
+    }
+  ]
+}

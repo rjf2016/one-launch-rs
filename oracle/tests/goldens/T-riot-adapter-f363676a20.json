@@ -1,0 +1,40 @@
+{
+  "id": "T-riot-adapter-f363676a20",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "fails when the watch runs out, saying whether the client took the request",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.pbe",
+          "name": "VALORANT (PBE)"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "VALORANT (PBE) did not start within 0.04 s. Look at the Riot Client window: the game may need an update or a repair, or the client may be waiting for you."
+      }
+    },
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "The Riot Client did not act on the launch within 0.04 s. Look at the Riot Client window: it may be updating itself or asking you to sign in."
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "T-riot-adapter-90e35f9490",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "confirms the start from the game’s own process name when a client does start the game itself",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "\"{tmp}\\Riot Games\\Riot Client\\RiotClientServices.exe\" --launch-product=valorant --launch-patchline=live (the Riot Client started the game)"
+      }
+    }
+  ]
+}

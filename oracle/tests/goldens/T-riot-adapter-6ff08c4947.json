@@ -1,0 +1,107 @@
+{
+  "id": "T-riot-adapter-6ff08c4947",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot switch (real)"
+  ],
+  "name": "closes the client, saves the outgoing sign-in, backs up, swaps the whole file, restarts, and confirms from the log and the file",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false,
+          "confirmClose": true,
+          "onProgress": {
+            "$function": "onProgress"
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "riot",
+        "account": {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333"
+        },
+        "strategy": "remembered",
+        "ok": true,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close the Riot Client",
+            "status": "done",
+            "detail": "Client closed."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing sign-in",
+            "status": "done",
+            "detail": "Saved Main's sign-in (fingerprint acd093bd)."
+          },
+          {
+            "id": "backup",
+            "title": "Back up RiotGamesPrivateSettings.yaml",
+            "status": "done",
+            "detail": "{tmp}\\backups\\riot\\<ts>"
+          },
+          {
+            "id": "file",
+            "title": "Put the account's sign-in in place",
+            "status": "done",
+            "detail": "RiotGamesPrivateSettings.yaml now holds the saved copy (fingerprint 4b8ad0db)."
+          },
+          {
+            "id": "start",
+            "title": "Start the Riot Client",
+            "status": "done",
+            "detail": "Client started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the client to come up",
+            "status": "done",
+            "detail": "RiotClientServices.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the client signed in",
+            "status": "done",
+            "detail": "Signed in as riot_alt."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "skipped",
+            "detail": "Runs only if the client refuses the saved sign-in or does not sign in within 0.04 s. The client stays on its login page; you sign in there once as riot_alt with “Stay signed in” ticked and One Launch continues as soon as the log reports the sign-in, up to 0.0013333333333333333 min."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new sign-in",
+            "status": "skipped",
+            "detail": "Runs only after a manual sign-in: the fresh sign-in replaces the stale saved copy."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": "<ts>",
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": null,
+        "error": null,
+        "needsSignIn": false,
+        "cancelled": false
+      }
+    }
+  ]
+}

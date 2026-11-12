@@ -1,0 +1,406 @@
+{
+  "function": "productStates",
+  "source": "src/main/launchers/battlenet/product-state.ts",
+  "note": "decode: none\narg0 is the event list parseLogEvents returns, in memory; fixture and test cases are parseLogEvents of the fixture or literal, computed by the generator.\ncall projects the returned Map to its entries in insertion order ([...map]); the Rust test must compare the same list of [codename, state] pairs.",
+  "cases": [
+    {
+      "id": "fixture-log-20260913",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | parsed by parseLogEvents"
+      },
+      "args": [
+        [
+          {
+            "kind": "started",
+            "build": "2.52.11.17778"
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          },
+          {
+            "kind": "sign-in-attempt"
+          },
+          {
+            "kind": "sign-in-attempt"
+          },
+          {
+            "kind": "main-window"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-13T03:20:55.149Z"
+          },
+          {
+            "kind": "close-requested"
+          },
+          {
+            "kind": "exit"
+          }
+        ]
+      ],
+      "out": [
+        [
+          "prometheus",
+          {
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          }
+        ]
+      ]
+    },
+    {
+      "id": "fixture-log-20260919",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > reads each product install state and the --exec game start sequence (client 2.52.12, 2026-09-19)"
+      },
+      "args": [
+        [
+          {
+            "kind": "started",
+            "build": "2.52.12.17821"
+          },
+          {
+            "kind": "product-state",
+            "codename": "hs_beta",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "UpToDate",
+            "status": "Paused",
+            "playable": true
+          },
+          {
+            "kind": "main-window"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-19T23:51:20.327Z"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          }
+        ]
+      ],
+      "out": [
+        [
+          "hs_beta",
+          {
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          }
+        ],
+        [
+          "prometheus",
+          {
+            "operation": "UpToDate",
+            "status": "Paused",
+            "playable": true
+          }
+        ]
+      ]
+    },
+    {
+      "id": "fixture-log-20260924",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > takes the refreshed state over the cached one, and sees no start when the client only selects the page (2026-09-24)"
+      },
+      "args": [
+        [
+          {
+            "kind": "started",
+            "build": "2.52.12.17821"
+          },
+          {
+            "kind": "product-state",
+            "codename": "hs_beta",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "UpToDate",
+            "status": "Paused",
+            "playable": true
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "Update",
+            "status": "New",
+            "playable": false
+          },
+          {
+            "kind": "main-window"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-24T22:07:07.271Z"
+          }
+        ]
+      ],
+      "out": [
+        [
+          "hs_beta",
+          {
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          }
+        ],
+        [
+          "prometheus",
+          {
+            "operation": "Update",
+            "status": "New",
+            "playable": false
+          }
+        ]
+      ]
+    },
+    {
+      "id": "test-regional-playable",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > ignores the regional playable flags and a game exit"
+      },
+      "args": [
+        [
+          {
+            "kind": "product-state",
+            "codename": "wow",
+            "operation": "Repair",
+            "status": "On",
+            "playable": false
+          },
+          {
+            "kind": "game-exited",
+            "codename": "wow"
+          }
+        ]
+      ],
+      "out": [
+        [
+          "wow",
+          {
+            "operation": "Repair",
+            "status": "On",
+            "playable": false
+          }
+        ]
+      ]
+    },
+    {
+      "id": "test-running",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > knows a game is running from the last start or exit the client logged for it, whoever started it (2026-10-10)"
+      },
+      "args": [
+        [
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          }
+        ]
+      ],
+      "out": []
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > knows a game is running from the last start or exit the client logged for it, whoever started it (2026-10-10) | no events"
+      },
+      "args": [
+        []
+      ],
+      "out": []
+    },
+    {
+      "id": "last-wins-insertion-order-kept",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260924T220659.026162.log | b, a, then b again: b keeps its first place in the map and takes its last state"
+      },
+      "args": [
+        [
+          {
+            "kind": "product-state",
+            "codename": "b",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          },
+          {
+            "kind": "product-state",
+            "codename": "a",
+            "operation": "UpToDate",
+            "status": null,
+            "playable": null
+          },
+          {
+            "kind": "exit"
+          },
+          {
+            "kind": "product-state",
+            "codename": "b",
+            "operation": "UpToDate",
+            "status": "Paused",
+            "playable": true
+          }
+        ]
+      ],
+      "out": [
+        [
+          "b",
+          {
+            "operation": "UpToDate",
+            "status": "Paused",
+            "playable": true
+          }
+        ],
+        [
+          "a",
+          {
+            "operation": "UpToDate",
+            "status": null,
+            "playable": null
+          }
+        ]
+      ]
+    },
+    {
+      "id": "case-distinct",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260924T220659.026162.log | codenames differing only in case are two products"
+      },
+      "args": [
+        [
+          {
+            "kind": "product-state",
+            "codename": "wow",
+            "operation": "Update",
+            "status": null,
+            "playable": null
+          },
+          {
+            "kind": "product-state",
+            "codename": "WOW",
+            "operation": "UpToDate",
+            "status": null,
+            "playable": null
+          }
+        ]
+      ],
+      "out": [
+        [
+          "wow",
+          {
+            "operation": "Update",
+            "status": null,
+            "playable": null
+          }
+        ],
+        [
+          "WOW",
+          {
+            "operation": "UpToDate",
+            "status": null,
+            "playable": null
+          }
+        ]
+      ]
+    },
+    {
+      "id": "proto-codename",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the codename __proto__ is an ordinary Map key"
+      },
+      "args": [
+        [
+          {
+            "kind": "product-state",
+            "codename": "__proto__",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          }
+        ]
+      ],
+      "out": [
+        [
+          "__proto__",
+          {
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          }
+        ]
+      ]
+    },
+    {
+      "id": "no-product-events",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | only game and sign-in events"
+      },
+      "args": [
+        [
+          {
+            "kind": "game-running",
+            "codename": "wow"
+          },
+          {
+            "kind": "signed-out"
+          }
+        ]
+      ],
+      "out": []
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-794ed4d7f6",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot detection"
+  ],
+  "name": "falls back to RiotClientInstalls.json, then the riotclient:// handler, then the default folder",
+  "calls": []
+}

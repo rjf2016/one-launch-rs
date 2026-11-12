@@ -1,0 +1,46 @@
+{
+  "condition": "hash-mismatch",
+  "runs": 3,
+  "digests": [
+    "856d568e57dc1a43c24ba301c1d10244affa2fdc6b0dfc5254ad72c31b46c003",
+    "856d568e57dc1a43c24ba301c1d10244affa2fdc6b0dfc5254ad72c31b46c003",
+    "856d568e57dc1a43c24ba301c1d10244affa2fdc6b0dfc5254ad72c31b46c003"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    },
+    {
+      "rule": "transient",
+      "path": "/steps/manual/states",
+      "runs": 3
+    },
+    {
+      "rule": "transient",
+      "path": "/steps/timer/states",
+      "runs": 3
+    },
+    {
+      "rule": "root",
+      "path": "/steps/*/log/*/text"
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    2,
+    2,
+    2
+  ]
+}

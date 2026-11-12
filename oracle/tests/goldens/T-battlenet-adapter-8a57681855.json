@@ -1,0 +1,25 @@
+{
+  "id": "T-battlenet-adapter-8a57681855",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "fails the launch when the client does not start the game after --exec (an update or repair it did not report)",
+  "calls": [
+    {
+      "launcher": "battlenet",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "hs_beta",
+          "name": "Hearthstone"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "Hearthstone did not start within 0.05 s of the launch command. Look at the Battle.net window: the game may need an update or a repair, or the client may be busy updating itself."
+      }
+    }
+  ]
+}

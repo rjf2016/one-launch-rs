@@ -1,0 +1,168 @@
+{
+  "function": "launchArgs",
+  "source": "src/main/launchers/riot/products.ts",
+  "note": "decode: none\narg0 is a RiotProductId as parseProductId makes it from a metadata folder name (product and patchline already lower-cased); the function only formats it and validates nothing.\nThe id field is not read.",
+  "cases": [
+    {
+      "id": "valorant-live",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-adapter.test.ts > Riot switch plan (dry run) > names the game’s launch arguments in the start step when a launch follows the switch"
+      },
+      "args": [
+        {
+          "id": "valorant.live",
+          "product": "valorant",
+          "patchline": "live"
+        }
+      ],
+      "out": [
+        "--launch-product=valorant",
+        "--launch-patchline=live"
+      ]
+    },
+    {
+      "id": "valorant-pbe",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-adapter.test.ts > Riot launch > stops watching when the signal aborts, with the client already started"
+      },
+      "args": [
+        {
+          "id": "valorant.pbe",
+          "product": "valorant",
+          "patchline": "pbe"
+        }
+      ],
+      "out": [
+        "--launch-product=valorant",
+        "--launch-patchline=pbe"
+      ]
+    },
+    {
+      "id": "league-live",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/league_of_legends.live.product_settings.yaml | the product of this settings file"
+      },
+      "args": [
+        {
+          "id": "league_of_legends.live",
+          "product": "league_of_legends",
+          "patchline": "live"
+        }
+      ],
+      "out": [
+        "--launch-product=league_of_legends",
+        "--launch-patchline=live"
+      ]
+    },
+    {
+      "id": "id-not-read",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-adapter.test.ts > Riot switch plan (dry run) > names the game’s launch arguments in the start step when a launch follows the switch | the id field disagrees with the parts"
+      },
+      "args": [
+        {
+          "id": "Riot Client",
+          "product": "bacon",
+          "patchline": "live"
+        }
+      ],
+      "out": [
+        "--launch-product=bacon",
+        "--launch-patchline=live"
+      ]
+    },
+    {
+      "id": "unvalidated-parts",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/valorant.live.product_settings.yaml | parts with a space, an equals sign and an empty patchline, which launchArgs passes through as they are"
+      },
+      "args": [
+        {
+          "id": "x",
+          "product": "a b=c",
+          "patchline": ""
+        }
+      ],
+      "out": [
+        "--launch-product=a b=c",
+        "--launch-patchline="
+      ]
+    },
+    {
+      "id": "adv-astral",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an astral character in the product goes through unchanged"
+      },
+      "args": [
+        {
+          "id": "x",
+          "product": "lion🎮",
+          "patchline": "live"
+        }
+      ],
+      "out": [
+        "--launch-product=lion🎮",
+        "--launch-patchline=live"
+      ]
+    },
+    {
+      "id": "adv-lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate in the patchline goes into the argument as it is; a Rust String cannot hold one"
+      },
+      "args": [
+        {
+          "id": "x",
+          "product": "valorant",
+          "patchline": {
+            "$utf16": [
+              108,
+              105,
+              118,
+              101,
+              55296
+            ]
+          }
+        }
+      ],
+      "out": [
+        "--launch-product=valorant",
+        {
+          "$utf16": [
+            45,
+            45,
+            108,
+            97,
+            117,
+            110,
+            99,
+            104,
+            45,
+            112,
+            97,
+            116,
+            99,
+            104,
+            108,
+            105,
+            110,
+            101,
+            61,
+            108,
+            105,
+            118,
+            101,
+            55296
+          ]
+        }
+      ]
+    }
+  ]
+}

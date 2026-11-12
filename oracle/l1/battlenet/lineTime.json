@@ -1,0 +1,238 @@
+{
+  "function": "lineTime",
+  "source": "src/main/launchers/battlenet/client-log.ts",
+  "note": "decode: none\narg0 is one log line, already split, in memory. Reads the prefix \"<level> YYYY-MM-DD HH:MM:SS.fff\"; no range check on the fields.",
+  "cases": [
+    {
+      "id": "test-line",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > parses the run: start, sign-in attempt, sign-in with the account id, main window, close, exit"
+      },
+      "args": [
+        "I 2026-09-13 03:20:55.149702 [BNLogin] {Main} x"
+      ],
+      "out": "2026-09-13T03:20:55.149Z"
+    },
+    {
+      "id": "test-no-prefix",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > parses the run: start, sign-in attempt, sign-in with the account id, main window, close, exit"
+      },
+      "args": [
+        "no prefix"
+      ],
+      "out": null
+    },
+    {
+      "id": "three-digit-fraction",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | a three-digit fraction"
+      },
+      "args": [
+        "D 2026-09-13 03:20:55.149 x"
+      ],
+      "out": "2026-09-13T03:20:55.149Z"
+    },
+    {
+      "id": "two-digit-fraction",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | a two-digit fraction"
+      },
+      "args": [
+        "D 2026-09-13 03:20:55.14 x"
+      ],
+      "out": null
+    },
+    {
+      "id": "many-spaces",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | several spaces and a tab after the level"
+      },
+      "args": [
+        "W \t  2026-09-13 03:20:55.149702 x"
+      ],
+      "out": "2026-09-13T03:20:55.149Z"
+    },
+    {
+      "id": "no-space",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | no space after the level"
+      },
+      "args": [
+        "I2026-09-13 03:20:55.149702 x"
+      ],
+      "out": null
+    },
+    {
+      "id": "two-letter-level",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | a two-letter level"
+      },
+      "args": [
+        "II 2026-09-13 03:20:55.149702 x"
+      ],
+      "out": null
+    },
+    {
+      "id": "underscore-level",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | an underscore or a digit is a \\w level"
+      },
+      "args": [
+        "_ 2026-09-13 03:20:55.149702 x"
+      ],
+      "out": "2026-09-13T03:20:55.149Z"
+    },
+    {
+      "id": "digit-level",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | a digit as the level"
+      },
+      "args": [
+        "7 2026-09-13 03:20:55.149702 x"
+      ],
+      "out": "2026-09-13T03:20:55.149Z"
+    },
+    {
+      "id": "leading-space",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | a space before the level"
+      },
+      "args": [
+        " I 2026-09-13 03:20:55.149702 x"
+      ],
+      "out": null
+    },
+    {
+      "id": "out-of-range",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | month 13, day 45, hour 99: copied as written"
+      },
+      "args": [
+        "I 2026-13-45 99:99:99.999 x"
+      ],
+      "out": "2026-13-45T99:99:99.999Z"
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | an empty line"
+      },
+      "args": [
+        ""
+      ],
+      "out": null
+    },
+    {
+      "id": "level-non-ascii",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "regex: a non-ASCII level letter: JS \\w (no u flag) is ASCII only"
+      },
+      "args": [
+        "É 2026-09-13 03:20:55.149702 x"
+      ],
+      "out": null
+    },
+    {
+      "id": "level-astral",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "regex: an astral level character is two UTF-16 units and no \\w"
+      },
+      "args": [
+        "𝐀 2026-09-13 03:20:55.149702 x"
+      ],
+      "out": null
+    },
+    {
+      "id": "space-nbsp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+00A0 after the level matches JS \\s"
+      },
+      "args": [
+        "I 2026-09-13 03:20:55.149702 x"
+      ],
+      "out": "2026-09-13T03:20:55.149Z"
+    },
+    {
+      "id": "space-feff",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+FEFF after the level matches JS \\s, not Rust \\s"
+      },
+      "args": [
+        "I﻿2026-09-13 03:20:55.149702 x"
+      ],
+      "out": "2026-09-13T03:20:55.149Z"
+    },
+    {
+      "id": "space-mongolian",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+180E after the level is no JS \\s"
+      },
+      "args": [
+        "I᠎2026-09-13 03:20:55.149702 x"
+      ],
+      "out": null
+    },
+    {
+      "id": "space-line-separator",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+2028 and U+3000 after the level match JS \\s"
+      },
+      "args": [
+        "I 　2026-09-13 03:20:55.149702 x"
+      ],
+      "out": "2026-09-13T03:20:55.149Z"
+    },
+    {
+      "id": "digits-arabic-indic",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: Arabic-Indic digits in the year: JS \\d is ASCII only"
+      },
+      "args": [
+        "I ٢٠٢٦-09-13 03:20:55.149702 x"
+      ],
+      "out": null
+    },
+    {
+      "id": "digits-fullwidth",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: full-width digits in the fraction"
+      },
+      "args": [
+        "I 2026-09-13 03:20:55.１４９ x"
+      ],
+      "out": null
+    },
+    {
+      "id": "bom-first",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a U+FEFF before the level, as the first line of a file with a BOM: \\w fails"
+      },
+      "args": [
+        "﻿I 2026-09-13 03:20:55.149702 x"
+      ],
+      "out": null
+    }
+  ]
+}

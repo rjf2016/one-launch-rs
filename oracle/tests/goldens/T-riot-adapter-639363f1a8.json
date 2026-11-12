@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-639363f1a8",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot metadata parsers"
+  ],
+  "name": "reads the top-level scalars of a product settings file",
+  "calls": []
+}

@@ -1,0 +1,30 @@
+{
+  "id": "T-riot-adapter-f12d7b6cc3",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "stops watching when the signal aborts, with the client already started",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.pbe",
+          "name": "VALORANT (PBE)"
+        },
+        {
+          "signal": {
+            "$object": "AbortSignal",
+            "value": {}
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "\"{tmp}\\Riot Games\\Riot Client\\RiotClientServices.exe\" --launch-product=valorant --launch-patchline=pbe (stopped watching for the game start)"
+      }
+    }
+  ]
+}

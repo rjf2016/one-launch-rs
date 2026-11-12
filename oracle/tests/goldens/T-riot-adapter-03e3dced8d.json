@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-03e3dced8d",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot session state"
+  ],
+  "name": "reports a signed-out client and a missing file as nobody, and a file in an unknown shape as an error",
+  "calls": []
+}

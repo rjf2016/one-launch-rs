@@ -1,0 +1,1077 @@
+{
+  "function": "launchCommand",
+  "source": "src/main/launchers/battlenet/products.ts",
+  "note": "decode: none\narg0 is a ProductCodes (only programCode and tactCode are read), arg1 the form, in memory. The result holds no path.",
+  "cases": [
+    {
+      "id": "test-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms"
+      },
+      "args": [
+        {
+          "programCode": "Pro",
+          "tactCode": "pro",
+          "name": "Overwatch",
+          "verified": true,
+          "steamAppId": "2357570"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/pro"
+      }
+    },
+    {
+      "id": "test-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms"
+      },
+      "args": [
+        {
+          "programCode": "Pro",
+          "tactCode": "pro",
+          "name": "Overwatch",
+          "verified": true,
+          "steamAppId": "2357570"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch Pro"
+      }
+    },
+    {
+      "id": "table-prometheus-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, prometheus, uri"
+      },
+      "args": [
+        {
+          "programCode": "Pro",
+          "tactCode": "pro"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/pro"
+      }
+    },
+    {
+      "id": "table-prometheus-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, prometheus, exec"
+      },
+      "args": [
+        {
+          "programCode": "Pro",
+          "tactCode": "pro"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch Pro"
+      }
+    },
+    {
+      "id": "table-hs-beta-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, hs_beta, uri"
+      },
+      "args": [
+        {
+          "programCode": "WTCG",
+          "tactCode": "hsb"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/hsb"
+      }
+    },
+    {
+      "id": "table-hs-beta-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, hs_beta, exec"
+      },
+      "args": [
+        {
+          "programCode": "WTCG",
+          "tactCode": "hsb"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch WTCG"
+      }
+    },
+    {
+      "id": "table-wow-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, wow, uri"
+      },
+      "args": [
+        {
+          "programCode": "WoW",
+          "tactCode": "wow"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/wow"
+      }
+    },
+    {
+      "id": "table-wow-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, wow, exec"
+      },
+      "args": [
+        {
+          "programCode": "WoW",
+          "tactCode": "wow"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch WoW"
+      }
+    },
+    {
+      "id": "table-wow-classic-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, wow_classic, uri"
+      },
+      "args": [
+        {
+          "programCode": "WoWC",
+          "tactCode": "wow_classic"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/wow_classic"
+      }
+    },
+    {
+      "id": "table-wow-classic-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, wow_classic, exec"
+      },
+      "args": [
+        {
+          "programCode": "WoWC",
+          "tactCode": "wow_classic"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch WoWC"
+      }
+    },
+    {
+      "id": "table-wow-classic-era-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, wow_classic_era, uri"
+      },
+      "args": [
+        {
+          "programCode": "WoWC",
+          "tactCode": "wow_classic_era"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/wow_classic_era"
+      }
+    },
+    {
+      "id": "table-wow-classic-era-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, wow_classic_era, exec"
+      },
+      "args": [
+        {
+          "programCode": "WoWC",
+          "tactCode": "wow_classic_era"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch WoWC"
+      }
+    },
+    {
+      "id": "table-diablo3-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, diablo3, uri"
+      },
+      "args": [
+        {
+          "programCode": "D3",
+          "tactCode": "d3"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/d3"
+      }
+    },
+    {
+      "id": "table-diablo3-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, diablo3, exec"
+      },
+      "args": [
+        {
+          "programCode": "D3",
+          "tactCode": "d3"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch D3"
+      }
+    },
+    {
+      "id": "table-fenris-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, fenris, uri"
+      },
+      "args": [
+        {
+          "programCode": "Fen",
+          "tactCode": "fenris"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/fenris"
+      }
+    },
+    {
+      "id": "table-fenris-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, fenris, exec"
+      },
+      "args": [
+        {
+          "programCode": "Fen",
+          "tactCode": "fenris"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch Fen"
+      }
+    },
+    {
+      "id": "table-osi-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, osi, uri"
+      },
+      "args": [
+        {
+          "programCode": "OSI",
+          "tactCode": "osi"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/osi"
+      }
+    },
+    {
+      "id": "table-osi-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, osi, exec"
+      },
+      "args": [
+        {
+          "programCode": "OSI",
+          "tactCode": "osi"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch OSI"
+      }
+    },
+    {
+      "id": "table-anbs-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, anbs, uri"
+      },
+      "args": [
+        {
+          "programCode": "ANBS",
+          "tactCode": "anbs"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/anbs"
+      }
+    },
+    {
+      "id": "table-anbs-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, anbs, exec"
+      },
+      "args": [
+        {
+          "programCode": "ANBS",
+          "tactCode": "anbs"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch ANBS"
+      }
+    },
+    {
+      "id": "table-s2-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, s2, uri"
+      },
+      "args": [
+        {
+          "programCode": "S2",
+          "tactCode": "s2"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/s2"
+      }
+    },
+    {
+      "id": "table-s2-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, s2, exec"
+      },
+      "args": [
+        {
+          "programCode": "S2",
+          "tactCode": "s2"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch S2"
+      }
+    },
+    {
+      "id": "table-s1-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, s1, uri"
+      },
+      "args": [
+        {
+          "programCode": "S1",
+          "tactCode": "s1"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/s1"
+      }
+    },
+    {
+      "id": "table-s1-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, s1, exec"
+      },
+      "args": [
+        {
+          "programCode": "S1",
+          "tactCode": "s1"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch S1"
+      }
+    },
+    {
+      "id": "table-heroes-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, heroes, uri"
+      },
+      "args": [
+        {
+          "programCode": "Hero",
+          "tactCode": "hero"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/hero"
+      }
+    },
+    {
+      "id": "table-heroes-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, heroes, exec"
+      },
+      "args": [
+        {
+          "programCode": "Hero",
+          "tactCode": "hero"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch Hero"
+      }
+    },
+    {
+      "id": "table-w3-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, w3, uri"
+      },
+      "args": [
+        {
+          "programCode": "W3",
+          "tactCode": "w3"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/w3"
+      }
+    },
+    {
+      "id": "table-w3-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, w3, exec"
+      },
+      "args": [
+        {
+          "programCode": "W3",
+          "tactCode": "w3"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch W3"
+      }
+    },
+    {
+      "id": "table-odin-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, odin, uri"
+      },
+      "args": [
+        {
+          "programCode": "ODIN",
+          "tactCode": "odin"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/odin"
+      }
+    },
+    {
+      "id": "table-odin-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, odin, exec"
+      },
+      "args": [
+        {
+          "programCode": "ODIN",
+          "tactCode": "odin"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch ODIN"
+      }
+    },
+    {
+      "id": "table-zeus-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, zeus, uri"
+      },
+      "args": [
+        {
+          "programCode": "ZEUS",
+          "tactCode": "zeus"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/zeus"
+      }
+    },
+    {
+      "id": "table-zeus-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, zeus, exec"
+      },
+      "args": [
+        {
+          "programCode": "ZEUS",
+          "tactCode": "zeus"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch ZEUS"
+      }
+    },
+    {
+      "id": "table-fore-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, fore, uri"
+      },
+      "args": [
+        {
+          "programCode": "FORE",
+          "tactCode": "fore"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/fore"
+      }
+    },
+    {
+      "id": "table-fore-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, fore, exec"
+      },
+      "args": [
+        {
+          "programCode": "FORE",
+          "tactCode": "fore"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch FORE"
+      }
+    },
+    {
+      "id": "table-lazr-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, lazr, uri"
+      },
+      "args": [
+        {
+          "programCode": "LAZR",
+          "tactCode": "lazr"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/lazr"
+      }
+    },
+    {
+      "id": "table-lazr-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, lazr, exec"
+      },
+      "args": [
+        {
+          "programCode": "LAZR",
+          "tactCode": "lazr"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch LAZR"
+      }
+    },
+    {
+      "id": "table-auks-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, auks, uri"
+      },
+      "args": [
+        {
+          "programCode": "AUKS",
+          "tactCode": "auks"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/auks"
+      }
+    },
+    {
+      "id": "table-auks-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, auks, exec"
+      },
+      "args": [
+        {
+          "programCode": "AUKS",
+          "tactCode": "auks"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch AUKS"
+      }
+    },
+    {
+      "id": "table-viper-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, viper, uri"
+      },
+      "args": [
+        {
+          "programCode": "VIPR",
+          "tactCode": "viper"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/viper"
+      }
+    },
+    {
+      "id": "table-viper-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, viper, exec"
+      },
+      "args": [
+        {
+          "programCode": "VIPR",
+          "tactCode": "viper"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch VIPR"
+      }
+    },
+    {
+      "id": "table-rtro-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, rtro, uri"
+      },
+      "args": [
+        {
+          "programCode": "RTRO",
+          "tactCode": "rtro"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/rtro"
+      }
+    },
+    {
+      "id": "table-rtro-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, rtro, exec"
+      },
+      "args": [
+        {
+          "programCode": "RTRO",
+          "tactCode": "rtro"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch RTRO"
+      }
+    },
+    {
+      "id": "table-wlby-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, wlby, uri"
+      },
+      "args": [
+        {
+          "programCode": "WLBY",
+          "tactCode": "wlby"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/wlby"
+      }
+    },
+    {
+      "id": "table-wlby-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, wlby, exec"
+      },
+      "args": [
+        {
+          "programCode": "WLBY",
+          "tactCode": "wlby"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch WLBY"
+      }
+    },
+    {
+      "id": "table-gryphon-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, gryphon, uri"
+      },
+      "args": [
+        {
+          "programCode": "GRY",
+          "tactCode": "gryphon"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/gryphon"
+      }
+    },
+    {
+      "id": "table-gryphon-exec",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | every table product, gryphon, exec"
+      },
+      "args": [
+        {
+          "programCode": "GRY",
+          "tactCode": "gryphon"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch GRY"
+      }
+    },
+    {
+      "id": "learned-codes",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | the codes productCodes builds for an unknown product"
+      },
+      "args": [
+        {
+          "programCode": "NGM",
+          "tactCode": "ngm",
+          "name": "newgame",
+          "verified": false
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch NGM"
+      }
+    },
+    {
+      "id": "form-unknown",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | any form but exec gives the URI"
+      },
+      "args": [
+        {
+          "programCode": "Pro",
+          "tactCode": "pro",
+          "name": "Overwatch",
+          "verified": true,
+          "steamAppId": "2357570"
+        },
+        "URI"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/pro"
+      }
+    },
+    {
+      "id": "form-exec-upper",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | EXEC in upper case is not exec"
+      },
+      "args": [
+        {
+          "programCode": "Pro",
+          "tactCode": "pro",
+          "name": "Overwatch",
+          "verified": true,
+          "steamAppId": "2357570"
+        },
+        "EXEC"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/pro"
+      }
+    },
+    {
+      "id": "form-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | the form left out"
+      },
+      "args": [
+        {
+          "programCode": "Pro",
+          "tactCode": "pro",
+          "name": "Overwatch",
+          "verified": true,
+          "steamAppId": "2357570"
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/pro"
+      }
+    },
+    {
+      "id": "codes-with-spaces",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | codes holding spaces, quotes and a slash are copied as they are"
+      },
+      "args": [
+        {
+          "programCode": "A \"B",
+          "tactCode": "x/y z"
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch A \"B"
+      }
+    },
+    {
+      "id": "codes-with-spaces-uri",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | the same codes in the URI form, not escaped"
+      },
+      "args": [
+        {
+          "programCode": "A \"B",
+          "tactCode": "x/y z"
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": "battlenet://game/x/y z"
+      }
+    },
+    {
+      "id": "codes-empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > products > resolves launch codes from the table and from product.db, and builds both launch forms | empty codes"
+      },
+      "args": [
+        {
+          "programCode": "",
+          "tactCode": ""
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": "--exec=launch "
+      }
+    },
+    {
+      "id": "codes-lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate in the codes is copied into the command"
+      },
+      "args": [
+        {
+          "programCode": {
+            "$utf16": [
+              80,
+              55296
+            ]
+          },
+          "tactCode": {
+            "$utf16": [
+              56320,
+              116
+            ]
+          }
+        },
+        "uri"
+      ],
+      "out": {
+        "kind": "uri",
+        "url": {
+          "$utf16": [
+            98,
+            97,
+            116,
+            116,
+            108,
+            101,
+            110,
+            101,
+            116,
+            58,
+            47,
+            47,
+            103,
+            97,
+            109,
+            101,
+            47,
+            56320,
+            116
+          ]
+        }
+      }
+    },
+    {
+      "id": "codes-lone-surrogate-exec",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate in the program code, exec form"
+      },
+      "args": [
+        {
+          "programCode": {
+            "$utf16": [
+              80,
+              55296
+            ]
+          },
+          "tactCode": {
+            "$utf16": [
+              56320,
+              116
+            ]
+          }
+        },
+        "exec"
+      ],
+      "out": {
+        "kind": "exec",
+        "arg": {
+          "$utf16": [
+            45,
+            45,
+            101,
+            120,
+            101,
+            99,
+            61,
+            108,
+            97,
+            117,
+            110,
+            99,
+            104,
+            32,
+            80,
+            55296
+          ]
+        }
+      }
+    }
+  ]
+}

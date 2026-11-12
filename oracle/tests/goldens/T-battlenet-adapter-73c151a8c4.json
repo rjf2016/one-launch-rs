@@ -1,0 +1,9 @@
+{
+  "id": "T-battlenet-adapter-73c151a8c4",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "real switches"
+  ],
+  "name": "watches only briefly for a restart when the log shows the client shutting down after the close",
+  "calls": []
+}

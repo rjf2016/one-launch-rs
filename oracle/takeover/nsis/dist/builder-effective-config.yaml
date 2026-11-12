@@ -1,0 +1,44 @@
+directories:
+  output: dist
+  buildResources: build
+appId: dev.onelaunch.app
+productName: One Launch
+executableName: OneLaunch
+copyright: Copyright © 2026 rjf2016
+files:
+  - filter:
+      - out/**
+      - package.json
+      - '!**/*.map'
+      - '!node_modules/better-sqlite3/{src,deps,build,docs}/**'
+      - '!node_modules/better-sqlite3/prebuilds/*'
+      - node_modules/better-sqlite3/prebuilds/win32-x64.node
+extraFiles:
+  - from: build/THIRD-PARTY-NOTICES.txt
+    to: THIRD-PARTY-NOTICES.txt
+asarUnpack:
+  - '**/*.node'
+npmRebuild: true
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  onlyLoadAppFromAsar: true
+  enableEmbeddedAsarIntegrityValidation: true
+win:
+  target:
+    - nsis
+  artifactName: OneLaunch-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  license: build/license.txt
+  deleteAppDataOnUninstall: false
+  include: build/installer.nsh
+publish:
+  provider: github
+  owner: rjf2016
+  repo: one-launch
+  releaseType: draft
+electronVersion: 44.7.0

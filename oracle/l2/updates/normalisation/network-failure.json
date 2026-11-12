@@ -1,0 +1,22 @@
+{
+  "condition": "network-failure",
+  "runs": 3,
+  "digests": [
+    "0060b7d27c3f67f8937d8d4fb2f7fafdf9a0c25497fe27489d2c20332e0dd464",
+    "0060b7d27c3f67f8937d8d4fb2f7fafdf9a0c25497fe27489d2c20332e0dd464",
+    "0060b7d27c3f67f8937d8d4fb2f7fafdf9a0c25497fe27489d2c20332e0dd464"
+  ],
+  "rules": [
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

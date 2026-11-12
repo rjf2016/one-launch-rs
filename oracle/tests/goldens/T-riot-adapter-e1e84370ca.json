@@ -1,0 +1,40 @@
+{
+  "id": "T-riot-adapter-e1e84370ca",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "fails with the client’s own reason when it lands on its login page",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "The Riot Client opened on its login page instead of signing in (the client refused the saved sign-in (401 invalid_grant)), so VALORANT was not started. Sign in there with “Stay signed in” ticked and press Play; One Launch saves the sign-in at the next switch."
+      }
+    },
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "The Riot Client opened on its login page instead of signing in (no saved sign-in), so VALORANT was not started. Sign in there with “Stay signed in” ticked and press Play; One Launch saves the sign-in at the next switch."
+      }
+    }
+  ]
+}

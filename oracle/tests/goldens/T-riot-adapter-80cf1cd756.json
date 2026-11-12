@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-80cf1cd756",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot health"
+  ],
+  "name": "describes the install, the products, the data folder and the log",
+  "calls": []
+}

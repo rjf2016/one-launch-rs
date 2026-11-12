@@ -1,0 +1,201 @@
+{
+  "function": "serializeBlob",
+  "source": "src/main/launchers/epic/session.ts",
+  "note": "decode: none\narg0 is an EpicSessionBlob as a plain value; the function is JSON.stringify of it, so the key order of the recorded argument is the order of the output. Every Data value is a placeholder.\nJSON.stringify escapes a lone surrogate as \\uXXXX and leaves U+2028, U+2029 and other non-ASCII characters raw; control characters below U+0020 become \\b \\f \\n \\r \\t or \\u00XX.",
+  "cases": [
+    {
+      "id": "test-fixture-blob",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic session blobs > reads the remembered session with a fingerprint and never echoes the blob in change descriptions"
+      },
+      "args": [
+        {
+          "v": 1,
+          "rememberMe": {
+            "enable": "True",
+            "data": "yBlFvOv94gZKCMyYxCc6ugG/pCCogaaN+fVoJ4QyIFqTyYv9RjP12lvPQBHh4Ix/ocSmZlmGBkZzuMP1lLuBGOhxBPucPHTOysrF2EGUrBho6IW/i7oADcJEio5v/0Wg"
+          },
+          "offline": {
+            "data": "Tigpb9uR42RQ2JyOwS4F3guqjas1wYwtcPc5WLLlXsuFJYoZaz091gUgb7IeckyTPqyCxXGZaoyb+/7kWIqyannQCZuj7HPO"
+          }
+        }
+      ],
+      "out": "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"yBlFvOv94gZKCMyYxCc6ugG/pCCogaaN+fVoJ4QyIFqTyYv9RjP12lvPQBHh4Ix/ocSmZlmGBkZzuMP1lLuBGOhxBPucPHTOysrF2EGUrBho6IW/i7oADcJEio5v/0Wg\"},\"offline\":{\"data\":\"Tigpb9uR42RQ2JyOwS4F3guqjas1wYwtcPc5WLLlXsuFJYoZaz091gUgb7IeckyTPqyCxXGZaoyb+/7kWIqyannQCZuj7HPO\"}}"
+    },
+    {
+      "id": "test-alt-blob",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-adapter.test.ts > EpicAdapter.listRememberedAccounts and sessionState > reports what the launcher remembers and whose it is, by fingerprint first and the log second | the B account blob of the top-level beforeEach"
+      },
+      "args": [
+        {
+          "v": 1,
+          "rememberMe": {
+            "enable": "True",
+            "data": "YmxvYi1mb3ItYWx0LWJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYg=="
+          },
+          "offline": {
+            "data": "b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0"
+          }
+        }
+      ],
+      "out": "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"YmxvYi1mb3ItYWx0LWJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYg==\"},\"offline\":{\"data\":\"b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0b2ZmbGluZS1mb3ItYWx0\"}}"
+    },
+    {
+      "id": "test-other-blob",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic session blobs > reads the remembered session with a fingerprint and never echoes the blob in change descriptions"
+      },
+      "args": [
+        {
+          "v": 1,
+          "rememberMe": {
+            "enable": "True",
+            "data": "QUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJD"
+          },
+          "offline": null
+        }
+      ],
+      "out": "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"QUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJDQUJD\"},\"offline\":null}"
+    },
+    {
+      "id": "placeholder-no-offline",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | a placeholder blob without offline data"
+      },
+      "args": [
+        {
+          "v": 1,
+          "rememberMe": {
+            "enable": "True",
+            "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+          },
+          "offline": null
+        }
+      ],
+      "out": "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"},\"offline\":null}"
+    },
+    {
+      "id": "placeholder-enable-false",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | a placeholder blob with Enable False"
+      },
+      "args": [
+        {
+          "v": 1,
+          "rememberMe": {
+            "enable": "False",
+            "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+          },
+          "offline": {
+            "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLW9mZmxpbmUtcHBwcHBwcHBwcHBwcHBwcHBwcHA="
+          }
+        }
+      ],
+      "out": "{\"v\":1,\"rememberMe\":{\"enable\":\"False\",\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"},\"offline\":{\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLW9mZmxpbmUtcHBwcHBwcHBwcHBwcHBwcHBwcHA=\"}}"
+    },
+    {
+      "id": "key-order-as-given",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | the same blob built offline first"
+      },
+      "args": [
+        {
+          "offline": null,
+          "rememberMe": {
+            "data": "cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=",
+            "enable": "True"
+          },
+          "v": 1
+        }
+      ],
+      "out": "{\"offline\":null,\"rememberMe\":{\"data\":\"cGxhY2Vob2xkZXItc2Vzc2lvbi1hLXBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA=\",\"enable\":\"True\"},\"v\":1}"
+    },
+    {
+      "id": "escapes",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/GameUserSettings.ini | a Data value holding quotes, backslash, slash and control characters"
+      },
+      "args": [
+        {
+          "v": 1,
+          "rememberMe": {
+            "enable": "True",
+            "data": "a\"b\\c/d\b\f\n\r\t\u0001\u001f"
+          },
+          "offline": null
+        }
+      ],
+      "out": "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"a\\\"b\\\\c/d\\b\\f\\n\\r\\t\\u0001\\u001f\"},\"offline\":null}"
+    },
+    {
+      "id": "adv-line-separators",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: U+2028 and U+2029 stay raw in JSON.stringify; serde_json also leaves them raw"
+      },
+      "args": [
+        {
+          "v": 1,
+          "rememberMe": {
+            "enable": "True",
+            "data": "a b c"
+          },
+          "offline": null
+        }
+      ],
+      "out": "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"a b c\"},\"offline\":null}"
+    },
+    {
+      "id": "adv-non-ascii",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: non-ASCII and astral characters stay raw, never \\u-escaped"
+      },
+      "args": [
+        {
+          "v": 1,
+          "rememberMe": {
+            "enable": "True",
+            "data": "é中😀"
+          },
+          "offline": null
+        }
+      ],
+      "out": "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"é中😀\"},\"offline\":null}"
+    },
+    {
+      "id": "adv-lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate is written as the escape \\ud800 (well-formed JSON.stringify); a Rust String cannot hold it"
+      },
+      "args": [
+        {
+          "v": 1,
+          "rememberMe": {
+            "enable": "True",
+            "data": {
+              "$utf16": [
+                97,
+                98,
+                55296,
+                99,
+                100
+              ]
+            }
+          },
+          "offline": null
+        }
+      ],
+      "out": "{\"v\":1,\"rememberMe\":{\"enable\":\"True\",\"data\":\"ab\\ud800cd\"},\"offline\":null}"
+    }
+  ]
+}

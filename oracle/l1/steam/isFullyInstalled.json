@@ -1,0 +1,185 @@
+{
+  "function": "isFullyInstalled",
+  "source": "src/main/launchers/steam/manifests.ts",
+  "note": "decode: none\narg0 is the StateFlags number from parseAppManifest. JS & truncates the operand to a signed 32-bit integer, so bits above 31 are ignored and fractions dropped.",
+  "cases": [
+    {
+      "id": "test-4",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-files.test.ts > parseAppManifest > treats StateFlags as a bit field"
+      },
+      "args": [
+        4
+      ],
+      "out": true
+    },
+    {
+      "id": "test-1026",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-files.test.ts > parseAppManifest > treats StateFlags as a bit field"
+      },
+      "args": [
+        1026
+      ],
+      "out": false
+    },
+    {
+      "id": "test-fixture-6",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-files.test.ts > parseAppManifest > reads the fields the library needs and nothing sensitive"
+      },
+      "args": [
+        6
+      ],
+      "out": true
+    },
+    {
+      "id": "flags-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"0\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        0
+      ],
+      "out": false
+    },
+    {
+      "id": "flags-installed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"4\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        4
+      ],
+      "out": true
+    },
+    {
+      "id": "flags-installed-update",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"6\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        6
+      ],
+      "out": true
+    },
+    {
+      "id": "flags-update-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"2\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        2
+      ],
+      "out": false
+    },
+    {
+      "id": "flags-other-bits",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"1026\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        1026
+      ],
+      "out": false
+    },
+    {
+      "id": "flags-all-bits",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"4294967295\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        4294967295
+      ],
+      "out": true
+    },
+    {
+      "id": "flags-high-bit",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"2147483648\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        2147483648
+      ],
+      "out": false
+    },
+    {
+      "id": "flags-above-32-bits",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"4294967302\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        4294967302
+      ],
+      "out": true
+    },
+    {
+      "id": "flags-negative-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"0\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        {
+          "$number": "-0"
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "flags-negative",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"-4\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        -4
+      ],
+      "out": true
+    },
+    {
+      "id": "flags-minus-one",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"-1\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        -1
+      ],
+      "out": true
+    },
+    {
+      "id": "flags-fraction",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"6.5\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        6.5
+      ],
+      "out": true
+    },
+    {
+      "id": "flags-safe-max",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"9007199254740991\" through the & operator, which works on the value as a signed 32-bit integer"
+      },
+      "args": [
+        9007199254740991
+      ],
+      "out": true
+    }
+  ]
+}

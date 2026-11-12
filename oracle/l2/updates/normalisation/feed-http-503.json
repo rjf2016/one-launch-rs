@@ -1,0 +1,46 @@
+{
+  "condition": "feed-http-503",
+  "runs": 3,
+  "digests": [
+    "4bdb7063bde2e801d01a28975c15b388b957ce89c71c6e080e36f36304cf9fab",
+    "4bdb7063bde2e801d01a28975c15b388b957ce89c71c6e080e36f36304cf9fab",
+    "4bdb7063bde2e801d01a28975c15b388b957ce89c71c6e080e36f36304cf9fab"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/log/*/text",
+      "runs": 3
+    },
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/log/*/text",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    },
+    {
+      "rule": "root",
+      "path": "/steps/*/log/*/text"
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-37d0e455fe",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.listInstalledGames"
+  ],
+  "name": "lists library games from .item manifests with normalized paths, skipping incomplete and broken ones",
+  "calls": []
+}

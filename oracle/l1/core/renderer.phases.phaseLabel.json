@@ -1,0 +1,169 @@
+{
+  "function": "phaseLabel",
+  "source": "src/renderer/src/lib/phases.ts",
+  "note": "decode: none\narg1 is PhaseNames { launcher, account, game }. An id outside PhaseId falls out of the switch and returns undefined.",
+  "cases": [
+    {
+      "id": "test-close",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > phaseLabel > names each phase for the user"
+      },
+      "args": [
+        "close",
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Close Steam"
+    },
+    {
+      "id": "test-switch",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > phaseLabel > names each phase for the user"
+      },
+      "args": [
+        "switch",
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Switch to Alt"
+    },
+    {
+      "id": "test-start",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > phaseLabel > names each phase for the user"
+      },
+      "args": [
+        "start",
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Start Steam"
+    },
+    {
+      "id": "test-signin",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > phaseLabel > names each phase for the user"
+      },
+      "args": [
+        "signin",
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Sign in"
+    },
+    {
+      "id": "test-launch",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > phaseLabel > names each phase for the user"
+      },
+      "args": [
+        "launch",
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Launch Dota 2"
+    },
+    {
+      "id": "test-launch-no-game",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > phaseLabel > names each phase for the user"
+      },
+      "args": [
+        "launch",
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": null
+        }
+      ],
+      "out": "Launch"
+    },
+    {
+      "id": "launch-empty-game",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty game name is falsy: plain Launch"
+      },
+      "args": [
+        "launch",
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": ""
+        }
+      ],
+      "out": "Launch"
+    },
+    {
+      "id": "riot-client",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a launcher name that reads mid-sentence is not capitalised here"
+      },
+      "args": [
+        "close",
+        {
+          "launcher": "the Riot Client",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Close the Riot Client"
+    },
+    {
+      "id": "astral-account",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an account name with an astral character"
+      },
+      "args": [
+        "switch",
+        {
+          "launcher": "Steam",
+          "account": "Alt 🎮",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Switch to Alt 🎮"
+    },
+    {
+      "id": "unknown-id",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an id outside PhaseId: undefined"
+      },
+      "args": [
+        "bogus",
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": {
+        "$undefined": true
+      }
+    }
+  ]
+}

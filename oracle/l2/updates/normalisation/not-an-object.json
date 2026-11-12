@@ -1,0 +1,36 @@
+{
+  "condition": "not-an-object",
+  "runs": 3,
+  "digests": [
+    "f84136f594cb3e47c79ca711cf42a6fc8f744af6742a6bbcfe9003e96fcd7345",
+    "f84136f594cb3e47c79ca711cf42a6fc8f744af6742a6bbcfe9003e96fcd7345",
+    "f84136f594cb3e47c79ca711cf42a6fc8f744af6742a6bbcfe9003e96fcd7345"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    },
+    {
+      "rule": "root",
+      "path": "/steps/*/log/*/text"
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

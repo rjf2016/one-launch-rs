@@ -1,0 +1,9 @@
+{
+  "id": "T-battlenet-adapter-a913a89b2e",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "reports the saved account names as remembered entries keyed by login",
+  "calls": []
+}

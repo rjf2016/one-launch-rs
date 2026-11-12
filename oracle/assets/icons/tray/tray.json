@@ -1,0 +1,96 @@
+{
+  "source": "build/icon.png",
+  "sourceSize": {
+    "width": 1024,
+    "height": 1024
+  },
+  "code": "src/main/tray.ts: nativeImage.createFromPath(iconPath).resize({ width: px, height: px }) with px = max(16, round(16 * scaleFactor))",
+  "electron": "44.7.0",
+  "sizes": [
+    {
+      "px": 16,
+      "firstScaleFactor": 1,
+      "file": "assets/icons/tray/tray-16.png"
+    },
+    {
+      "px": 20,
+      "firstScaleFactor": 1.25,
+      "file": "assets/icons/tray/tray-20.png"
+    },
+    {
+      "px": 24,
+      "firstScaleFactor": 1.5,
+      "file": "assets/icons/tray/tray-24.png"
+    },
+    {
+      "px": 28,
+      "firstScaleFactor": 1.75,
+      "file": "assets/icons/tray/tray-28.png"
+    },
+    {
+      "px": 32,
+      "firstScaleFactor": 2,
+      "file": "assets/icons/tray/tray-32.png"
+    },
+    {
+      "px": 36,
+      "firstScaleFactor": 2.25,
+      "file": "assets/icons/tray/tray-36.png"
+    },
+    {
+      "px": 40,
+      "firstScaleFactor": 2.5,
+      "file": "assets/icons/tray/tray-40.png"
+    },
+    {
+      "px": 44,
+      "firstScaleFactor": 2.75,
+      "file": "assets/icons/tray/tray-44.png"
+    },
+    {
+      "px": 48,
+      "firstScaleFactor": 3,
+      "file": "assets/icons/tray/tray-48.png"
+    },
+    {
+      "px": 52,
+      "firstScaleFactor": 3.25,
+      "file": "assets/icons/tray/tray-52.png"
+    },
+    {
+      "px": 56,
+      "firstScaleFactor": 3.5,
+      "file": "assets/icons/tray/tray-56.png"
+    },
+    {
+      "px": 60,
+      "firstScaleFactor": 3.75,
+      "file": "assets/icons/tray/tray-60.png"
+    },
+    {
+      "px": 64,
+      "firstScaleFactor": 4,
+      "file": "assets/icons/tray/tray-64.png"
+    },
+    {
+      "px": 68,
+      "firstScaleFactor": 4.25,
+      "file": "assets/icons/tray/tray-68.png"
+    },
+    {
+      "px": 72,
+      "firstScaleFactor": 4.5,
+      "file": "assets/icons/tray/tray-72.png"
+    },
+    {
+      "px": 76,
+      "firstScaleFactor": 4.75,
+      "file": "assets/icons/tray/tray-76.png"
+    },
+    {
+      "px": 80,
+      "firstScaleFactor": 5,
+      "file": "assets/icons/tray/tray-80.png"
+    }
+  ]
+}

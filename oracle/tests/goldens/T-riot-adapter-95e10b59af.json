@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-95e10b59af",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot detection"
+  ],
+  "name": "accepts only RiotClientServices.exe from Locate and refuses the library when not installed",
+  "calls": []
+}

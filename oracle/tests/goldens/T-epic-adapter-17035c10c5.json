@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-17035c10c5",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.listRememberedAccounts and sessionState"
+  ],
+  "name": "reports what the launcher remembers and whose it is, by fingerprint first and the log second",
+  "calls": []
+}

@@ -1,0 +1,236 @@
+{
+  "condition": "no-manifest",
+  "title": "The feed has no latest.yml (HTTP 404)",
+  "group": "behaviour",
+  "app": {
+    "version": "1.0.0-beta.3",
+    "mode": "unpackaged, fake launchers \"none\", test feed",
+    "clock": "2026-11-06T16:46:23.000Z"
+  },
+  "feed": {
+    "url": "http://127.0.0.1:{port}/",
+    "listening": true,
+    "keys": [
+      "3376dec30c48c71f"
+    ],
+    "manifest": null,
+    "installer": {
+      "path": "/OneLaunch-1.0.0-beta.4-setup.exe",
+      "bytes": 50,
+      "text": "placeholder installer bytes, not a real executable",
+      "matchesManifest": true
+    }
+  },
+  "recorded": {
+    "condition": "no-manifest",
+    "steps": [
+      {
+        "step": "start",
+        "by": "app start",
+        "actions": [
+          {
+            "invoke": "settings:set",
+            "req": {
+              "key": "logLevel",
+              "value": "debug"
+            },
+            "at": "before the first check, so that the engine lines reach the log"
+          }
+        ],
+        "states": [
+          {
+            "state": "idle"
+          }
+        ],
+        "requests": [],
+        "timers": [
+          {
+            "ev": "arm",
+            "ms": 15000
+          }
+        ],
+        "log": []
+      },
+      {
+        "step": "timer",
+        "by": "the first-check timer",
+        "states": [
+          {
+            "state": "checking"
+          },
+          {
+            "state": "failed",
+            "step": "check",
+            "message": "the latest release has no update manifest"
+          }
+        ],
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/latest.yml",
+            "query": {
+              "noCache": "<t32>"
+            },
+            "headers": {
+              "cache-control": "no-cache",
+              "user-agent": "electron-builder",
+              "x-user-staging-id": "00000000-0000-0000-0000-000000000000"
+            },
+            "transport": {
+              "accept-encoding": "gzip, deflate, br, zstd",
+              "accept-language": "en-US",
+              "connection": "keep-alive",
+              "host": "127.0.0.1:{port}",
+              "sec-fetch-dest": "empty",
+              "sec-fetch-mode": "no-cors",
+              "sec-fetch-site": "none"
+            },
+            "answer": {
+              "status": 404,
+              "bytes": 0
+            }
+          }
+        ],
+        "timers": [
+          {
+            "ev": "fire",
+            "ms": 15000
+          },
+          {
+            "ev": "arm",
+            "ms": 21600000
+          }
+        ],
+        "log": [
+          {
+            "level": "INFO",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update check",
+            "meta": {
+              "origin": "background"
+            }
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Checking for update"
+          },
+          {
+            "level": "WARN",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Error: Error: Cannot find channel \"latest.yml\" update info: HttpError: 404 Not Found\\n\"method: GET url: http://127.0.0.1:{port}/latest.yml?noCache=<t32>\\n\\nPlease double check that your authentication token is correct. Due to security reasons, actual status maybe not reported, but 404.\\n\"\\nHeaders: {\\n  \"connection\": \"keep-alive\",\\n  \"content-length\": \"0\",\\n  \"keep-alive\": \"timeout=5\"\\n}\\n    at createHttpError ({repo}\\node_modules\\builder-util-runtime\\out\\httpExecutor.js:53:12)\\n    at ElectronHttpExecutor.handleResponse ({repo}\\node_modules\\builder-util-runtime\\out\\httpExecutor.js:157:20)\\n    at ClientRequest.<anonymous> ({repo}\\node_modules\\builder-util-runtime\\out\\httpExecutor.js:122:26)\\n    at ClientRequest.emit (node:events:514:28)\\n    at SimpleURLLoaderWrapper.<anonymous> (node:electron/js2c/browser_init:1:138771)\\n    at SimpleURLLoaderWrapper.emit (node:events:514:28)\\n    at newError ({repo}\\node_modules\\builder-util-runtime\\out\\error.js:5:19)\\n    at GenericProvider.getLatestVersion ({repo}\\node_modules\\electron-updater\\out\\providers\\GenericProvider.js:27:63)\\n    at async TestFeedUpdater.getUpdateInfoAndProvider ({repo}\\node_modules\\electron-updater\\out\\AppUpdater.js:389:19)\\n    at async TestFeedUpdater.doCheckForUpdates ({repo}\\node_modules\\electron-updater\\out\\AppUpdater.js:402:24)\\n    at async Object.check (file:///{repo}/out/main/chunks/engine-CEpwLOOx.js:56:22)\\n    at async UpdateService.checkAndDownload (file:///{repo}/out/main/index.js:11589:14)"
+          },
+          {
+            "level": "WARN",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update check failed",
+            "meta": {
+              "message": "the latest release has no update manifest"
+            }
+          }
+        ]
+      },
+      {
+        "step": "manual",
+        "by": "updates:check",
+        "answer": {
+          "state": "checking"
+        },
+        "states": [
+          {
+            "state": "checking"
+          },
+          {
+            "state": "failed",
+            "step": "check",
+            "message": "the latest release has no update manifest"
+          }
+        ],
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/latest.yml",
+            "query": {
+              "noCache": "<t32>"
+            },
+            "headers": {
+              "cache-control": "no-cache",
+              "user-agent": "electron-builder",
+              "x-user-staging-id": "00000000-0000-0000-0000-000000000000"
+            },
+            "transport": {
+              "accept-encoding": "gzip, deflate, br, zstd",
+              "accept-language": "en-US",
+              "connection": "keep-alive",
+              "host": "127.0.0.1:{port}",
+              "sec-fetch-dest": "empty",
+              "sec-fetch-mode": "no-cors",
+              "sec-fetch-site": "none"
+            },
+            "answer": {
+              "status": 404,
+              "bytes": 0
+            }
+          }
+        ],
+        "timers": [],
+        "log": [
+          {
+            "level": "INFO",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update check",
+            "meta": {
+              "origin": "manual"
+            }
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Checking for update"
+          },
+          {
+            "level": "WARN",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Error: Error: Cannot find channel \"latest.yml\" update info: HttpError: 404 Not Found\\n\"method: GET url: http://127.0.0.1:{port}/latest.yml?noCache=<t32>\\n\\nPlease double check that your authentication token is correct. Due to security reasons, actual status maybe not reported, but 404.\\n\"\\nHeaders: {\\n  \"connection\": \"keep-alive\",\\n  \"content-length\": \"0\",\\n  \"keep-alive\": \"timeout=5\"\\n}\\n    at createHttpError ({repo}\\node_modules\\builder-util-runtime\\out\\httpExecutor.js:53:12)\\n    at ElectronHttpExecutor.handleResponse ({repo}\\node_modules\\builder-util-runtime\\out\\httpExecutor.js:157:20)\\n    at ClientRequest.<anonymous> ({repo}\\node_modules\\builder-util-runtime\\out\\httpExecutor.js:122:26)\\n    at ClientRequest.emit (node:events:514:28)\\n    at SimpleURLLoaderWrapper.<anonymous> (node:electron/js2c/browser_init:1:138771)\\n    at SimpleURLLoaderWrapper.emit (node:events:514:28)\\n    at newError ({repo}\\node_modules\\builder-util-runtime\\out\\error.js:5:19)\\n    at GenericProvider.getLatestVersion ({repo}\\node_modules\\electron-updater\\out\\providers\\GenericProvider.js:27:63)\\n    at async TestFeedUpdater.getUpdateInfoAndProvider ({repo}\\node_modules\\electron-updater\\out\\AppUpdater.js:389:19)\\n    at async TestFeedUpdater.doCheckForUpdates ({repo}\\node_modules\\electron-updater\\out\\AppUpdater.js:402:24)\\n    at async Object.check (file:///{repo}/out/main/chunks/engine-CEpwLOOx.js:56:22)\\n    at async UpdateService.checkAndDownload (file:///{repo}/out/main/index.js:11589:14)"
+          },
+          {
+            "level": "WARN",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update check failed",
+            "meta": {
+              "message": "the latest release has no update manifest"
+            }
+          }
+        ]
+      },
+      {
+        "step": "quit",
+        "by": "window close",
+        "exit": 0,
+        "states": [],
+        "requests": [],
+        "timers": [
+          {
+            "ev": "clear",
+            "ms": 21600000
+          }
+        ],
+        "log": []
+      }
+    ],
+    "dataFolder": {
+      "devAppUpdateYml": "provider: generic\nurl: \"http://127.0.0.1:{port}/\"\nupdaterCacheDirName: update-cache\n",
+      "updateCache": [],
+      "updateInfoJson": null,
+      "updaterIdFile": false
+    }
+  }
+}

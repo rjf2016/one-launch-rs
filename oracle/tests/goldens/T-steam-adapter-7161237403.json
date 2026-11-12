@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-7161237403",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.detectInstall"
+  ],
+  "name": "looks in the folder chosen in Settings first, and says so when Steam is no longer in it",
+  "calls": []
+}

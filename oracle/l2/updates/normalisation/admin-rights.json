@@ -1,0 +1,32 @@
+{
+  "condition": "admin-rights",
+  "runs": 3,
+  "digests": [
+    "4613eb28501d5324a36da8cf0d4f8385b521c3b4f8dc1d139bbf275b07088140",
+    "4613eb28501d5324a36da8cf0d4f8385b521c3b4f8dc1d139bbf275b07088140",
+    "4613eb28501d5324a36da8cf0d4f8385b521c3b4f8dc1d139bbf275b07088140"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

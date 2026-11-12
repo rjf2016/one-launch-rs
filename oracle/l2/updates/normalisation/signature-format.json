@@ -1,0 +1,32 @@
+{
+  "condition": "signature-format",
+  "runs": 3,
+  "digests": [
+    "50eb57c184da950dac25cbe4a9416d9468238df8842ca99b8df3cf3f362f1d94",
+    "50eb57c184da950dac25cbe4a9416d9468238df8842ca99b8df3cf3f362f1d94",
+    "50eb57c184da950dac25cbe4a9416d9468238df8842ca99b8df3cf3f362f1d94"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

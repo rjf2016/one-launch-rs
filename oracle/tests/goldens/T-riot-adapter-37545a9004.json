@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-37545a9004",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot detection"
+  ],
+  "name": "prefers the chosen folder, then the Uninstall key with its forward slashes and trailing slash",
+  "calls": []
+}

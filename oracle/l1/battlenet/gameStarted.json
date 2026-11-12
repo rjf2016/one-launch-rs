@@ -1,0 +1,413 @@
+{
+  "function": "gameStarted",
+  "source": "src/main/launchers/battlenet/product-state.ts",
+  "note": "decode: none\narg0 is the event list parseLogEvents returns, in memory; fixture and test cases are parseLogEvents of the fixture or literal, computed by the generator.\narg1 is the product codename and arg2 its program code, in memory.",
+  "cases": [
+    {
+      "id": "fixture-0919-prometheus",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > reads each product install state and the --exec game start sequence (client 2.52.12, 2026-09-19)"
+      },
+      "args": [
+        [
+          {
+            "kind": "started",
+            "build": "2.52.12.17821"
+          },
+          {
+            "kind": "product-state",
+            "codename": "hs_beta",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "UpToDate",
+            "status": "Paused",
+            "playable": true
+          },
+          {
+            "kind": "main-window"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-19T23:51:20.327Z"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          }
+        ],
+        "prometheus",
+        "Pro"
+      ],
+      "out": true
+    },
+    {
+      "id": "fixture-0919-hs-beta",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > reads each product install state and the --exec game start sequence (client 2.52.12, 2026-09-19)"
+      },
+      "args": [
+        [
+          {
+            "kind": "started",
+            "build": "2.52.12.17821"
+          },
+          {
+            "kind": "product-state",
+            "codename": "hs_beta",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "UpToDate",
+            "status": "Paused",
+            "playable": true
+          },
+          {
+            "kind": "main-window"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-19T23:51:20.327Z"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          }
+        ],
+        "hs_beta",
+        "WTCG"
+      ],
+      "out": false
+    },
+    {
+      "id": "fixture-0924-prometheus",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > takes the refreshed state over the cached one, and sees no start when the client only selects the page (2026-09-24)"
+      },
+      "args": [
+        [
+          {
+            "kind": "started",
+            "build": "2.52.12.17821"
+          },
+          {
+            "kind": "product-state",
+            "codename": "hs_beta",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "UpToDate",
+            "status": "Paused",
+            "playable": true
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "Update",
+            "status": "New",
+            "playable": false
+          },
+          {
+            "kind": "main-window"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-24T22:07:07.271Z"
+          }
+        ],
+        "prometheus",
+        "Pro"
+      ],
+      "out": false
+    },
+    {
+      "id": "fixture-0913-prometheus",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | parsed by parseLogEvents"
+      },
+      "args": [
+        [
+          {
+            "kind": "started",
+            "build": "2.52.11.17778"
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          },
+          {
+            "kind": "sign-in-attempt"
+          },
+          {
+            "kind": "sign-in-attempt"
+          },
+          {
+            "kind": "main-window"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-13T03:20:55.149Z"
+          },
+          {
+            "kind": "close-requested"
+          },
+          {
+            "kind": "exit"
+          }
+        ],
+        "prometheus",
+        "Pro"
+      ],
+      "out": false
+    },
+    {
+      "id": "test-launch-request",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > still accepts the launch request line older builds logged, matched on the program code"
+      },
+      "args": [
+        [
+          {
+            "kind": "launch-request",
+            "code": "Pro"
+          }
+        ],
+        "prometheus",
+        "Pro"
+      ],
+      "out": true
+    },
+    {
+      "id": "test-launch-request-other",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > still accepts the launch request line older builds logged, matched on the program code"
+      },
+      "args": [
+        [
+          {
+            "kind": "launch-request",
+            "code": "Pro"
+          }
+        ],
+        "hs_beta",
+        "WTCG"
+      ],
+      "out": false
+    },
+    {
+      "id": "test-regional",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > ignores the regional playable flags and a game exit"
+      },
+      "args": [
+        [
+          {
+            "kind": "product-state",
+            "codename": "wow",
+            "operation": "Repair",
+            "status": "On",
+            "playable": false
+          },
+          {
+            "kind": "game-exited",
+            "codename": "wow"
+          }
+        ],
+        "wow",
+        "WoW"
+      ],
+      "out": false
+    },
+    {
+      "id": "test-running",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > knows a game is running from the last start or exit the client logged for it, whoever started it (2026-10-10)"
+      },
+      "args": [
+        [
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          }
+        ],
+        "prometheus",
+        "Pro"
+      ],
+      "out": true
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > knows a game is running from the last start or exit the client logged for it, whoever started it (2026-10-10) | no events"
+      },
+      "args": [
+        [],
+        "prometheus",
+        "Pro"
+      ],
+      "out": false
+    },
+    {
+      "id": "launching-case-insensitive",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > knows a game is running from the last start or exit the client logged for it, whoever started it (2026-10-10) | codename in another case"
+      },
+      "args": [
+        [
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          }
+        ],
+        "PROMETHEUS",
+        "x"
+      ],
+      "out": true
+    },
+    {
+      "id": "request-case-insensitive",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > still accepts the launch request line older builds logged, matched on the program code | program code in another case"
+      },
+      "args": [
+        [
+          {
+            "kind": "launch-request",
+            "code": "Pro"
+          }
+        ],
+        "x",
+        "pRO"
+      ],
+      "out": true
+    },
+    {
+      "id": "exited-only",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > ignores the regional playable flags and a game exit | an exit is no start"
+      },
+      "args": [
+        [
+          {
+            "kind": "game-exited",
+            "codename": "wow"
+          }
+        ],
+        "wow",
+        "WoW"
+      ],
+      "out": false
+    },
+    {
+      "id": "case-kelvin",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: a codename with the Kelvin sign lower-cases to an ASCII k and matches"
+      },
+      "args": [
+        [
+          {
+            "kind": "game-running",
+            "codename": "kr"
+          }
+        ],
+        "Kr",
+        "x"
+      ],
+      "out": true
+    },
+    {
+      "id": "case-dotted-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: İ lower-cases to i + U+0307, so it does not match a plain i"
+      },
+      "args": [
+        [
+          {
+            "kind": "game-launching",
+            "codename": "i"
+          }
+        ],
+        "İ",
+        "x"
+      ],
+      "out": false
+    }
+  ]
+}

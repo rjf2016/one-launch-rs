@@ -1,0 +1,98 @@
+{
+  "id": "T-riot-adapter-ba290c085f",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot running state"
+  ],
+  "name": "treats a process list that cannot be read as no game for the status, and refuses a launch, a switch and a restore on it",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "access denied"
+      }
+    },
+    {
+      "launcher": "riot",
+      "method": "preflight",
+      "args": [
+        {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333",
+          "hasSecret": false
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "access denied"
+      }
+    },
+    {
+      "launcher": "riot",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333",
+          "hasSecret": false
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "access denied"
+      }
+    },
+    {
+      "launcher": "riot",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false,
+          "confirmClose": true
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "access denied"
+      }
+    },
+    {
+      "launcher": "riot",
+      "method": "restoreBackup",
+      "args": [
+        "any"
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "access denied"
+      }
+    }
+  ]
+}

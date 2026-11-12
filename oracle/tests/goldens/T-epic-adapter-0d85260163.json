@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-0d85260163",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.switchAccount (real)"
+  ],
+  "name": "watches only briefly for a restart when the log shows the launcher closed cleanly without announcing one",
+  "calls": []
+}

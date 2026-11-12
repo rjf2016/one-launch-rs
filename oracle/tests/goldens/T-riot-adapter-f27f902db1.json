@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-f27f902db1",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot running state"
+  ],
+  "name": "reports the client by image name and a game by its process name alone",
+  "calls": []
+}

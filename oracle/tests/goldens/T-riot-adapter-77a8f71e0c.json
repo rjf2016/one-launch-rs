@@ -1,0 +1,40 @@
+{
+  "id": "T-riot-adapter-77a8f71e0c",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "hands over, saying what happened, when the client refuses the request or takes it and starts nothing",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "\"{tmp}\\Riot Games\\Riot Client\\RiotClientServices.exe\" --launch-product=valorant --launch-patchline=live (the Riot Client opened the game's page: Auto-launch is disabled; the launch request was not taken: the Riot Client answered the launch request with HTTP 500)",
+        "handOff": "Press Play in the Riot Client window to start VALORANT; it is open on the game's page."
+      }
+    },
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "\"{tmp}\\Riot Games\\Riot Client\\RiotClientServices.exe\" --launch-product=valorant --launch-patchline=live (the Riot Client opened the game's page: Auto-launch is disabled; the Riot Client took the launch request but did not start the game within 0.04 s)",
+        "handOff": "Press Play in the Riot Client window to start VALORANT; it is open on the game's page."
+      }
+    }
+  ]
+}

@@ -1,0 +1,372 @@
+{
+  "function": "classifyReason",
+  "source": "src/main/launchers/steam/login-log.ts",
+  "note": "decode: none\narg0 is the reason text of a WaitingForCredentials line, an in-memory string (from parseLoginStates). trim() and toLowerCase() are the JS ones.",
+  "cases": [
+    {
+      "id": "test-ok",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > maps Steam's reason wording to what the user has to do"
+      },
+      "args": [
+        "OK"
+      ],
+      "out": "none"
+    },
+    {
+      "id": "test-empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > maps Steam's reason wording to what the user has to do"
+      },
+      "args": [
+        ""
+      ],
+      "out": "none"
+    },
+    {
+      "id": "test-account-logon-denied",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > maps Steam's reason wording to what the user has to do"
+      },
+      "args": [
+        "Account Logon Denied"
+      ],
+      "out": "guard-email"
+    },
+    {
+      "id": "test-account-login-denied-need-two-factor",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > maps Steam's reason wording to what the user has to do"
+      },
+      "args": [
+        "Account Login Denied Need Two Factor"
+      ],
+      "out": "guard-mobile"
+    },
+    {
+      "id": "test-two-factor-code-mismatch",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > maps Steam's reason wording to what the user has to do"
+      },
+      "args": [
+        "Two Factor Code Mismatch"
+      ],
+      "out": "guard-mobile"
+    },
+    {
+      "id": "test-invalid-password",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > maps Steam's reason wording to what the user has to do"
+      },
+      "args": [
+        "Invalid Password"
+      ],
+      "out": "password"
+    },
+    {
+      "id": "test-license-expired",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > maps Steam's reason wording to what the user has to do"
+      },
+      "args": [
+        "License expired"
+      ],
+      "out": "expired"
+    },
+    {
+      "id": "test-rate-limit-exceeded",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > maps Steam's reason wording to what the user has to do"
+      },
+      "args": [
+        "Rate Limit Exceeded"
+      ],
+      "out": "rate-limit"
+    },
+    {
+      "id": "test-service-unavailable",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > maps Steam's reason wording to what the user has to do"
+      },
+      "args": [
+        "Service Unavailable"
+      ],
+      "out": "other"
+    },
+    {
+      "id": "ok-padded",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \" ok \\u{9}\": trim then lower-case"
+      },
+      "args": [
+        " ok \t"
+      ],
+      "out": "none"
+    },
+    {
+      "id": "ok-nbsp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"\\u{a0}OK\\u{3000}\": JS trim strips NBSP and U+3000"
+      },
+      "args": [
+        " OK　"
+      ],
+      "out": "none"
+    },
+    {
+      "id": "ok-bom",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"\\u{feff}OK\": JS trim strips U+FEFF; Rust str::trim does not"
+      },
+      "args": [
+        "﻿OK"
+      ],
+      "out": "none"
+    },
+    {
+      "id": "ok-nel",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"\\u{85}OK\": JS trim keeps U+0085; Rust str::trim strips it"
+      },
+      "args": [
+        "OK"
+      ],
+      "out": "other"
+    },
+    {
+      "id": "ok-zwsp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"OK\\u{200b}\": U+200B is not whitespace to either"
+      },
+      "args": [
+        "OK​"
+      ],
+      "out": "other"
+    },
+    {
+      "id": "ok-kelvin",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: \"O\\u{212a}\": U+212A KELVIN SIGN lower-cases to k, so this is ok"
+      },
+      "args": [
+        "OK"
+      ],
+      "out": "none"
+    },
+    {
+      "id": "twofactor",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"TwoFactorRequired\": twofactor without a space"
+      },
+      "args": [
+        "TwoFactorRequired"
+      ],
+      "out": "guard-mobile"
+    },
+    {
+      "id": "mobile",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"Mobile Authenticator\": mobile"
+      },
+      "args": [
+        "Mobile Authenticator"
+      ],
+      "out": "guard-mobile"
+    },
+    {
+      "id": "email",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"Check your EMAIL\": email"
+      },
+      "args": [
+        "Check your EMAIL"
+      ],
+      "out": "guard-email"
+    },
+    {
+      "id": "login-denied",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"Login Denied\": login denied"
+      },
+      "args": [
+        "Login Denied"
+      ],
+      "out": "guard-email"
+    },
+    {
+      "id": "priority-mobile-over-email",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"Logon Denied, two factor by email\": two factor is checked before logon denied"
+      },
+      "args": [
+        "Logon Denied, two factor by email"
+      ],
+      "out": "guard-mobile"
+    },
+    {
+      "id": "priority-email-over-password",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"Logon denied: password\": logon denied is checked before password"
+      },
+      "args": [
+        "Logon denied: password"
+      ],
+      "out": "guard-email"
+    },
+    {
+      "id": "priority-password-over-expired",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"Password expired\": password is checked before expired"
+      },
+      "args": [
+        "Password expired"
+      ],
+      "out": "password"
+    },
+    {
+      "id": "priority-expired-over-rate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"Expired rate limit\": expired is checked before rate limit"
+      },
+      "args": [
+        "Expired rate limit"
+      ],
+      "out": "expired"
+    },
+    {
+      "id": "throttle",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"Throttled\": throttle"
+      },
+      "args": [
+        "Throttled"
+      ],
+      "out": "rate-limit"
+    },
+    {
+      "id": "rate-double-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"Rate  Limit\": two spaces are not rate limit"
+      },
+      "args": [
+        "Rate  Limit"
+      ],
+      "out": "other"
+    },
+    {
+      "id": "rate-nbsp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"Rate\\u{a0}Limit\": an NBSP is not the space in rate limit"
+      },
+      "args": [
+        "Rate Limit"
+      ],
+      "out": "other"
+    },
+    {
+      "id": "dotted-i-email",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: \"EMA\\u{130}L\": İ lower-cases to i plus U+0307, so EMAİL is not email"
+      },
+      "args": [
+        "EMAİL"
+      ],
+      "out": "other"
+    },
+    {
+      "id": "turkish-password",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: \"PASSWORD \\u{130}nvalid\": PASSWORD still lower-cases to password"
+      },
+      "args": [
+        "PASSWORD İnvalid"
+      ],
+      "out": "password"
+    },
+    {
+      "id": "long-s",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: \"PA\\u{17f}\\u{17f}WORD\": ſ (long s) stays ſ under toLowerCase, so this is not password"
+      },
+      "args": [
+        "PAſſWORD"
+      ],
+      "out": "other"
+    },
+    {
+      "id": "fullwidth",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: \"\\u{ff30}\\u{ff21}\\u{ff33}\\u{ff33}\\u{ff37}\\u{ff2f}\\u{ff32}\\u{ff24}\": fullwidth letters lower-case to fullwidth, not ASCII"
+      },
+      "args": [
+        "ＰＡＳＳＷＯＲＤ"
+      ],
+      "out": "other"
+    },
+    {
+      "id": "lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: \"\\u{d800} Password\": a lone surrogate passes through trim and toLowerCase"
+      },
+      "args": [
+        {
+          "$utf16": [
+            55296,
+            32,
+            80,
+            97,
+            115,
+            115,
+            119,
+            111,
+            114,
+            100
+          ]
+        }
+      ],
+      "out": "password"
+    },
+    {
+      "id": "only-spaces",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \" \\u{9}\\u{2028} \": only whitespace is empty, so none"
+      },
+      "args": [
+        " \t  "
+      ],
+      "out": "none"
+    }
+  ]
+}

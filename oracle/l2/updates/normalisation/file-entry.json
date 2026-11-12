@@ -1,0 +1,32 @@
+{
+  "condition": "file-entry",
+  "runs": 3,
+  "digests": [
+    "24a075adf28d0d1861fde687344fdc90b208f5d7299eda1298a643eb63c68b38",
+    "24a075adf28d0d1861fde687344fdc90b208f5d7299eda1298a643eb63c68b38",
+    "24a075adf28d0d1861fde687344fdc90b208f5d7299eda1298a643eb63c68b38"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

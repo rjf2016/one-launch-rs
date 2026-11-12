@@ -1,0 +1,1005 @@
+{
+  "function": "jobAnnouncement",
+  "source": "src/renderer/src/lib/phases.ts",
+  "note": "decode: none\narg0 is the job's state, steps, attention, error, account, game and optional handOff; arg1 is PhaseNames. The running phase comes from groupSteps(steps, true).",
+  "cases": [
+    {
+      "id": "test-switch-underway",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > jobAnnouncement > names the phase underway, and stays the same sentence while steps inside that phase change"
+      },
+      "args": [
+        {
+          "state": "running",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Switch to Alt…"
+    },
+    {
+      "id": "test-switch-file-running",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > jobAnnouncement > names the phase underway, and stays the same sentence while steps inside that phase change"
+      },
+      "args": [
+        {
+          "state": "running",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "done",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "running",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Switch to Alt…"
+    },
+    {
+      "id": "test-no-steps",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > jobAnnouncement > names the phase underway, and stays the same sentence while steps inside that phase change"
+      },
+      "args": [
+        {
+          "state": "running",
+          "steps": [],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Working…"
+    },
+    {
+      "id": "test-attention",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > jobAnnouncement > says when the job waits for the user, and how it ended"
+      },
+      "args": [
+        {
+          "state": "running",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": {
+            "kind": "sign-in",
+            "title": "Steam is asking you to sign in as alt",
+            "message": "",
+            "reason": null,
+            "canCopyPassword": false,
+            "until": ""
+          },
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Steam is asking you to sign in as alt"
+    },
+    {
+      "id": "test-done",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > jobAnnouncement > says when the job waits for the user, and how it ended"
+      },
+      "args": [
+        {
+          "state": "done",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Launched as Alt"
+    },
+    {
+      "id": "test-done-no-game",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > jobAnnouncement > says when the job waits for the user, and how it ended"
+      },
+      "args": [
+        {
+          "state": "done",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": null
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Switched to Alt"
+    },
+    {
+      "id": "test-failed-error",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > jobAnnouncement > says when the job waits for the user, and how it ended"
+      },
+      "args": [
+        {
+          "state": "failed",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": "Steam did not start.",
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Steam did not start."
+    },
+    {
+      "id": "test-failed-no-error",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > jobAnnouncement > says when the job waits for the user, and how it ended"
+      },
+      "args": [
+        {
+          "state": "failed",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "The switch failed."
+    },
+    {
+      "id": "gap-running",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: no step running but a phase between steps: that phase"
+      },
+      "args": [
+        {
+          "state": "running",
+          "steps": [
+            {
+              "id": "backup",
+              "status": "done",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Switch to Alt…"
+    },
+    {
+      "id": "all-pending",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: every step pending: Working…"
+      },
+      "args": [
+        {
+          "state": "running",
+          "steps": [
+            {
+              "id": "close",
+              "status": "pending",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Working…"
+    },
+    {
+      "id": "launch-phase",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the launch phase running"
+      },
+      "args": [
+        {
+          "state": "running",
+          "steps": [
+            {
+              "id": "start",
+              "status": "done",
+              "title": "start",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "running",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Launch Dota 2…"
+    },
+    {
+      "id": "launch-phase-no-game",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the launch phase running with no game name"
+      },
+      "args": [
+        {
+          "state": "running",
+          "steps": [
+            {
+              "id": "launch",
+              "status": "running",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": null
+        }
+      ],
+      "out": "Launch…"
+    },
+    {
+      "id": "done-handoff",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: done with a hand-off sentence"
+      },
+      "args": [
+        {
+          "state": "done",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          },
+          "handOff": "Press Play in the Riot Client."
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Switched to Alt. Press Play in the Riot Client."
+    },
+    {
+      "id": "done-empty-handoff",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: done with an empty hand-off: falsy, so the plain sentence"
+      },
+      "args": [
+        {
+          "state": "done",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          },
+          "handOff": ""
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Launched as Alt"
+    },
+    {
+      "id": "done-null-handoff",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: done with handOff null"
+      },
+      "args": [
+        {
+          "state": "done",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          },
+          "handOff": null
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Launched as Alt"
+    },
+    {
+      "id": "failed-empty-error",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: failed with an empty error: ?? keeps the empty string"
+      },
+      "args": [
+        {
+          "state": "failed",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": "",
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": ""
+    },
+    {
+      "id": "cancelled",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: cancelled with no error"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "The switch failed."
+    },
+    {
+      "id": "needs-sign-in-error",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: needs-sign-in with an error"
+      },
+      "args": [
+        {
+          "state": "needs-sign-in",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": null,
+          "error": "Sign in to Steam to finish.",
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Sign in to Steam to finish."
+    },
+    {
+      "id": "attention-when-done",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: attention set on a finished job is ignored"
+      },
+      "args": [
+        {
+          "state": "done",
+          "steps": [
+            {
+              "id": "close",
+              "status": "done",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "backup",
+              "status": "running",
+              "title": "backup",
+              "detail": ""
+            },
+            {
+              "id": "file",
+              "status": "pending",
+              "title": "file",
+              "detail": ""
+            },
+            {
+              "id": "launch",
+              "status": "pending",
+              "title": "launch",
+              "detail": ""
+            }
+          ],
+          "attention": {
+            "kind": "sign-in",
+            "title": "Steam is asking you to sign in as alt",
+            "message": "",
+            "reason": null,
+            "canCopyPassword": false,
+            "until": ""
+          },
+          "error": null,
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        {
+          "launcher": "Steam",
+          "account": "Alt",
+          "game": "Dota 2"
+        }
+      ],
+      "out": "Launched as Alt"
+    }
+  ]
+}

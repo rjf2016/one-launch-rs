@@ -1,0 +1,32 @@
+{
+  "condition": "key-id-format",
+  "runs": 3,
+  "digests": [
+    "90b0fb6479795125b7d61cf35c56eaad089c2960dadb402b91e39a3aeb534c80",
+    "90b0fb6479795125b7d61cf35c56eaad089c2960dadb402b91e39a3aeb534c80",
+    "90b0fb6479795125b7d61cf35c56eaad089c2960dadb402b91e39a3aeb534c80"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "T-epic-adapter-29e9aa3c32",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.switchAccount (real)"
+  ],
+  "name": "refuses to close a running launcher without confirmation, naming the running game",
+  "calls": [
+    {
+      "launcher": "epic",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:epic:alt@example.com",
+          "displayName": "Alt",
+          "login": "alt@example.com",
+          "launcherUid": "22222222222222222222222222222222",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "ConfirmationRequiredError",
+        "message": "Epic Games Launcher is running Rocket League®. Switching closes the launcher and the game; unsaved progress in the game is lost.",
+        "runningGame": {
+          "launcher": "epic",
+          "launcherGameId": "Sugar",
+          "name": "Rocket League®",
+          "source": "process"
+        },
+        "code": "CONFIRM_REQUIRED"
+      }
+    }
+  ]
+}

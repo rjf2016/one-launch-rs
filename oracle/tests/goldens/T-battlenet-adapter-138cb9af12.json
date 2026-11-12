@@ -1,0 +1,30 @@
+{
+  "id": "T-battlenet-adapter-138cb9af12",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "an abort ends the watch for the game start; the command has already been sent",
+  "calls": [
+    {
+      "launcher": "battlenet",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "prometheus",
+          "name": "Overwatch"
+        },
+        {
+          "signal": {
+            "$object": "AbortSignal",
+            "value": {}
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "battlenet://game/pro (stopped watching for the game start)"
+      }
+    }
+  ]
+}

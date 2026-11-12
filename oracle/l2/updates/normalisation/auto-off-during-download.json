@@ -1,0 +1,41 @@
+{
+  "condition": "auto-off-during-download",
+  "runs": 3,
+  "digests": [
+    "7b7420306d7828f29b5aab84793e8d0d3f081306ebec1cec625fba3d0d090d4c",
+    "7b7420306d7828f29b5aab84793e8d0d3f081306ebec1cec625fba3d0d090d4c",
+    "7b7420306d7828f29b5aab84793e8d0d3f081306ebec1cec625fba3d0d090d4c"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    },
+    {
+      "rule": "transient",
+      "path": "/steps/timer-again/states",
+      "runs": 3
+    },
+    {
+      "rule": "root",
+      "path": "/steps/*/log/*/text"
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    1,
+    1,
+    1
+  ]
+}

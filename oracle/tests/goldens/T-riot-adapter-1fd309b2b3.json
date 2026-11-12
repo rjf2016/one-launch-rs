@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-1fd309b2b3",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot health"
+  ],
+  "name": "warns about a client that has never run for this user and about a product folder that is gone",
+  "calls": []
+}

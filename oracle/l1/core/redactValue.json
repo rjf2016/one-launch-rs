@@ -1,0 +1,941 @@
+{
+  "function": "redactValue",
+  "source": "src/main/services/logger.ts",
+  "note": "decode: none\narg1 is the value to copy, arg2 the starting depth (undefined for the default 0; the third parameter, the seen set, is always the default).\nGlobal state: the logger's account-name list. call first runs forgetAccountNames() and then redactAccountNames(arg0) (arg0 is the list of names a caller would have handed over: null, undefined, short, long, duplicate and stop-list names included), so every case starts from exactly that list and nothing carries over between cases. The list's own limits (3 to 256 UTF-16 units after trim and toLowerCase, at most 2000 names, a stop list of launcher words) are redactAccountNames's, reached through this argument.\nA value that JSON cannot carry is given as a marker object { \"%make\": kind, ... } that call builds before the export runs; every other object and array is walked and rebuilt as it is. Kinds: zero-bytes (Buffer.alloc(length), for a top-level Buffer, which would otherwise need a decode entry), error (new Error(message); name set when given; stack set to the given value, or to `${name}: ${message}` when absent, so no real stack with machine paths is recorded; code and the properties of extra assigned), function (() => undefined), symbol (Symbol(description)), bigint (BigInt(value)), map (new Map(entries)), uint16 (new Uint16Array(values)), boxed-string (new String(value)), self (the built value with value[key] pointing back at itself), shared (one built value under every name in keys: the same object twice, not a cycle), throwing-getter ({ before: 'kept' } plus an enumerable getter at key that throws Error('getter failed')), to-json (the built value with a toJSON method returning returns).\ncall: (arg0, arg1, arg2) => { forgetAccountNames(); redactAccountNames(arg0); return project(redactValue(build(arg1), arg2)); }. project replaces each bigint in the result with { \"%bigint\": its decimal }; nothing else is changed. build copies plain objects with Object.fromEntries, so an own __proto__ key of arg1 stays an own key going in.\ngap: src/main/services/logger.ts:138:34 if arm (return String(value)), unreachable: every typeof other than object is handled above it.",
+  "cases": [
+    {
+      "id": "sensitive-keys-any-depth",
+      "origin": {
+        "kind": "test",
+        "ref": "test/logger.test.ts > redactValue > replaces values under sensitive keys at any depth"
+      },
+      "args": [
+        [],
+        {
+          "login": "bob",
+          "password": "hunter2",
+          "nested": {
+            "apiKey": "k",
+            "secret_enc": {
+              "$bytes": "eA=="
+            },
+            "list": [
+              {
+                "token": "t"
+              }
+            ]
+          }
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "login": "bob",
+        "password": "[REDACTED]",
+        "nested": {
+          "apiKey": "[REDACTED]",
+          "secret_enc": "[REDACTED]",
+          "list": [
+            {
+              "token": "[REDACTED]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cycle",
+      "origin": {
+        "kind": "test",
+        "ref": "test/logger.test.ts > redactValue > summarises buffers and survives cycles and errors"
+      },
+      "args": [
+        [],
+        {
+          "%make": "self",
+          "value": {
+            "a": 1
+          },
+          "key": "self"
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "a": 1,
+        "self": "[circular]"
+      }
+    },
+    {
+      "id": "buffer",
+      "origin": {
+        "kind": "test",
+        "ref": "test/logger.test.ts > redactValue > summarises buffers and survives cycles and errors"
+      },
+      "args": [
+        [],
+        {
+          "%make": "zero-bytes",
+          "length": 10
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": "<bytes 10>"
+    },
+    {
+      "id": "error",
+      "origin": {
+        "kind": "test",
+        "ref": "test/logger.test.ts > redactValue > summarises buffers and survives cycles and errors"
+      },
+      "args": [
+        [],
+        {
+          "%make": "error",
+          "message": "bad password=abc"
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "name": "Error",
+        "message": "bad password=[REDACTED]",
+        "stack": "Error: bad password=[REDACTED]"
+      }
+    },
+    {
+      "id": "every-sensitive-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "regex: every key the sensitive-key rule names, case-insensitive and anchored"
+      },
+      "args": [
+        [],
+        {
+          "pass": "v",
+          "password": "v",
+          "passwd": "v",
+          "passphrase": "v",
+          "pwd": "v",
+          "secret": "v",
+          "secret_enc": "v",
+          "token": "v",
+          "api_key": "v",
+          "api-key": "v",
+          "apikey": "v",
+          "APIKEY": "v",
+          "authorization": "v",
+          "auth": "v",
+          "cookie": "v",
+          "session": "v",
+          "session_id": "v",
+          "session-blob": "v",
+          "sessiondata": "v",
+          "refresh_token": "v",
+          "access-token": "v",
+          "credential": "v",
+          "credentials": "v",
+          "private_key": "v",
+          "remember_me": "v",
+          "value_enc": "v",
+          "data": "v",
+          "Data": "v",
+          "DATA": "v",
+          "tokens": "v",
+          "my_token": "v",
+          "password2": "v",
+          "authority": "v",
+          "metadata": "v"
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "pass": "[REDACTED]",
+        "password": "[REDACTED]",
+        "passwd": "[REDACTED]",
+        "passphrase": "[REDACTED]",
+        "pwd": "[REDACTED]",
+        "secret": "[REDACTED]",
+        "secret_enc": "[REDACTED]",
+        "token": "[REDACTED]",
+        "api_key": "[REDACTED]",
+        "api-key": "[REDACTED]",
+        "apikey": "[REDACTED]",
+        "APIKEY": "[REDACTED]",
+        "authorization": "[REDACTED]",
+        "auth": "[REDACTED]",
+        "cookie": "[REDACTED]",
+        "session": "[REDACTED]",
+        "session_id": "[REDACTED]",
+        "session-blob": "[REDACTED]",
+        "sessiondata": "[REDACTED]",
+        "refresh_token": "[REDACTED]",
+        "access-token": "[REDACTED]",
+        "credential": "[REDACTED]",
+        "credentials": "[REDACTED]",
+        "private_key": "[REDACTED]",
+        "remember_me": "[REDACTED]",
+        "value_enc": "[REDACTED]",
+        "data": "[REDACTED]",
+        "Data": "[REDACTED]",
+        "DATA": "[REDACTED]",
+        "tokens": "v",
+        "my_token": "v",
+        "password2": "v",
+        "authority": "v",
+        "metadata": "v"
+      }
+    },
+    {
+      "id": "sensitive-key-object-value",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an object under a sensitive key is replaced whole, not walked"
+      },
+      "args": [
+        [],
+        {
+          "session": {
+            "id": 1,
+            "nested": {
+              "x": 2
+            }
+          },
+          "ok": {
+            "data": [
+              1,
+              2
+            ]
+          }
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "session": "[REDACTED]",
+        "ok": {
+          "data": "[REDACTED]"
+        }
+      }
+    },
+    {
+      "id": "strings-redacted",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: strings anywhere are passed through redactString, account names included"
+      },
+      "args": [
+        [
+          "gordon_f"
+        ],
+        {
+          "msg": "gordon_f token=abc",
+          "list": [
+            "a@b.example",
+            "C:\\Users\\someone\\x"
+          ]
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "msg": "[ACCOUNT] token=[REDACTED]",
+        "list": [
+          "[EMAIL]",
+          "C:\\Users\\[USER]\\x"
+        ]
+      }
+    },
+    {
+      "id": "primitives",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: numbers, booleans, null and undefined come back as they are"
+      },
+      "args": [
+        [],
+        {
+          "n": 1.5,
+          "z": {
+            "$number": "-0"
+          },
+          "nan": {
+            "$number": "NaN"
+          },
+          "inf": {
+            "$number": "Infinity"
+          },
+          "t": true,
+          "f": false,
+          "nil": null,
+          "undef": {
+            "$undefined": true
+          }
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "n": 1.5,
+        "z": {
+          "$number": "-0"
+        },
+        "nan": {
+          "$number": "NaN"
+        },
+        "inf": {
+          "$number": "Infinity"
+        },
+        "t": true,
+        "f": false,
+        "nil": null,
+        "undef": {
+          "$undefined": true
+        }
+      }
+    },
+    {
+      "id": "top-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: null at the top"
+      },
+      "args": [
+        [],
+        null,
+        {
+          "$undefined": true
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "top-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: undefined at the top"
+      },
+      "args": [
+        [],
+        {
+          "$undefined": true
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "$undefined": true
+      }
+    },
+    {
+      "id": "top-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a string at the top"
+      },
+      "args": [
+        [],
+        "password=x",
+        {
+          "$undefined": true
+        }
+      ],
+      "out": "password=[REDACTED]"
+    },
+    {
+      "id": "function-and-symbol",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a function and a symbol become [function] and [symbol]"
+      },
+      "args": [
+        [],
+        {
+          "f": {
+            "%make": "function"
+          },
+          "s": {
+            "%make": "symbol",
+            "description": "d"
+          }
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "f": "[function]",
+        "s": "[symbol]"
+      }
+    },
+    {
+      "id": "bigint",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: a bigint is returned as it is; the record shows it as { \"%bigint\": decimal }"
+      },
+      "args": [
+        [],
+        {
+          "big": {
+            "%make": "bigint",
+            "value": "12345678901234567890"
+          }
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "big": {
+          "%bigint": "12345678901234567890"
+        }
+      }
+    },
+    {
+      "id": "error-fields",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an Error keeps name, message and stack (redacted) and a string code; a number code and other properties are dropped"
+      },
+      "args": [
+        [],
+        {
+          "a": {
+            "%make": "error",
+            "name": "TypeError",
+            "message": "failed for a@b.example",
+            "stack": "TypeError: failed\n    at C:\\Users\\someone\\x.js:1:1",
+            "code": "ENOENT",
+            "extra": {
+              "path": "p",
+              "token": "t"
+            }
+          },
+          "b": {
+            "%make": "error",
+            "message": "numeric code",
+            "code": 7
+          },
+          "c": {
+            "%make": "error",
+            "message": "no stack",
+            "stack": {
+              "$undefined": true
+            }
+          }
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "a": {
+          "name": "TypeError",
+          "message": "failed for [EMAIL]",
+          "stack": "TypeError: failed\n    at C:\\Users\\[USER]\\x.js:1:1",
+          "code": "ENOENT"
+        },
+        "b": {
+          "name": "Error",
+          "message": "numeric code",
+          "stack": "Error: numeric code"
+        },
+        "c": {
+          "name": "Error",
+          "message": "no stack",
+          "stack": {
+            "$undefined": true
+          }
+        }
+      }
+    },
+    {
+      "id": "shared-reference",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the same object under two keys: the second is reported as [circular] though there is no cycle"
+      },
+      "args": [
+        [],
+        {
+          "%make": "shared",
+          "value": {
+            "x": 1
+          },
+          "keys": [
+            "a",
+            "b"
+          ]
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "a": {
+          "x": 1
+        },
+        "b": "[circular]"
+      }
+    },
+    {
+      "id": "array-cycle",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an array that contains itself"
+      },
+      "args": [
+        [],
+        {
+          "%make": "self",
+          "value": {
+            "list": [
+              1
+            ]
+          },
+          "key": "me"
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "list": [
+          1
+        ],
+        "me": "[circular]"
+      }
+    },
+    {
+      "id": "map-and-typed-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a Map has no own entries and becomes {}; a Uint16Array is walked by index; a boxed string by character; a Date has no own entries"
+      },
+      "args": [
+        [],
+        {
+          "m": {
+            "%make": "map",
+            "entries": [
+              [
+                "k",
+                "v"
+              ]
+            ]
+          },
+          "u": {
+            "%make": "uint16",
+            "values": [
+              1,
+              2
+            ]
+          },
+          "s": {
+            "%make": "boxed-string",
+            "value": "ab"
+          },
+          "d": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          }
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "m": {},
+        "u": {
+          "0": 1,
+          "1": 2
+        },
+        "s": {
+          "0": "a",
+          "1": "b"
+        },
+        "d": {}
+      }
+    },
+    {
+      "id": "uint8-nested",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a nested Uint8Array becomes <bytes n>"
+      },
+      "args": [
+        [],
+        {
+          "b": {
+            "$bytes": "YWJj"
+          },
+          "e": {
+            "$bytes": ""
+          }
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "b": "<bytes 3>",
+        "e": "<bytes 0>"
+      }
+    },
+    {
+      "id": "cap-depth-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: objects nested 6 deep: the sixth level is still walked, its children become [depth]"
+      },
+      "args": [
+        [],
+        {
+          "a": {
+            "b": {
+              "c": {
+                "d": {
+                  "e": {
+                    "f": {
+                      "g": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "a": {
+          "b": {
+            "c": {
+              "d": {
+                "e": {
+                  "f": "[depth]"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "cap-depth-scalars",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: past the depth limit a scalar is still returned; only objects become [depth]"
+      },
+      "args": [
+        [],
+        {
+          "a": {
+            "b": {
+              "c": {
+                "d": {
+                  "e": {
+                    "f": "deep token=x",
+                    "g": [
+                      1
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "a": {
+          "b": {
+            "c": {
+              "d": {
+                "e": {
+                  "f": "deep token=[REDACTED]",
+                  "g": "[depth]"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "depth-arg-at-limit",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: called with depth 6: an object at the top is [depth] at once"
+      },
+      "args": [
+        [],
+        {
+          "a": 1
+        },
+        6
+      ],
+      "out": "[depth]"
+    },
+    {
+      "id": "depth-arg-below",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: called with depth 5: one level is walked"
+      },
+      "args": [
+        [],
+        {
+          "a": {
+            "b": 1
+          },
+          "s": "x"
+        },
+        5
+      ],
+      "out": {
+        "a": "[depth]",
+        "s": "x"
+      }
+    },
+    {
+      "id": "depth-arg-negative",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: called with depth -1: one more level than the default"
+      },
+      "args": [
+        [],
+        {
+          "a": {
+            "b": {
+              "c": {
+                "d": {
+                  "e": {
+                    "f": {
+                      "g": {
+                        "h": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        -1
+      ],
+      "out": {
+        "a": {
+          "b": {
+            "c": {
+              "d": {
+                "e": {
+                  "f": {
+                    "g": "[depth]"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "depth-arg-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: called with depth NaN: NaN >= 6 is false at every level, so nothing is ever cut"
+      },
+      "args": [
+        [],
+        {
+          "a": {
+            "b": {
+              "c": {
+                "d": {
+                  "e": {
+                    "f": {
+                      "g": {
+                        "h": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$number": "NaN"
+        }
+      ],
+      "out": {
+        "a": {
+          "b": {
+            "c": {
+              "d": {
+                "e": {
+                  "f": {
+                    "g": {
+                      "h": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "depth-arg-on-scalar",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the depth limit does not apply to a string at the top"
+      },
+      "args": [
+        [],
+        "token=x",
+        99
+      ],
+      "out": "token=[REDACTED]"
+    },
+    {
+      "id": "getter-throws",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an enumerable getter that throws makes redactValue throw"
+      },
+      "args": [
+        [],
+        {
+          "%make": "throwing-getter",
+          "key": "bad"
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "error": {
+        "name": "Error",
+        "message": "getter failed"
+      }
+    },
+    {
+      "id": "to-json-not-called",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: toJSON is an own function property: it is copied as [function], never called"
+      },
+      "args": [
+        [],
+        {
+          "%make": "to-json",
+          "value": {
+            "a": 1
+          },
+          "returns": "replaced"
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "a": 1,
+        "toJSON": "[function]"
+      }
+    },
+    {
+      "id": "proto-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: an own __proto__ key (as JSON.parse makes it) is copied with a plain assignment, which sets the prototype of the copy instead of a property, so the key is gone from the result"
+      },
+      "args": [
+        [],
+        {
+          "__proto__": {
+            "token": "x"
+          },
+          "a": 1
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "a": 1
+      }
+    },
+    {
+      "id": "integer-keys-order",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: integer-like keys come first in JS enumeration order, then insertion order"
+      },
+      "args": [
+        [],
+        {
+          "1": "one",
+          "2": "two",
+          "b": 1,
+          "a": 2
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "1": "one",
+        "2": "two",
+        "b": 1,
+        "a": 2
+      }
+    },
+    {
+      "id": "lone-surrogate-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a key and a value with lone surrogates"
+      },
+      "args": [
+        [],
+        {
+          "k\ud800": {
+            "$utf16": [
+              118,
+              56320
+            ]
+          }
+        },
+        {
+          "$undefined": true
+        }
+      ],
+      "out": {
+        "k\ud800": {
+          "$utf16": [
+            118,
+            56320
+          ]
+        }
+      }
+    }
+  ]
+}

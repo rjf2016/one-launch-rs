@@ -1,0 +1,103 @@
+{
+  "id": "T-epic-adapter-1fefc03df2",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.switchAccount (real)"
+  ],
+  "name": "ends in needs-sign-in when the manual wait runs out",
+  "calls": [
+    {
+      "launcher": "epic",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:epic:new@example.com",
+          "displayName": "New",
+          "login": "new@example.com",
+          "launcherUid": null,
+          "hasSecret": true
+        },
+        {
+          "dryRun": false
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "epic",
+        "account": {
+          "id": "@acct:epic:new@example.com",
+          "displayName": "New",
+          "login": "new@example.com",
+          "launcherUid": null
+        },
+        "strategy": "credentials",
+        "ok": false,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Epic Games Launcher",
+            "status": "skipped",
+            "detail": "Skipped: EpicGamesLauncher.exe is not running."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing session",
+            "status": "done",
+            "detail": "Main's stored session is already current."
+          },
+          {
+            "id": "backup",
+            "title": "Back up GameUserSettings.ini",
+            "status": "done",
+            "detail": "{tmp}\\backups\\epic\\<ts>"
+          },
+          {
+            "id": "file",
+            "title": "Sign the launcher out",
+            "status": "done",
+            "detail": "[RememberMe] cleared in 1 file."
+          },
+          {
+            "id": "start",
+            "title": "Start Epic Games Launcher",
+            "status": "done",
+            "detail": "Launcher started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the launcher to come up",
+            "status": "done",
+            "detail": "EpicGamesLauncher.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the launcher signed in",
+            "status": "failed",
+            "detail": "Waiting for you."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "failed",
+            "detail": "No sign-in after 0.0013333333333333333 min."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new session",
+            "status": "pending",
+            "detail": ""
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": null,
+        "cancelled": false,
+        "needsSignIn": true,
+        "error": "One Launch waited 0.0013333333333333333 min for the sign-in as new@example.com and gave up. Epic Games Launcher is still on its sign-in page: sign in there, and the session is saved at the next switch."
+      }
+    }
+  ]
+}

@@ -1,0 +1,665 @@
+{
+  "function": "dataDirFromArgv",
+  "source": "src/main/platform/paths.ts",
+  "note": "decode: none\narg0 is the process argv (configureAppPaths passes process.argv). Paths are win32 throughout (the module uses node:path win32 explicitly).\nErrors are DataDirFlagError, a subclass that sets no name of its own, so the recorded name is 'Error'; the Rust side tells it by message.",
+  "cases": [
+    {
+      "id": "no-flag",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe"
+        ]
+      ],
+      "out": null
+    },
+    {
+      "id": "flag-without-equals",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir",
+          "D:\\scratch"
+        ]
+      ],
+      "out": null
+    },
+    {
+      "id": "forward-slashes",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:/scratch/ol"
+        ]
+      ],
+      "out": "D:\\scratch\\ol"
+    },
+    {
+      "id": "same-twice",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\a",
+          "--data-dir=D:\\a"
+        ]
+      ],
+      "out": "D:\\a"
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir="
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= needs an absolute folder path, got \"\""
+      }
+    },
+    {
+      "id": "blank",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=   "
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= needs an absolute folder path, got \"\""
+      }
+    },
+    {
+      "id": "relative",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=scratch"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= needs an absolute folder path, got \"scratch\""
+      }
+    },
+    {
+      "id": "dot-relative",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=.\\scratch"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= needs an absolute folder path, got \".\\scratch\""
+      }
+    },
+    {
+      "id": "drive-only",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= needs an absolute folder path, got \"D:\""
+      }
+    },
+    {
+      "id": "drive-root",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= must name a folder, not the drive \"D:\\\""
+      }
+    },
+    {
+      "id": "unc-share-root",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=\\\\server\\share\\"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= must name a folder, not the drive \"\\\\server\\share\\\""
+      }
+    },
+    {
+      "id": "two-different",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > refuses a --data-dir= it cannot use instead of falling back to the real folder (A11)"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\a",
+          "--data-dir=D:\\b"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= was given more than once with different folders"
+      }
+    },
+    {
+      "id": "packaged-exe",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > --data-dir= moves everything, packaged or not, and wins over the environment variable (A11)"
+      },
+      "args": [
+        [
+          "C:\\Program Files\\One Launch\\OneLaunch.exe",
+          "--data-dir=D:\\scratch\\packaged"
+        ]
+      ],
+      "out": "D:\\scratch\\packaged"
+    },
+    {
+      "id": "dev-trailing-separator",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > --data-dir= moves everything, packaged or not, and wins over the environment variable (A11)"
+      },
+      "args": [
+        [
+          "electron.exe",
+          ".",
+          "--data-dir=D:\\scratch\\flag\\"
+        ]
+      ],
+      "out": "D:\\scratch\\flag"
+    },
+    {
+      "id": "dev-no-flag",
+      "origin": {
+        "kind": "test",
+        "ref": "test/paths.test.ts > app paths (B19) > --data-dir= moves everything, packaged or not, and wins over the environment variable (A11)"
+      },
+      "args": [
+        [
+          "electron.exe",
+          "."
+        ]
+      ],
+      "out": null
+    },
+    {
+      "id": "empty-argv",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty argv"
+      },
+      "args": [
+        []
+      ],
+      "out": null
+    },
+    {
+      "id": "flag-anywhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the flag is read from any position, the first included"
+      },
+      "args": [
+        [
+          "--data-dir=D:\\first",
+          "x.exe"
+        ]
+      ],
+      "out": "D:\\first"
+    },
+    {
+      "id": "flag-case",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: the prefix is case-sensitive: --DATA-DIR= is not the flag"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--DATA-DIR=D:\\a"
+        ]
+      ],
+      "out": null
+    },
+    {
+      "id": "flag-lookalike",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: --data-directory= and -data-dir= are not the flag"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-directory=D:\\a",
+          "-data-dir=D:\\b"
+        ]
+      ],
+      "out": null
+    },
+    {
+      "id": "value-trimmed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: the value is trimmed with JS trim, U+00A0 and U+FEFF included"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir= ﻿ D:\\scratch\\ol 　"
+        ]
+      ],
+      "out": "D:\\scratch\\ol"
+    },
+    {
+      "id": "value-nel-not-trimmed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: JS trim keeps U+0085, so the value is not absolute"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\scratch"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= needs an absolute folder path, got \"D:\\scratch\""
+      }
+    },
+    {
+      "id": "same-after-trim",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: two values equal after trim count as one"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\a",
+          "--data-dir= D:\\a "
+        ]
+      ],
+      "out": "D:\\a"
+    },
+    {
+      "id": "differ-by-case",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: the same folder in another case counts as two folders"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\a",
+          "--data-dir=d:\\A"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= was given more than once with different folders"
+      }
+    },
+    {
+      "id": "differ-by-trailing-separator",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the same folder with a trailing separator counts as two folders: values are compared before normalising"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\a",
+          "--data-dir=D:\\a\\"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= was given more than once with different folders"
+      }
+    },
+    {
+      "id": "three-values-one-different",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: two equal values and one different"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\a",
+          "--data-dir=D:\\a",
+          "--data-dir=D:\\c"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= was given more than once with different folders"
+      }
+    },
+    {
+      "id": "dotdot-to-root",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"..\" that climbs to the drive root is refused as the drive"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\a\\.."
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= must name a folder, not the drive \"D:\\\""
+      }
+    },
+    {
+      "id": "dotdot-resolved",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"..\" inside the path is resolved"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\a\\b\\..\\c\\.\\"
+        ]
+      ],
+      "out": "D:\\a\\c"
+    },
+    {
+      "id": "many-trailing-separators",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: several trailing separators are all dropped"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\a\\\\\\"
+        ]
+      ],
+      "out": "D:\\a"
+    },
+    {
+      "id": "forward-trailing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a trailing forward slash"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:/a/"
+        ]
+      ],
+      "out": "D:\\a"
+    },
+    {
+      "id": "unc-folder",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a folder on a UNC share is accepted"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=\\\\server\\share\\scratch"
+        ]
+      ],
+      "out": "\\\\server\\share\\scratch"
+    },
+    {
+      "id": "unc-share-no-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a UNC share without a trailing separator is its root"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=\\\\server\\share"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= must name a folder, not the drive \"\\\\server\\share\\\""
+      }
+    },
+    {
+      "id": "rooted-no-drive",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a path rooted on the current drive is absolute for win32"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=\\scratch"
+        ]
+      ],
+      "out": "\\scratch"
+    },
+    {
+      "id": "forward-rooted",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a forward-slash rooted path"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=/scratch/ol"
+        ]
+      ],
+      "out": "\\scratch\\ol"
+    },
+    {
+      "id": "bare-backslash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a lone backslash is the root"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=\\"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= must name a folder, not the drive \"\\\""
+      }
+    },
+    {
+      "id": "drive-relative",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: D:scratch is drive-relative, not absolute"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:scratch"
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= needs an absolute folder path, got \"D:scratch\""
+      }
+    },
+    {
+      "id": "long-path-prefix",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the \\\\?\\ prefix"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=\\\\?\\D:\\scratch"
+        ]
+      ],
+      "out": "\\\\?\\D:\\scratch"
+    },
+    {
+      "id": "quoted-value",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: quotes are part of the value, so it is not absolute"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=\"D:\\scratch\""
+        ]
+      ],
+      "error": {
+        "name": "Error",
+        "message": "--data-dir= needs an absolute folder path, got \"\"D:\\scratch\"\""
+      }
+    },
+    {
+      "id": "equals-in-value",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: only the first = belongs to the flag"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=D:\\a=b"
+        ]
+      ],
+      "out": "D:\\a=b"
+    },
+    {
+      "id": "non-ascii",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: non-ASCII and astral characters are kept"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=E:\\Ünï\\😀"
+        ]
+      ],
+      "out": "E:\\Ünï\\😀"
+    },
+    {
+      "id": "lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate in the folder name is kept"
+      },
+      "args": [
+        [
+          "x.exe",
+          {
+            "$utf16": [
+              45,
+              45,
+              100,
+              97,
+              116,
+              97,
+              45,
+              100,
+              105,
+              114,
+              61,
+              69,
+              58,
+              92,
+              97,
+              55296
+            ]
+          }
+        ]
+      ],
+      "out": {
+        "$utf16": [
+          69,
+          58,
+          92,
+          97,
+          55296
+        ]
+      }
+    },
+    {
+      "id": "profile-folder",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the default data folder named explicitly"
+      },
+      "args": [
+        [
+          "x.exe",
+          "--data-dir=C:\\Users\\someone\\AppData\\Roaming\\OneLaunch"
+        ]
+      ],
+      "out": "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch"
+    }
+  ]
+}

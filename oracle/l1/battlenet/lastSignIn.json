@@ -1,0 +1,412 @@
+{
+  "function": "lastSignIn",
+  "source": "src/main/launchers/battlenet/client-log.ts",
+  "note": "decode: none\narg0 is the event list parseLogEvents returns, in memory; fixture cases are parseLogEvents(fixture) computed by the generator (the same out as parseLogEvents.json).",
+  "cases": [
+    {
+      "id": "fixture-log-20260913",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | parsed by parseLogEvents"
+      },
+      "args": [
+        [
+          {
+            "kind": "started",
+            "build": "2.52.11.17778"
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          },
+          {
+            "kind": "sign-in-attempt"
+          },
+          {
+            "kind": "sign-in-attempt"
+          },
+          {
+            "kind": "main-window"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-13T03:20:55.149Z"
+          },
+          {
+            "kind": "close-requested"
+          },
+          {
+            "kind": "exit"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "0a1b2c3d",
+        "at": "2026-09-13T03:20:55.149Z"
+      }
+    },
+    {
+      "id": "fixture-log-20260919",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260919T235113.602062.log | parsed by parseLogEvents"
+      },
+      "args": [
+        [
+          {
+            "kind": "started",
+            "build": "2.52.12.17821"
+          },
+          {
+            "kind": "product-state",
+            "codename": "hs_beta",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "UpToDate",
+            "status": "Paused",
+            "playable": true
+          },
+          {
+            "kind": "main-window"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-19T23:51:20.327Z"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-launching",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          },
+          {
+            "kind": "game-running",
+            "codename": "prometheus"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "0a1b2c3d",
+        "at": "2026-09-19T23:51:20.327Z"
+      }
+    },
+    {
+      "id": "fixture-log-20260924",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260924T220659.026162.log | parsed by parseLogEvents"
+      },
+      "args": [
+        [
+          {
+            "kind": "started",
+            "build": "2.52.12.17821"
+          },
+          {
+            "kind": "product-state",
+            "codename": "hs_beta",
+            "operation": "Update",
+            "status": "New",
+            "playable": null
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "UpToDate",
+            "status": "Paused",
+            "playable": true
+          },
+          {
+            "kind": "product-state",
+            "codename": "prometheus",
+            "operation": "Update",
+            "status": "New",
+            "playable": false
+          },
+          {
+            "kind": "main-window"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-24T22:07:07.271Z"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "0a1b2c3d",
+        "at": "2026-09-24T22:07:07.271Z"
+      }
+    },
+    {
+      "id": "test-failures",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > recognises failures, logouts, and launch requests, and masks reasons"
+      },
+      "args": [
+        [
+          {
+            "kind": "sign-in-attempt"
+          },
+          {
+            "kind": "sign-in-failed",
+            "reason": "the client discarded the token at start (its login page remembers a different account)"
+          },
+          {
+            "kind": "sign-in-failed",
+            "reason": "ERROR_BAD_PASSWORD for … token …"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-13T03:21:00.000Z"
+          },
+          {
+            "kind": "launch-request",
+            "code": "Pro"
+          },
+          {
+            "kind": "signed-out"
+          },
+          {
+            "kind": "exit"
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "signed out"
+      }
+    },
+    {
+      "id": "test-first-four",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > recognises failures, logouts, and launch requests, and masks reasons | events.slice(0, 4)"
+      },
+      "args": [
+        [
+          {
+            "kind": "sign-in-attempt"
+          },
+          {
+            "kind": "sign-in-failed",
+            "reason": "the client discarded the token at start (its login page remembers a different account)"
+          },
+          {
+            "kind": "sign-in-failed",
+            "reason": "ERROR_BAD_PASSWORD for … token …"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-13T03:21:00.000Z"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "0a1b2c3d",
+        "at": "2026-09-13T03:21:00.000Z"
+      }
+    },
+    {
+      "id": "test-first-one",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > recognises failures, logouts, and launch requests, and masks reasons | events.slice(0, 1)"
+      },
+      "args": [
+        [
+          {
+            "kind": "sign-in-attempt"
+          }
+        ]
+      ],
+      "out": null
+    },
+    {
+      "id": "test-tail",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > log files > reads the end of a log that is larger than one read, so the newest sign-in decides"
+      },
+      "args": [
+        [
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-13T03:20:55.149Z"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "ffffffff",
+            "at": "2026-09-13T03:20:55.149Z"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "ffffffff",
+        "at": "2026-09-13T03:20:55.149Z"
+      }
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > recognises failures, logouts, and launch requests, and masks reasons | no events"
+      },
+      "args": [
+        []
+      ],
+      "out": null
+    },
+    {
+      "id": "failed-last",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > recognises failures, logouts, and launch requests, and masks reasons | a sign-in, then a failure"
+      },
+      "args": [
+        [
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": null
+          },
+          {
+            "kind": "sign-in-failed",
+            "reason": "bad password"
+          },
+          {
+            "kind": "exit"
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "bad password"
+      }
+    },
+    {
+      "id": "signed-in-after-out",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > recognises failures, logouts, and launch requests, and masks reasons | a sign-out, then a sign-in"
+      },
+      "args": [
+        [
+          {
+            "kind": "signed-out"
+          },
+          {
+            "kind": "signed-in",
+            "accountId": "0a1b2c3d",
+            "at": "2026-09-13T03:21:00.000Z"
+          },
+          {
+            "kind": "sign-in-attempt"
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "0a1b2c3d",
+        "at": "2026-09-13T03:21:00.000Z"
+      }
+    },
+    {
+      "id": "out-after-failure",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > recognises failures, logouts, and launch requests, and masks reasons | a failure, then a sign-out"
+      },
+      "args": [
+        [
+          {
+            "kind": "sign-in-failed",
+            "reason": "bad password"
+          },
+          {
+            "kind": "signed-out"
+          }
+        ]
+      ],
+      "out": {
+        "ok": false,
+        "reason": "signed out"
+      }
+    },
+    {
+      "id": "attempts-only",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > recognises failures, logouts, and launch requests, and masks reasons | attempts and an exit only"
+      },
+      "args": [
+        [
+          {
+            "kind": "sign-in-attempt"
+          },
+          {
+            "kind": "sign-in-attempt"
+          },
+          {
+            "kind": "exit"
+          }
+        ]
+      ],
+      "out": null
+    },
+    {
+      "id": "empty-account-id",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > recognises failures, logouts, and launch requests, and masks reasons | a sign-in whose account id did not parse"
+      },
+      "args": [
+        [
+          {
+            "kind": "signed-in",
+            "accountId": "",
+            "at": null
+          }
+        ]
+      ],
+      "out": {
+        "ok": true,
+        "accountId": "",
+        "at": null
+      }
+    }
+  ]
+}

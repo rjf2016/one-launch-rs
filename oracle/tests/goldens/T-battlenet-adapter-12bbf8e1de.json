@@ -1,0 +1,42 @@
+{
+  "id": "T-battlenet-adapter-12bbf8e1de",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "reads needsUpdate from the client log and refuses to launch a product Battle.net wants to update, before sending anything",
+  "calls": [
+    {
+      "launcher": "battlenet",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "prometheus",
+          "name": "Overwatch"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "GameNotPlayableError",
+        "message": "Overwatch needs an update before it can start. Update it in the Battle.net window, then press Play again.",
+        "code": "GAME_NOT_PLAYABLE"
+      }
+    },
+    {
+      "launcher": "battlenet",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "prometheus",
+          "name": "Overwatch"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "GameNotPlayableError",
+        "message": "Overwatch needs an update before it can start. Update it in the Battle.net window, then press Play again.",
+        "code": "GAME_NOT_PLAYABLE"
+      }
+    }
+  ]
+}

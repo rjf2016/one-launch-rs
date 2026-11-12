@@ -1,0 +1,421 @@
+{
+  "format": "Chromium os_crypt v10 as Electron safeStorage writes it on Windows: prefix, nonce, ciphertext, tag; AES-256-GCM with no associated data",
+  "encoding": "every byte string is standard base64 with padding; plaintext is the UTF-8 string",
+  "layout": {
+    "prefix": "djEw",
+    "prefixText": "v10",
+    "prefixBytes": 3,
+    "nonceBytes": 12,
+    "tagBytes": 16,
+    "overheadBytes": 31,
+    "ciphertextBytes": "equal to the UTF-8 length of the plaintext"
+  },
+  "key": {
+    "base64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+    "bytes": 32,
+    "note": "throwaway: the counting bytes 0x00 to 0x1f; no DPAPI involved, never a real key"
+  },
+  "otherKey": {
+    "base64": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+    "note": "the counting bytes 0x20 to 0x3f, used only by the wrong-key failure"
+  },
+  "nonces": "fixed: twelve counting bytes from a start byte per vector, so the file is identical on every run",
+  "valid": [
+    {
+      "name": "empty",
+      "plaintext": "",
+      "plaintextUtf8Bytes": 0,
+      "nonce": "QEFCQ0RFRkdISUpL",
+      "ciphertext": "",
+      "tag": "ybPCPr7NacTC2HvCfuNIEA==",
+      "blob": "djEwQEFCQ0RFRkdISUpLybPCPr7NacTC2HvCfuNIEA==",
+      "blobBytes": 31,
+      "electron": {
+        "decryptsToThePlaintext": true
+      }
+    },
+    {
+      "name": "ascii",
+      "plaintext": "placeholder-password-1",
+      "plaintextUtf8Bytes": 22,
+      "nonce": "UFFSU1RVVldYWVpb",
+      "ciphertext": "4ktXF4E41oo4009IvYDwppRAj48PQA==",
+      "tag": "04qXp2GQj5ev3LZkbG4/9Q==",
+      "blob": "djEwUFFSU1RVVldYWVpb4ktXF4E41oo4009IvYDwppRAj48PQNOKl6dhkI+Xr9y2ZGxuP/U=",
+      "blobBytes": 53,
+      "electron": {
+        "decryptsToThePlaintext": true
+      }
+    },
+    {
+      "name": "utf8-multibyte",
+      "plaintext": "placeholder-pässwörd-日本語-🎮",
+      "plaintextUtf8Bytes": 37,
+      "nonce": "YGFiY2RlZmdoaWpr",
+      "ciphertext": "mrf6Nt4o7AMYc4sGAk5lMFUCSj/2AB8/NARm8NAaXZafaad2Cg==",
+      "tag": "3TFTb9i04lq0/9DbA5qJbA==",
+      "blob": "djEwYGFiY2RlZmdoaWprmrf6Nt4o7AMYc4sGAk5lMFUCSj/2AB8/NARm8NAaXZafaad2Ct0xU2/YtOJatP/Q2wOaiWw=",
+      "blobBytes": 68,
+      "electron": {
+        "decryptsToThePlaintext": true
+      }
+    },
+    {
+      "name": "vault-probe",
+      "plaintext": "one-launch-vault-probe-v1",
+      "plaintextUtf8Bytes": 25,
+      "nonce": "cHFyc3R1dnd4eXp7",
+      "ciphertext": "eOnfCt+o6VonQhuksDXdo4BHt+Jm/mHMlA==",
+      "tag": "BwxL9o9otnIBlV2waT/XrA==",
+      "blob": "djEwcHFyc3R1dnd4eXp7eOnfCt+o6VonQhuksDXdo4BHt+Jm/mHMlAcMS/aPaLZyAZVdsGk/16w=",
+      "blobBytes": 56,
+      "electron": {
+        "decryptsToThePlaintext": true
+      }
+    },
+    {
+      "name": "long",
+      "plaintext": "placeholder-000-äplaceholder-001-äplaceholder-002-äplaceholder-003-äplaceholder-004-äplaceholder-005-äplaceholder-006-äplaceholder-007-äplaceholder-008-äplaceholder-009-äplaceholder-010-äplaceholder-011-äplaceholder-012-äplaceholder-013-äplaceholder-014-äplaceholder-015-äplaceholder-016-äplaceholder-017-äplaceholder-018-äplaceholder-019-äplaceholder-020-äplaceholder-021-äplaceholder-022-äplaceholder-023-äplaceholder-024-äplaceholder-025-äplaceholder-026-äplaceholder-027-äplaceholder-028-äplaceholder-029-äplaceholder-030-äplaceholder-031-äplaceholder-032-äplaceholder-033-äplaceholder-034-äplaceholder-035-äplaceholder-036-äplaceholder-037-äplaceholder-038-äplaceholder-039-äplaceholder-040-äplaceholder-041-äplaceholder-042-äplaceholder-043-äplaceholder-044-äplaceholder-045-äplaceholder-046-äplaceholder-047-äplaceholder-048-äplaceholder-049-äplaceholder-050-äplaceholder-051-äplaceholder-052-äplaceholder-053-äplaceholder-054-äplaceholder-055-äplaceholder-056-äplaceholder-057-äplaceholder-058-äplaceholder-059-äplaceholder-060-äplaceholder-061-äplaceholder-062-äplaceholder-063-äplaceholder-064-äplaceholder-065-äplaceholder-066-äplaceholder-067-äplaceholder-068-äplaceholder-069-äplaceholder-070-äplaceholder-071-äplaceholder-072-äplaceholder-073-äplaceholder-074-äplaceholder-075-äplaceholder-076-äplaceholder-077-äplaceholder-078-äplaceholder-079-äplaceholder-080-äplaceholder-081-äplaceholder-082-äplaceholder-083-äplaceholder-084-äplaceholder-085-äplaceholder-086-äplaceholder-087-äplaceholder-088-äplaceholder-089-äplaceholder-090-äplaceholder-091-äplaceholder-092-äplaceholder-093-äplaceholder-094-äplaceholder-095-äplaceholder-096-äplaceholder-097-äplaceholder-098-äplaceholder-099-äplaceholder-100-äplaceholder-101-äplaceholder-102-äplaceholder-103-äplaceholder-104-äplaceholder-105-äplaceholder-106-äplaceholder-107-äplaceholder-108-äplaceholder-109-äplaceholder-110-äplaceholder-111-äplaceholder-112-äplaceholder-113-äplaceholder-114-äplaceholder-115-äplaceholder-116-äplaceholder-117-äplaceholder-118-äplaceholder-119-äplaceholder-120-äplaceholder-121-äplaceholder-122-äplaceholder-123-äplaceholder-124-äplaceholder-125-äplaceholder-126-äplaceholder-127-ä",
+      "plaintextUtf8Bytes": 2304,
+      "nonce": "gIGCg4SFhoeIiYqL",
+      "ciphertext": "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",
+      "tag": "vphKD3qDik54UsE7SHbeAQ==",
+      "blob": "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",
+      "blobBytes": 2335,
+      "electron": {
+        "decryptsToThePlaintext": true
+      }
+    }
+  ],
+  "failures": [
+    {
+      "name": "wrong-prefix-v11",
+      "derivedFrom": "ascii",
+      "why": "the prefix is v11, not v10",
+      "key": "key",
+      "blob": "djExUFFSU1RVVldYWVpb4ktXF4E41oo4009IvYDwppRAj48PQNOKl6dhkI+Xr9y2ZGxuP/U=",
+      "blobBytes": 53,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": false,
+          "returned": null,
+          "thrown": "Error while decrypting the ciphertext provided to safeStorage.decryptString.",
+          "processExit": "0",
+          "chromiumLog": [
+            "Failed to decrypt: The data is invalid. (0xD)"
+          ]
+        },
+        "app": {
+          "outcome": "error",
+          "error": "VaultUnreadableError",
+          "code": "VAULT_UNREADABLE",
+          "message": "One Launch cannot decrypt its stored secrets: the encryption key in the app data folder (chromium\\Local State) was lost or belongs to a different Windows user. In Settings, clear the stored passwords and sign-ins, then enter them again."
+        }
+      }
+    },
+    {
+      "name": "wrong-prefix-v20",
+      "derivedFrom": "ascii",
+      "why": "the prefix is v20, not v10",
+      "key": "key",
+      "blob": "djIwUFFSU1RVVldYWVpb4ktXF4E41oo4009IvYDwppRAj48PQNOKl6dhkI+Xr9y2ZGxuP/U=",
+      "blobBytes": 53,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": false,
+          "returned": null,
+          "thrown": "Error while decrypting the ciphertext provided to safeStorage.decryptString. Ciphertext does not appear to be encrypted.",
+          "processExit": "0",
+          "chromiumLog": []
+        },
+        "app": {
+          "outcome": "error",
+          "error": "VaultUnreadableError",
+          "code": "VAULT_UNREADABLE",
+          "message": "One Launch cannot decrypt its stored secrets: the encryption key in the app data folder (chromium\\Local State) was lost or belongs to a different Windows user. In Settings, clear the stored passwords and sign-ins, then enter them again."
+        }
+      }
+    },
+    {
+      "name": "no-prefix",
+      "derivedFrom": "ascii",
+      "why": "the blob starts with the nonce; the prefix is missing",
+      "key": "key",
+      "blob": "UFFSU1RVVldYWVpb4ktXF4E41oo4009IvYDwppRAj48PQNOKl6dhkI+Xr9y2ZGxuP/U=",
+      "blobBytes": 50,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": false,
+          "returned": null,
+          "thrown": "Error while decrypting the ciphertext provided to safeStorage.decryptString. Ciphertext does not appear to be encrypted.",
+          "processExit": "0",
+          "chromiumLog": []
+        },
+        "app": {
+          "outcome": "error",
+          "error": "VaultUnreadableError",
+          "code": "VAULT_UNREADABLE",
+          "message": "One Launch cannot decrypt its stored secrets: the encryption key in the app data folder (chromium\\Local State) was lost or belongs to a different Windows user. In Settings, clear the stored passwords and sign-ins, then enter them again."
+        }
+      }
+    },
+    {
+      "name": "empty-blob",
+      "derivedFrom": null,
+      "why": "zero bytes",
+      "key": "key",
+      "blob": "",
+      "blobBytes": 0,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": true,
+          "returned": "",
+          "thrown": null,
+          "processExit": "0",
+          "chromiumLog": []
+        },
+        "app": {
+          "outcome": "no error",
+          "detail": "safeStorage.decryptString returns \"\", which the vault hands back as the plaintext"
+        }
+      }
+    },
+    {
+      "name": "prefix-only",
+      "derivedFrom": "ascii",
+      "why": "the prefix and nothing else",
+      "key": "key",
+      "blob": "djEw",
+      "blobBytes": 3,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": false,
+          "returned": null,
+          "thrown": null,
+          "processExit": "0xC0000409",
+          "chromiumLog": [
+            "out_of_range was thrown in -fno-exceptions mode with message \"basic_string\""
+          ]
+        },
+        "app": {
+          "outcome": "the main process ends",
+          "detail": "safeStorage.decryptString does not return or throw; the process exits with 0xC0000409"
+        }
+      }
+    },
+    {
+      "name": "truncated-in-nonce",
+      "derivedFrom": "ascii",
+      "why": "the blob ends inside the nonce",
+      "key": "key",
+      "blob": "djEwUFFSU1RVVg==",
+      "blobBytes": 10,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": false,
+          "returned": null,
+          "thrown": null,
+          "processExit": "0xC0000409",
+          "chromiumLog": [
+            "out_of_range was thrown in -fno-exceptions mode with message \"basic_string\""
+          ]
+        },
+        "app": {
+          "outcome": "the main process ends",
+          "detail": "safeStorage.decryptString does not return or throw; the process exits with 0xC0000409"
+        }
+      }
+    },
+    {
+      "name": "truncated-below-overhead",
+      "derivedFrom": "ascii",
+      "why": "one byte shorter than prefix, nonce and tag together",
+      "key": "key",
+      "blob": "djEwUFFSU1RVVldYWVpb4ktXF4E41oo4009IvYDw",
+      "blobBytes": 30,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": false,
+          "returned": null,
+          "thrown": "Error while decrypting the ciphertext provided to safeStorage.decryptString.",
+          "processExit": "0",
+          "chromiumLog": []
+        },
+        "app": {
+          "outcome": "error",
+          "error": "VaultUnreadableError",
+          "code": "VAULT_UNREADABLE",
+          "message": "One Launch cannot decrypt its stored secrets: the encryption key in the app data folder (chromium\\Local State) was lost or belongs to a different Windows user. In Settings, clear the stored passwords and sign-ins, then enter them again."
+        }
+      }
+    },
+    {
+      "name": "truncated-last-byte",
+      "derivedFrom": "ascii",
+      "why": "the last byte of the tag is missing",
+      "key": "key",
+      "blob": "djEwUFFSU1RVVldYWVpb4ktXF4E41oo4009IvYDwppRAj48PQNOKl6dhkI+Xr9y2ZGxuPw==",
+      "blobBytes": 52,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": false,
+          "returned": null,
+          "thrown": "Error while decrypting the ciphertext provided to safeStorage.decryptString.",
+          "processExit": "0",
+          "chromiumLog": []
+        },
+        "app": {
+          "outcome": "error",
+          "error": "VaultUnreadableError",
+          "code": "VAULT_UNREADABLE",
+          "message": "One Launch cannot decrypt its stored secrets: the encryption key in the app data folder (chromium\\Local State) was lost or belongs to a different Windows user. In Settings, clear the stored passwords and sign-ins, then enter them again."
+        }
+      }
+    },
+    {
+      "name": "flipped-tag-bit",
+      "derivedFrom": "ascii",
+      "why": "the lowest bit of the last tag byte is flipped",
+      "key": "key",
+      "blob": "djEwUFFSU1RVVldYWVpb4ktXF4E41oo4009IvYDwppRAj48PQNOKl6dhkI+Xr9y2ZGxuP/Q=",
+      "blobBytes": 53,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": false,
+          "returned": null,
+          "thrown": "Error while decrypting the ciphertext provided to safeStorage.decryptString.",
+          "processExit": "0",
+          "chromiumLog": []
+        },
+        "app": {
+          "outcome": "error",
+          "error": "VaultUnreadableError",
+          "code": "VAULT_UNREADABLE",
+          "message": "One Launch cannot decrypt its stored secrets: the encryption key in the app data folder (chromium\\Local State) was lost or belongs to a different Windows user. In Settings, clear the stored passwords and sign-ins, then enter them again."
+        }
+      }
+    },
+    {
+      "name": "flipped-ciphertext-bit",
+      "derivedFrom": "ascii",
+      "why": "the lowest bit of the first ciphertext byte is flipped",
+      "key": "key",
+      "blob": "djEwUFFSU1RVVldYWVpb40tXF4E41oo4009IvYDwppRAj48PQNOKl6dhkI+Xr9y2ZGxuP/U=",
+      "blobBytes": 53,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": false,
+          "returned": null,
+          "thrown": "Error while decrypting the ciphertext provided to safeStorage.decryptString.",
+          "processExit": "0",
+          "chromiumLog": []
+        },
+        "app": {
+          "outcome": "error",
+          "error": "VaultUnreadableError",
+          "code": "VAULT_UNREADABLE",
+          "message": "One Launch cannot decrypt its stored secrets: the encryption key in the app data folder (chromium\\Local State) was lost or belongs to a different Windows user. In Settings, clear the stored passwords and sign-ins, then enter them again."
+        }
+      }
+    },
+    {
+      "name": "flipped-nonce-bit",
+      "derivedFrom": "ascii",
+      "why": "the lowest bit of the first nonce byte is flipped",
+      "key": "key",
+      "blob": "djEwUVFSU1RVVldYWVpb4ktXF4E41oo4009IvYDwppRAj48PQNOKl6dhkI+Xr9y2ZGxuP/U=",
+      "blobBytes": 53,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": false,
+          "returned": null,
+          "thrown": "Error while decrypting the ciphertext provided to safeStorage.decryptString.",
+          "processExit": "0",
+          "chromiumLog": []
+        },
+        "app": {
+          "outcome": "error",
+          "error": "VaultUnreadableError",
+          "code": "VAULT_UNREADABLE",
+          "message": "One Launch cannot decrypt its stored secrets: the encryption key in the app data folder (chromium\\Local State) was lost or belongs to a different Windows user. In Settings, clear the stored passwords and sign-ins, then enter them again."
+        }
+      }
+    },
+    {
+      "name": "wrong-key",
+      "derivedFrom": "ascii",
+      "why": "an intact blob opened with another key (bytes 0x20 to 0x3f)",
+      "key": "otherKey",
+      "blob": "djEwUFFSU1RVVldYWVpb4ktXF4E41oo4009IvYDwppRAj48PQNOKl6dhkI+Xr9y2ZGxuP/U=",
+      "blobBytes": 53,
+      "nodeCrypto": "refuses",
+      "electron": {
+        "safeStorage": {
+          "decrypts": false,
+          "returned": null,
+          "thrown": "Error while decrypting the ciphertext provided to safeStorage.decryptString.",
+          "processExit": "0",
+          "chromiumLog": []
+        },
+        "app": {
+          "outcome": "error",
+          "error": "VaultUnreadableError",
+          "code": "VAULT_UNREADABLE",
+          "message": "One Launch cannot decrypt its stored secrets: the encryption key in the app data folder (chromium\\Local State) was lost or belongs to a different Windows user. In Settings, clear the stored passwords and sign-ins, then enter them again."
+        }
+      }
+    }
+  ],
+  "electronProbe": {
+    "how": "scripts/oracle/takeover/vault/safestorage-probe.mjs: the same vectors rebuilt under a throwaway scratch profile key with the same nonces, each failure decrypted by real safeStorage in a process of its own",
+    "appMapping": "src/main/services/vault.ts:59-66: a thrown safeStorage error becomes VaultUnreadableError; a returned string is the plaintext",
+    "written": [
+      {
+        "name": "empty",
+        "prefix": "v10",
+        "blobBytes": 31,
+        "expectedBytes": 31,
+        "opensWithTheProfileKeyByNodeCrypto": true
+      },
+      {
+        "name": "ascii",
+        "prefix": "v10",
+        "blobBytes": 53,
+        "expectedBytes": 53,
+        "opensWithTheProfileKeyByNodeCrypto": true
+      },
+      {
+        "name": "utf8-multibyte",
+        "prefix": "v10",
+        "blobBytes": 68,
+        "expectedBytes": 68,
+        "opensWithTheProfileKeyByNodeCrypto": true
+      },
+      {
+        "name": "vault-probe",
+        "prefix": "v10",
+        "blobBytes": 56,
+        "expectedBytes": 56,
+        "opensWithTheProfileKeyByNodeCrypto": true
+      },
+      {
+        "name": "long",
+        "prefix": "v10",
+        "blobBytes": 2335,
+        "expectedBytes": 2335,
+        "opensWithTheProfileKeyByNodeCrypto": true
+      }
+    ]
+  }
+}

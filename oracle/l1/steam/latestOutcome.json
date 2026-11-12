@@ -1,0 +1,184 @@
+{
+  "function": "latestOutcome",
+  "source": "src/main/launchers/steam/login-log.ts",
+  "note": "decode: none\narg0 is a list of { state, reason } as parseLoginStates returns it.",
+  "cases": [
+    {
+      "id": "sample",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > reports the last decisive state, or null while Steam is still working"
+      },
+      "args": [
+        [
+          {
+            "state": "WaitingForNetwork",
+            "reason": "OK"
+          },
+          {
+            "state": "WaitingForServerResponse",
+            "reason": "OK"
+          },
+          {
+            "state": "WaitingForCredentials",
+            "reason": "Account Logon Denied"
+          }
+        ]
+      ],
+      "out": {
+        "kind": "credentials",
+        "reason": "Account Logon Denied",
+        "cause": "guard-email"
+      }
+    },
+    {
+      "id": "sample-then-success",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > reports the last decisive state, or null while Steam is still working"
+      },
+      "args": [
+        [
+          {
+            "state": "WaitingForNetwork",
+            "reason": "OK"
+          },
+          {
+            "state": "WaitingForServerResponse",
+            "reason": "OK"
+          },
+          {
+            "state": "WaitingForCredentials",
+            "reason": "Account Logon Denied"
+          },
+          {
+            "state": "Success",
+            "reason": "OK"
+          }
+        ]
+      ],
+      "out": {
+        "kind": "success"
+      }
+    },
+    {
+      "id": "still-working",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > reports the last decisive state, or null while Steam is still working"
+      },
+      "args": [
+        [
+          {
+            "state": "WaitingForNetwork",
+            "reason": "OK"
+          }
+        ]
+      ],
+      "out": null
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > steamui_login.txt parsing > reports the last decisive state, or null while Steam is still working"
+      },
+      "args": [
+        []
+      ],
+      "out": null
+    },
+    {
+      "id": "success-then-credentials",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the last decisive event wins"
+      },
+      "args": [
+        [
+          {
+            "state": "Success",
+            "reason": "OK"
+          },
+          {
+            "state": "WaitingForCredentials",
+            "reason": "License expired"
+          },
+          {
+            "state": "WaitingForNetwork",
+            "reason": "OK"
+          }
+        ]
+      ],
+      "out": {
+        "kind": "credentials",
+        "reason": "License expired",
+        "cause": "expired"
+      }
+    },
+    {
+      "id": "credentials-ok",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: credentials with OK classify as none"
+      },
+      "args": [
+        [
+          {
+            "state": "WaitingForCredentials",
+            "reason": "OK"
+          }
+        ]
+      ],
+      "out": {
+        "kind": "credentials",
+        "reason": "OK",
+        "cause": "none"
+      }
+    },
+    {
+      "id": "state-case",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: states are compared exactly: success and SUCCESS are not decisive"
+      },
+      "args": [
+        [
+          {
+            "state": "success",
+            "reason": "OK"
+          },
+          {
+            "state": "SUCCESS",
+            "reason": "OK"
+          },
+          {
+            "state": "waitingforcredentials",
+            "reason": "x"
+          }
+        ]
+      ],
+      "out": null
+    },
+    {
+      "id": "reason-kept-raw",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: the reason is returned as it was, untrimmed; only the cause is from the trimmed form"
+      },
+      "args": [
+        [
+          {
+            "state": "WaitingForCredentials",
+            "reason": " Invalid Password "
+          }
+        ]
+      ],
+      "out": {
+        "kind": "credentials",
+        "reason": " Invalid Password ",
+        "cause": "password"
+      }
+    }
+  ]
+}

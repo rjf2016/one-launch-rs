@@ -1,0 +1,112 @@
+{
+  "id": "T-battlenet-adapter-cb40ac7cba",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "real switches"
+  ],
+  "name": "rolls back, naming the account, when an account without an id signs in as an id another account holds",
+  "calls": [
+    {
+      "launcher": "battlenet",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:battlenet:new@example.com",
+          "displayName": "New",
+          "login": "new@example.com",
+          "launcherUid": null,
+          "hasSecret": true
+        },
+        {
+          "dryRun": false,
+          "onAttention": {
+            "$function": "onAttention"
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "battlenet",
+        "account": {
+          "id": "@acct:battlenet:new@example.com",
+          "displayName": "New",
+          "login": "new@example.com",
+          "launcherUid": null
+        },
+        "strategy": "credentials",
+        "ok": false,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Battle.net",
+            "status": "skipped",
+            "detail": "Skipped: Battle.net.exe is not running."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing session",
+            "status": "done",
+            "detail": "Main's stored session is already current."
+          },
+          {
+            "id": "backup",
+            "title": "Back up Battle.net.config and the UnifiedAuth value",
+            "status": "done",
+            "detail": "{tmp}\\backups\\battlenet\\<ts>"
+          },
+          {
+            "id": "registry",
+            "title": "Sign the client out",
+            "status": "done",
+            "detail": "UnifiedAuth cleared."
+          },
+          {
+            "id": "file",
+            "title": "Put the login first in the saved-accounts list",
+            "status": "done",
+            "detail": "new@example.com is now first of 6 saved accounts."
+          },
+          {
+            "id": "start",
+            "title": "Start Battle.net",
+            "status": "done",
+            "detail": "Client started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the client to come up",
+            "status": "done",
+            "detail": "Battle.net.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the client signed in",
+            "status": "skipped",
+            "detail": "Handed over to you: the client is on its login page."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "failed",
+            "detail": "Signed in as a different account."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new session",
+            "status": "pending",
+            "detail": ""
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": true,
+        "error": "Battle.net signed in as Main (account …2c3d), which is another One Launch account, instead of New. Sign in to the client as new@example.com.",
+        "needsSignIn": false,
+        "cancelled": false
+      }
+    }
+  ]
+}

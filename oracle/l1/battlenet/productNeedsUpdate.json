@@ -1,0 +1,140 @@
+{
+  "function": "productNeedsUpdate",
+  "source": "src/main/launchers/battlenet/product-state.ts",
+  "note": "decode: none\narg0 is one ProductState from productStates, or undefined when the product has none; in memory.",
+  "cases": [
+    {
+      "id": "up-to-date",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > reads each product install state and the --exec game start sequence (client 2.52.12, 2026-09-19) | prometheus"
+      },
+      "args": [
+        {
+          "operation": "UpToDate",
+          "status": "Paused",
+          "playable": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "update",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > reads each product install state and the --exec game start sequence (client 2.52.12, 2026-09-19) | hs_beta"
+      },
+      "args": [
+        {
+          "operation": "Update",
+          "status": "New",
+          "playable": null
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > reads each product install state and the --exec game start sequence (client 2.52.12, 2026-09-19) | no state"
+      },
+      "args": [
+        {
+          "$undefined": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "repair",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > ignores the regional playable flags and a game exit"
+      },
+      "args": [
+        {
+          "operation": "Repair",
+          "status": "On",
+          "playable": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "null-operation",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > reads each product install state and the --exec game start sequence (client 2.52.12, 2026-09-19) | operation null"
+      },
+      "args": [
+        {
+          "operation": null,
+          "status": null,
+          "playable": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "upper-case",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > reads each product install state and the --exec game start sequence (client 2.52.12, 2026-09-19) | UPDATE in upper case"
+      },
+      "args": [
+        {
+          "operation": "UPDATE",
+          "status": null,
+          "playable": null
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "updating",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-product-state.test.ts > Battle.net product state and game start, from the client log > reads each product install state and the --exec game start sequence (client 2.52.12, 2026-09-19) | a longer word"
+      },
+      "args": [
+        {
+          "operation": "Updating",
+          "status": null,
+          "playable": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dotted-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: a trailing dotted capital I lower-cases to i + U+0307, two units, so the word is no longer update"
+      },
+      "args": [
+        {
+          "operation": "UPDATEİ",
+          "status": null,
+          "playable": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "fullwidth-u",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: a fullwidth Ｕ does not lower-case to an ASCII u"
+      },
+      "args": [
+        {
+          "operation": "Ｕpdate",
+          "status": null,
+          "playable": null
+        }
+      ],
+      "out": false
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "id": "T-steam-adapter-3b2d2f52cd",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.switchAccount (real, remembered path)"
+  ],
+  "name": "an abort while Steam is closing stops at once with nothing changed",
+  "calls": [
+    {
+      "launcher": "steam",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "acct-1",
+          "displayName": "Third",
+          "login": "user_3",
+          "launcherUid": "76561198000000003",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false,
+          "confirmClose": true,
+          "signal": {
+            "$object": "AbortSignal",
+            "value": {}
+          },
+          "onProgress": {
+            "$function": "onProgress"
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "steam",
+        "account": {
+          "id": "acct-1",
+          "displayName": "Third",
+          "login": "user_3",
+          "launcherUid": "76561198000000003"
+        },
+        "strategy": "remembered",
+        "ok": false,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Steam",
+            "status": "failed",
+            "detail": "Stopped."
+          },
+          {
+            "id": "backup",
+            "title": "Back up Steam files",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "title": "Mark the account as most recent",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "registry-user",
+            "title": "Point Steam at the account",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "registry-remember",
+            "title": "Keep the session remembered",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "start",
+            "title": "Start Steam",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "wait",
+            "title": "Wait for Steam to come up",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "verify",
+            "title": "Confirm Steam signed in",
+            "status": "pending",
+            "detail": ""
+          },
+          {
+            "id": "login",
+            "title": "Fallback: sign in with the stored password",
+            "status": "skipped",
+            "detail": "Not available: no password is stored for this account. If Steam asks for credentials, One Launch waits for you to sign in by hand (next step)."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "skipped",
+            "detail": "Runs only if Steam still asks for something One Launch cannot supply: a Steam Guard code for a PC this account has not used before, an expired session with no stored password, or a session Steam simply refuses. The Steam window stays open on its sign-in form; you sign in there once with \"Remember me\" ticked and One Launch continues with the game as soon as Steam reports the sign-in, up to 0.0006666666666666666 min. A wrong stored password ends the switch instead."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": null,
+        "restored": null,
+        "error": "Stopped before Steam was started as user_3. Nothing had been changed.",
+        "needsSignIn": false,
+        "cancelled": true
+      }
+    }
+  ]
+}

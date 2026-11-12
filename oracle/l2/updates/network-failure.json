@@ -1,0 +1,177 @@
+{
+  "condition": "network-failure",
+  "title": "Nothing listens on the feed port: the connection is refused",
+  "group": "core",
+  "app": {
+    "version": "1.0.0-beta.3",
+    "mode": "unpackaged, fake launchers \"none\", test feed",
+    "clock": "2026-11-06T16:46:23.000Z"
+  },
+  "feed": {
+    "url": "http://127.0.0.1:{port}/",
+    "listening": false,
+    "keys": [
+      "3376dec30c48c71f"
+    ]
+  },
+  "recorded": {
+    "condition": "network-failure",
+    "steps": [
+      {
+        "step": "start",
+        "by": "app start",
+        "actions": [
+          {
+            "invoke": "settings:set",
+            "req": {
+              "key": "logLevel",
+              "value": "debug"
+            },
+            "at": "before the first check, so that the engine lines reach the log"
+          }
+        ],
+        "states": [
+          {
+            "state": "idle"
+          }
+        ],
+        "requests": [],
+        "timers": [
+          {
+            "ev": "arm",
+            "ms": 15000
+          }
+        ],
+        "log": []
+      },
+      {
+        "step": "timer",
+        "by": "the first-check timer",
+        "states": [
+          {
+            "state": "checking"
+          },
+          {
+            "state": "failed",
+            "step": "check",
+            "message": "the update server could not be reached"
+          }
+        ],
+        "requests": [],
+        "timers": [
+          {
+            "ev": "fire",
+            "ms": 15000
+          },
+          {
+            "ev": "arm",
+            "ms": 21600000
+          }
+        ],
+        "log": [
+          {
+            "level": "INFO",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update check",
+            "meta": {
+              "origin": "background"
+            }
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Checking for update"
+          },
+          {
+            "level": "WARN",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Error: Error: net::ERR_CONNECTION_REFUSED\\n    at SimpleURLLoaderWrapper.<anonymous> (node:electron/js2c/browser_init:1:139023)\\n    at SimpleURLLoaderWrapper.emit (node:events:514:28)"
+          },
+          {
+            "level": "WARN",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update check failed",
+            "meta": {
+              "message": "the update server could not be reached"
+            }
+          }
+        ]
+      },
+      {
+        "step": "manual",
+        "by": "updates:check",
+        "answer": {
+          "state": "checking"
+        },
+        "states": [
+          {
+            "state": "checking"
+          },
+          {
+            "state": "failed",
+            "step": "check",
+            "message": "the update server could not be reached"
+          }
+        ],
+        "requests": [],
+        "timers": [],
+        "log": [
+          {
+            "level": "INFO",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update check",
+            "meta": {
+              "origin": "manual"
+            }
+          },
+          {
+            "level": "DEBUG",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Checking for update"
+          },
+          {
+            "level": "WARN",
+            "scope": "main:updater",
+            "exact": false,
+            "text": "Error: Error: net::ERR_CONNECTION_REFUSED\\n    at SimpleURLLoaderWrapper.<anonymous> (node:electron/js2c/browser_init:1:139023)\\n    at SimpleURLLoaderWrapper.emit (node:events:514:28)"
+          },
+          {
+            "level": "WARN",
+            "scope": "main:updates",
+            "exact": true,
+            "message": "update check failed",
+            "meta": {
+              "message": "the update server could not be reached"
+            }
+          }
+        ]
+      },
+      {
+        "step": "quit",
+        "by": "window close",
+        "exit": 0,
+        "states": [],
+        "requests": [],
+        "timers": [
+          {
+            "ev": "clear",
+            "ms": 21600000
+          }
+        ],
+        "log": []
+      }
+    ],
+    "dataFolder": {
+      "devAppUpdateYml": "provider: generic\nurl: \"http://127.0.0.1:{port}/\"\nupdaterCacheDirName: update-cache\n",
+      "updateCache": [],
+      "updateInfoJson": null,
+      "updaterIdFile": false
+    }
+  }
+}

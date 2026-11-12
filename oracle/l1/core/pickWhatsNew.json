@@ -1,0 +1,1744 @@
+{
+  "function": "pickWhatsNew",
+  "source": "src/shared/whats-new.ts",
+  "note": "decode: none\narg0 is the release list (src/shared/whats-new-releases.ts WHATS_NEW in the app; small lists here, and the real table in the app-table-* cases), arg1 the running version (app.getVersion(), package.json's version), arg2 the whatsNew.lastSeen setting or null. The result is the release object itself, or null.\nThe app-table-* cases carry the pinned WHATS_NEW table and package.json's version as plain values.\nThe one length limit is MAX_VERSION_LENGTH, 64 UTF-16 units, applied to arg1, arg2 and each release version (cap-*).",
+  "cases": [
+    {
+      "id": "beta5-seen3",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > returns the newest unseen entry at or below the running version"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.5",
+        "1.0.0-beta.3"
+      ],
+      "out": {
+        "version": "1.0.0-beta.5",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "beta6-seen3",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > returns the newest unseen entry at or below the running version"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.6",
+        "1.0.0-beta.3"
+      ],
+      "out": {
+        "version": "1.0.0-beta.5",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "beta4-seen3",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > returns the newest unseen entry at or below the running version"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.4",
+        "1.0.0-beta.3"
+      ],
+      "out": null
+    },
+    {
+      "id": "beta5-seen5",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > returns the newest unseen entry at or below the running version"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.5",
+        "1.0.0-beta.5"
+      ],
+      "out": null
+    },
+    {
+      "id": "beta3-seen5",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > returns the newest unseen entry at or below the running version"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.3",
+        "1.0.0-beta.5"
+      ],
+      "out": null
+    },
+    {
+      "id": "beta5-seen-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > treats nothing seen, or something that is not a version, as older than every entry"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.5",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-beta.5",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "beta2-seen-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > treats nothing seen, or something that is not a version, as older than every entry"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.2",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-beta.1",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "beta3-seen-garbage",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > treats nothing seen, or something that is not a version, as older than every entry"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.3",
+        "garbage"
+      ],
+      "out": {
+        "version": "1.0.0-beta.3",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "current-not-a-version",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > treats nothing seen, or something that is not a version, as older than every entry"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "not a version",
+        null
+      ],
+      "out": null
+    },
+    {
+      "id": "no-releases",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > treats nothing seen, or something that is not a version, as older than every entry"
+      },
+      "args": [
+        [],
+        "1.0.0-beta.5",
+        null
+      ],
+      "out": null
+    },
+    {
+      "id": "latest-beta5",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > latestWhatsNew ignores what was seen"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.5",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-beta.5",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "latest-beta4",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > latestWhatsNew ignores what was seen"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.4",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-beta.3",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "latest-beta0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/whats-new.test.ts > pickWhatsNew > latestWhatsNew ignores what was seen"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.0",
+        null
+      ],
+      "out": null
+    },
+    {
+      "id": "app-table-fresh",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the app's own WHATS_NEW table at package.json's version, nothing seen"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-15",
+            "image": {
+              "file": "beta-3.png",
+              "alt": "The setup guide on a new install"
+            },
+            "sections": [
+              {
+                "heading": "New Features",
+                "tone": "success",
+                "items": [
+                  {
+                    "lead": "One Launch now tells you what changed.",
+                    "detail": "After an update, this card shows up to inform you of any new quirks or features."
+                  }
+                ]
+              },
+              {
+                "heading": "Improved",
+                "tone": "warning",
+                "items": [
+                  {
+                    "lead": "A clearer welcome for new installs.",
+                    "detail": "The setup guide opens with the same tagline as the rest of the app and gets to the point faster."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.3",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-beta.3",
+        "date": "2026-10-15",
+        "image": {
+          "file": "beta-3.png",
+          "alt": "The setup guide on a new install"
+        },
+        "sections": [
+          {
+            "heading": "New Features",
+            "tone": "success",
+            "items": [
+              {
+                "lead": "One Launch now tells you what changed.",
+                "detail": "After an update, this card shows up to inform you of any new quirks or features."
+              }
+            ]
+          },
+          {
+            "heading": "Improved",
+            "tone": "warning",
+            "items": [
+              {
+                "lead": "A clearer welcome for new installs.",
+                "detail": "The setup guide opens with the same tagline as the rest of the app and gets to the point faster."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "app-table-seen-current",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the app's own table with the current version already seen"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-15",
+            "image": {
+              "file": "beta-3.png",
+              "alt": "The setup guide on a new install"
+            },
+            "sections": [
+              {
+                "heading": "New Features",
+                "tone": "success",
+                "items": [
+                  {
+                    "lead": "One Launch now tells you what changed.",
+                    "detail": "After an update, this card shows up to inform you of any new quirks or features."
+                  }
+                ]
+              },
+              {
+                "heading": "Improved",
+                "tone": "warning",
+                "items": [
+                  {
+                    "lead": "A clearer welcome for new installs.",
+                    "detail": "The setup guide opens with the same tagline as the rest of the app and gets to the point faster."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.3",
+        "1.0.0-beta.3"
+      ],
+      "out": null
+    },
+    {
+      "id": "cap-current-length-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: a 64-character version is a version"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "cap-current-length-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: a 65-character version is not"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        null
+      ],
+      "out": null
+    },
+    {
+      "id": "cap-seen-length-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: a 65-character lastSeen is not a version, so it counts as nothing seen"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.5",
+        "1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "out": {
+        "version": "1.0.0-beta.5",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "cap-release-length-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: a release whose version is 65 characters is skipped"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "9.0.0",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-beta.1",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "unsorted-input",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: the newest is found whatever the order of the list"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.9",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-beta.5",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "equal-versions-first-wins",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: 1.0.0 and 01.0.0 compare equal; the first in the list is kept"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0",
+            "date": "2026-01-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "01.0.0",
+            "date": "2026-02-02",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "2.0.0",
+        null
+      ],
+      "out": {
+        "version": "1.0.0",
+        "date": "2026-01-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "leading-zero-current",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: a current version with a leading zero passes the shape check and reads as 1"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "01.0.0-beta.5",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-beta.5",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "release-not-a-version",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a release whose version is not a version is skipped"
+      },
+      "args": [
+        [
+          {
+            "version": "v1.0.0",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-beta.1",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "current-trailing-newline",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "regex: JS $ without the m flag does not match before a final newline, so the version is refused"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.5\n",
+        null
+      ],
+      "out": null
+    },
+    {
+      "id": "current-arabic-digit",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: JS \\d is ASCII, so ١.0.0 is not a version"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "١.0.0",
+        null
+      ],
+      "out": null
+    },
+    {
+      "id": "current-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a current version that is not a string"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        1,
+        null
+      ],
+      "out": null
+    },
+    {
+      "id": "seen-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a lastSeen that is not a string counts as nothing seen"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.5",
+        1
+      ],
+      "out": {
+        "version": "1.0.0-beta.5",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "seen-newer-than-all",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: everything at or below the current version is already seen"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0-beta.5",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.3",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-beta.5",
+        "2.0.0"
+      ],
+      "out": null
+    },
+    {
+      "id": "release-above-current",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a release above the running version is skipped"
+      },
+      "args": [
+        [
+          {
+            "version": "2.0.0",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-beta.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-beta.1",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "prerelease-vs-release",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a running prerelease does not see the release it precedes"
+      },
+      "args": [
+        [
+          {
+            "version": "1.0.0",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "1.0.0-rc.1",
+            "date": "2026-10-01",
+            "sections": [
+              {
+                "heading": "Changes",
+                "items": [
+                  {
+                    "lead": "Something changed."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1.0.0-rc.2",
+        null
+      ],
+      "out": {
+        "version": "1.0.0-rc.1",
+        "date": "2026-10-01",
+        "sections": [
+          {
+            "heading": "Changes",
+            "items": [
+              {
+                "lead": "Something changed."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

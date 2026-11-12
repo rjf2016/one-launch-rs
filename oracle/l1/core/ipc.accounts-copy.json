@@ -1,0 +1,2192 @@
+{
+  "function": "registerIpcHandlers",
+  "source": "src/main/ipc/index.ts",
+  "note": "decode: none\narg0 is the channel, arg1 the payload, arg2 the context { trusted, busy }.\ncall reaches the real handler: electron is mocked (ipcMain.handle collects the handlers) and registerIpcHandlers from src/main/ipc/index.ts is run once, as test/ipc-validation.test.ts does, with every service a recording proxy that answers undefined, paths a proxy, rescan and the pickers recording stubs, and the logger a silent stub. Per case: isTrustedSender returns context.trusted, launch.isBusy returns context.busy (the only service a refused payload may reach), and the handler is invoked with the event { senderFrame: { url } } and arg1 as the request. A \"__proto__\" key in a payload is an own data key, as a structured clone over IPC delivers it. out is the envelope the handler layer returns, { ok: false, error: { code, message } }; the messages are exact.\nEvery case is refused before any service, shell call, picker or rescan is reached: call throws if one is, so a payload that passes validation can never be recorded here.\nThe matrix stops at validation: what a handler does once a payload passes (its service calls, the ?? defaults after a nullable field, the OPEN_FAILED, NO_PASSWORD, NOT_FOUND, NOT_A_LAUNCHER and UNAVAILABLE refusals) is hand-translated with the services, not recorded here.\nThe generated family comes from a transcription of the handler's validators (scripts/oracle/l1/core/ipc/schema.ts and model.ts), checked by the generator against the real handlers on every case; cases from test/ipc-validation.test.ts are its REFUSED table, copied as written.",
+  "cases": [
+    {
+      "id": "untrusted-undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy from a frame that is not the app's renderer: refused before the handler runs"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "untrusted-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy with a well-formed payload from an untrusted frame: the sender check wins"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": "login"
+        },
+        {
+          "trusted": false,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "UNTRUSTED_SENDER",
+          "message": "Request rejected"
+        }
+      }
+    },
+    {
+      "id": "busy-ignored-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy does not wait for a running switch: a null payload is still BAD_REQUEST"
+      },
+      "args": [
+        "accounts:copy",
+        null,
+        {
+          "trusted": true,
+          "busy": true
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload no payload at all, as invoke(channel) sends"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload null"
+      },
+      "args": [
+        "accounts:copy",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload false"
+      },
+      "args": [
+        "accounts:copy",
+        false,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload true"
+      },
+      "args": [
+        "accounts:copy",
+        true,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload the number 0"
+      },
+      "args": [
+        "accounts:copy",
+        0,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload the number 7"
+      },
+      "args": [
+        "accounts:copy",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: accounts:copy payload NaN"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "$number": "NaN"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload an empty string"
+      },
+      "args": [
+        "accounts:copy",
+        "",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload a string"
+      },
+      "args": [
+        "accounts:copy",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload an empty array"
+      },
+      "args": [
+        "accounts:copy",
+        [],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-array-of-valid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload an array holding a well-formed payload"
+      },
+      "args": [
+        "accounts:copy",
+        [
+          {
+            "id": "a",
+            "field": "login"
+          }
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "top-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload a Date: an object to the check, with none of the fields"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "$date": "2026-01-02T03:04:05.000Z"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "top-empty-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy payload an empty object: every field missing"
+      },
+      "args": [
+        "accounts:copy",
+        {},
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: the key left out"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: the key present with the value undefined"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": {
+            "$undefined": true
+          },
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: null"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": null,
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: the number 0"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": 0,
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: the number 5"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": 5,
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: accounts:copy id: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": {
+            "$number": "NaN"
+          },
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: accounts:copy id: Infinity"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": {
+            "$number": "Infinity"
+          },
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: true"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": true,
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: false"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": false,
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: an empty array"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": [],
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: an array of one string"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": [
+            "a"
+          ],
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: an empty object"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": {},
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          },
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": {
+            "$bytes": "YQ=="
+          },
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "id.empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: an empty string, which the validators do not refuse; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "",
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "id.space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: accounts:copy id: a single space; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": " ",
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "id.nbsp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: accounts:copy id: a no-break space, which trim() removes; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": " ",
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "id.lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: accounts:copy id: a lone high surrogate; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": {
+            "$utf16": [
+              55296
+            ]
+          },
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "id.nul",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: a NUL inside the string; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a\u0000b",
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "cap-id-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: accounts:copy id: 65 ASCII characters, one over the limit of 64 UTF-16 code units"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-id-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: accounts:copy id: 64 ASCII characters, exactly at the limit; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "cap-id-astral-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: accounts:copy id: 63 ASCII characters and one astral character: 64 code points but 65 UTF-16 code units"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀",
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-id-astral-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: accounts:copy id: 62 ASCII characters and one astral character: 64 UTF-16 code units, 63 code points; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀",
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "cap-id-lone-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: accounts:copy id: 64 ASCII characters and a lone high surrogate: one unit over the limit"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": {
+            "$utf16": [
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              55296
+            ]
+          },
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id exceeds 64 characters"
+        }
+      }
+    },
+    {
+      "id": "cap-id-lone-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: accounts:copy id: 63 ASCII characters and a lone high surrogate, exactly at the limit; the string is not well-formed and still accepted; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": {
+            "$utf16": [
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              120,
+              55296
+            ]
+          },
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "id.id-traversal",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: a path-like id; ids are not shape-checked at the IPC layer; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "..\\..\\elsewhere",
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "id.id-alias",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: an id that is not a UUID; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "@acct:steam:user_3",
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "id.id-padded",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: accounts:copy id: an id with spaces around it; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": " a ",
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "id.id-accented",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy id: a non-ASCII id; accepted, so field is set to 5 and its refusal is the answer"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "é",
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: the key left out"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.undefined",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: the key present with the value undefined"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": {
+            "$undefined": true
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: null"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": null
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: the number 0"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": 0
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: the number 5"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: accounts:copy field: NaN, which JSON cannot carry and a structured clone keeps"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": {
+            "$number": "NaN"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-infinity",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: accounts:copy field: Infinity"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": {
+            "$number": "Infinity"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-true",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: true"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-false",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: false"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": false
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-empty-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: an empty array"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": []
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-array",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: an array of one string"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": [
+            "a"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: an empty object"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": {}
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: a Date, which a structured clone keeps"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": {
+            "$date": "2026-01-02T03:04:05.000Z"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.type-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: bytes (a Uint8Array over IPC)"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": {
+            "$bytes": "YQ=="
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.unknown",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: a value outside the allowed list"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": "nope"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: an empty string"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": ""
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.upper",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: accounts:copy field: login upper-cased; the list is matched exactly"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": "LOGIN"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.title",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: accounts:copy field: login with a capital first letter"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": "Login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.leading-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: accounts:copy field: login with a leading space; nothing is trimmed"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": " login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.trailing-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: accounts:copy field: login with a trailing space"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": "login "
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.trailing-nul",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: login with a trailing NUL"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": "login\u0000"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.trailing-lone",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: accounts:copy field: login with a trailing lone surrogate"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": {
+            "$utf16": [
+              108,
+              111,
+              103,
+              105,
+              110,
+              55296
+            ]
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.proto",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: accounts:copy field: \"__proto__\" as the value; the list is an array, so includes() finds nothing"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": "__proto__"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.constructor",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: accounts:copy field: \"constructor\" as the value"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": "constructor"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "field.array-of-allowed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy field: [\"login\"], an array holding an allowed value"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": [
+            "login"
+          ]
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "extra-field",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: accounts:copy: an unknown key next to a payload missing id; unknown keys are ignored, not refused"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "field": "login",
+          "unexpected": "x"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "shadow-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: accounts:copy: keys named after Object.prototype members (toString, constructor, hasOwnProperty) next to a payload missing id"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "field": "login",
+          "toString": "x",
+          "constructor": "x",
+          "hasOwnProperty": 5
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-own-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: accounts:copy: an own \"__proto__\" data key holding a well-formed payload (as JSON.parse and a structured clone make it); the fields are not read through it"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "__proto__": {
+            "id": "a",
+            "field": "login"
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "proto-constructor-prototype",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: accounts:copy: a constructor.prototype path holding a well-formed payload"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "constructor": {
+            "prototype": {
+              "id": "a",
+              "field": "login"
+            }
+          }
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    },
+    {
+      "id": "test-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "$undefined": true
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "accounts:copy",
+        null,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-str-text",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "accounts:copy",
+        "text",
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-number-7",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "accounts:copy",
+        7,
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-arr1-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "accounts:copy",
+        [
+          "a"
+        ],
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "accounts:copy: expected an object payload"
+        }
+      }
+    },
+    {
+      "id": "test-id-str-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-id-str-a.field-str-notes",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "id": "a",
+          "field": "notes"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "field is not an allowed value"
+        }
+      }
+    },
+    {
+      "id": "test-field-str-login",
+      "origin": {
+        "kind": "test",
+        "ref": "test/ipc-validation.test.ts > IPC request validation (B19) > ${channel} refuses ${payloads.length} malformed payloads before touching a service"
+      },
+      "args": [
+        "accounts:copy",
+        {
+          "field": "login"
+        },
+        {
+          "trusted": true,
+          "busy": false
+        }
+      ],
+      "out": {
+        "ok": false,
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "id must be a string"
+        }
+      }
+    }
+  ]
+}

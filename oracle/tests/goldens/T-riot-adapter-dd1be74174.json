@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-dd1be74174",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot health"
+  ],
+  "name": "describes the session file without reading a value: signed out, device-bound, an unknown shape, absent",
+  "calls": []
+}

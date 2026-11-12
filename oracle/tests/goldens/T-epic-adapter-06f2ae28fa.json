@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-06f2ae28fa",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.detectInstall"
+  ],
+  "name": "uses the Uninstall key, then the URI handler command, then the default location",
+  "calls": []
+}

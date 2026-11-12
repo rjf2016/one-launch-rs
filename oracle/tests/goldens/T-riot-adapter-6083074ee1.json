@@ -1,0 +1,27 @@
+{
+  "id": "T-riot-adapter-6083074ee1",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "with startedBySwitch but a run without the product context (a bare start), hands the client the arguments as before",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        },
+        {
+          "startedBySwitch": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "\"{tmp}\\Riot Games\\Riot Client\\RiotClientServices.exe\" --launch-product=valorant --launch-patchline=live (One Launch pressed Play and the Riot Client started the game)"
+      }
+    }
+  ]
+}

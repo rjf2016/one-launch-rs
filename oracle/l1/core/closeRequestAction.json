@@ -1,0 +1,127 @@
+{
+  "function": "closeRequestAction",
+  "source": "src/main/window-guard.ts",
+  "note": "decode: none\narg0 is { quitting, closeToTray, switchBusy }, as the main window close handler in src/main/index.ts builds it. The cases are the full truth table, 8 rows.",
+  "cases": [
+    {
+      "id": "quitting-0.close-to-tray-0.switch-busy-0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > closeRequestAction > with the tray off, closes when idle and asks during a switch"
+      },
+      "args": [
+        {
+          "quitting": false,
+          "closeToTray": false,
+          "switchBusy": false
+        }
+      ],
+      "out": "close"
+    },
+    {
+      "id": "quitting-0.close-to-tray-0.switch-busy-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > closeRequestAction > with the tray off, closes when idle and asks during a switch"
+      },
+      "args": [
+        {
+          "quitting": false,
+          "closeToTray": false,
+          "switchBusy": true
+        }
+      ],
+      "out": "ask"
+    },
+    {
+      "id": "quitting-0.close-to-tray-1.switch-busy-0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > closeRequestAction > hides to the tray when the setting is on, even during a switch"
+      },
+      "args": [
+        {
+          "quitting": false,
+          "closeToTray": true,
+          "switchBusy": false
+        }
+      ],
+      "out": "hide"
+    },
+    {
+      "id": "quitting-0.close-to-tray-1.switch-busy-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > closeRequestAction > hides to the tray when the setting is on, even during a switch"
+      },
+      "args": [
+        {
+          "quitting": false,
+          "closeToTray": true,
+          "switchBusy": true
+        }
+      ],
+      "out": "hide"
+    },
+    {
+      "id": "quitting-1.close-to-tray-0.switch-busy-0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > closeRequestAction > a quit already under way closes whatever the setting says"
+      },
+      "args": [
+        {
+          "quitting": true,
+          "closeToTray": false,
+          "switchBusy": false
+        }
+      ],
+      "out": "close"
+    },
+    {
+      "id": "quitting-1.close-to-tray-0.switch-busy-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "quitting": true,
+          "closeToTray": false,
+          "switchBusy": true
+        }
+      ],
+      "out": "close"
+    },
+    {
+      "id": "quitting-1.close-to-tray-1.switch-busy-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "quitting": true,
+          "closeToTray": true,
+          "switchBusy": false
+        }
+      ],
+      "out": "close"
+    },
+    {
+      "id": "quitting-1.close-to-tray-1.switch-busy-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > closeRequestAction > a quit already under way closes whatever the setting says"
+      },
+      "args": [
+        {
+          "quitting": true,
+          "closeToTray": true,
+          "switchBusy": true
+        }
+      ],
+      "out": "close"
+    }
+  ]
+}

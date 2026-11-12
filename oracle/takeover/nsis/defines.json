@@ -1,0 +1,363 @@
+{
+  "derivation": "Derived by reading NsisTarget.js at the installed app-builder-lib version with electron-builder.yml and package.json at the pin; no build was run. dist/builder-debug.yml from the earlier build holds only the file patterns (the NSIS script is added to it only when the debug logger is on), so it is not the source of these values.",
+  "appBuilderLib": {
+    "version": "26.15.3",
+    "license": "MIT"
+  },
+  "toolset": {
+    "makensis": "nsis-3.0.4.1 (legacy toolset: toolsets.nsis unset), from node_modules/app-builder-lib/out/toolsets/windows.js:154-158",
+    "plugins": "nsis-resources-3.4.1, x86-unicode plugin folder (unicode not false), from node_modules/app-builder-lib/out/toolsets/windows.js:159-161 and NsisTarget.js:582-586",
+    "cwd": "{templates}",
+    "script": "stdin: the header (NsisTarget.js:571-609) followed by computeFinalScript of installer.nsi (NsisTarget.js:610-663)"
+  },
+  "placeholders": {
+    "{project}": "the folder of the Electron repo the build ran in",
+    "{dist}": "{project}\\dist",
+    "{templates}": "{project}\\node_modules\\app-builder-lib\\templates\\nsis",
+    "{icon}": "the .ico electron-builder converts from build/icon.* into its cache at build time (under the user profile)",
+    "{electron-builder-cache}": "%LOCALAPPDATA%\\electron-builder\\Cache (under the user profile): makensis and the plugins",
+    "{build-temp}": "electron-builder's temp folder under %TEMP% (under the user profile): the generated messages includes",
+    "{archive-sha512-hex-upper}": "the SHA-512 of the app archive, upper-case hex",
+    "{ceil(unpacked-bytes/1024)}": "the size of win-unpacked in KiB, rounded up",
+    "{round(unpacked-bytes/1024)}": "the size of win-unpacked in KiB, rounded"
+  },
+  "defines": [
+    {
+      "name": "APP_ID",
+      "value": "dev.onelaunch.app",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:160",
+      "note": "electron-builder.yml appId"
+    },
+    {
+      "name": "APP_GUID",
+      "value": "37275e3e-77ba-54aa-bc32-31551d28dc0d",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:157,161",
+      "note": "UUIDv5 of appId in the electron-builder namespace; equals INSTALLER_GUID in src/main/updates/availability.ts:7"
+    },
+    {
+      "name": "UNINSTALL_APP_KEY",
+      "value": "37275e3e-77ba-54aa-bc32-31551d28dc0d",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:158,163",
+      "note": "the GUID has no backslash, so UNINSTALL_REGISTRY_KEY_2 is not defined (line 176)"
+    },
+    {
+      "name": "PRODUCT_NAME",
+      "value": "One Launch",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:164",
+      "note": "electron-builder.yml productName"
+    },
+    {
+      "name": "PRODUCT_FILENAME",
+      "value": "OneLaunch",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:165",
+      "note": "electron-builder.yml executableName"
+    },
+    {
+      "name": "APP_FILENAME",
+      "value": "OneLaunch",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:166",
+      "note": "getWindowsInstallationDirName with oneClick false: the product file name, since it matches ^[-_+0-9a-zA-Z .]+$"
+    },
+    {
+      "name": "APP_DESCRIPTION",
+      "value": "Launch any game, from any launcher, on any account.",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:167",
+      "note": "package.json description"
+    },
+    {
+      "name": "VERSION",
+      "value": "1.0.0-beta.3",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:168",
+      "note": "package.json version at the pin; the uninstaller pass gets the same value (no shortVersion)"
+    },
+    {
+      "name": "PROJECT_DIR",
+      "value": "{project}",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:169",
+      "note": "placeholder: the repo folder of the build"
+    },
+    {
+      "name": "BUILD_RESOURCES_DIR",
+      "value": "{project}\\build",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:170",
+      "note": "placeholder: directories.buildResources"
+    },
+    {
+      "name": "APP_PACKAGE_NAME",
+      "value": "one-launch",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:171",
+      "note": "package.json name"
+    },
+    {
+      "name": "MUI_ICON",
+      "value": "{icon}",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:191-198",
+      "note": "placeholder: build/installerIcon.ico is absent, so the app icon electron-builder converts to .ico at build time"
+    },
+    {
+      "name": "MUI_UNICON",
+      "value": "{icon}",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:191-198",
+      "note": "placeholder: as MUI_ICON; no build/uninstallerIcon.ico (line 466)"
+    },
+    {
+      "name": "APP_64",
+      "value": "{dist}\\one-launch-1.0.0-beta.3-x64.nsis.7z",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:79,216-217",
+      "note": "placeholder folder: the 7z archive of win-unpacked"
+    },
+    {
+      "name": "APP_64_NAME",
+      "value": "one-launch-1.0.0-beta.3-x64.nsis.7z",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:219-220"
+    },
+    {
+      "name": "APP_64_HASH",
+      "value": "{archive-sha512-hex-upper}",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:223-224",
+      "note": "placeholder: build output"
+    },
+    {
+      "name": "APP_64_UNPACKED_SIZE",
+      "value": "{ceil(unpacked-bytes/1024)}",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:227-228",
+      "note": "placeholder: build output"
+    },
+    {
+      "name": "COMPANY_NAME",
+      "value": "rjf2016",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:490-493",
+      "note": "package.json author, normalised to {name}; becomes the Publisher value"
+    },
+    {
+      "name": "APP_INSTALLER_STORE_FILE",
+      "value": "one-launch-updater\\installer.exe",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:502",
+      "note": "updaterCacheDirName (appInfo.js:126-128) plus CURRENT_APP_INSTALLER_FILE_NAME"
+    },
+    {
+      "name": "COMPRESSION_METHOD",
+      "value": "7z",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:509",
+      "note": "useZip unset"
+    },
+    {
+      "name": "MULTIUSER_INSTALLMODE_ALLOW_ELEVATION",
+      "value": null,
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:435-437",
+      "note": "allowElevation unset"
+    },
+    {
+      "name": "INSTALL_MODE_PER_ALL_USERS_REQUIRED",
+      "value": null,
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:445-447",
+      "note": "oneClick false"
+    },
+    {
+      "name": "allowToChangeInstallationDirectory",
+      "value": null,
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:448-453",
+      "note": "electron-builder.yml nsis.allowToChangeInstallationDirectory"
+    },
+    {
+      "name": "SHORTCUT_NAME",
+      "value": "One Launch",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:461",
+      "note": "shortcutName unset: the sanitised product name"
+    },
+    {
+      "name": "UNINSTALL_DISPLAY_NAME",
+      "value": "One Launch 1.0.0-beta.3",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:473",
+      "note": "${productName} ${version}"
+    },
+    {
+      "name": "MUI_WELCOMEFINISHPAGE_BITMAP",
+      "value": "${NSISDIR}\\Contrib\\Graphics\\Wizard\\nsis3-metro.bmp",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:430-434",
+      "note": "no build/installerSidebar.bmp"
+    },
+    {
+      "name": "MUI_UNWELCOMEFINISHPAGE_BITMAP",
+      "value": "${NSISDIR}\\Contrib\\Graphics\\Wizard\\nsis3-metro.bmp",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:430-434",
+      "note": "no build/uninstallerSidebar.bmp"
+    },
+    {
+      "name": "ESTIMATED_SIZE",
+      "value": "{round(unpacked-bytes/1024)}",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:256-259",
+      "note": "placeholder: build output; always defined, so the installer never calls GetSize"
+    },
+    {
+      "name": "COMPRESS",
+      "value": "auto",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:267-270",
+      "note": "compression not store"
+    },
+    {
+      "name": "UNINSTALLER_OUT_FILE",
+      "value": "{dist}\\OneLaunch-1.0.0-beta.3-setup.__uninstaller.exe",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:298,349",
+      "note": "placeholder folder; present in the final pass only"
+    }
+  ],
+  "notDefined": [
+    {
+      "name": "ONE_CLICK",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:406-408",
+      "why": "oneClick false"
+    },
+    {
+      "name": "INSTALL_MODE_PER_ALL_USERS",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:439-441",
+      "why": "perMachine false"
+    },
+    {
+      "name": "DELETE_APP_DATA_ON_UNINSTALL",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:462-464",
+      "why": "deleteAppDataOnUninstall false"
+    },
+    {
+      "name": "UNINSTALLER_ICON",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:465-472",
+      "why": "no build/uninstallerIcon.ico"
+    },
+    {
+      "name": "MENU_FILENAME",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:458-460",
+      "why": "menuCategory unset"
+    },
+    {
+      "name": "DO_NOT_CREATE_DESKTOP_SHORTCUT",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:474-476",
+      "why": "createDesktopShortcut unset (FRESH_INSTALL)"
+    },
+    {
+      "name": "RECREATE_DESKTOP_SHORTCUT",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:477-479",
+      "why": "createDesktopShortcut unset (FRESH_INSTALL)"
+    },
+    {
+      "name": "DO_NOT_CREATE_START_MENU_SHORTCUT",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:480-482",
+      "why": "createStartMenuShortcut unset"
+    },
+    {
+      "name": "HIDE_RUN_AFTER_FINISH",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:419-421",
+      "why": "runAfterFinish unset"
+    },
+    {
+      "name": "UNINSTALL_REGISTRY_KEY_2",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:176-178",
+      "why": "the uninstall key equals the GUID"
+    },
+    {
+      "name": "APP_PRODUCT_FILENAME",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:495-497",
+      "why": "APP_FILENAME equals the product file name"
+    },
+    {
+      "name": "UNINSTALL_URL_HELP / _INFO_ABOUT / _UPDATE_INFO / _README",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:179-183",
+      "why": "package.json has no homepage and no repository"
+    },
+    {
+      "name": "ENABLE_LOGGING_ELECTRON_BUILDER",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:173-175",
+      "why": "customNsisBinary unset"
+    },
+    {
+      "name": "MUI_HEADERIMAGE",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:422-429",
+      "why": "no build/installerHeader.bmp"
+    },
+    {
+      "name": "DISPLAY_LANG_SELECTOR",
+      "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:483-485",
+      "why": "displayLanguageSelector unset"
+    }
+  ],
+  "commands": {
+    "OutFile": "\"{dist}\\OneLaunch-1.0.0-beta.3-setup.exe\"",
+    "VIProductVersion": "1.0.0.0",
+    "VIAddVersionKey": [
+      "/LANG=1033 ProductName \"One Launch\"",
+      "/LANG=1033 ProductVersion \"1.0.0-beta.3\"",
+      "/LANG=1033 LegalCopyright \"Copyright © 2026 rjf2016\"",
+      "/LANG=1033 FileDescription \"Launch any game, from any launcher, on any account.\"",
+      "/LANG=1033 FileVersion \"1.0.0-beta.3\"",
+      "/LANG=1033 CompanyName \"rjf2016\""
+    ],
+    "Unicode": true,
+    "SetCompressor": "zlib"
+  },
+  "commandsSource": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:184-189,382-401,260-271; VIProductVersion ends in .0 and FileVersion has no build number because the build sets none of BUILD_NUMBER, TRAVIS_BUILD_NUMBER, APPVEYOR_BUILD_NUMBER, CIRCLE_BUILD_NUM, BUILD_BUILDNUMBER, CI_PIPELINE_IID (node_modules/app-builder-lib/out/appInfo.js:34-46,66-86)",
+  "uninstallerPass": {
+    "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:277-284,337-381",
+    "differences": "the same defines and commands plus BUILD_UNINSTALLER (no value); UNINSTALLER_OUT_FILE is the same path; the resulting installer is run once to write the uninstaller (WriteUninstaller in .onInit, installer.nsi:63-65)"
+  },
+  "makensisArgs": {
+    "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:512-546",
+    "args": [
+      "-WX",
+      "-INPUTCHARSET",
+      "UTF8",
+      "-DAPP_ID=dev.onelaunch.app",
+      "-DAPP_GUID=37275e3e-77ba-54aa-bc32-31551d28dc0d",
+      "-DUNINSTALL_APP_KEY=37275e3e-77ba-54aa-bc32-31551d28dc0d",
+      "-DPRODUCT_NAME=One Launch",
+      "-DPRODUCT_FILENAME=OneLaunch",
+      "-DAPP_FILENAME=OneLaunch",
+      "-DAPP_DESCRIPTION=Launch any game, from any launcher, on any account.",
+      "-DVERSION=1.0.0-beta.3",
+      "-DPROJECT_DIR={project}",
+      "-DBUILD_RESOURCES_DIR={project}\\build",
+      "-DAPP_PACKAGE_NAME=one-launch",
+      "-DMUI_ICON={icon}",
+      "-DMUI_UNICON={icon}",
+      "-DAPP_64={dist}\\one-launch-1.0.0-beta.3-x64.nsis.7z",
+      "-DAPP_64_NAME=one-launch-1.0.0-beta.3-x64.nsis.7z",
+      "-DAPP_64_HASH={archive-sha512-hex-upper}",
+      "-DAPP_64_UNPACKED_SIZE={ceil(unpacked-bytes/1024)}",
+      "-DCOMPANY_NAME=rjf2016",
+      "-DAPP_INSTALLER_STORE_FILE=one-launch-updater\\installer.exe",
+      "-DCOMPRESSION_METHOD=7z",
+      "-DMULTIUSER_INSTALLMODE_ALLOW_ELEVATION",
+      "-DINSTALL_MODE_PER_ALL_USERS_REQUIRED",
+      "-DallowToChangeInstallationDirectory",
+      "-DSHORTCUT_NAME=One Launch",
+      "-DUNINSTALL_DISPLAY_NAME=One Launch 1.0.0-beta.3",
+      "-DMUI_WELCOMEFINISHPAGE_BITMAP=${NSISDIR}\\Contrib\\Graphics\\Wizard\\nsis3-metro.bmp",
+      "-DMUI_UNWELCOMEFINISHPAGE_BITMAP=${NSISDIR}\\Contrib\\Graphics\\Wizard\\nsis3-metro.bmp",
+      "-DESTIMATED_SIZE={round(unpacked-bytes/1024)}",
+      "-DCOMPRESS=auto",
+      "-DUNINSTALLER_OUT_FILE={dist}\\OneLaunch-1.0.0-beta.3-setup.__uninstaller.exe",
+      "-XOutFile \"{dist}\\OneLaunch-1.0.0-beta.3-setup.exe\"",
+      "-XVIProductVersion 1.0.0.0",
+      "-XVIAddVersionKey /LANG=1033 ProductName \"One Launch\"",
+      "-XVIAddVersionKey /LANG=1033 ProductVersion \"1.0.0-beta.3\"",
+      "-XVIAddVersionKey /LANG=1033 LegalCopyright \"Copyright © 2026 rjf2016\"",
+      "-XVIAddVersionKey /LANG=1033 FileDescription \"Launch any game, from any launcher, on any account.\"",
+      "-XVIAddVersionKey /LANG=1033 FileVersion \"1.0.0-beta.3\"",
+      "-XVIAddVersionKey /LANG=1033 CompanyName \"rjf2016\"",
+      "-XUnicode true",
+      "-XSetCompressor zlib",
+      "-"
+    ]
+  },
+  "flags": {
+    "source": "node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js:579; node_modules/app-builder-lib/out/targets/nsis/nsisScriptGenerator.js:29-38",
+    "names": [
+      "updated",
+      "force-run",
+      "keep-shortcuts",
+      "no-desktop-shortcut",
+      "delete-app-data",
+      "allusers",
+      "currentuser"
+    ],
+    "macro": "${StdUtils.TestParameter} $R9 \"<flag>\" for each; the defines are isUpdated, isForceRun, isKeepShortcuts, isNoDesktopShortcut, isDeleteAppData, isForAllUsers, isForCurrentUser"
+  }
+}

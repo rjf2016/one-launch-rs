@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-321aca8353",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot shutdown"
+  ],
+  "name": "watches only briefly for a restart after a forced close: an ended core has no updater left to bring it back",
+  "calls": []
+}

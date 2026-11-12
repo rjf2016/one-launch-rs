@@ -1,0 +1,54 @@
+{
+  "id": "T-riot-adapter-7111bbd780",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "refuses while a Riot game runs, before sending anything: the same game, or another one",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "GameRunningError",
+        "message": "VALORANT is already running.",
+        "runningGame": {
+          "launcher": "riot",
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT",
+          "source": "process"
+        },
+        "code": "GAME_RUNNING"
+      }
+    },
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "teamfighttactics.live",
+          "name": "Teamfight Tactics"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "GameRunningError",
+        "message": "VALORANT is running. Close it, then press Play again: One Launch never closes a Riot game.",
+        "runningGame": {
+          "launcher": "riot",
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT",
+          "source": "process"
+        },
+        "code": "GAME_RUNNING"
+      }
+    }
+  ]
+}

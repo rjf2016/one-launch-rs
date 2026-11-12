@@ -1,0 +1,379 @@
+{
+  "id": "T-riot-adapter-baacd57759",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot switch plan (dry run)"
+  ],
+  "name": "plans the sign-out path (null, a manual sign-in, a capture) for an account without a saved sign-in",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:riot:riot_new",
+          "displayName": "New",
+          "login": "riot_new",
+          "launcherUid": null,
+          "hasSecret": true
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "riot",
+        "account": {
+          "id": "@acct:riot:riot_new",
+          "displayName": "New",
+          "login": "riot_new",
+          "launcherUid": null
+        },
+        "strategy": "credentials",
+        "current": {
+          "mostRecentLogin": "riot_main",
+          "autoLoginUser": null,
+          "running": false
+        },
+        "steps": [
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "close",
+            "kind": "process",
+            "title": "Close the Riot Client",
+            "target": "RiotClientServices.exe",
+            "detail": "Skipped: RiotClientServices.exe is not running."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "capture",
+            "kind": "backup",
+            "title": "Save the outgoing sign-in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml",
+            "detail": "RiotGamesPrivateSettings.yaml holds Main's sign-in and it changed since it was last saved (the client rotates the token at every start); store the file, encrypted, as the account's saved sign-in if it changed. Nothing in the client's files changes."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "backup",
+            "kind": "backup",
+            "title": "Back up RiotGamesPrivateSettings.yaml",
+            "target": "{tmp}\\backups\\riot\\<timestamp>",
+            "detail": "Copy {tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml, encrypted, into a new snapshot folder so a failed switch can be rolled back. The newest 20 snapshots are kept."
+          },
+          {
+            "changes": [
+              {
+                "where": "psl.authorization.riot-client",
+                "before": "(saved sign-in for Riot account …1111, fingerprint acd093bd)",
+                "after": "null (signed out)"
+              }
+            ],
+            "skipped": false,
+            "id": "file",
+            "kind": "file",
+            "title": "Sign the client out",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml",
+            "detail": "Set psl.authorization.riot-client to null, the state the client itself writes at a sign-out, and leave every other line (the device cookie included) as it is, so the client opens on its login page instead of signing in as Main."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "start",
+            "kind": "launch",
+            "title": "Start the Riot Client",
+            "target": "\"{tmp}\\Riot Games\\Riot Client\\RiotClientServices.exe\"",
+            "detail": "Start the client with no arguments. With no saved sign-in it opens on its login page."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "wait",
+            "kind": "wait",
+            "title": "Wait for the client to come up",
+            "target": "RiotClientServices.exe",
+            "detail": "Poll the process list until RiotClientServices.exe is running, up to 0.04 s."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "verify",
+            "kind": "wait",
+            "title": "Confirm the client signed in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Logs\\Riot Client Logs",
+            "detail": "Read what the client appends to its new run log until it reports a sign-in verdict. With no saved sign-in it opens on its login page, so this goes straight to the next step."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "manual",
+            "kind": "wait",
+            "title": "Wait for you to sign in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Logs\\Riot Client Logs",
+            "detail": "The client opens on its login page. Sign in there as riot_new with “Stay signed in” ticked (the password can be copied from One Launch). One Launch continues as soon as the log reports the sign-in, up to 0.0013333333333333333 min. Signing in as a different Riot account than the one linked to New ends the switch and puts the file back."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "recapture",
+            "kind": "backup",
+            "title": "Save the new sign-in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml",
+            "detail": "Once the sign-in is reported, wait up to 0.04 s for the client to write RiotGamesPrivateSettings.yaml, then store the file, encrypted, as New's saved sign-in and record the Riot account id on the account. If the client writes it later, it is saved at the next switch instead. Later switches use the saved sign-in."
+          }
+        ],
+        "warnings": [
+          "No sign-in is saved for New yet. The client will open on its login page; sign in once with “Stay signed in” ticked and One Launch saves it for later switches."
+        ],
+        "notes": [],
+        "executable": true,
+        "generatedAt": "<ts>"
+      }
+    },
+    {
+      "launcher": "riot",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:riot:riot_new",
+          "displayName": "New",
+          "login": "riot_new",
+          "launcherUid": null,
+          "hasSecret": true
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "riot",
+        "account": {
+          "id": "@acct:riot:riot_new",
+          "displayName": "New",
+          "login": "riot_new",
+          "launcherUid": null
+        },
+        "strategy": "credentials",
+        "current": {
+          "mostRecentLogin": null,
+          "autoLoginUser": null,
+          "running": false
+        },
+        "steps": [
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "close",
+            "kind": "process",
+            "title": "Close the Riot Client",
+            "target": "RiotClientServices.exe",
+            "detail": "Skipped: RiotClientServices.exe is not running."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "capture",
+            "kind": "backup",
+            "title": "Save the outgoing sign-in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml",
+            "detail": "Skipped: the client holds no saved sign-in."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "backup",
+            "kind": "backup",
+            "title": "Back up RiotGamesPrivateSettings.yaml",
+            "target": "{tmp}\\backups\\riot\\<timestamp>",
+            "detail": "Copy {tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml, encrypted, into a new snapshot folder so a failed switch can be rolled back. The newest 20 snapshots are kept."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "file",
+            "kind": "file",
+            "title": "Sign the client out",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml",
+            "detail": "No change: the client holds no saved sign-in, so it opens on its login page."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "start",
+            "kind": "launch",
+            "title": "Start the Riot Client",
+            "target": "\"{tmp}\\Riot Games\\Riot Client\\RiotClientServices.exe\"",
+            "detail": "Start the client with no arguments. With no saved sign-in it opens on its login page."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "wait",
+            "kind": "wait",
+            "title": "Wait for the client to come up",
+            "target": "RiotClientServices.exe",
+            "detail": "Poll the process list until RiotClientServices.exe is running, up to 0.04 s."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "verify",
+            "kind": "wait",
+            "title": "Confirm the client signed in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Logs\\Riot Client Logs",
+            "detail": "Read what the client appends to its new run log until it reports a sign-in verdict. With no saved sign-in it opens on its login page, so this goes straight to the next step."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "manual",
+            "kind": "wait",
+            "title": "Wait for you to sign in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Logs\\Riot Client Logs",
+            "detail": "The client opens on its login page. Sign in there as riot_new with “Stay signed in” ticked (the password can be copied from One Launch). One Launch continues as soon as the log reports the sign-in, up to 0.0013333333333333333 min. Signing in as a different Riot account than the one linked to New ends the switch and puts the file back."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "recapture",
+            "kind": "backup",
+            "title": "Save the new sign-in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml",
+            "detail": "Once the sign-in is reported, wait up to 0.04 s for the client to write RiotGamesPrivateSettings.yaml, then store the file, encrypted, as New's saved sign-in and record the Riot account id on the account. If the client writes it later, it is saved at the next switch instead. Later switches use the saved sign-in."
+          }
+        ],
+        "warnings": [
+          "No sign-in is saved for New yet. The client will open on its login page; sign in once with “Stay signed in” ticked and One Launch saves it for later switches."
+        ],
+        "notes": [],
+        "executable": true,
+        "generatedAt": "<ts>"
+      }
+    },
+    {
+      "launcher": "riot",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333",
+          "hasSecret": false
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "riot",
+        "account": {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333"
+        },
+        "strategy": "credentials",
+        "current": {
+          "mostRecentLogin": null,
+          "autoLoginUser": null,
+          "running": false
+        },
+        "steps": [
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "close",
+            "kind": "process",
+            "title": "Close the Riot Client",
+            "target": "RiotClientServices.exe",
+            "detail": "Skipped: RiotClientServices.exe is not running."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "capture",
+            "kind": "backup",
+            "title": "Save the outgoing sign-in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml",
+            "detail": "Skipped: the client holds no saved sign-in."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "backup",
+            "kind": "backup",
+            "title": "Back up RiotGamesPrivateSettings.yaml",
+            "target": "{tmp}\\backups\\riot\\<timestamp>",
+            "detail": "Copy {tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml, encrypted, into a new snapshot folder so a failed switch can be rolled back. The newest 20 snapshots are kept."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "file",
+            "kind": "file",
+            "title": "Sign the client out",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml",
+            "detail": "No change: the client holds no saved sign-in, so it opens on its login page."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "start",
+            "kind": "launch",
+            "title": "Start the Riot Client",
+            "target": "\"{tmp}\\Riot Games\\Riot Client\\RiotClientServices.exe\"",
+            "detail": "Start the client with no arguments. With no saved sign-in it opens on its login page."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "wait",
+            "kind": "wait",
+            "title": "Wait for the client to come up",
+            "target": "RiotClientServices.exe",
+            "detail": "Poll the process list until RiotClientServices.exe is running, up to 0.04 s."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "verify",
+            "kind": "wait",
+            "title": "Confirm the client signed in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Logs\\Riot Client Logs",
+            "detail": "Read what the client appends to its new run log until it reports a sign-in verdict. With no saved sign-in it opens on its login page, so this goes straight to the next step."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "manual",
+            "kind": "wait",
+            "title": "Wait for you to sign in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Logs\\Riot Client Logs",
+            "detail": "The client opens on its login page. Sign in there as riot_alt with “Stay signed in” ticked. One Launch continues as soon as the log reports the sign-in, up to 0.0013333333333333333 min. Signing in as a different Riot account than the one linked to Alt ends the switch and puts the file back."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "recapture",
+            "kind": "backup",
+            "title": "Save the new sign-in",
+            "target": "{tmp}\\Local\\Riot Games\\Riot Client\\Data\\RiotGamesPrivateSettings.yaml",
+            "detail": "Once the sign-in is reported, wait up to 0.04 s for the client to write RiotGamesPrivateSettings.yaml, then store the file, encrypted, as Alt's saved sign-in and record the Riot account id on the account. If the client writes it later, it is saved at the next switch instead. Later switches use the saved sign-in."
+          }
+        ],
+        "warnings": [
+          "Alt's saved sign-in no longer works: the client refused the saved sign-in (401 invalid_grant). You will sign in once by hand, with “Stay signed in” ticked, and One Launch stores the fresh sign-in."
+        ],
+        "notes": [],
+        "executable": true,
+        "generatedAt": "<ts>"
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "source": "src/shared/whats-new-releases.ts (WHATS_NEW), newest first",
+  "dateFormat": "formatReleaseDate in src/renderer/src/components/WhatsNewDialog.tsx: toLocaleDateString with year numeric, month long, day numeric (en-US: \"October 15, 2026\")",
+  "releases": [
+    {
+      "version": "1.0.0-beta.3",
+      "date": "2026-10-15",
+      "image": {
+        "file": "beta-3.png",
+        "alt": "The setup guide on a new install"
+      },
+      "sections": [
+        {
+          "heading": "New Features",
+          "tone": "success",
+          "items": [
+            {
+              "lead": "One Launch now tells you what changed.",
+              "detail": "After an update, this card shows up to inform you of any new quirks or features."
+            }
+          ]
+        },
+        {
+          "heading": "Improved",
+          "tone": "warning",
+          "items": [
+            {
+              "lead": "A clearer welcome for new installs.",
+              "detail": "The setup guide opens with the same tagline as the rest of the app and gets to the point faster."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "images": [
+    {
+      "file": "assets/whats-new/beta-3.png",
+      "source": "src/renderer/src/assets/whats-new/beta-3.png",
+      "sha256": "955de0baa44f412d385907d9a7a0dc5f1750e2dd248489006cc64dd00e37d0a7"
+    }
+  ]
+}

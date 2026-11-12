@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-16da3280d6",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot metadata parsers"
+  ],
+  "name": "reads RiotClientInstalls.json and shrugs at junk",
+  "calls": []
+}

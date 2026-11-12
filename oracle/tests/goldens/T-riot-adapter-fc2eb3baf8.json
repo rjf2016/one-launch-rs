@@ -1,0 +1,24 @@
+{
+  "id": "T-riot-adapter-fc2eb3baf8",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot launch"
+  ],
+  "name": "presses Play for the user once the page is up: one launch request to the client’s local server, then the game confirmed by its name",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "valorant.live",
+          "name": "VALORANT"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "\"{tmp}\\Riot Games\\Riot Client\\RiotClientServices.exe\" --launch-product=valorant --launch-patchline=live (One Launch pressed Play and the Riot Client started the game)"
+      }
+    }
+  ]
+}

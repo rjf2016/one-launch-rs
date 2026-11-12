@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-0a1d203052",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot library"
+  ],
+  "name": "names the product’s own icon: beside its metadata first, else the Uninstall key’s DisplayIcon when that is an .ico file",
+  "calls": []
+}

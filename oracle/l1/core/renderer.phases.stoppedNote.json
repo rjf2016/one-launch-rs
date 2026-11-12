@@ -1,0 +1,557 @@
+{
+  "function": "stoppedNote",
+  "source": "src/renderer/src/lib/phases.ts",
+  "note": "decode: none\narg0 is the job's state, switched, restored, steps, account and game; arg1 the launcher's name as it reads mid-sentence; arg2 the action label. Checks run in order: switched, restored true, restored false, then the hand-over test on the manual step.",
+  "cases": [
+    {
+      "id": "test-switched",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > says what state the launcher was left in after a stopped or timed-out job"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": true,
+          "restored": null,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": "Steam is signed in as Alt. Press Play again to launch the game."
+    },
+    {
+      "id": "test-restored",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > says what state the launcher was left in after a stopped or timed-out job"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": false,
+          "restored": true,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": "Steam was put back the way it was and left closed."
+    },
+    {
+      "id": "test-not-restored",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > says what state the launcher was left in after a stopped or timed-out job"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": false,
+          "restored": false,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": "Steam could not be put back automatically. Open Settings › Backups and restore the latest snapshot."
+    },
+    {
+      "id": "test-manual-failed",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > says what state the launcher was left in after a stopped or timed-out job"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": false,
+          "restored": null,
+          "steps": [
+            {
+              "id": "manual",
+              "status": "failed",
+              "title": "manual",
+              "detail": ""
+            }
+          ],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": "Nothing was rolled back. Once Steam is signed in, press Play again to launch the game."
+    },
+    {
+      "id": "test-needs-sign-in-no-game",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > says what state the launcher was left in after a stopped or timed-out job"
+      },
+      "args": [
+        {
+          "state": "needs-sign-in",
+          "switched": false,
+          "restored": null,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": null
+        },
+        "Steam",
+        "Switch"
+      ],
+      "out": "Nothing was rolled back. Once Steam is signed in, press Switch again."
+    },
+    {
+      "id": "test-riot-switched",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > starts its sentences properly when the program is \"the Riot Client\""
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": true,
+          "restored": null,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "the Riot Client",
+        "Play"
+      ],
+      "out": "The Riot Client is signed in as Alt. Press Play again to launch the game."
+    },
+    {
+      "id": "test-riot-restored",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > starts its sentences properly when the program is \"the Riot Client\""
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": false,
+          "restored": true,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "the Riot Client",
+        "Play"
+      ],
+      "out": "The Riot Client was put back the way it was and left closed."
+    },
+    {
+      "id": "test-riot-manual-failed",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > starts its sentences properly when the program is \"the Riot Client\""
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": false,
+          "restored": null,
+          "steps": [
+            {
+              "id": "manual",
+              "status": "failed",
+              "title": "manual",
+              "detail": ""
+            }
+          ],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "the Riot Client",
+        "Play"
+      ],
+      "out": "Nothing was rolled back. Once the Riot Client is signed in, press Play again to launch the game."
+    },
+    {
+      "id": "test-close-failed-manual-pending",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > adds nothing when the job was stopped before or while the launcher started: the job sentence already says it"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": false,
+          "restored": null,
+          "steps": [
+            {
+              "id": "close",
+              "status": "failed",
+              "title": "close",
+              "detail": ""
+            },
+            {
+              "id": "manual",
+              "status": "pending",
+              "title": "manual",
+              "detail": ""
+            }
+          ],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": null
+    },
+    {
+      "id": "test-wait-failed-manual-skipped",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > stoppedNote > adds nothing when the job was stopped before or while the launcher started: the job sentence already says it"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": false,
+          "restored": null,
+          "steps": [
+            {
+              "id": "wait",
+              "status": "failed",
+              "title": "wait",
+              "detail": ""
+            },
+            {
+              "id": "manual",
+              "status": "skipped",
+              "title": "manual",
+              "detail": ""
+            }
+          ],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": null
+    },
+    {
+      "id": "switched-wins",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: switched and restored false together: switched is checked first"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": true,
+          "restored": false,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": "Steam is signed in as Alt. Press Play again to launch the game."
+    },
+    {
+      "id": "cancelled-no-steps",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: cancelled with no steps: null"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": false,
+          "restored": null,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": null
+    },
+    {
+      "id": "cancelled-manual-running",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: cancelled while the manual step runs: handed over, so the note"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": false,
+          "restored": null,
+          "steps": [
+            {
+              "id": "manual",
+              "status": "running",
+              "title": "manual",
+              "detail": ""
+            }
+          ],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": "Nothing was rolled back. Once Steam is signed in, press Play again to launch the game."
+    },
+    {
+      "id": "cancelled-manual-done",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: cancelled after the manual step finished"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": false,
+          "restored": null,
+          "steps": [
+            {
+              "id": "manual",
+              "status": "done",
+              "title": "manual",
+              "detail": ""
+            }
+          ],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": "Nothing was rolled back. Once Steam is signed in, press Play again to launch the game."
+    },
+    {
+      "id": "failed-no-steps",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: failed (not cancelled) with no steps: the note, with the game"
+      },
+      "args": [
+        {
+          "state": "failed",
+          "switched": false,
+          "restored": null,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": "Nothing was rolled back. Once Steam is signed in, press Play again to launch the game."
+    },
+    {
+      "id": "failed-no-game",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: failed with no game: no \"to launch the game\""
+      },
+      "args": [
+        {
+          "state": "failed",
+          "switched": false,
+          "restored": null,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": null
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": "Nothing was rolled back. Once Steam is signed in, press Play again."
+    },
+    {
+      "id": "restored-lowercase-name",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: a launcher name starting with é"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": false,
+          "restored": true,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "épic",
+        "Play"
+      ],
+      "out": "Épic was put back the way it was and left closed."
+    },
+    {
+      "id": "switched-astral-account",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an account name with an astral character"
+      },
+      "args": [
+        {
+          "state": "cancelled",
+          "switched": true,
+          "restored": null,
+          "steps": [],
+          "account": {
+            "id": "a",
+            "displayName": "Alt 🎮",
+            "login": "alt"
+          },
+          "game": {
+            "id": "g",
+            "name": "Dota 2",
+            "launcherGameId": "570"
+          }
+        },
+        "Steam",
+        "Play"
+      ],
+      "out": "Steam is signed in as Alt 🎮. Press Play again to launch the game."
+    }
+  ]
+}

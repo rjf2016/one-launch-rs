@@ -1,0 +1,163 @@
+{
+  "electron": "44.7.0",
+  "clock": "2026-11-06T16:46:23.000Z",
+  "locale": "en-US",
+  "fake": "all-four",
+  "viewport": [
+    1280,
+    800
+  ],
+  "tokens": [
+    {
+      "name": "--color-bg",
+      "custom": "#0b0d12",
+      "computed": "rgb(11, 13, 18)",
+      "via": "color: var(--color-bg) on a probe element"
+    },
+    {
+      "name": "--color-surface",
+      "custom": "#12151c",
+      "computed": "rgb(18, 21, 28)",
+      "via": "color: var(--color-surface) on a probe element"
+    },
+    {
+      "name": "--color-surface-2",
+      "custom": "#1a1e28",
+      "computed": "rgb(26, 30, 40)",
+      "via": "color: var(--color-surface-2) on a probe element"
+    },
+    {
+      "name": "--color-surface-3",
+      "custom": "#222736",
+      "computed": "rgb(34, 39, 54)",
+      "via": "color: var(--color-surface-3) on a probe element"
+    },
+    {
+      "name": "--color-border",
+      "custom": "#262b38",
+      "computed": "rgb(38, 43, 56)",
+      "via": "color: var(--color-border) on a probe element"
+    },
+    {
+      "name": "--color-border-strong",
+      "custom": "#343a4b",
+      "computed": "rgb(52, 58, 75)",
+      "via": "color: var(--color-border-strong) on a probe element"
+    },
+    {
+      "name": "--color-text",
+      "custom": "#e8eaf0",
+      "computed": "rgb(232, 234, 240)",
+      "via": "color: var(--color-text) on a probe element"
+    },
+    {
+      "name": "--color-text-strong",
+      "custom": "#fff",
+      "computed": "rgb(255, 255, 255)",
+      "via": "color: var(--color-text-strong) on a probe element"
+    },
+    {
+      "name": "--color-muted",
+      "custom": "#8f97ab",
+      "computed": "rgb(143, 151, 171)",
+      "via": "color: var(--color-muted) on a probe element"
+    },
+    {
+      "name": "--color-faint",
+      "custom": "#7f879b",
+      "computed": "rgb(127, 135, 155)",
+      "via": "color: var(--color-faint) on a probe element"
+    },
+    {
+      "name": "--color-accent",
+      "custom": "#8b5cf6",
+      "computed": "rgb(139, 92, 246)",
+      "via": "color: var(--color-accent) on a probe element"
+    },
+    {
+      "name": "--color-accent-hover",
+      "custom": "#9d75ff",
+      "computed": "rgb(157, 117, 255)",
+      "via": "color: var(--color-accent-hover) on a probe element"
+    },
+    {
+      "name": "--color-accent-soft",
+      "custom": "#8b5cf629",
+      "computed": "rgba(139, 92, 246, 0.16)",
+      "via": "color: var(--color-accent-soft) on a probe element"
+    },
+    {
+      "name": "--color-success",
+      "custom": "#3ddc97",
+      "computed": "rgb(61, 220, 151)",
+      "via": "color: var(--color-success) on a probe element"
+    },
+    {
+      "name": "--color-warning",
+      "custom": "#f5b750",
+      "computed": "rgb(245, 183, 80)",
+      "via": "color: var(--color-warning) on a probe element"
+    },
+    {
+      "name": "--color-danger",
+      "custom": "#f25f5c",
+      "computed": "rgb(242, 95, 92)",
+      "via": "color: var(--color-danger) on a probe element"
+    },
+    {
+      "name": "--color-steam",
+      "custom": "#66c0f4",
+      "computed": "rgb(102, 192, 244)",
+      "via": "color: var(--color-steam) on a probe element"
+    },
+    {
+      "name": "--color-epic",
+      "custom": "#e6e6e6",
+      "computed": "rgb(230, 230, 230)",
+      "via": "color: var(--color-epic) on a probe element"
+    },
+    {
+      "name": "--color-battlenet",
+      "custom": "#148eff",
+      "computed": "rgb(20, 142, 255)",
+      "via": "color: var(--color-battlenet) on a probe element"
+    },
+    {
+      "name": "--color-riot",
+      "custom": "#ff4655",
+      "computed": "rgb(255, 70, 85)",
+      "via": "color: var(--color-riot) on a probe element"
+    },
+    {
+      "name": "--font-sans",
+      "custom": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+      "computed": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+      "via": "font-family of a probe with class font-sans"
+    },
+    {
+      "name": "--font-mono",
+      "custom": "",
+      "computed": "\"Cascadia Code\", \"Cascadia Mono\", Consolas, ui-monospace, monospace",
+      "via": "font-family of a probe with class font-mono"
+    },
+    {
+      "name": "--radius-panel",
+      "custom": "",
+      "computed": "12px",
+      "via": "border-top-left-radius of a probe with class rounded-panel"
+    },
+    {
+      "name": "--shadow-panel",
+      "custom": "",
+      "computed": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(255, 255, 255, 0.03) 0px 1px 0px 0px inset, rgba(0, 0, 0, 0.35) 0px 8px 24px 0px",
+      "via": "box-shadow of a probe with class shadow-panel"
+    }
+  ],
+  "body": {
+    "fontFamily": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+    "fontSize": "14px",
+    "lineHeight": "20.3px",
+    "color": "rgb(232, 234, 240)",
+    "backgroundColor": "rgb(11, 13, 18)"
+  }
+}

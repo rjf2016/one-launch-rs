@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-2d0e434607",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.healthCheck"
+  ],
+  "name": "warns on a missing manifests folder, a failed sign-in, and stale snapshots",
+  "calls": []
+}

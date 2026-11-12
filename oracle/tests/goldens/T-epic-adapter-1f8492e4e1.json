@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-1f8492e4e1",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.captureSession"
+  ],
+  "name": "while the launcher runs, trusts its log over the file and refuses a sign-in it has not saved yet",
+  "calls": []
+}

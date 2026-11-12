@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-19625cbbe5",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.listInstalledGames"
+  ],
+  "name": "returns nothing when the manifests folder is missing, and NOT_INSTALLED without the launcher",
+  "calls": []
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T-battlenet-adapter-acc44bab9f",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "lists installed products from the Uninstall tree with LastPlayed from the config, skipping missing folders",
+  "calls": []
+}

@@ -1,0 +1,368 @@
+{
+  "function": "vdfHas",
+  "source": "src/main/launchers/steam/vdf.ts",
+  "note": "decode: none\ncall rebuilds arg0 recursively as null-prototype objects, as parseVdf makes them, so a key such as toString is found only when the object has it; key order is as recorded. arg1 is the key looked up.",
+  "cases": [
+    {
+      "id": "exact",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > looks keys up case-insensitively, exact match first"
+      },
+      "args": [
+        {
+          "Name": "exact",
+          "name": "lower",
+          "Flag": "1"
+        },
+        "Name"
+      ],
+      "out": true
+    },
+    {
+      "id": "insensitive-first-wins",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > looks keys up case-insensitively, exact match first"
+      },
+      "args": [
+        {
+          "Name": "exact",
+          "name": "lower",
+          "Flag": "1"
+        },
+        "NAME"
+      ],
+      "out": true
+    },
+    {
+      "id": "exact-later-key",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > looks keys up case-insensitively, exact match first | looked up as name: the exact key wins over the earlier Name"
+      },
+      "args": [
+        {
+          "Name": "exact",
+          "name": "lower",
+          "Flag": "1"
+        },
+        "name"
+      ],
+      "out": true
+    },
+    {
+      "id": "missing",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > looks keys up case-insensitively, exact match first"
+      },
+      "args": [
+        {
+          "Name": "exact",
+          "name": "lower",
+          "Flag": "1"
+        },
+        "missing"
+      ],
+      "out": false
+    },
+    {
+      "id": "block-value",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > parses nested blocks with quoted keys and values"
+      },
+      "args": [
+        {
+          "users": {
+            "76561198000000001": {
+              "AccountName": "user_1",
+              "PersonaName": "Persona One",
+              "RememberPassword": "1",
+              "WantsOfflineMode": "0",
+              "SkipOfflineModeWarning": "0",
+              "AutoLogin": "1",
+              "Timestamp": "1789145779"
+            },
+            "76561198000000002": {
+              "AccountName": "user_2",
+              "PersonaName": "Persona Two",
+              "RememberPassword": "1",
+              "WantsOfflineMode": "0",
+              "SkipOfflineModeWarning": "0",
+              "AutoLogin": "0",
+              "Timestamp": "1759203770"
+            },
+            "76561198000000003": {
+              "AccountName": "user_3",
+              "PersonaName": "Persona Three",
+              "RememberPassword": "1",
+              "WantsOfflineMode": "0",
+              "SkipOfflineModeWarning": "0",
+              "AutoLogin": "0",
+              "Timestamp": "1755130895"
+            },
+            "76561198000000004": {
+              "AccountName": "user_4",
+              "PersonaName": "Persona Four",
+              "RememberPassword": "1",
+              "WantsOfflineMode": "0",
+              "SkipOfflineModeWarning": "0",
+              "AutoLogin": "0",
+              "Timestamp": "1716245512"
+            }
+          }
+        },
+        "USERS"
+      ],
+      "out": true
+    },
+    {
+      "id": "empty-value",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty string value is found, not missing"
+      },
+      "args": [
+        {
+          "k": ""
+        },
+        "K"
+      ],
+      "out": true
+    },
+    {
+      "id": "empty-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the empty key is a key"
+      },
+      "args": [
+        {
+          "": "v"
+        },
+        ""
+      ],
+      "out": true
+    },
+    {
+      "id": "proto-names",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: toString is not found on a null-prototype object that lacks it"
+      },
+      "args": [
+        {
+          "a": "1"
+        },
+        "toString"
+      ],
+      "out": false
+    },
+    {
+      "id": "proto-key-own",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > does not let a hostile key touch Object.prototype"
+      },
+      "args": [
+        {
+          "__proto__": {
+            "polluted": "yes"
+          }
+        },
+        "__proto__"
+      ],
+      "out": true
+    },
+    {
+      "id": "proto-key-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: looking up __proto__ on a null-prototype object without that key finds nothing"
+      },
+      "args": [
+        {
+          "a": "1"
+        },
+        "__proto__"
+      ],
+      "out": false
+    },
+    {
+      "id": "proto-key-insensitive",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: __PROTO__ finds an own __proto__ key case-insensitively"
+      },
+      "args": [
+        {
+          "__proto__": "p"
+        },
+        "__PROTO__"
+      ],
+      "out": true
+    },
+    {
+      "id": "proto-names-present",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a toString key is found case-insensitively"
+      },
+      "args": [
+        {
+          "TOSTRING": "1"
+        },
+        "toString"
+      ],
+      "out": true
+    },
+    {
+      "id": "integer-key-first",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the case-insensitive scan follows enumeration order, so array-index keys come first"
+      },
+      "args": [
+        {
+          "2": "two",
+          "10": "ten"
+        },
+        "2"
+      ],
+      "out": true
+    },
+    {
+      "id": "kelvin",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: U+212A KELVIN SIGN lower-cases to k, so Kelvin matches kelvin"
+      },
+      "args": [
+        {
+          "Kelvin": "k"
+        },
+        "kelvin"
+      ],
+      "out": true
+    },
+    {
+      "id": "kelvin-reverse",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: looking up with U+212A finds the ASCII key"
+      },
+      "args": [
+        {
+          "kelvin": "k"
+        },
+        "Kelvin"
+      ],
+      "out": true
+    },
+    {
+      "id": "dotted-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: İ lower-cases to i plus U+0307, so it does not match i"
+      },
+      "args": [
+        {
+          "İd": "x"
+        },
+        "id"
+      ],
+      "out": false
+    },
+    {
+      "id": "dotted-i-self",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: İD and i̇d (i, U+0307, d) match under toLowerCase"
+      },
+      "args": [
+        {
+          "İD": "x"
+        },
+        "i̇d"
+      ],
+      "out": true
+    },
+    {
+      "id": "final-sigma",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ΟΔΟΣ lower-cases with a final sigma ς, so it does not match οδοσ"
+      },
+      "args": [
+        {
+          "ΟΔΟΣ": "x"
+        },
+        "οδοσ"
+      ],
+      "out": false
+    },
+    {
+      "id": "final-sigma-match",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ΟΔΟΣ matches οδος"
+      },
+      "args": [
+        {
+          "ΟΔΟΣ": "x"
+        },
+        "οδος"
+      ],
+      "out": true
+    },
+    {
+      "id": "sharp-s",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ß does not lower-case to ss; STRASSE does not match Straße"
+      },
+      "args": [
+        {
+          "Straße": "x"
+        },
+        "STRASSE"
+      ],
+      "out": false
+    },
+    {
+      "id": "dotless-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ı (dotless) is not i"
+      },
+      "args": [
+        {
+          "ıd": "x"
+        },
+        "ID"
+      ],
+      "out": false
+    },
+    {
+      "id": "lone-surrogate-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a key holding a lone surrogate is matched unit for unit"
+      },
+      "args": [
+        {
+          "\ud800A": "x"
+        },
+        {
+          "$utf16": [
+            55296,
+            97
+          ]
+        }
+      ],
+      "out": true
+    }
+  ]
+}

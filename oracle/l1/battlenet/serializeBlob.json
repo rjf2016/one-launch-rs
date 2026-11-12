@@ -1,0 +1,152 @@
+{
+  "function": "serializeBlob",
+  "source": "src/main/launchers/battlenet/session.ts",
+  "note": "decode: none\narg0 is the session blob object, in memory. The output is JSON.stringify of it, keys in the order the object was built.\nThe vault line: sessions.decrypt (DPAPI through Electron safeStorage.decryptString) yields this JSON string and sessions.encrypt takes it; that step is not pure and is not recorded. Everything here is the layout on the clear side of it. Token values are placeholders.\nThe app writes v1 only (the capture in adapter.ts and src/main/launchers/sim/seed.ts); the v2 cases record that serializeBlob does not check the shape and writes a v2 object as it is.",
+  "cases": [
+    {
+      "id": "v1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape"
+      },
+      "args": [
+        {
+          "v": 1,
+          "unifiedAuth": {
+            "name": "AA11BB22",
+            "hex": "01000000d08c9ddf"
+          }
+        }
+      ],
+      "out": "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"01000000d08c9ddf\"}}"
+    },
+    {
+      "id": "v2-with-cookies",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | the v2 literal as an object"
+      },
+      "args": [
+        {
+          "v": 2,
+          "unifiedAuth": {
+            "name": "AA11BB22",
+            "hex": "01ff"
+          },
+          "cookies": "abcd"
+        }
+      ],
+      "out": "{\"v\":2,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"01ff\"},\"cookies\":\"abcd\"}"
+    },
+    {
+      "id": "v2-without-cookies",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | a v2 object without its cookie store"
+      },
+      "args": [
+        {
+          "v": 2,
+          "unifiedAuth": {
+            "name": "AA11BB22",
+            "hex": "01000000d08c9ddf"
+          }
+        }
+      ],
+      "out": "{\"v\":2,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"01000000d08c9ddf\"}}"
+    },
+    {
+      "id": "key-order",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | keys built in another order"
+      },
+      "args": [
+        {
+          "unifiedAuth": {
+            "hex": "01000000d08c9ddf",
+            "name": "AA11BB22"
+          },
+          "v": 1
+        }
+      ],
+      "out": "{\"unifiedAuth\":{\"hex\":\"01000000d08c9ddf\",\"name\":\"AA11BB22\"},\"v\":1}"
+    },
+    {
+      "id": "upper-hex",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | upper-case hex is written as it is"
+      },
+      "args": [
+        {
+          "v": 1,
+          "unifiedAuth": {
+            "name": "AA11BB22",
+            "hex": "01000000D08C9DDF"
+          }
+        }
+      ],
+      "out": "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"01000000D08C9DDF\"}}"
+    },
+    {
+      "id": "undefined-member",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | an undefined member is left out"
+      },
+      "args": [
+        {
+          "v": 1,
+          "unifiedAuth": {
+            "name": "AA11BB22",
+            "hex": "01000000d08c9ddf"
+          },
+          "extra": {
+            "$undefined": true
+          }
+        }
+      ],
+      "out": "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"01000000d08c9ddf\"}}"
+    },
+    {
+      "id": "name-escapes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a value name with a quote, a backslash, a control character, U+2028 and non-ASCII: JSON.stringify escapes the first three only"
+      },
+      "args": [
+        {
+          "v": 1,
+          "unifiedAuth": {
+            "name": "a\"b\\c\u0001d é😀",
+            "hex": "01000000d08c9ddf"
+          }
+        }
+      ],
+      "out": "{\"v\":1,\"unifiedAuth\":{\"name\":\"a\\\"b\\\\c\\u0001d é😀\",\"hex\":\"01000000d08c9ddf\"}}"
+    },
+    {
+      "id": "name-lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate in the value name is written as a lower-case \\ud800 escape"
+      },
+      "args": [
+        {
+          "v": 1,
+          "unifiedAuth": {
+            "name": {
+              "$utf16": [
+                120,
+                55296
+              ]
+            },
+            "hex": "01000000d08c9ddf"
+          }
+        }
+      ],
+      "out": "{\"v\":1,\"unifiedAuth\":{\"name\":\"x\\ud800\",\"hex\":\"01000000d08c9ddf\"}}"
+    }
+  ]
+}

@@ -1,0 +1,1051 @@
+{
+  "function": "placementFrom",
+  "source": "src/main/window-guard.ts",
+  "note": "decode: none\narg0 is the window.bounds setting as stored (a string or null; a settings value, not file text), arg1 the work areas of the connected displays (Electron's Rectangle objects as plain { x, y, width, height }).",
+  "cases": [
+    {
+      "id": "restores",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > restores a placement that is on a connected display, never smaller than the minimum window"
+      },
+      "args": [
+        "{\"x\":100,\"y\":80,\"width\":1400,\"height\":900,\"maximized\":false}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": 80,
+          "width": 1400,
+          "height": 900
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "minimum-size",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > restores a placement that is on a connected display, never smaller than the minimum window"
+      },
+      "args": [
+        "{\"x\":100,\"y\":80,\"width\":300,\"height\":200}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": 80,
+          "width": 960,
+          "height": 600
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "second-display",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > restores a placement that is on a connected display, never smaller than the minimum window"
+      },
+      "args": [
+        "{\"x\":-1800,\"y\":40,\"width\":1280,\"height\":800,\"maximized\":true}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          },
+          {
+            "x": -1920,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": -1800,
+          "y": 40,
+          "width": 1280,
+          "height": 800
+        },
+        "maximized": true
+      }
+    },
+    {
+      "id": "display-gone",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > drops a placement whose title bar could not be reached, but still remembers maximized"
+      },
+      "args": [
+        "{\"x\":-1800,\"y\":40,\"width\":1280,\"height\":800,\"maximized\":true}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": true
+      }
+    },
+    {
+      "id": "off-right",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > drops a placement whose title bar could not be reached, but still remembers maximized"
+      },
+      "args": [
+        "{\"x\":1900,\"y\":40,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "above-top",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > drops a placement whose title bar could not be reached, but still remembers maximized"
+      },
+      "args": [
+        "{\"x\":100,\"y\":-200,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "below-bottom",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > drops a placement whose title bar could not be reached, but still remembers maximized"
+      },
+      "args": [
+        "{\"x\":100,\"y\":1030,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "no-displays",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > drops a placement whose title bar could not be reached, but still remembers maximized"
+      },
+      "args": [
+        "{\"x\":100,\"y\":80,\"width\":1280,\"height\":800}",
+        []
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "none-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > treats a missing, malformed, or non-numeric setting as no placement"
+      },
+      "args": [
+        null,
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "none-empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > treats a missing, malformed, or non-numeric setting as no placement"
+      },
+      "args": [
+        "",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "none-not-json",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > treats a missing, malformed, or non-numeric setting as no placement"
+      },
+      "args": [
+        "not json",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "none-array",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > treats a missing, malformed, or non-numeric setting as no placement"
+      },
+      "args": [
+        "[]",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "none-string",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > treats a missing, malformed, or non-numeric setting as no placement"
+      },
+      "args": [
+        "\"x\"",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "none-string-x",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > treats a missing, malformed, or non-numeric setting as no placement"
+      },
+      "args": [
+        "{\"x\":\"1\",\"y\":2,\"width\":3,\"height\":4}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "none-null-width",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > treats a missing, malformed, or non-numeric setting as no placement"
+      },
+      "args": [
+        "{\"x\":1,\"y\":2,\"width\":null,\"height\":4}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "none-overflow",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > placementFrom (B19) > treats a missing, malformed, or non-numeric setting as no placement"
+      },
+      "args": [
+        "{\"x\":1e999,\"y\":2,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "cap-left-edge-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: x = 1855 leaves 65 px of the title bar on screen: kept"
+      },
+      "args": [
+        "{\"x\":1855,\"y\":40,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 1855,
+          "y": 40,
+          "width": 1280,
+          "height": 800
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "cap-left-edge-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: x = 1856 leaves 64 px: dropped"
+      },
+      "args": [
+        "{\"x\":1856,\"y\":40,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "cap-right-edge-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: x + width = 65: kept"
+      },
+      "args": [
+        "{\"x\":-1215,\"y\":40,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": -1215,
+          "y": 40,
+          "width": 1280,
+          "height": 800
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "cap-right-edge-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: x + width = 64: dropped"
+      },
+      "args": [
+        "{\"x\":-1216,\"y\":40,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "cap-top-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: y = -8, the most a title bar may sit above the work area: kept"
+      },
+      "args": [
+        "{\"x\":100,\"y\":-8,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": -8,
+          "width": 1280,
+          "height": 800
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "cap-top-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: y = -9: dropped"
+      },
+      "args": [
+        "{\"x\":100,\"y\":-9,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "cap-bottom-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: y = 975 is 65 px above the bottom: kept"
+      },
+      "args": [
+        "{\"x\":100,\"y\":975,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": 975,
+          "width": 1280,
+          "height": 800
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "cap-bottom-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: y = 976: dropped"
+      },
+      "args": [
+        "{\"x\":100,\"y\":976,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "cap-min-width-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: exactly the minimum window"
+      },
+      "args": [
+        "{\"x\":100,\"y\":80,\"width\":960,\"height\":600}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": 80,
+          "width": 960,
+          "height": 600
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "cap-min-width-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: one under the minimum is raised to it"
+      },
+      "args": [
+        "{\"x\":100,\"y\":80,\"width\":959,\"height\":599}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": 80,
+          "width": 960,
+          "height": 600
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "fractions",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: fractional values are kept as they are"
+      },
+      "args": [
+        "{\"x\":100.5,\"y\":80.25,\"width\":1280.75,\"height\":800.5}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100.5,
+          "y": 80.25,
+          "width": 1280.75,
+          "height": 800.5
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "negative-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: -0 from JSON is kept"
+      },
+      "args": [
+        "{\"x\":-0,\"y\":-0,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": {
+            "$number": "-0"
+          },
+          "y": {
+            "$number": "-0"
+          },
+          "width": 1280,
+          "height": 800
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "negative-size",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: a negative size is raised to the minimum"
+      },
+      "args": [
+        "{\"x\":100,\"y\":80,\"width\":-5,\"height\":-5}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": 80,
+          "width": 960,
+          "height": 600
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "huge",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: 1e308 is finite and kept"
+      },
+      "args": [
+        "{\"x\":0,\"y\":0,\"width\":1e+308,\"height\":1e+308}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1e+308,
+          "height": 1e+308
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "exponent",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: exponent forms parse as numbers"
+      },
+      "args": [
+        "{\"x\":1e2,\"y\":8E1,\"width\":1.28e3,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": 80,
+          "width": 1280,
+          "height": 800
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "maximized-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: maximized without bounds"
+      },
+      "args": [
+        "{\"maximized\":true}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": true
+      }
+    },
+    {
+      "id": "maximized-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: maximized must be the boolean true"
+      },
+      "args": [
+        "{\"x\":100,\"y\":80,\"width\":1280,\"height\":800,\"maximized\":\"true\"}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": 80,
+          "width": 1280,
+          "height": 800
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "json-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: the JSON null makes the property read throw, caught as no placement"
+      },
+      "args": [
+        "null",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "json-number",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a JSON number has no x"
+      },
+      "args": [
+        "42",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "duplicate-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a duplicate key: the last one wins in JSON.parse"
+      },
+      "args": [
+        "{\"x\":5000,\"x\":100,\"y\":80,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": 80,
+          "width": 1280,
+          "height": 800
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "proto-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a __proto__ key from JSON.parse is an own property, so x is not inherited"
+      },
+      "args": [
+        "{\"__proto__\":{\"x\":100},\"y\":80,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "bom",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a leading U+FEFF makes JSON.parse throw"
+      },
+      "args": [
+        "﻿{\"x\":100,\"y\":80,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "whitespace",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: JSON whitespace around the value is allowed"
+      },
+      "args": [
+        " \n{\"x\":100,\"y\":80,\"width\":1280,\"height\":800}\t",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": 80,
+          "width": 1280,
+          "height": 800
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "nbsp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+00A0 is not JSON whitespace"
+      },
+      "args": [
+        " {\"x\":100,\"y\":80,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "trailing-comma",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a trailing comma is refused"
+      },
+      "args": [
+        "{\"x\":100,\"y\":80,\"width\":1280,\"height\":800,}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": null,
+        "maximized": false
+      }
+    },
+    {
+      "id": "big-integer",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a 20-digit width parses to the nearest double"
+      },
+      "args": [
+        "{\"x\":100,\"y\":80,\"width\":12345678901234567890,\"height\":800}",
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1040
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 100,
+          "y": 80,
+          "width": 12345678901234567000,
+          "height": 800
+        },
+        "maximized": false
+      }
+    },
+    {
+      "id": "offset-work-area",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: a display whose work area starts at y = 40: y = 32 is exactly 8 px above it"
+      },
+      "args": [
+        "{\"x\":2000,\"y\":32,\"width\":1280,\"height\":800}",
+        [
+          {
+            "x": 1920,
+            "y": 40,
+            "width": 1280,
+            "height": 1000
+          }
+        ]
+      ],
+      "out": {
+        "bounds": {
+          "x": 2000,
+          "y": 32,
+          "width": 1280,
+          "height": 800
+        },
+        "maximized": false
+      }
+    }
+  ]
+}

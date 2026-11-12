@@ -1,0 +1,13 @@
+[2026-09-11 12:56:02] Startup - updater built Sep  2 2026 18:32:43
+[2026-09-11 12:56:02] Startup - Steam Client launched with: d:\games\steam\steam.exe
+[2026-09-11 12:56:02] Verifying installation...
+[2026-09-11 12:56:02] Verifying file sizes only
+[2026-09-11 12:56:02] Verification complete
+[2026-09-11 12:56:02] Background update loop checking for update. . .
+[2026-09-11 12:56:02] Downloaded new manifest: /steam_client_win64 version 1779486452, installed version 1778281814, existing pending version 0
+[2026-09-11 12:56:02] Downloading update (141 of 269 KB)...
+[2026-09-11 12:56:02] Download complete.
+[2026-09-11 12:56:02] Shutdown
+[2026-09-11 12:56:02] Startup - updater built May  8 2026 15:40:38
+[2026-09-11 12:56:02] Download complete.
+[2026-09-11 12:56:02] Found pending update

@@ -1,0 +1,9 @@
+{
+  "id": "T-battlenet-adapter-d6b828df5b",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "session state and capture"
+  ],
+  "name": "captures the current token for its account and refuses when it belongs to someone else",
+  "calls": []
+}

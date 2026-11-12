@@ -1,0 +1,552 @@
+{
+  "function": "maskReason",
+  "source": "src/main/launchers/battlenet/client-log.ts",
+  "note": "decode: none\narg0 is a failure text cut from a log line, in memory. Drops emails and hex runs of 16 or more, trims (JS trim), then keeps the first 200 UTF-16 units.\nThe test literals of 200 000 characters that check linear time are not recorded (over the inline limit and about time, not output); shorter cases of the same shapes are.",
+  "cases": [
+    {
+      "id": "test-cut-200",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > client log > recognises failures, logouts, and launch requests, and masks reasons"
+      },
+      "args": [
+        "x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x "
+      ],
+      "out": "x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x "
+    },
+    {
+      "id": "test-email-and-token",
+      "origin": {
+        "kind": "test",
+        "ref": "test/parse-limits.test.ts > launcher files of a size or shape no launcher writes (H16) > masks a failure reason in linear time, whatever one long run of characters it holds"
+      },
+      "args": [
+        "wrong password for some.one@example.com token 0123456789abcdef0123"
+      ],
+      "out": "wrong password for … token …"
+    },
+    {
+      "id": "test-long-run-a",
+      "origin": {
+        "kind": "test",
+        "ref": "test/parse-limits.test.ts > launcher files of a size or shape no launcher writes (H16) > masks a failure reason in linear time, whatever one long run of characters it holds | shortened to 2000 characters"
+      },
+      "args": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "out": "…"
+    },
+    {
+      "id": "test-long-run-dots",
+      "origin": {
+        "kind": "test",
+        "ref": "test/parse-limits.test.ts > launcher files of a size or shape no launcher writes (H16) > masks a failure reason in linear time, whatever one long run of characters it holds | shortened to 1000 pairs"
+      },
+      "args": [
+        "a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a."
+      ],
+      "out": "a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a."
+    },
+    {
+      "id": "test-long-run-ats",
+      "origin": {
+        "kind": "test",
+        "ref": "test/parse-limits.test.ts > launcher files of a size or shape no launcher writes (H16) > masks a failure reason in linear time, whatever one long run of characters it holds | shortened to 1000 pairs"
+      },
+      "args": [
+        "a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@"
+      ],
+      "out": "a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@a@"
+    },
+    {
+      "id": "email-plus-dots",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | an email with a plus, dots and a sub-domain"
+      },
+      "args": [
+        "for first.last+tag@mail.example.co.uk."
+      ],
+      "out": "for …"
+    },
+    {
+      "id": "email-glued",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | an email right after a slash and before a comma"
+      },
+      "args": [
+        "/user_1@example.com,user_2@example.com"
+      ],
+      "out": "/…,…"
+    },
+    {
+      "id": "email-no-dot",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | an @ with no dotted domain is kept"
+      },
+      "args": [
+        "user@localhost"
+      ],
+      "out": "user@localhost"
+    },
+    {
+      "id": "email-non-ascii-local",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "regex: a non-ASCII letter right before the @: JS \\w is ASCII, so this email is not masked; Rust Unicode \\w would mask it"
+      },
+      "args": [
+        "for josé@example.com"
+      ],
+      "out": "for josé@example.com"
+    },
+    {
+      "id": "email-non-ascii-domain",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "regex: a non-ASCII domain letter: the JS pattern stops before it and keeps the email"
+      },
+      "args": [
+        "for user@exämple.com"
+      ],
+      "out": "for user@exämple.com"
+    },
+    {
+      "id": "email-non-ascii-tld",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "regex: a non-ASCII letter after the dot: JS masks up to it and keeps the rest"
+      },
+      "args": [
+        "for user@example.cöm"
+      ],
+      "out": "for …öm"
+    },
+    {
+      "id": "hex-16",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | a 16-digit hex run, the shortest that is masked"
+      },
+      "args": [
+        "token 0123456789abcdef end"
+      ],
+      "out": "token … end"
+    },
+    {
+      "id": "hex-15",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | a 15-digit hex run is kept"
+      },
+      "args": [
+        "token 0123456789abcde end"
+      ],
+      "out": "token 0123456789abcde end"
+    },
+    {
+      "id": "hex-upper",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | upper-case hex is masked"
+      },
+      "args": [
+        "token 0123456789ABCDEF0123 end"
+      ],
+      "out": "token … end"
+    },
+    {
+      "id": "hex-glued-letter",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | a hex run glued to a letter has no word boundary and is kept"
+      },
+      "args": [
+        "tokeng0123456789abcdef0123 end"
+      ],
+      "out": "tokeng0123456789abcdef0123 end"
+    },
+    {
+      "id": "hex-glued-underscore",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | a hex run after an underscore has no word boundary"
+      },
+      "args": [
+        "id_0123456789abcdef0123"
+      ],
+      "out": "id_0123456789abcdef0123"
+    },
+    {
+      "id": "hex-non-ascii-boundary",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "word-boundary: a hex run after é: JS \\b sees a boundary and masks; Rust Unicode \\b does not"
+      },
+      "args": [
+        "café0123456789abcdef0123"
+      ],
+      "out": "café…"
+    },
+    {
+      "id": "hex-in-email",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | an email whose local part is hex"
+      },
+      "args": [
+        "0123456789abcdef0123@example.com"
+      ],
+      "out": "…"
+    },
+    {
+      "id": "trim-ascii",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | spaces, tabs and newlines around the text"
+      },
+      "args": [
+        " \t\r\n bad password \n"
+      ],
+      "out": "bad password"
+    },
+    {
+      "id": "trim-unicode",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+FEFF, U+3000, U+00A0 and U+2029 around the text are trimmed by JS trim; Rust str::trim keeps U+FEFF"
+      },
+      "args": [
+        "﻿　 bad password ﻿"
+      ],
+      "out": "bad password"
+    },
+    {
+      "id": "trim-not-mongolian",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+180E is not trimmed by JS"
+      },
+      "args": [
+        "᠎bad᠎"
+      ],
+      "out": "᠎bad᠎"
+    },
+    {
+      "id": "cap-length-at",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | exactly 200 units"
+      },
+      "args": [
+        "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+      ],
+      "out": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+    },
+    {
+      "id": "cap-length-over",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | 201 units"
+      },
+      "args": [
+        "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+      ],
+      "out": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+    },
+    {
+      "id": "cap-length-astral-straddle",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an astral character at units 200 and 201: the cut keeps its high surrogate alone"
+      },
+      "args": [
+        "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy😀z"
+      ],
+      "out": {
+        "$utf16": [
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          121,
+          55357
+        ]
+      }
+    },
+    {
+      "id": "cap-length-astral-inside",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: 100 astral characters are 200 units and are kept whole"
+      },
+      "args": [
+        "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀z"
+      ],
+      "out": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+    },
+    {
+      "id": "cap-after-mask",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | the cut counts the text after masking and trimming"
+      },
+      "args": [
+        "  0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 0123456789abcdef0123 wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"
+      ],
+      "out": "… … … … … … … … … … … … … … … … … … … … … … … … … … … … … … wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"
+    },
+    {
+      "id": "lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone surrogate in the text is kept"
+      },
+      "args": [
+        {
+          "$utf16": [
+            98,
+            97,
+            100,
+            32,
+            55296,
+            32,
+            112,
+            97,
+            115,
+            115,
+            119,
+            111,
+            114,
+            100
+          ]
+        }
+      ],
+      "out": {
+        "$utf16": [
+          98,
+          97,
+          100,
+          32,
+          55296,
+          32,
+          112,
+          97,
+          115,
+          115,
+          119,
+          111,
+          114,
+          100
+        ]
+      }
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/battle.net-20260913T032048.091643.log | an empty reason"
+      },
+      "args": [
+        ""
+      ],
+      "out": ""
+    }
+  ]
+}

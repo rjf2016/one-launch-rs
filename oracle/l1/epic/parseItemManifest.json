@@ -1,0 +1,1563 @@
+{
+  "function": "parseItemManifest",
+  "source": "src/main/launchers/epic/manifests.ts",
+  "note": "decode: arg0=utf8\narg0 is the file as the Epic adapter reads it (src/main/launchers/epic/adapter.ts readLauncherText: readLauncherBytes, then toString utf8, so a BOM is kept and invalid bytes become U+FFFD); the function strips one leading U+FEFF itself.\nPaths go through normalizeLauncherPath (src/main/platform/fs-path.ts): trim, a doubled backslash made single, separators unified to \\ by path.win32.normalize (which also resolves . and ..), a trailing separator dropped except on a drive root.\nA JSON.parse failure is recorded with V8's message inside the function's own text, exactly as Node prints it; the error is EpicManifestError with the own property code MANIFEST_FORMAT.\nNo size cap in the function: it relies on readLauncherBytes (MAX_LAUNCHER_FILE_BYTES, 4 MiB) in the adapter.\ngap: src/main/launchers/epic/manifests.ts:53:89 ?: false arm, JSON.parse only ever throws a SyntaxError (an Error), so String(err) is never reached.",
+  "cases": [
+    {
+      "id": "test-fixture",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > parses the sanitized Rocket League manifest and normalizes its mixed separators"
+      },
+      "args": [
+        {
+          "$file": "fixtures/launchers/epic/A0000000000000000000000000000001.item",
+          "sha256": "46891eac6d5b22f3cdd7a7fa379b3f37bfe7131f74d246f123b1e4274b240428"
+        }
+      ],
+      "out": {
+        "installationGuid": "A0000000000000000000000000000001",
+        "appName": "Sugar",
+        "displayName": "Rocket League®",
+        "catalogNamespace": "0000000000000000000000000000000a",
+        "catalogItemId": "0000000000000000000000000000000b",
+        "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+        "launchExecutable": "Binaries\\Win64\\Launcher.exe",
+        "installSize": 42793420249,
+        "incomplete": false,
+        "mainGameAppName": "Sugar",
+        "categories": [
+          "public",
+          "games",
+          "applications"
+        ]
+      }
+    },
+    {
+      "id": "test-incomplete",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > keeps DLC, incomplete installs, and engine installs out of the library"
+      },
+      "args": [
+        {
+          "$bytes": "ewoJIkZvcm1hdFZlcnNpb24iOiAwLAoJImJJc0luY29tcGxldGVJbnN0YWxsIjogdHJ1ZSwKCSJMYXVuY2hDb21tYW5kIjogIiIsCgkiTGF1bmNoRXhlY3V0YWJsZSI6ICJCaW5hcmllcy9XaW42NC9MYXVuY2hlci5leGUiLAoJIk1hbmlmZXN0TG9jYXRpb24iOiAiRDpcXFBsYWNlaG9sZGVyXFxFcGljIEdhbWVzL3JvY2tldGxlYWd1ZS8uZWdzdG9yZSIsCgkiTWFuaWZlc3RIYXNoIjogIjExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTEiLAoJImJJc0FwcGxpY2F0aW9uIjogdHJ1ZSwKCSJiSXNFeGVjdXRhYmxlIjogdHJ1ZSwKCSJiSXNNYW5hZ2VkIjogZmFsc2UsCgkiYk5lZWRzVmFsaWRhdGlvbiI6IGZhbHNlLAoJImJSZXF1aXJlc0F1dGgiOiB0cnVlLAoJImJBbGxvd011bHRpcGxlSW5zdGFuY2VzIjogZmFsc2UsCgkiYkNhblJ1bk9mZmxpbmUiOiB0cnVlLAoJImJBbGxvd1VyaUNtZEFyZ3MiOiBmYWxzZSwKCSJiTGF1bmNoRWxldmF0ZWQiOiBmYWxzZSwKCSJCYXNlVVJMcyI6IFsKCQkiaHR0cDovL2Vncy1jbG91ZGZyb250LWNodW5rcy5lcGljZ2FtZXNjZG4uY29tL0J1aWxkcy9Pcmcvby1wbGFjZWhvbGRlci8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYy9kZWZhdWx0IiwKCQkiaHR0cDovL2VwaWNnYW1lcy1kb3dubG9hZDEuYWthbWFpemVkLm5ldC9CdWlsZHMvT3JnL28tcGxhY2Vob2xkZXIvMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGMvZGVmYXVsdCIsCgkJImh0dHA6Ly9lZ2Rvd25sb2FkLmZhc3RseS1lZGdlLmNvbS9CdWlsZHMvT3JnL28tcGxhY2Vob2xkZXIvMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGMvZGVmYXVsdCIKCV0sCgkiQnVpbGRMYWJlbCI6ICJMaXZlIiwKCSJBcHBDYXRlZ29yaWVzIjogWwoJCSJwdWJsaWMiLAoJCSJnYW1lcyIsCgkJImFwcGxpY2F0aW9ucyIKCV0sCgkiQ2h1bmtEYnMiOiBbXSwKCSJDb21wYXRpYmxlQXBwcyI6IFtdLAoJIkRpc3BsYXlOYW1lIjogIlJvY2tldCBMZWFndWXCriIsCgkiSW5zdGFsbGF0aW9uR3VpZCI6ICJBMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsCgkiSW5zdGFsbExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUiLAoJIkluc3RhbGxTZXNzaW9uSWQiOiAiQjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIiLAoJIkluc3RhbGxUYWdzIjogW10sCgkiSW5zdGFsbENvbXBvbmVudHMiOiBbXSwKCSJIb3N0SW5zdGFsbGF0aW9uR3VpZCI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsCgkiUHJlcmVxSWRzIjogWwoJCSJFQUNfU2VydmljZSIKCV0sCgkiUHJlcmVxU0hBMUhhc2giOiAiMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMiIsCgkiTGFzdFByZXJlcVN1Y2NlZWRlZFNIQTFIYXNoIjogIiIsCgkiU3RhZ2luZ0xvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUvYnBzIiwKCSJUZWNobmljYWxUeXBlIjogInB1YmxpYyxnYW1lcyxhcHBsaWNhdGlvbnMiLAoJIlZhdWx0VGh1bWJuYWlsVXJsIjogIiIsCgkiVmF1bHRUaXRsZVRleHQiOiAiIiwKCSJJbnN0YWxsU2l6ZSI6IDQyNzkzNDIwMjQ5LAoJIk1haW5XaW5kb3dQcm9jZXNzTmFtZSI6ICIiLAoJIlByb2Nlc3NOYW1lcyI6IFtdLAoJIkJhY2tncm91bmRQcm9jZXNzTmFtZXMiOiBbXSwKCSJJZ25vcmVkUHJvY2Vzc05hbWVzIjogW10sCgkiRGxjUHJvY2Vzc05hbWVzIjogW10sCgkiTWFuZGF0b3J5QXBwRm9sZGVyTmFtZSI6ICJyb2NrZXRsZWFndWUiLAoJIk93bmVyc2hpcFRva2VuIjogImZhbHNlIiwKCSJTaWRlY2FyQ29uZmlnUmV2aXNpb24iOiAwLAoJIkNhdGFsb2dOYW1lc3BhY2UiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGEiLAoJIkNhdGFsb2dJdGVtSWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGIiLAoJIkFwcE5hbWUiOiAiU3VnYXIiLAoJIkFwcFZlcnNpb25TdHJpbmciOiAiKytQcmltZStVcGRhdGU1OS4xLUNMLTUyNjUzMSIsCgkiTWFpbkdhbWVDYXRhbG9nTmFtZXNwYWNlIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBhIiwKCSJNYWluR2FtZUNhdGFsb2dJdGVtSWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGIiLAoJIk1haW5HYW1lQXBwTmFtZSI6ICJTdWdhciIsCgkiQWxsb3dlZFVyaUVudlZhcnMiOiBbXQp9"
+        }
+      ],
+      "out": {
+        "installationGuid": "A0000000000000000000000000000001",
+        "appName": "Sugar",
+        "displayName": "Rocket League®",
+        "catalogNamespace": "0000000000000000000000000000000a",
+        "catalogItemId": "0000000000000000000000000000000b",
+        "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+        "launchExecutable": "Binaries\\Win64\\Launcher.exe",
+        "installSize": 42793420249,
+        "incomplete": true,
+        "mainGameAppName": "Sugar",
+        "categories": [
+          "public",
+          "games",
+          "applications"
+        ]
+      }
+    },
+    {
+      "id": "test-dlc",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > keeps DLC, incomplete installs, and engine installs out of the library"
+      },
+      "args": [
+        {
+          "$bytes": "ewoJIkZvcm1hdFZlcnNpb24iOiAwLAoJImJJc0luY29tcGxldGVJbnN0YWxsIjogZmFsc2UsCgkiTGF1bmNoQ29tbWFuZCI6ICIiLAoJIkxhdW5jaEV4ZWN1dGFibGUiOiAiQmluYXJpZXMvV2luNjQvTGF1bmNoZXIuZXhlIiwKCSJNYW5pZmVzdExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUiLAoJIk1hbmlmZXN0SGFzaCI6ICIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIiwKCSJiSXNBcHBsaWNhdGlvbiI6IHRydWUsCgkiYklzRXhlY3V0YWJsZSI6IHRydWUsCgkiYklzTWFuYWdlZCI6IGZhbHNlLAoJImJOZWVkc1ZhbGlkYXRpb24iOiBmYWxzZSwKCSJiUmVxdWlyZXNBdXRoIjogdHJ1ZSwKCSJiQWxsb3dNdWx0aXBsZUluc3RhbmNlcyI6IGZhbHNlLAoJImJDYW5SdW5PZmZsaW5lIjogdHJ1ZSwKCSJiQWxsb3dVcmlDbWRBcmdzIjogZmFsc2UsCgkiYkxhdW5jaEVsZXZhdGVkIjogZmFsc2UsCgkiQmFzZVVSTHMiOiBbCgkJImh0dHA6Ly9lZ3MtY2xvdWRmcm9udC1jaHVua3MuZXBpY2dhbWVzY2RuLmNvbS9CdWlsZHMvT3JnL28tcGxhY2Vob2xkZXIvMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGMvZGVmYXVsdCIsCgkJImh0dHA6Ly9lcGljZ2FtZXMtZG93bmxvYWQxLmFrYW1haXplZC5uZXQvQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiLAoJCSJodHRwOi8vZWdkb3dubG9hZC5mYXN0bHktZWRnZS5jb20vQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiCgldLAoJIkJ1aWxkTGFiZWwiOiAiTGl2ZSIsCgkiQXBwQ2F0ZWdvcmllcyI6IFsKCQkicHVibGljIiwKCQkiZ2FtZXMiLAoJCSJhcHBsaWNhdGlvbnMiCgldLAoJIkNodW5rRGJzIjogW10sCgkiQ29tcGF0aWJsZUFwcHMiOiBbXSwKCSJEaXNwbGF5TmFtZSI6ICJSb2NrZXQgTGVhZ3Vlwq4iLAoJIkluc3RhbGxhdGlvbkd1aWQiOiAiQTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLAoJIkluc3RhbGxMb2NhdGlvbiI6ICJEOlxcUGxhY2Vob2xkZXJcXEVwaWMgR2FtZXMvcm9ja2V0bGVhZ3VlIiwKCSJJbnN0YWxsU2Vzc2lvbklkIjogIkIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyIiwKCSJJbnN0YWxsVGFncyI6IFtdLAoJIkluc3RhbGxDb21wb25lbnRzIjogW10sCgkiSG9zdEluc3RhbGxhdGlvbkd1aWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLAoJIlByZXJlcUlkcyI6IFsKCQkiRUFDX1NlcnZpY2UiCgldLAoJIlByZXJlcVNIQTFIYXNoIjogIjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIiLAoJIkxhc3RQcmVyZXFTdWNjZWVkZWRTSEExSGFzaCI6ICIiLAoJIlN0YWdpbmdMb2NhdGlvbiI6ICJEOlxcUGxhY2Vob2xkZXJcXEVwaWMgR2FtZXMvcm9ja2V0bGVhZ3VlLy5lZ3N0b3JlL2JwcyIsCgkiVGVjaG5pY2FsVHlwZSI6ICJwdWJsaWMsZ2FtZXMsYXBwbGljYXRpb25zIiwKCSJWYXVsdFRodW1ibmFpbFVybCI6ICIiLAoJIlZhdWx0VGl0bGVUZXh0IjogIiIsCgkiSW5zdGFsbFNpemUiOiA0Mjc5MzQyMDI0OSwKCSJNYWluV2luZG93UHJvY2Vzc05hbWUiOiAiIiwKCSJQcm9jZXNzTmFtZXMiOiBbXSwKCSJCYWNrZ3JvdW5kUHJvY2Vzc05hbWVzIjogW10sCgkiSWdub3JlZFByb2Nlc3NOYW1lcyI6IFtdLAoJIkRsY1Byb2Nlc3NOYW1lcyI6IFtdLAoJIk1hbmRhdG9yeUFwcEZvbGRlck5hbWUiOiAicm9ja2V0bGVhZ3VlIiwKCSJPd25lcnNoaXBUb2tlbiI6ICJmYWxzZSIsCgkiU2lkZWNhckNvbmZpZ1JldmlzaW9uIjogMCwKCSJDYXRhbG9nTmFtZXNwYWNlIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBhIiwKCSJDYXRhbG9nSXRlbUlkIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBiIiwKCSJBcHBOYW1lIjogIlN1Z2FyIiwKCSJBcHBWZXJzaW9uU3RyaW5nIjogIisrUHJpbWUrVXBkYXRlNTkuMS1DTC01MjY1MzEiLAoJIk1haW5HYW1lQ2F0YWxvZ05hbWVzcGFjZSI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYSIsCgkiTWFpbkdhbWVDYXRhbG9nSXRlbUlkIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBiIiwKCSJNYWluR2FtZUFwcE5hbWUiOiAiT3RoZXJHYW1lIiwKCSJBbGxvd2VkVXJpRW52VmFycyI6IFtdCn0="
+        }
+      ],
+      "out": {
+        "installationGuid": "A0000000000000000000000000000001",
+        "appName": "Sugar",
+        "displayName": "Rocket League®",
+        "catalogNamespace": "0000000000000000000000000000000a",
+        "catalogItemId": "0000000000000000000000000000000b",
+        "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+        "launchExecutable": "Binaries\\Win64\\Launcher.exe",
+        "installSize": 42793420249,
+        "incomplete": false,
+        "mainGameAppName": "OtherGame",
+        "categories": [
+          "public",
+          "games",
+          "applications"
+        ]
+      }
+    },
+    {
+      "id": "test-engines",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > keeps DLC, incomplete installs, and engine installs out of the library"
+      },
+      "args": [
+        {
+          "$bytes": "ewoJIkZvcm1hdFZlcnNpb24iOiAwLAoJImJJc0luY29tcGxldGVJbnN0YWxsIjogZmFsc2UsCgkiTGF1bmNoQ29tbWFuZCI6ICIiLAoJIkxhdW5jaEV4ZWN1dGFibGUiOiAiQmluYXJpZXMvV2luNjQvTGF1bmNoZXIuZXhlIiwKCSJNYW5pZmVzdExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUiLAoJIk1hbmlmZXN0SGFzaCI6ICIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIiwKCSJiSXNBcHBsaWNhdGlvbiI6IHRydWUsCgkiYklzRXhlY3V0YWJsZSI6IHRydWUsCgkiYklzTWFuYWdlZCI6IGZhbHNlLAoJImJOZWVkc1ZhbGlkYXRpb24iOiBmYWxzZSwKCSJiUmVxdWlyZXNBdXRoIjogdHJ1ZSwKCSJiQWxsb3dNdWx0aXBsZUluc3RhbmNlcyI6IGZhbHNlLAoJImJDYW5SdW5PZmZsaW5lIjogdHJ1ZSwKCSJiQWxsb3dVcmlDbWRBcmdzIjogZmFsc2UsCgkiYkxhdW5jaEVsZXZhdGVkIjogZmFsc2UsCgkiQmFzZVVSTHMiOiBbCgkJImh0dHA6Ly9lZ3MtY2xvdWRmcm9udC1jaHVua3MuZXBpY2dhbWVzY2RuLmNvbS9CdWlsZHMvT3JnL28tcGxhY2Vob2xkZXIvMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGMvZGVmYXVsdCIsCgkJImh0dHA6Ly9lcGljZ2FtZXMtZG93bmxvYWQxLmFrYW1haXplZC5uZXQvQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiLAoJCSJodHRwOi8vZWdkb3dubG9hZC5mYXN0bHktZWRnZS5jb20vQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiCgldLAoJIkJ1aWxkTGFiZWwiOiAiTGl2ZSIsCgkiQXBwQ2F0ZWdvcmllcyI6IFsKCQkicHVibGljIiwKCQkiZW5naW5lcyIKCV0sCgkiQ2h1bmtEYnMiOiBbXSwKCSJDb21wYXRpYmxlQXBwcyI6IFtdLAoJIkRpc3BsYXlOYW1lIjogIlJvY2tldCBMZWFndWXCriIsCgkiSW5zdGFsbGF0aW9uR3VpZCI6ICJBMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsCgkiSW5zdGFsbExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUiLAoJIkluc3RhbGxTZXNzaW9uSWQiOiAiQjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIiLAoJIkluc3RhbGxUYWdzIjogW10sCgkiSW5zdGFsbENvbXBvbmVudHMiOiBbXSwKCSJIb3N0SW5zdGFsbGF0aW9uR3VpZCI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsCgkiUHJlcmVxSWRzIjogWwoJCSJFQUNfU2VydmljZSIKCV0sCgkiUHJlcmVxU0hBMUhhc2giOiAiMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMiIsCgkiTGFzdFByZXJlcVN1Y2NlZWRlZFNIQTFIYXNoIjogIiIsCgkiU3RhZ2luZ0xvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUvYnBzIiwKCSJUZWNobmljYWxUeXBlIjogInB1YmxpYyxnYW1lcyxhcHBsaWNhdGlvbnMiLAoJIlZhdWx0VGh1bWJuYWlsVXJsIjogIiIsCgkiVmF1bHRUaXRsZVRleHQiOiAiIiwKCSJJbnN0YWxsU2l6ZSI6IDQyNzkzNDIwMjQ5LAoJIk1haW5XaW5kb3dQcm9jZXNzTmFtZSI6ICIiLAoJIlByb2Nlc3NOYW1lcyI6IFtdLAoJIkJhY2tncm91bmRQcm9jZXNzTmFtZXMiOiBbXSwKCSJJZ25vcmVkUHJvY2Vzc05hbWVzIjogW10sCgkiRGxjUHJvY2Vzc05hbWVzIjogW10sCgkiTWFuZGF0b3J5QXBwRm9sZGVyTmFtZSI6ICJyb2NrZXRsZWFndWUiLAoJIk93bmVyc2hpcFRva2VuIjogImZhbHNlIiwKCSJTaWRlY2FyQ29uZmlnUmV2aXNpb24iOiAwLAoJIkNhdGFsb2dOYW1lc3BhY2UiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGEiLAoJIkNhdGFsb2dJdGVtSWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGIiLAoJIkFwcE5hbWUiOiAiU3VnYXIiLAoJIkFwcFZlcnNpb25TdHJpbmciOiAiKytQcmltZStVcGRhdGU1OS4xLUNMLTUyNjUzMSIsCgkiTWFpbkdhbWVDYXRhbG9nTmFtZXNwYWNlIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBhIiwKCSJNYWluR2FtZUNhdGFsb2dJdGVtSWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGIiLAoJIk1haW5HYW1lQXBwTmFtZSI6ICJTdWdhciIsCgkiQWxsb3dlZFVyaUVudlZhcnMiOiBbXQp9"
+        }
+      ],
+      "out": {
+        "installationGuid": "A0000000000000000000000000000001",
+        "appName": "Sugar",
+        "displayName": "Rocket League®",
+        "catalogNamespace": "0000000000000000000000000000000a",
+        "catalogItemId": "0000000000000000000000000000000b",
+        "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+        "launchExecutable": "Binaries\\Win64\\Launcher.exe",
+        "installSize": 42793420249,
+        "incomplete": false,
+        "mainGameAppName": "Sugar",
+        "categories": [
+          "public",
+          "engines"
+        ]
+      }
+    },
+    {
+      "id": "test-no-categories",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > keeps DLC, incomplete installs, and engine installs out of the library"
+      },
+      "args": [
+        {
+          "$bytes": "ewoJIkZvcm1hdFZlcnNpb24iOiAwLAoJImJJc0luY29tcGxldGVJbnN0YWxsIjogZmFsc2UsCgkiTGF1bmNoQ29tbWFuZCI6ICIiLAoJIkxhdW5jaEV4ZWN1dGFibGUiOiAiQmluYXJpZXMvV2luNjQvTGF1bmNoZXIuZXhlIiwKCSJNYW5pZmVzdExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUiLAoJIk1hbmlmZXN0SGFzaCI6ICIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIiwKCSJiSXNBcHBsaWNhdGlvbiI6IHRydWUsCgkiYklzRXhlY3V0YWJsZSI6IHRydWUsCgkiYklzTWFuYWdlZCI6IGZhbHNlLAoJImJOZWVkc1ZhbGlkYXRpb24iOiBmYWxzZSwKCSJiUmVxdWlyZXNBdXRoIjogdHJ1ZSwKCSJiQWxsb3dNdWx0aXBsZUluc3RhbmNlcyI6IGZhbHNlLAoJImJDYW5SdW5PZmZsaW5lIjogdHJ1ZSwKCSJiQWxsb3dVcmlDbWRBcmdzIjogZmFsc2UsCgkiYkxhdW5jaEVsZXZhdGVkIjogZmFsc2UsCgkiQmFzZVVSTHMiOiBbCgkJImh0dHA6Ly9lZ3MtY2xvdWRmcm9udC1jaHVua3MuZXBpY2dhbWVzY2RuLmNvbS9CdWlsZHMvT3JnL28tcGxhY2Vob2xkZXIvMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGMvZGVmYXVsdCIsCgkJImh0dHA6Ly9lcGljZ2FtZXMtZG93bmxvYWQxLmFrYW1haXplZC5uZXQvQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiLAoJCSJodHRwOi8vZWdkb3dubG9hZC5mYXN0bHktZWRnZS5jb20vQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiCgldLAoJIkJ1aWxkTGFiZWwiOiAiTGl2ZSIsCgkiQXBwQ2F0ZWdvcmllcyI6IFsKCQkKCV0sCgkiQ2h1bmtEYnMiOiBbXSwKCSJDb21wYXRpYmxlQXBwcyI6IFtdLAoJIkRpc3BsYXlOYW1lIjogIlJvY2tldCBMZWFndWXCriIsCgkiSW5zdGFsbGF0aW9uR3VpZCI6ICJBMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsCgkiSW5zdGFsbExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUiLAoJIkluc3RhbGxTZXNzaW9uSWQiOiAiQjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIiLAoJIkluc3RhbGxUYWdzIjogW10sCgkiSW5zdGFsbENvbXBvbmVudHMiOiBbXSwKCSJIb3N0SW5zdGFsbGF0aW9uR3VpZCI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsCgkiUHJlcmVxSWRzIjogWwoJCSJFQUNfU2VydmljZSIKCV0sCgkiUHJlcmVxU0hBMUhhc2giOiAiMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMiIsCgkiTGFzdFByZXJlcVN1Y2NlZWRlZFNIQTFIYXNoIjogIiIsCgkiU3RhZ2luZ0xvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUvYnBzIiwKCSJUZWNobmljYWxUeXBlIjogInB1YmxpYyxnYW1lcyxhcHBsaWNhdGlvbnMiLAoJIlZhdWx0VGh1bWJuYWlsVXJsIjogIiIsCgkiVmF1bHRUaXRsZVRleHQiOiAiIiwKCSJJbnN0YWxsU2l6ZSI6IDQyNzkzNDIwMjQ5LAoJIk1haW5XaW5kb3dQcm9jZXNzTmFtZSI6ICIiLAoJIlByb2Nlc3NOYW1lcyI6IFtdLAoJIkJhY2tncm91bmRQcm9jZXNzTmFtZXMiOiBbXSwKCSJJZ25vcmVkUHJvY2Vzc05hbWVzIjogW10sCgkiRGxjUHJvY2Vzc05hbWVzIjogW10sCgkiTWFuZGF0b3J5QXBwRm9sZGVyTmFtZSI6ICJyb2NrZXRsZWFndWUiLAoJIk93bmVyc2hpcFRva2VuIjogImZhbHNlIiwKCSJTaWRlY2FyQ29uZmlnUmV2aXNpb24iOiAwLAoJIkNhdGFsb2dOYW1lc3BhY2UiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGEiLAoJIkNhdGFsb2dJdGVtSWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGIiLAoJIkFwcE5hbWUiOiAiU3VnYXIiLAoJIkFwcFZlcnNpb25TdHJpbmciOiAiKytQcmltZStVcGRhdGU1OS4xLUNMLTUyNjUzMSIsCgkiTWFpbkdhbWVDYXRhbG9nTmFtZXNwYWNlIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBhIiwKCSJNYWluR2FtZUNhdGFsb2dJdGVtSWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGIiLAoJIk1haW5HYW1lQXBwTmFtZSI6ICJTdWdhciIsCgkiQWxsb3dlZFVyaUVudlZhcnMiOiBbXQp9"
+        }
+      ],
+      "out": {
+        "installationGuid": "A0000000000000000000000000000001",
+        "appName": "Sugar",
+        "displayName": "Rocket League®",
+        "catalogNamespace": "0000000000000000000000000000000a",
+        "catalogItemId": "0000000000000000000000000000000b",
+        "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+        "launchExecutable": "Binaries\\Win64\\Launcher.exe",
+        "installSize": 42793420249,
+        "incomplete": false,
+        "mainGameAppName": "Sugar",
+        "categories": []
+      }
+    },
+    {
+      "id": "test-no-appname",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > rejects manifests without an AppName or InstallLocation, and non-JSON"
+      },
+      "args": [
+        {
+          "$bytes": "eyJEaXNwbGF5TmFtZSI6IngiLCJJbnN0YWxsTG9jYXRpb24iOiJDOlxceCJ9"
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "manifest has no AppName",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "test-no-install-location",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > rejects manifests without an AppName or InstallLocation, and non-JSON"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoieCJ9"
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "manifest for x has no InstallLocation",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "test-not-json",
+      "origin": {
+        "kind": "test",
+        "ref": "test/epic-files.test.ts > Epic .item manifests > rejects manifests without an AppName or InstallLocation, and non-JSON"
+      },
+      "args": [
+        {
+          "$bytes": "bm90IGpzb24="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "not valid JSON (Unexpected token 'o', \"not json\" is not valid JSON)",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "bom",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | UTF-8 BOM added"
+      },
+      "args": [
+        {
+          "$bytes": "77u/ewoJIkZvcm1hdFZlcnNpb24iOiAwLAoJImJJc0luY29tcGxldGVJbnN0YWxsIjogZmFsc2UsCgkiTGF1bmNoQ29tbWFuZCI6ICIiLAoJIkxhdW5jaEV4ZWN1dGFibGUiOiAiQmluYXJpZXMvV2luNjQvTGF1bmNoZXIuZXhlIiwKCSJNYW5pZmVzdExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUiLAoJIk1hbmlmZXN0SGFzaCI6ICIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIiwKCSJiSXNBcHBsaWNhdGlvbiI6IHRydWUsCgkiYklzRXhlY3V0YWJsZSI6IHRydWUsCgkiYklzTWFuYWdlZCI6IGZhbHNlLAoJImJOZWVkc1ZhbGlkYXRpb24iOiBmYWxzZSwKCSJiUmVxdWlyZXNBdXRoIjogdHJ1ZSwKCSJiQWxsb3dNdWx0aXBsZUluc3RhbmNlcyI6IGZhbHNlLAoJImJDYW5SdW5PZmZsaW5lIjogdHJ1ZSwKCSJiQWxsb3dVcmlDbWRBcmdzIjogZmFsc2UsCgkiYkxhdW5jaEVsZXZhdGVkIjogZmFsc2UsCgkiQmFzZVVSTHMiOiBbCgkJImh0dHA6Ly9lZ3MtY2xvdWRmcm9udC1jaHVua3MuZXBpY2dhbWVzY2RuLmNvbS9CdWlsZHMvT3JnL28tcGxhY2Vob2xkZXIvMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGMvZGVmYXVsdCIsCgkJImh0dHA6Ly9lcGljZ2FtZXMtZG93bmxvYWQxLmFrYW1haXplZC5uZXQvQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiLAoJCSJodHRwOi8vZWdkb3dubG9hZC5mYXN0bHktZWRnZS5jb20vQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiCgldLAoJIkJ1aWxkTGFiZWwiOiAiTGl2ZSIsCgkiQXBwQ2F0ZWdvcmllcyI6IFsKCQkicHVibGljIiwKCQkiZ2FtZXMiLAoJCSJhcHBsaWNhdGlvbnMiCgldLAoJIkNodW5rRGJzIjogW10sCgkiQ29tcGF0aWJsZUFwcHMiOiBbXSwKCSJEaXNwbGF5TmFtZSI6ICJSb2NrZXQgTGVhZ3Vlwq4iLAoJIkluc3RhbGxhdGlvbkd1aWQiOiAiQTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLAoJIkluc3RhbGxMb2NhdGlvbiI6ICJEOlxcUGxhY2Vob2xkZXJcXEVwaWMgR2FtZXMvcm9ja2V0bGVhZ3VlIiwKCSJJbnN0YWxsU2Vzc2lvbklkIjogIkIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyIiwKCSJJbnN0YWxsVGFncyI6IFtdLAoJIkluc3RhbGxDb21wb25lbnRzIjogW10sCgkiSG9zdEluc3RhbGxhdGlvbkd1aWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLAoJIlByZXJlcUlkcyI6IFsKCQkiRUFDX1NlcnZpY2UiCgldLAoJIlByZXJlcVNIQTFIYXNoIjogIjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIiLAoJIkxhc3RQcmVyZXFTdWNjZWVkZWRTSEExSGFzaCI6ICIiLAoJIlN0YWdpbmdMb2NhdGlvbiI6ICJEOlxcUGxhY2Vob2xkZXJcXEVwaWMgR2FtZXMvcm9ja2V0bGVhZ3VlLy5lZ3N0b3JlL2JwcyIsCgkiVGVjaG5pY2FsVHlwZSI6ICJwdWJsaWMsZ2FtZXMsYXBwbGljYXRpb25zIiwKCSJWYXVsdFRodW1ibmFpbFVybCI6ICIiLAoJIlZhdWx0VGl0bGVUZXh0IjogIiIsCgkiSW5zdGFsbFNpemUiOiA0Mjc5MzQyMDI0OSwKCSJNYWluV2luZG93UHJvY2Vzc05hbWUiOiAiIiwKCSJQcm9jZXNzTmFtZXMiOiBbXSwKCSJCYWNrZ3JvdW5kUHJvY2Vzc05hbWVzIjogW10sCgkiSWdub3JlZFByb2Nlc3NOYW1lcyI6IFtdLAoJIkRsY1Byb2Nlc3NOYW1lcyI6IFtdLAoJIk1hbmRhdG9yeUFwcEZvbGRlck5hbWUiOiAicm9ja2V0bGVhZ3VlIiwKCSJPd25lcnNoaXBUb2tlbiI6ICJmYWxzZSIsCgkiU2lkZWNhckNvbmZpZ1JldmlzaW9uIjogMCwKCSJDYXRhbG9nTmFtZXNwYWNlIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBhIiwKCSJDYXRhbG9nSXRlbUlkIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBiIiwKCSJBcHBOYW1lIjogIlN1Z2FyIiwKCSJBcHBWZXJzaW9uU3RyaW5nIjogIisrUHJpbWUrVXBkYXRlNTkuMS1DTC01MjY1MzEiLAoJIk1haW5HYW1lQ2F0YWxvZ05hbWVzcGFjZSI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYSIsCgkiTWFpbkdhbWVDYXRhbG9nSXRlbUlkIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBiIiwKCSJNYWluR2FtZUFwcE5hbWUiOiAiU3VnYXIiLAoJIkFsbG93ZWRVcmlFbnZWYXJzIjogW10KfQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "A0000000000000000000000000000001",
+        "appName": "Sugar",
+        "displayName": "Rocket League®",
+        "catalogNamespace": "0000000000000000000000000000000a",
+        "catalogItemId": "0000000000000000000000000000000b",
+        "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+        "launchExecutable": "Binaries\\Win64\\Launcher.exe",
+        "installSize": 42793420249,
+        "incomplete": false,
+        "mainGameAppName": "Sugar",
+        "categories": [
+          "public",
+          "games",
+          "applications"
+        ]
+      }
+    },
+    {
+      "id": "double-bom",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | two UTF-8 BOMs: only one is stripped"
+      },
+      "args": [
+        {
+          "$bytes": "77u/77u/ewoJIkZvcm1hdFZlcnNpb24iOiAwLAoJImJJc0luY29tcGxldGVJbnN0YWxsIjogZmFsc2UsCgkiTGF1bmNoQ29tbWFuZCI6ICIiLAoJIkxhdW5jaEV4ZWN1dGFibGUiOiAiQmluYXJpZXMvV2luNjQvTGF1bmNoZXIuZXhlIiwKCSJNYW5pZmVzdExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUiLAoJIk1hbmlmZXN0SGFzaCI6ICIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIiwKCSJiSXNBcHBsaWNhdGlvbiI6IHRydWUsCgkiYklzRXhlY3V0YWJsZSI6IHRydWUsCgkiYklzTWFuYWdlZCI6IGZhbHNlLAoJImJOZWVkc1ZhbGlkYXRpb24iOiBmYWxzZSwKCSJiUmVxdWlyZXNBdXRoIjogdHJ1ZSwKCSJiQWxsb3dNdWx0aXBsZUluc3RhbmNlcyI6IGZhbHNlLAoJImJDYW5SdW5PZmZsaW5lIjogdHJ1ZSwKCSJiQWxsb3dVcmlDbWRBcmdzIjogZmFsc2UsCgkiYkxhdW5jaEVsZXZhdGVkIjogZmFsc2UsCgkiQmFzZVVSTHMiOiBbCgkJImh0dHA6Ly9lZ3MtY2xvdWRmcm9udC1jaHVua3MuZXBpY2dhbWVzY2RuLmNvbS9CdWlsZHMvT3JnL28tcGxhY2Vob2xkZXIvMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGMvZGVmYXVsdCIsCgkJImh0dHA6Ly9lcGljZ2FtZXMtZG93bmxvYWQxLmFrYW1haXplZC5uZXQvQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiLAoJCSJodHRwOi8vZWdkb3dubG9hZC5mYXN0bHktZWRnZS5jb20vQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiCgldLAoJIkJ1aWxkTGFiZWwiOiAiTGl2ZSIsCgkiQXBwQ2F0ZWdvcmllcyI6IFsKCQkicHVibGljIiwKCQkiZ2FtZXMiLAoJCSJhcHBsaWNhdGlvbnMiCgldLAoJIkNodW5rRGJzIjogW10sCgkiQ29tcGF0aWJsZUFwcHMiOiBbXSwKCSJEaXNwbGF5TmFtZSI6ICJSb2NrZXQgTGVhZ3Vlwq4iLAoJIkluc3RhbGxhdGlvbkd1aWQiOiAiQTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLAoJIkluc3RhbGxMb2NhdGlvbiI6ICJEOlxcUGxhY2Vob2xkZXJcXEVwaWMgR2FtZXMvcm9ja2V0bGVhZ3VlIiwKCSJJbnN0YWxsU2Vzc2lvbklkIjogIkIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyIiwKCSJJbnN0YWxsVGFncyI6IFtdLAoJIkluc3RhbGxDb21wb25lbnRzIjogW10sCgkiSG9zdEluc3RhbGxhdGlvbkd1aWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLAoJIlByZXJlcUlkcyI6IFsKCQkiRUFDX1NlcnZpY2UiCgldLAoJIlByZXJlcVNIQTFIYXNoIjogIjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIiLAoJIkxhc3RQcmVyZXFTdWNjZWVkZWRTSEExSGFzaCI6ICIiLAoJIlN0YWdpbmdMb2NhdGlvbiI6ICJEOlxcUGxhY2Vob2xkZXJcXEVwaWMgR2FtZXMvcm9ja2V0bGVhZ3VlLy5lZ3N0b3JlL2JwcyIsCgkiVGVjaG5pY2FsVHlwZSI6ICJwdWJsaWMsZ2FtZXMsYXBwbGljYXRpb25zIiwKCSJWYXVsdFRodW1ibmFpbFVybCI6ICIiLAoJIlZhdWx0VGl0bGVUZXh0IjogIiIsCgkiSW5zdGFsbFNpemUiOiA0Mjc5MzQyMDI0OSwKCSJNYWluV2luZG93UHJvY2Vzc05hbWUiOiAiIiwKCSJQcm9jZXNzTmFtZXMiOiBbXSwKCSJCYWNrZ3JvdW5kUHJvY2Vzc05hbWVzIjogW10sCgkiSWdub3JlZFByb2Nlc3NOYW1lcyI6IFtdLAoJIkRsY1Byb2Nlc3NOYW1lcyI6IFtdLAoJIk1hbmRhdG9yeUFwcEZvbGRlck5hbWUiOiAicm9ja2V0bGVhZ3VlIiwKCSJPd25lcnNoaXBUb2tlbiI6ICJmYWxzZSIsCgkiU2lkZWNhckNvbmZpZ1JldmlzaW9uIjogMCwKCSJDYXRhbG9nTmFtZXNwYWNlIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBhIiwKCSJDYXRhbG9nSXRlbUlkIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBiIiwKCSJBcHBOYW1lIjogIlN1Z2FyIiwKCSJBcHBWZXJzaW9uU3RyaW5nIjogIisrUHJpbWUrVXBkYXRlNTkuMS1DTC01MjY1MzEiLAoJIk1haW5HYW1lQ2F0YWxvZ05hbWVzcGFjZSI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYSIsCgkiTWFpbkdhbWVDYXRhbG9nSXRlbUlkIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBiIiwKCSJNYWluR2FtZUFwcE5hbWUiOiAiU3VnYXIiLAoJIkFsbG93ZWRVcmlFbnZWYXJzIjogW10KfQ=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "not valid JSON (Unexpected token '﻿', \"﻿{\n\t\"Forma\"... is not valid JSON)",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "crlf",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | LF made CRLF"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KCSJGb3JtYXRWZXJzaW9uIjogMCwNCgkiYklzSW5jb21wbGV0ZUluc3RhbGwiOiBmYWxzZSwNCgkiTGF1bmNoQ29tbWFuZCI6ICIiLA0KCSJMYXVuY2hFeGVjdXRhYmxlIjogIkJpbmFyaWVzL1dpbjY0L0xhdW5jaGVyLmV4ZSIsDQoJIk1hbmlmZXN0TG9jYXRpb24iOiAiRDpcXFBsYWNlaG9sZGVyXFxFcGljIEdhbWVzL3JvY2tldGxlYWd1ZS8uZWdzdG9yZSIsDQoJIk1hbmlmZXN0SGFzaCI6ICIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIiwNCgkiYklzQXBwbGljYXRpb24iOiB0cnVlLA0KCSJiSXNFeGVjdXRhYmxlIjogdHJ1ZSwNCgkiYklzTWFuYWdlZCI6IGZhbHNlLA0KCSJiTmVlZHNWYWxpZGF0aW9uIjogZmFsc2UsDQoJImJSZXF1aXJlc0F1dGgiOiB0cnVlLA0KCSJiQWxsb3dNdWx0aXBsZUluc3RhbmNlcyI6IGZhbHNlLA0KCSJiQ2FuUnVuT2ZmbGluZSI6IHRydWUsDQoJImJBbGxvd1VyaUNtZEFyZ3MiOiBmYWxzZSwNCgkiYkxhdW5jaEVsZXZhdGVkIjogZmFsc2UsDQoJIkJhc2VVUkxzIjogWw0KCQkiaHR0cDovL2Vncy1jbG91ZGZyb250LWNodW5rcy5lcGljZ2FtZXNjZG4uY29tL0J1aWxkcy9Pcmcvby1wbGFjZWhvbGRlci8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYy9kZWZhdWx0IiwNCgkJImh0dHA6Ly9lcGljZ2FtZXMtZG93bmxvYWQxLmFrYW1haXplZC5uZXQvQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiLA0KCQkiaHR0cDovL2VnZG93bmxvYWQuZmFzdGx5LWVkZ2UuY29tL0J1aWxkcy9Pcmcvby1wbGFjZWhvbGRlci8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYy9kZWZhdWx0Ig0KCV0sDQoJIkJ1aWxkTGFiZWwiOiAiTGl2ZSIsDQoJIkFwcENhdGVnb3JpZXMiOiBbDQoJCSJwdWJsaWMiLA0KCQkiZ2FtZXMiLA0KCQkiYXBwbGljYXRpb25zIg0KCV0sDQoJIkNodW5rRGJzIjogW10sDQoJIkNvbXBhdGlibGVBcHBzIjogW10sDQoJIkRpc3BsYXlOYW1lIjogIlJvY2tldCBMZWFndWXCriIsDQoJIkluc3RhbGxhdGlvbkd1aWQiOiAiQTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLA0KCSJJbnN0YWxsTG9jYXRpb24iOiAiRDpcXFBsYWNlaG9sZGVyXFxFcGljIEdhbWVzL3JvY2tldGxlYWd1ZSIsDQoJIkluc3RhbGxTZXNzaW9uSWQiOiAiQjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIiLA0KCSJJbnN0YWxsVGFncyI6IFtdLA0KCSJJbnN0YWxsQ29tcG9uZW50cyI6IFtdLA0KCSJIb3N0SW5zdGFsbGF0aW9uR3VpZCI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsDQoJIlByZXJlcUlkcyI6IFsNCgkJIkVBQ19TZXJ2aWNlIg0KCV0sDQoJIlByZXJlcVNIQTFIYXNoIjogIjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIiLA0KCSJMYXN0UHJlcmVxU3VjY2VlZGVkU0hBMUhhc2giOiAiIiwNCgkiU3RhZ2luZ0xvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUvYnBzIiwNCgkiVGVjaG5pY2FsVHlwZSI6ICJwdWJsaWMsZ2FtZXMsYXBwbGljYXRpb25zIiwNCgkiVmF1bHRUaHVtYm5haWxVcmwiOiAiIiwNCgkiVmF1bHRUaXRsZVRleHQiOiAiIiwNCgkiSW5zdGFsbFNpemUiOiA0Mjc5MzQyMDI0OSwNCgkiTWFpbldpbmRvd1Byb2Nlc3NOYW1lIjogIiIsDQoJIlByb2Nlc3NOYW1lcyI6IFtdLA0KCSJCYWNrZ3JvdW5kUHJvY2Vzc05hbWVzIjogW10sDQoJIklnbm9yZWRQcm9jZXNzTmFtZXMiOiBbXSwNCgkiRGxjUHJvY2Vzc05hbWVzIjogW10sDQoJIk1hbmRhdG9yeUFwcEZvbGRlck5hbWUiOiAicm9ja2V0bGVhZ3VlIiwNCgkiT3duZXJzaGlwVG9rZW4iOiAiZmFsc2UiLA0KCSJTaWRlY2FyQ29uZmlnUmV2aXNpb24iOiAwLA0KCSJDYXRhbG9nTmFtZXNwYWNlIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBhIiwNCgkiQ2F0YWxvZ0l0ZW1JZCI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYiIsDQoJIkFwcE5hbWUiOiAiU3VnYXIiLA0KCSJBcHBWZXJzaW9uU3RyaW5nIjogIisrUHJpbWUrVXBkYXRlNTkuMS1DTC01MjY1MzEiLA0KCSJNYWluR2FtZUNhdGFsb2dOYW1lc3BhY2UiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGEiLA0KCSJNYWluR2FtZUNhdGFsb2dJdGVtSWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGIiLA0KCSJNYWluR2FtZUFwcE5hbWUiOiAiU3VnYXIiLA0KCSJBbGxvd2VkVXJpRW52VmFycyI6IFtdDQp9"
+        }
+      ],
+      "out": {
+        "installationGuid": "A0000000000000000000000000000001",
+        "appName": "Sugar",
+        "displayName": "Rocket League®",
+        "catalogNamespace": "0000000000000000000000000000000a",
+        "catalogItemId": "0000000000000000000000000000000b",
+        "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+        "launchExecutable": "Binaries\\Win64\\Launcher.exe",
+        "installSize": 42793420249,
+        "incomplete": false,
+        "mainGameAppName": "Sugar",
+        "categories": [
+          "public",
+          "games",
+          "applications"
+        ]
+      }
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | an empty file"
+      },
+      "args": [
+        {
+          "$bytes": ""
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "not valid JSON (Unexpected end of JSON input)",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "json-null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | the JSON null"
+      },
+      "args": [
+        {
+          "$bytes": "bnVsbA=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "not a JSON object",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "json-array",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | a JSON array"
+      },
+      "args": [
+        {
+          "$bytes": "W3siQXBwTmFtZSI6IlN1Z2FyIn1d"
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "not a JSON object",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "json-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | a JSON number"
+      },
+      "args": [
+        {
+          "$bytes": "MA=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "not a JSON object",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "json-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | a JSON string"
+      },
+      "args": [
+        {
+          "$bytes": "IlN1Z2FyIg=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "not a JSON object",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "json-true",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | the JSON true"
+      },
+      "args": [
+        {
+          "$bytes": "dHJ1ZQ=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "not a JSON object",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "json-false",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | the JSON false"
+      },
+      "args": [
+        {
+          "$bytes": "ZmFsc2U="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "not a JSON object",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "truncated",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | cut in half"
+      },
+      "args": [
+        {
+          "$bytes": "ewoJIkZvcm1hdFZlcnNpb24iOiAwLAoJImJJc0luY29tcGxldGVJbnN0YWxsIjogZmFsc2UsCgkiTGF1bmNoQ29tbWFuZCI6ICIiLAoJIkxhdW5jaEV4ZWN1dGFibGUiOiAiQmluYXJpZXMvV2luNjQvTGF1bmNoZXIuZXhlIiwKCSJNYW5pZmVzdExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUiLAoJIk1hbmlmZXN0SGFzaCI6ICIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIiwKCSJiSXNBcHBsaWNhdGlvbiI6IHRydWUsCgkiYklzRXhlY3V0YWJsZSI6IHRydWUsCgkiYklzTWFuYWdlZCI6IGZhbHNlLAoJImJOZWVkc1ZhbGlkYXRpb24iOiBmYWxzZSwKCSJiUmVxdWlyZXNBdXRoIjogdHJ1ZSwKCSJiQWxsb3dNdWx0aXBsZUluc3RhbmNlcyI6IGZhbHNlLAoJImJDYW5SdW5PZmZsaW5lIjogdHJ1ZSwKCSJiQWxsb3dVcmlDbWRBcmdzIjogZmFsc2UsCgkiYkxhdW5jaEVsZXZhdGVkIjogZmFsc2UsCgkiQmFzZVVSTHMiOiBbCgkJImh0dHA6Ly9lZ3MtY2xvdWRmcm9udC1jaHVua3MuZXBpY2dhbWVzY2RuLmNvbS9CdWlsZHMvT3JnL28tcGxhY2Vob2xkZXIvMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGMvZGVmYXVsdCIsCgkJImh0dHA6Ly9lcGljZ2FtZXMtZG93bmxvYWQxLmFrYW1haXplZC5uZXQvQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiLAoJCSJodHRwOi8vZWdkb3dubG9hZC5mYXN0bHktZWRnZS5jb20vQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiCgldLAoJIkJ1aWxkTGFiZWwiOiAiTGl2ZSIsCgkiQXBwQ2F0ZWdvcmllcyI6IFsKCQkicHVibGljIiwKCQkiZ2FtZXMiLAoJCSJhcHBsaWNhdGlvbnMiCgldLAoJIkNodW5rRGJzIjogW10sCgkiQ29tcGF0aWJsZUFwcHMiOiBbXSwKCSJEaXNwbGF5TmFtZSI6ICJSb2NrZXQgTGVhZ3Vlwq4iLAoJIkluc3RhbGxhdGlvbkd1aWQiOiAiQTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLAoJIkluc3RhbGxMb2NhdGlvbiI6ICJEOlxcUGxhY2Vob2xkZXJcXEVwaWMgR2FtZQ=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "not valid JSON (Unterminated string in JSON at position 1119 (line 32 column 48))",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "appname-blank",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | AppName only spaces"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiICAgIiwiSW5zdGFsbExvY2F0aW9uIjoiRDpcXEdhbWVzXFxTdWdhciJ9"
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "manifest has no AppName",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "appname-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | AppName a number"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjo3LCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIn0="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "manifest has no AppName",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "appname-trimmed",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | AppName with spaces and tabs around it"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiIFx0U3VnYXJcbiAiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIn0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "install-location-blank",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallLocation only spaces"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiIgIn0="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "manifest for Sugar has no InstallLocation",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "install-location-array",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallLocation an array"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOlsiRDpcXHgiXX0="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "manifest for Sugar has no InstallLocation",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "minimal",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | only AppName and InstallLocation"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIn0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "display-name-blank",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | DisplayName blank falls back to AppName"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiRGlzcGxheU5hbWUiOiIgICJ9"
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "guid-number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallationGuid a number gives an empty guid"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiSW5zdGFsbGF0aW9uR3VpZCI6MX0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "catalog-blank",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | catalog ids blank"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQ2F0YWxvZ05hbWVzcGFjZSI6IiIsIkNhdGFsb2dJdGVtSWQiOiIgIn0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "launch-exe-blank",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | LaunchExecutable blank"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiTGF1bmNoRXhlY3V0YWJsZSI6IiAifQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "launch-exe-dot-segments",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | LaunchExecutable with . and .. segments"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiTGF1bmNoRXhlY3V0YWJsZSI6Ii4vQmluYXJpZXMvLi4vQmluYXJpZXMvL1dpbjY0L0dhbWUuZXhlIn0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": "Binaries\\Win64\\Game.exe",
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "launch-exe-above-root",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | LaunchExecutable climbing above its folder"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiTGF1bmNoRXhlY3V0YWJsZSI6Ii4uLy4uL090aGVyL3guZXhlIn0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": "..\\..\\Other\\x.exe",
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "location-trailing-slash",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallLocation with a trailing slash"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOi9HYW1lcy9TdWdhci8ifQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "location-drive-root",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallLocation a drive root"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOi8ifQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "location-bare-drive",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallLocation a bare drive letter"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOiJ9"
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:.",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "location-unc",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallLocation a UNC path: the doubled leading backslash is made single"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJcXFxcc2VydmVyXFxzaGFyZVxcU3VnYXIifQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "\\server\\share\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "location-escaped-backslashes",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallLocation with doubled backslashes"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcXFxHYW1lc1xcXFxTdWdhciJ9"
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "location-relative",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallLocation relative"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJHYW1lcy9TdWdhciJ9"
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "location-dotdot",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallLocation with .."
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOi9HYW1lcy9PdGhlci8uLi9TdWdhciJ9"
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "size-zero",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallSize 0"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiSW5zdGFsbFNpemUiOjB9"
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": 0,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "size-negative",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallSize negative"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiSW5zdGFsbFNpemUiOi0xfQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "size-float",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallSize a fraction"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiSW5zdGFsbFNpemUiOjEuNX0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": 1.5,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "size-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | InstallSize a string"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiSW5zdGFsbFNpemUiOiIxMjMifQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "incomplete-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | bIsIncompleteInstall the string \"true\""
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiYklzSW5jb21wbGV0ZUluc3RhbGwiOiJ0cnVlIn0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "incomplete-one",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | bIsIncompleteInstall 1"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiYklzSW5jb21wbGV0ZUluc3RhbGwiOjF9"
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "categories-mixed",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | AppCategories holding non-strings"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwQ2F0ZWdvcmllcyI6WyJnYW1lcyIsMSxudWxsLCJ4IixbInkiXSx7InoiOjF9XX0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": [
+          "games",
+          "x"
+        ]
+      }
+    },
+    {
+      "id": "categories-string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | AppCategories a string"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwQ2F0ZWdvcmllcyI6ImdhbWVzIn0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "categories-untrimmed",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | AppCategories strings are not trimmed"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiQXBwQ2F0ZWdvcmllcyI6WyIgZ2FtZXMgIiwiIl19"
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": [
+          " games ",
+          ""
+        ]
+      }
+    },
+    {
+      "id": "main-game-blank",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | MainGameAppName blank"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiTWFpbkdhbWVBcHBOYW1lIjoiICJ9"
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "appname-uri-chars",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | AppName holding URI-reserved characters"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiYSBiL2M/ZCNlJmYlZyIsIkluc3RhbGxMb2NhdGlvbiI6IkQ6XFxHYW1lc1xcU3VnYXIifQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "a b/c?d#e&f%g",
+        "displayName": "a b/c?d#e&f%g",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "every-field",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/epic/A0000000000000000000000000000001.item | every string field set"
+      },
+      "args": [
+        {
+          "$bytes": "ewoJIkZvcm1hdFZlcnNpb24iOiAwLAoJImJJc0luY29tcGxldGVJbnN0YWxsIjogZmFsc2UsCgkiTGF1bmNoQ29tbWFuZCI6ICIiLAoJIkxhdW5jaEV4ZWN1dGFibGUiOiAiQmluYXJpZXMvV2luNjQvTGF1bmNoZXIuZXhlIiwKCSJNYW5pZmVzdExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUiLAoJIk1hbmlmZXN0SGFzaCI6ICIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIiwKCSJiSXNBcHBsaWNhdGlvbiI6IHRydWUsCgkiYklzRXhlY3V0YWJsZSI6IHRydWUsCgkiYklzTWFuYWdlZCI6IGZhbHNlLAoJImJOZWVkc1ZhbGlkYXRpb24iOiBmYWxzZSwKCSJiUmVxdWlyZXNBdXRoIjogdHJ1ZSwKCSJiQWxsb3dNdWx0aXBsZUluc3RhbmNlcyI6IGZhbHNlLAoJImJDYW5SdW5PZmZsaW5lIjogdHJ1ZSwKCSJiQWxsb3dVcmlDbWRBcmdzIjogZmFsc2UsCgkiYkxhdW5jaEVsZXZhdGVkIjogZmFsc2UsCgkiQmFzZVVSTHMiOiBbCgkJImh0dHA6Ly9lZ3MtY2xvdWRmcm9udC1jaHVua3MuZXBpY2dhbWVzY2RuLmNvbS9CdWlsZHMvT3JnL28tcGxhY2Vob2xkZXIvMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGMvZGVmYXVsdCIsCgkJImh0dHA6Ly9lcGljZ2FtZXMtZG93bmxvYWQxLmFrYW1haXplZC5uZXQvQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiLAoJCSJodHRwOi8vZWdkb3dubG9hZC5mYXN0bHktZWRnZS5jb20vQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiCgldLAoJIkJ1aWxkTGFiZWwiOiAiTGl2ZSIsCgkiQXBwQ2F0ZWdvcmllcyI6IFsKCQkicHVibGljIiwKCQkiZ2FtZXMiLAoJCSJhcHBsaWNhdGlvbnMiCgldLAoJIkNodW5rRGJzIjogW10sCgkiQ29tcGF0aWJsZUFwcHMiOiBbXSwKCSJEaXNwbGF5TmFtZSI6ICJSb2NrZXQgTGVhZ3Vlwq4iLAoJIkluc3RhbGxhdGlvbkd1aWQiOiAiIEExICIsCgkiSW5zdGFsbExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUiLAoJIkluc3RhbGxTZXNzaW9uSWQiOiAiQjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIiLAoJIkluc3RhbGxUYWdzIjogW10sCgkiSW5zdGFsbENvbXBvbmVudHMiOiBbXSwKCSJIb3N0SW5zdGFsbGF0aW9uR3VpZCI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsCgkiUHJlcmVxSWRzIjogWwoJCSJFQUNfU2VydmljZSIKCV0sCgkiUHJlcmVxU0hBMUhhc2giOiAiMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMiIsCgkiTGFzdFByZXJlcVN1Y2NlZWRlZFNIQTFIYXNoIjogIiIsCgkiU3RhZ2luZ0xvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUvYnBzIiwKCSJUZWNobmljYWxUeXBlIjogInB1YmxpYyxnYW1lcyxhcHBsaWNhdGlvbnMiLAoJIlZhdWx0VGh1bWJuYWlsVXJsIjogIiIsCgkiVmF1bHRUaXRsZVRleHQiOiAiIiwKCSJJbnN0YWxsU2l6ZSI6IDQyNzkzNDIwMjQ5LAoJIk1haW5XaW5kb3dQcm9jZXNzTmFtZSI6ICIiLAoJIlByb2Nlc3NOYW1lcyI6IFtdLAoJIkJhY2tncm91bmRQcm9jZXNzTmFtZXMiOiBbXSwKCSJJZ25vcmVkUHJvY2Vzc05hbWVzIjogW10sCgkiRGxjUHJvY2Vzc05hbWVzIjogW10sCgkiTWFuZGF0b3J5QXBwRm9sZGVyTmFtZSI6ICJyb2NrZXRsZWFndWUiLAoJIk93bmVyc2hpcFRva2VuIjogImZhbHNlIiwKCSJTaWRlY2FyQ29uZmlnUmV2aXNpb24iOiAwLAoJIkNhdGFsb2dOYW1lc3BhY2UiOiAiIG5zICIsCgkiQ2F0YWxvZ0l0ZW1JZCI6ICIgaXRlbSAiLAoJIkFwcE5hbWUiOiAiU3VnYXIiLAoJIkFwcFZlcnNpb25TdHJpbmciOiAiKytQcmltZStVcGRhdGU1OS4xLUNMLTUyNjUzMSIsCgkiTWFpbkdhbWVDYXRhbG9nTmFtZXNwYWNlIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBhIiwKCSJNYWluR2FtZUNhdGFsb2dJdGVtSWQiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGIiLAoJIk1haW5HYW1lQXBwTmFtZSI6ICJTdWdhciIsCgkiQWxsb3dlZFVyaUVudlZhcnMiOiBbXQp9"
+        }
+      ],
+      "out": {
+        "installationGuid": "A1",
+        "appName": "Sugar",
+        "displayName": "Rocket League®",
+        "catalogNamespace": "ns",
+        "catalogItemId": "item",
+        "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+        "launchExecutable": "Binaries\\Win64\\Launcher.exe",
+        "installSize": 42793420249,
+        "incomplete": false,
+        "mainGameAppName": "Sugar",
+        "categories": [
+          "public",
+          "games",
+          "applications"
+        ]
+      }
+    },
+    {
+      "id": "adv-trim-feff",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: AppName wrapped in U+FEFF: JS trim() removes it; Rust str::trim does not"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoi77u/U3VnYXLvu78iLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIn0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-trim-feff-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: AppName only U+FEFF: JS trim() empties it, so there is no AppName; Rust str::trim keeps it"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoi77u/IiwiSW5zdGFsbExvY2F0aW9uIjoiRDpcXEdhbWVzXFxTdWdhciJ9"
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "manifest has no AppName",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "adv-trim-nel",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: AppName wrapped in U+0085: JS trim() keeps it; Rust str::trim removes it"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiwoVTdWdhcsKFIiwiSW5zdGFsbExvY2F0aW9uIjoiRDpcXEdhbWVzXFxTdWdhciJ9"
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-trim-unicode-spaces",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: AppName wrapped in U+00A0, U+2007, U+3000 and U+2028: both trims remove them"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiwqDigIdTdWdhcuOAgOKAqCIsIkluc3RhbGxMb2NhdGlvbiI6IkQ6XFxHYW1lc1xcU3VnYXIifQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-trim-zwsp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: AppName wrapped in U+200B and U+180E: neither trim removes them"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoi4oCLU3VnYXLhoI4iLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIn0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "​Sugar᠎",
+        "displayName": "​Sugar᠎",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-path-trim-feff",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: InstallLocation ending in U+FEFF: str() trims it in JS before the path is normalised"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2Fy77u/In0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-duplicate-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: AppName twice: JSON.parse keeps the last"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiRmlyc3QiLCJBcHBOYW1lIjoiU2Vjb25kIiwiSW5zdGFsbExvY2F0aW9uIjoiRDpcXHgifQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Second",
+        "displayName": "Second",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\x",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-proto-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a __proto__ key holding AppName: an own property of the parsed object, never its prototype, so AppName is not seen"
+      },
+      "args": [
+        {
+          "$bytes": "eyJfX3Byb3RvX18iOnsiQXBwTmFtZSI6IlN1Z2FyIn0sIkluc3RhbGxMb2NhdGlvbiI6IkQ6XFx4In0="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "manifest has no AppName",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "adv-size-max-safe",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: InstallSize 2^53 + 1 parses to the double 2^53"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxceCIsIkluc3RhbGxTaXplIjo5MDA3MTk5MjU0NzQwOTkzfQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\x",
+        "launchExecutable": null,
+        "installSize": 9007199254740992,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-size-huge",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: InstallSize 1e400 parses to Infinity and is dropped as not finite; serde_json refuses the number"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxceCIsIkluc3RhbGxTaXplIjoxZTQwMH0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\x",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-size-negative-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: InstallSize -0 passes v >= 0 and is kept as -0"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxceCIsIkluc3RhbGxTaXplIjotMH0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\x",
+        "launchExecutable": null,
+        "installSize": {
+          "$number": "-0"
+        },
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-size-exponent",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: InstallSize written 4.2e10 is the integer 42000000000"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxceCIsIkluc3RhbGxTaXplIjo0LjJlMTB9"
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\x",
+        "launchExecutable": null,
+        "installSize": 42000000000,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: DisplayName holding the escape \\ud800: JSON.parse gives a lone surrogate; serde_json refuses the escape"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxceCIsIkRpc3BsYXlOYW1lIjoiUm9ja2V0IFx1ZDgwMCBMZWFndWUifQ=="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": {
+          "$utf16": [
+            82,
+            111,
+            99,
+            107,
+            101,
+            116,
+            32,
+            55296,
+            32,
+            76,
+            101,
+            97,
+            103,
+            117,
+            101
+          ]
+        },
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\x",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-invalid-utf8",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: an invalid byte in DisplayName of the fixture becomes U+FFFD before JSON.parse"
+      },
+      "args": [
+        {
+          "$bytes": "ewoJIkZvcm1hdFZlcnNpb24iOiAwLAoJImJJc0luY29tcGxldGVJbnN0YWxsIjogZmFsc2UsCgkiTGF1bmNoQ29tbWFuZCI6ICIiLAoJIkxhdW5jaEV4ZWN1dGFibGUiOiAiQmluYXJpZXMvV2luNjQvTGF1bmNoZXIuZXhlIiwKCSJNYW5pZmVzdExvY2F0aW9uIjogIkQ6XFxQbGFjZWhvbGRlclxcRXBpYyBHYW1lcy9yb2NrZXRsZWFndWUvLmVnc3RvcmUiLAoJIk1hbmlmZXN0SGFzaCI6ICIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIiwKCSJiSXNBcHBsaWNhdGlvbiI6IHRydWUsCgkiYklzRXhlY3V0YWJsZSI6IHRydWUsCgkiYklzTWFuYWdlZCI6IGZhbHNlLAoJImJOZWVkc1ZhbGlkYXRpb24iOiBmYWxzZSwKCSJiUmVxdWlyZXNBdXRoIjogdHJ1ZSwKCSJiQWxsb3dNdWx0aXBsZUluc3RhbmNlcyI6IGZhbHNlLAoJImJDYW5SdW5PZmZsaW5lIjogdHJ1ZSwKCSJiQWxsb3dVcmlDbWRBcmdzIjogZmFsc2UsCgkiYkxhdW5jaEVsZXZhdGVkIjogZmFsc2UsCgkiQmFzZVVSTHMiOiBbCgkJImh0dHA6Ly9lZ3MtY2xvdWRmcm9udC1jaHVua3MuZXBpY2dhbWVzY2RuLmNvbS9CdWlsZHMvT3JnL28tcGxhY2Vob2xkZXIvMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGMvZGVmYXVsdCIsCgkJImh0dHA6Ly9lcGljZ2FtZXMtZG93bmxvYWQxLmFrYW1haXplZC5uZXQvQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiLAoJCSJodHRwOi8vZWdkb3dubG9hZC5mYXN0bHktZWRnZS5jb20vQnVpbGRzL09yZy9vLXBsYWNlaG9sZGVyLzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBjL2RlZmF1bHQiCgldLAoJIkJ1aWxkTGFiZWwiOiAiTGl2ZSIsCgkiQXBwQ2F0ZWdvcmllcyI6IFsKCQkicHVibGljIiwKCQkiZ2FtZXMiLAoJCSJhcHBsaWNhdGlvbnMiCgldLAoJIkNodW5rRGJzIjogW10sCgkiQ29tcGF0aWJsZUFwcHMiOiBbXSwKCSJEaXNwbGF5TmFtZSI6ICJSb2NrZXQg/0xlYWd1ZcKuIiwKCSJJbnN0YWxsYXRpb25HdWlkIjogIkEwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwKCSJJbnN0YWxsTG9jYXRpb24iOiAiRDpcXFBsYWNlaG9sZGVyXFxFcGljIEdhbWVzL3JvY2tldGxlYWd1ZSIsCgkiSW5zdGFsbFNlc3Npb25JZCI6ICJCMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMiIsCgkiSW5zdGFsbFRhZ3MiOiBbXSwKCSJJbnN0YWxsQ29tcG9uZW50cyI6IFtdLAoJIkhvc3RJbnN0YWxsYXRpb25HdWlkIjogIjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwKCSJQcmVyZXFJZHMiOiBbCgkJIkVBQ19TZXJ2aWNlIgoJXSwKCSJQcmVyZXFTSEExSGFzaCI6ICIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwKCSJMYXN0UHJlcmVxU3VjY2VlZGVkU0hBMUhhc2giOiAiIiwKCSJTdGFnaW5nTG9jYXRpb24iOiAiRDpcXFBsYWNlaG9sZGVyXFxFcGljIEdhbWVzL3JvY2tldGxlYWd1ZS8uZWdzdG9yZS9icHMiLAoJIlRlY2huaWNhbFR5cGUiOiAicHVibGljLGdhbWVzLGFwcGxpY2F0aW9ucyIsCgkiVmF1bHRUaHVtYm5haWxVcmwiOiAiIiwKCSJWYXVsdFRpdGxlVGV4dCI6ICIiLAoJIkluc3RhbGxTaXplIjogNDI3OTM0MjAyNDksCgkiTWFpbldpbmRvd1Byb2Nlc3NOYW1lIjogIiIsCgkiUHJvY2Vzc05hbWVzIjogW10sCgkiQmFja2dyb3VuZFByb2Nlc3NOYW1lcyI6IFtdLAoJIklnbm9yZWRQcm9jZXNzTmFtZXMiOiBbXSwKCSJEbGNQcm9jZXNzTmFtZXMiOiBbXSwKCSJNYW5kYXRvcnlBcHBGb2xkZXJOYW1lIjogInJvY2tldGxlYWd1ZSIsCgkiT3duZXJzaGlwVG9rZW4iOiAiZmFsc2UiLAoJIlNpZGVjYXJDb25maWdSZXZpc2lvbiI6IDAsCgkiQ2F0YWxvZ05hbWVzcGFjZSI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYSIsCgkiQ2F0YWxvZ0l0ZW1JZCI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYiIsCgkiQXBwTmFtZSI6ICJTdWdhciIsCgkiQXBwVmVyc2lvblN0cmluZyI6ICIrK1ByaW1lK1VwZGF0ZTU5LjEtQ0wtNTI2NTMxIiwKCSJNYWluR2FtZUNhdGFsb2dOYW1lc3BhY2UiOiAiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMGEiLAoJIk1haW5HYW1lQ2F0YWxvZ0l0ZW1JZCI6ICIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYiIsCgkiTWFpbkdhbWVBcHBOYW1lIjogIlN1Z2FyIiwKCSJBbGxvd2VkVXJpRW52VmFycyI6IFtdCn0="
+        }
+      ],
+      "out": {
+        "installationGuid": "A0000000000000000000000000000001",
+        "appName": "Sugar",
+        "displayName": "Rocket �League®",
+        "catalogNamespace": "0000000000000000000000000000000a",
+        "catalogItemId": "0000000000000000000000000000000b",
+        "installLocation": "D:\\Placeholder\\Epic Games\\rocketleague",
+        "launchExecutable": "Binaries\\Win64\\Launcher.exe",
+        "installSize": 42793420249,
+        "incomplete": false,
+        "mainGameAppName": "Sugar",
+        "categories": [
+          "public",
+          "games",
+          "applications"
+        ]
+      }
+    },
+    {
+      "id": "adv-depth-200",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: an ignored field nested 200 arrays deep: JSON.parse accepts it; serde_json stops at 128 by default"
+      },
+      "args": [
+        {
+          "$bytes": "eyJBcHBOYW1lIjoiU3VnYXIiLCJJbnN0YWxsTG9jYXRpb24iOiJEOlxcR2FtZXNcXFN1Z2FyIiwiRGVlcCI6W1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tdXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXX0="
+        }
+      ],
+      "out": {
+        "installationGuid": "",
+        "appName": "Sugar",
+        "displayName": "Sugar",
+        "catalogNamespace": null,
+        "catalogItemId": null,
+        "installLocation": "D:\\Games\\Sugar",
+        "launchExecutable": null,
+        "installSize": null,
+        "incomplete": false,
+        "mainGameAppName": null,
+        "categories": []
+      }
+    },
+    {
+      "id": "adv-nbsp-before",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+00A0 before the object is not JSON whitespace"
+      },
+      "args": [
+        {
+          "$bytes": "wqB7IkFwcE5hbWUiOiJTdWdhciIsIkluc3RhbGxMb2NhdGlvbiI6IkQ6XFxHYW1lc1xcU3VnYXIifQ=="
+        }
+      ],
+      "error": {
+        "name": "EpicManifestError",
+        "message": "not valid JSON (Unexpected token ' ', \" {\"AppName\"... is not valid JSON)",
+        "code": "MANIFEST_FORMAT"
+      }
+    }
+  ]
+}

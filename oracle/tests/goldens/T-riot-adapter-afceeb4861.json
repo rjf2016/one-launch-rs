@@ -1,0 +1,106 @@
+{
+  "id": "T-riot-adapter-afceeb4861",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot hand-over"
+  ],
+  "name": "fails and rolls back when a linked account signs in as a Riot account that is not its own",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false,
+          "onAttention": {
+            "$function": "onAttention"
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "riot",
+        "account": {
+          "id": "@acct:riot:riot_alt",
+          "displayName": "Alt",
+          "login": "riot_alt",
+          "launcherUid": "33333333-3333-4333-8333-333333333333"
+        },
+        "strategy": "remembered",
+        "ok": false,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close the Riot Client",
+            "status": "skipped",
+            "detail": "Skipped: RiotClientServices.exe is not running."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing sign-in",
+            "status": "done",
+            "detail": "Saved Main's sign-in (fingerprint acd093bd)."
+          },
+          {
+            "id": "backup",
+            "title": "Back up RiotGamesPrivateSettings.yaml",
+            "status": "done",
+            "detail": "{tmp}\\backups\\riot\\<ts>"
+          },
+          {
+            "id": "file",
+            "title": "Put the account's sign-in in place",
+            "status": "done",
+            "detail": "RiotGamesPrivateSettings.yaml now holds the saved copy (fingerprint 4b8ad0db)."
+          },
+          {
+            "id": "start",
+            "title": "Start the Riot Client",
+            "status": "done",
+            "detail": "Client started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the client to come up",
+            "status": "done",
+            "detail": "RiotClientServices.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the client signed in",
+            "status": "failed",
+            "detail": "The client ended on its login page: the client refused the saved sign-in (401 invalid_grant)."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "failed",
+            "detail": "Signed in as a different account."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new sign-in",
+            "status": "skipped",
+            "detail": "Runs only after a manual sign-in: the fresh sign-in replaces the stale saved copy."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": true,
+        "error": "The Riot Client signed in as Riot account …4444 instead of Alt (…3333). Sign in to the client as riot_alt, or fix the Riot account id on the account page.",
+        "needsSignIn": false,
+        "cancelled": false
+      }
+    }
+  ]
+}

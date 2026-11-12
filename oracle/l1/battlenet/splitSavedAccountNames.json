@@ -1,0 +1,126 @@
+{
+  "function": "splitSavedAccountNames",
+  "source": "src/main/launchers/battlenet/config.ts",
+  "note": "decode: none\narg0 is Client.SavedAccountNames as read from the parsed document (a string), or null when absent; in memory.",
+  "cases": [
+    {
+      "id": "fixture",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the client settings and the Games timestamps"
+      },
+      "args": [
+        "saved1@example.com,saved2@example.com,saved3@example.com,saved4@example.com,saved5@example.com"
+      ],
+      "out": [
+        "saved1@example.com",
+        "saved2@example.com",
+        "saved3@example.com",
+        "saved4@example.com",
+        "saved5@example.com"
+      ]
+    },
+    {
+      "id": "null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/0a1b2c3d.config | no SavedAccountNames"
+      },
+      "args": [
+        null
+      ],
+      "out": []
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | SavedAccountNames empty"
+      },
+      "args": [
+        ""
+      ],
+      "out": []
+    },
+    {
+      "id": "commas",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | only commas"
+      },
+      "args": [
+        ",,,"
+      ],
+      "out": []
+    },
+    {
+      "id": "spaces",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | spaces and empty items"
+      },
+      "args": [
+        " a@example.com , ,b@example.com,"
+      ],
+      "out": [
+        "a@example.com",
+        "b@example.com"
+      ]
+    },
+    {
+      "id": "tabs-newlines",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | tabs and newlines around items"
+      },
+      "args": [
+        "\ta@example.com\n,\r\nb@example.com"
+      ],
+      "out": [
+        "a@example.com",
+        "b@example.com"
+      ]
+    },
+    {
+      "id": "unicode-spaces",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+FEFF, U+3000, U+00A0, U+2028 and U+180E around items; JS trim removes all but U+180E"
+      },
+      "args": [
+        "﻿a@example.com　, b@example.com ,᠎c@example.com"
+      ],
+      "out": [
+        "a@example.com",
+        "b@example.com",
+        "᠎c@example.com"
+      ]
+    },
+    {
+      "id": "only-unicode-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: an item of U+FEFF alone trims to empty and is dropped"
+      },
+      "args": [
+        "﻿,a@example.com"
+      ],
+      "out": [
+        "a@example.com"
+      ]
+    },
+    {
+      "id": "case-kept",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | mixed case is kept"
+      },
+      "args": [
+        "User_1@Example.com"
+      ],
+      "out": [
+        "User_1@Example.com"
+      ]
+    }
+  ]
+}

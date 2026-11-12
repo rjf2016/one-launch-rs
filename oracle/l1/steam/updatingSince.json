@@ -1,0 +1,115 @@
+{
+  "function": "updatingSince",
+  "source": "src/main/launchers/steam/bootstrap-log.ts",
+  "note": "decode: none\narg0 stands for the log file: { file: <bytes> } when <SteamPath>\\logs\\bootstrap_log.txt exists, {} when it does not. call writes the bytes to bootstrap_log.txt in a fresh temporary folder, passes that path, and removes the folder; the path never reaches the result.\narg1 is the mark. The function is updateInProgress(readLoginLogSince(path, mark)): at most the last 512 KiB since the mark, from the start if the log shrank, toString(utf8). The tail cap is covered by outcomeSince’s cap-tail-* on the same reader.",
+  "cases": [
+    {
+      "id": "missing",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-bootstrap-log.test.ts > reading only what the updater appends > ignores an update from before the mark and copes with a missing file"
+      },
+      "args": [
+        {},
+        0
+      ],
+      "out": false
+    },
+    {
+      "id": "from-start",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-bootstrap-log.test.ts > reading only what the updater appends > ignores an update from before the mark and copes with a missing file"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "WzIwMjYtMDktMTEgMTI6NTY6MDJdIFN0YXJ0dXAgLSB1cGRhdGVyIGJ1aWx0IFNlcCAgMiAyMDI2IDE4OjMyOjQzDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gQ2hlY2tpbmcgZm9yIHVwZGF0ZSBvbiBzdGFydHVwDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gQ2hlY2tpbmcgZm9yIGF2YWlsYWJsZSB1cGRhdGVzLi4uDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gRG93bmxvYWRlZCBuZXcgbWFuaWZlc3Q6IC9zdGVhbV9jbGllbnRfd2luNjQgdmVyc2lvbiAxNzg4NjUyMjE1LCBpbnN0YWxsZWQgdmVyc2lvbiAxNzg1Nzk5MTk2LCBleGlzdGluZyBwZW5kaW5nIHZlcnNpb24gMA0KWzIwMjYtMDktMTEgMTI6NTY6MDJdIERvd25sb2FkaW5nIHVwZGF0ZSAoMTIsODQyIG9mIDIxMiwzMTQgS0IpLi4uDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gRG93bmxvYWQgY29tcGxldGUuDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gRm91bmQgcGVuZGluZyB1cGRhdGUNClsyMDI2LTA5LTExIDEyOjU2OjAyXSBJbnN0YWxsaW5nIHVwZGF0ZS4uLg0KWzIwMjYtMDktMTEgMTI6NTY6MDJdIEV4dHJhY3RpbmcgcGFja2FnZS4uLg0KWzIwMjYtMDktMTEgMTI6NTY6MDJdIEluc3RhbGxpbmcgdXBkYXRlLi4uDQo="
+          }
+        },
+        0
+      ],
+      "out": true
+    },
+    {
+      "id": "from-mark",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-bootstrap-log.test.ts > reading only what the updater appends > ignores an update from before the mark and copes with a missing file"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "WzIwMjYtMDktMTEgMTI6NTY6MDJdIFN0YXJ0dXAgLSB1cGRhdGVyIGJ1aWx0IFNlcCAgMiAyMDI2IDE4OjMyOjQzDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gQ2hlY2tpbmcgZm9yIHVwZGF0ZSBvbiBzdGFydHVwDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gQ2hlY2tpbmcgZm9yIGF2YWlsYWJsZSB1cGRhdGVzLi4uDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gRG93bmxvYWRlZCBuZXcgbWFuaWZlc3Q6IC9zdGVhbV9jbGllbnRfd2luNjQgdmVyc2lvbiAxNzg4NjUyMjE1LCBpbnN0YWxsZWQgdmVyc2lvbiAxNzg1Nzk5MTk2LCBleGlzdGluZyBwZW5kaW5nIHZlcnNpb24gMA0KWzIwMjYtMDktMTEgMTI6NTY6MDJdIERvd25sb2FkaW5nIHVwZGF0ZSAoMTIsODQyIG9mIDIxMiwzMTQgS0IpLi4uDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gRG93bmxvYWQgY29tcGxldGUuDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gRm91bmQgcGVuZGluZyB1cGRhdGUNClsyMDI2LTA5LTExIDEyOjU2OjAyXSBJbnN0YWxsaW5nIHVwZGF0ZS4uLg0KWzIwMjYtMDktMTEgMTI6NTY6MDJdIEV4dHJhY3RpbmcgcGFja2FnZS4uLg0KWzIwMjYtMDktMTEgMTI6NTY6MDJdIEluc3RhbGxpbmcgdXBkYXRlLi4uDQo="
+          }
+        },
+        611
+      ],
+      "out": false
+    },
+    {
+      "id": "appended-after-mark",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-bootstrap-log.test.ts > reading only what the updater appends > ignores an update from before the mark and copes with a missing file"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "WzIwMjYtMDktMTEgMTI6NTY6MDJdIFN0YXJ0dXAgLSB1cGRhdGVyIGJ1aWx0IFNlcCAgMiAyMDI2IDE4OjMyOjQzDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gQ2hlY2tpbmcgZm9yIHVwZGF0ZSBvbiBzdGFydHVwDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gQ2hlY2tpbmcgZm9yIGF2YWlsYWJsZSB1cGRhdGVzLi4uDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gRG93bmxvYWRlZCBuZXcgbWFuaWZlc3Q6IC9zdGVhbV9jbGllbnRfd2luNjQgdmVyc2lvbiAxNzg4NjUyMjE1LCBpbnN0YWxsZWQgdmVyc2lvbiAxNzg1Nzk5MTk2LCBleGlzdGluZyBwZW5kaW5nIHZlcnNpb24gMA0KWzIwMjYtMDktMTEgMTI6NTY6MDJdIERvd25sb2FkaW5nIHVwZGF0ZSAoMTIsODQyIG9mIDIxMiwzMTQgS0IpLi4uDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gRG93bmxvYWQgY29tcGxldGUuDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gRm91bmQgcGVuZGluZyB1cGRhdGUNClsyMDI2LTA5LTExIDEyOjU2OjAyXSBJbnN0YWxsaW5nIHVwZGF0ZS4uLg0KWzIwMjYtMDktMTEgMTI6NTY6MDJdIEV4dHJhY3RpbmcgcGFja2FnZS4uLg0KWzIwMjYtMDktMTEgMTI6NTY6MDJdIEluc3RhbGxpbmcgdXBkYXRlLi4uDQpbMjAyNi0wOS0xMSAxMjo1NjowMl0gRG93bmxvYWRpbmcgdXBkYXRlICgxIG9mIDIgS0IpLi4uDQo="
+          }
+        },
+        611
+      ],
+      "out": true
+    },
+    {
+      "id": "rotated",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a log smaller than the mark is read from its start"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "WzIwMjYtMDktMTEgMTI6NTY6MDJdIERvd25sb2FkaW5nIHVwZGF0ZSAoMSBvZiAyIEtCKS4uLg0K"
+          }
+        },
+        10000
+      ],
+      "out": true
+    },
+    {
+      "id": "mark-mid-line",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a mark inside an update line still sees the rest of the tag"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "WzIwMjYtMDktMTEgMTI6NTY6MDJdIEluc3RhbGxpbmcgdXBkYXRlLi4u"
+          }
+        },
+        22
+      ],
+      "out": true
+    },
+    {
+      "id": "mark-cuts-tag",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a mark that cuts into the tag hides it"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "WzIwMjYtMDktMTEgMTI6NTY6MDJdIEluc3RhbGxpbmcgdXBkYXRlLi4u"
+          }
+        },
+        25
+      ],
+      "out": false
+    }
+  ]
+}

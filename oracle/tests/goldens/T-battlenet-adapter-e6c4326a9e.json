@@ -1,0 +1,444 @@
+{
+  "id": "T-battlenet-adapter-e6c4326a9e",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "plans"
+  ],
+  "name": "warns about sticky preferences it never writes, and skips the file step when the layout cannot be reproduced",
+  "calls": [
+    {
+      "launcher": "battlenet",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:battlenet:saved3@example.com",
+          "displayName": "Alt",
+          "login": "saved3@example.com",
+          "launcherUid": "0b2c3d4e",
+          "hasSecret": false
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "battlenet",
+        "account": {
+          "id": "@acct:battlenet:saved3@example.com",
+          "displayName": "Alt",
+          "login": "saved3@example.com",
+          "launcherUid": "0b2c3d4e"
+        },
+        "strategy": "remembered",
+        "current": {
+          "mostRecentLogin": "saved1@example.com",
+          "autoLoginUser": "saved1@example.com",
+          "running": false
+        },
+        "steps": [
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "close",
+            "kind": "process",
+            "title": "Close Battle.net",
+            "target": "Battle.net.exe",
+            "detail": "Skipped: Battle.net.exe is not running."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "capture",
+            "kind": "backup",
+            "title": "Save the outgoing session",
+            "target": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth",
+            "detail": "The UnifiedAuth value holds Main's session; store it, encrypted, as the account's snapshot if it changed. Nothing of the client's changes."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "backup",
+            "kind": "backup",
+            "title": "Back up Battle.net.config and the UnifiedAuth value",
+            "target": "{tmp}\\backups\\battlenet\\<timestamp>",
+            "detail": "Copy {tmp}\\Roaming\\Battle.net\\Battle.net.config into a new snapshot folder and record 1 UnifiedAuth value in it, vault-encrypted, so a failed switch can be rolled back. The newest 20 snapshots are kept."
+          },
+          {
+            "changes": [
+              {
+                "where": "UnifiedAuth\\B1B1B1B1",
+                "before": "(absent)",
+                "after": "(stored snapshot, fingerprint 59028191, captured <ts>)"
+              },
+              {
+                "where": "UnifiedAuth\\AA11BB22",
+                "before": "(34 bytes, fingerprint d4a156d2)",
+                "after": "(removed)"
+              }
+            ],
+            "skipped": false,
+            "id": "registry",
+            "kind": "registry",
+            "title": "Put the account's session token in place",
+            "target": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth",
+            "detail": "Decrypt Alt's session snapshot from the vault and write it as the REG_BINARY value under UnifiedAuth (reg add /t REG_BINARY). Any other value there (the outgoing token, saved in the step above when it belongs to a One Launch account) is removed, the way the client's own logout removes it. The bytes are a DPAPI blob bound to this Windows user and are never shown or logged. Identity, EncryptionKey, Launch Options, and every file under the client's folders stay untouched."
+          },
+          {
+            "changes": [
+              {
+                "where": "Client.SavedAccountNames",
+                "before": "s…@example.com, s…@example.com, saved3@example.com, s…@example.com, s…@example.com",
+                "after": "saved3@example.com, s…@example.com, s…@example.com, s…@example.com, s…@example.com"
+              }
+            ],
+            "skipped": false,
+            "id": "file",
+            "kind": "file",
+            "title": "Put the login first in the saved-accounts list",
+            "target": "{tmp}\\Roaming\\Battle.net\\Battle.net.config",
+            "detail": "Move saved3@example.com to the front of Client.SavedAccountNames, rewriting the file with the same layout (4-space indent, CRLF, \"\\/\" escapes) via a temp file and rename; every other key stays byte for byte. The client moves the signed-in login to the front at every sign-in and at start only accepts the UnifiedAuth token of the login that is first (2026-09-13: every switch with another login first was asked for a password; the one with the target first signed in silently)."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "start",
+            "kind": "launch",
+            "title": "Start Battle.net",
+            "target": "\"{tmp}\\Battle.net\\Battle.net Launcher.exe\"",
+            "detail": "Start Battle.net Launcher.exe with no arguments, as the Start Menu shortcut does (it applies any pending update, then starts the client with --from-launcher). The client signs in as saved3@example.com on its own from the UnifiedAuth token."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "wait",
+            "kind": "wait",
+            "title": "Wait for the client to come up",
+            "target": "Battle.net.exe",
+            "detail": "Poll the process list until Battle.net.exe is running, up to 0.5 s."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "verify",
+            "kind": "wait",
+            "title": "Confirm the client signed in",
+            "target": "{tmp}\\Local\\Battle.net\\Logs",
+            "detail": "Read the new run's log (battle.net-<timestamp>.log; no tokens in it) until \"Logged into Battle.net successfully\" names the account id …3d4e, up to 0.5 s. A \"Login failed\" line means the token was rejected: the snapshot is marked stale and the next step hands over to you."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "manual",
+            "kind": "wait",
+            "title": "Wait for you to sign in",
+            "target": "{tmp}\\Local\\Battle.net\\Logs",
+            "detail": "Runs only if the client rejects the stored token or does not sign in within 0.5 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.016666666666666666 min."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "recapture",
+            "kind": "backup",
+            "title": "Save the new session",
+            "target": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth",
+            "detail": "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+          }
+        ],
+        "warnings": [
+          "\"Keep me logged in\" (Client.AutoLogin) is false in Battle.net.config, so the client will not sign in on its own from a token. One Launch never changes that setting: turn it on on the client's login page, and the next sign-in is remembered.",
+          "The current account's Battle.net preferences close to the system tray instead of exiting ({tmp}\\Roaming\\Battle.net\\b7c8.config: HideOnClose). The close step will wait 0.2 s and then force-close the client."
+        ],
+        "notes": [],
+        "executable": true,
+        "generatedAt": "<ts>"
+      }
+    },
+    {
+      "launcher": "battlenet",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:battlenet:saved3@example.com",
+          "displayName": "Alt",
+          "login": "saved3@example.com",
+          "launcherUid": "0b2c3d4e",
+          "hasSecret": false
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "battlenet",
+        "account": {
+          "id": "@acct:battlenet:saved3@example.com",
+          "displayName": "Alt",
+          "login": "saved3@example.com",
+          "launcherUid": "0b2c3d4e"
+        },
+        "strategy": "remembered",
+        "current": {
+          "mostRecentLogin": "saved1@example.com",
+          "autoLoginUser": "saved1@example.com",
+          "running": false
+        },
+        "steps": [
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "close",
+            "kind": "process",
+            "title": "Close Battle.net",
+            "target": "Battle.net.exe",
+            "detail": "Skipped: Battle.net.exe is not running."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "capture",
+            "kind": "backup",
+            "title": "Save the outgoing session",
+            "target": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth",
+            "detail": "The UnifiedAuth value holds Main's session; store it, encrypted, as the account's snapshot if it changed. Nothing of the client's changes."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "backup",
+            "kind": "backup",
+            "title": "Back up Battle.net.config and the UnifiedAuth value",
+            "target": "{tmp}\\backups\\battlenet\\<timestamp>",
+            "detail": "Copy {tmp}\\Roaming\\Battle.net\\Battle.net.config into a new snapshot folder and record 1 UnifiedAuth value in it, vault-encrypted, so a failed switch can be rolled back. The newest 20 snapshots are kept."
+          },
+          {
+            "changes": [
+              {
+                "where": "UnifiedAuth\\B1B1B1B1",
+                "before": "(absent)",
+                "after": "(stored snapshot, fingerprint 59028191, captured <ts>)"
+              },
+              {
+                "where": "UnifiedAuth\\AA11BB22",
+                "before": "(34 bytes, fingerprint d4a156d2)",
+                "after": "(removed)"
+              }
+            ],
+            "skipped": false,
+            "id": "registry",
+            "kind": "registry",
+            "title": "Put the account's session token in place",
+            "target": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth",
+            "detail": "Decrypt Alt's session snapshot from the vault and write it as the REG_BINARY value under UnifiedAuth (reg add /t REG_BINARY). Any other value there (the outgoing token, saved in the step above when it belongs to a One Launch account) is removed, the way the client's own logout removes it. The bytes are a DPAPI blob bound to this Windows user and are never shown or logged. Identity, EncryptionKey, Launch Options, and every file under the client's folders stay untouched."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "file",
+            "kind": "file",
+            "title": "Put the login first in the saved-accounts list",
+            "target": "{tmp}\\Roaming\\Battle.net\\Battle.net.config",
+            "detail": "Skipped: {tmp}\\Roaming\\Battle.net\\Battle.net.config does not round-trip through One Launch's JSON writer byte for byte, so it is left alone rather than rewritten with a different layout."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "start",
+            "kind": "launch",
+            "title": "Start Battle.net",
+            "target": "\"{tmp}\\Battle.net\\Battle.net Launcher.exe\"",
+            "detail": "Start Battle.net Launcher.exe with no arguments, as the Start Menu shortcut does (it applies any pending update, then starts the client with --from-launcher). The client signs in as saved3@example.com on its own from the UnifiedAuth token."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "wait",
+            "kind": "wait",
+            "title": "Wait for the client to come up",
+            "target": "Battle.net.exe",
+            "detail": "Poll the process list until Battle.net.exe is running, up to 0.5 s."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "verify",
+            "kind": "wait",
+            "title": "Confirm the client signed in",
+            "target": "{tmp}\\Local\\Battle.net\\Logs",
+            "detail": "Read the new run's log (battle.net-<timestamp>.log; no tokens in it) until \"Logged into Battle.net successfully\" names the account id …3d4e, up to 0.5 s. A \"Login failed\" line means the token was rejected: the snapshot is marked stale and the next step hands over to you."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "manual",
+            "kind": "wait",
+            "title": "Wait for you to sign in",
+            "target": "{tmp}\\Local\\Battle.net\\Logs",
+            "detail": "Runs only if the client rejects the stored token or does not sign in within 0.5 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.016666666666666666 min."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "recapture",
+            "kind": "backup",
+            "title": "Save the new session",
+            "target": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth",
+            "detail": "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+          }
+        ],
+        "warnings": [
+          "{tmp}\\Roaming\\Battle.net\\Battle.net.config has a layout One Launch cannot reproduce exactly, so the saved-accounts step is skipped rather than rewriting the file differently.",
+          "The current account's Battle.net preferences close to the system tray instead of exiting ({tmp}\\Roaming\\Battle.net\\b7c8.config: HideOnClose). The close step will wait 0.2 s and then force-close the client.",
+          "saved3@example.com cannot be put first in Client.SavedAccountNames (see the saved-accounts step), and the client only accepts the token of the login that is first, so it will ask for the password."
+        ],
+        "notes": [],
+        "executable": true,
+        "generatedAt": "<ts>"
+      }
+    },
+    {
+      "launcher": "battlenet",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:battlenet:saved3@example.com",
+          "displayName": "Alt",
+          "login": "saved3@example.com",
+          "launcherUid": "0b2c3d4e",
+          "hasSecret": false
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "battlenet",
+        "account": {
+          "id": "@acct:battlenet:saved3@example.com",
+          "displayName": "Alt",
+          "login": "saved3@example.com",
+          "launcherUid": "0b2c3d4e"
+        },
+        "strategy": "remembered",
+        "current": {
+          "mostRecentLogin": "saved1@example.com",
+          "autoLoginUser": null,
+          "running": false
+        },
+        "steps": [
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "close",
+            "kind": "process",
+            "title": "Close Battle.net",
+            "target": "Battle.net.exe",
+            "detail": "Skipped: Battle.net.exe is not running."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "capture",
+            "kind": "backup",
+            "title": "Save the outgoing session",
+            "target": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth",
+            "detail": "The UnifiedAuth value holds Main's session; store it, encrypted, as the account's snapshot if it changed. Nothing of the client's changes."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "backup",
+            "kind": "backup",
+            "title": "Back up Battle.net.config and the UnifiedAuth value",
+            "target": "{tmp}\\backups\\battlenet\\<timestamp>",
+            "detail": "Copy (no Battle.net.config to copy) into a new snapshot folder and record 1 UnifiedAuth value in it, vault-encrypted, so a failed switch can be rolled back. The newest 20 snapshots are kept."
+          },
+          {
+            "changes": [
+              {
+                "where": "UnifiedAuth\\B1B1B1B1",
+                "before": "(absent)",
+                "after": "(stored snapshot, fingerprint 59028191, captured <ts>)"
+              },
+              {
+                "where": "UnifiedAuth\\AA11BB22",
+                "before": "(34 bytes, fingerprint d4a156d2)",
+                "after": "(removed)"
+              }
+            ],
+            "skipped": false,
+            "id": "registry",
+            "kind": "registry",
+            "title": "Put the account's session token in place",
+            "target": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth",
+            "detail": "Decrypt Alt's session snapshot from the vault and write it as the REG_BINARY value under UnifiedAuth (reg add /t REG_BINARY). Any other value there (the outgoing token, saved in the step above when it belongs to a One Launch account) is removed, the way the client's own logout removes it. The bytes are a DPAPI blob bound to this Windows user and are never shown or logged. Identity, EncryptionKey, Launch Options, and every file under the client's folders stay untouched."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "file",
+            "kind": "file",
+            "title": "Put the login first in the saved-accounts list",
+            "target": "{tmp}\\Roaming\\Battle.net\\Battle.net.config",
+            "detail": "Skipped: {tmp}\\Roaming\\Battle.net\\Battle.net.config does not exist. One Launch never creates it; the client writes it at its next exit."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "start",
+            "kind": "launch",
+            "title": "Start Battle.net",
+            "target": "\"{tmp}\\Battle.net\\Battle.net Launcher.exe\"",
+            "detail": "Start Battle.net Launcher.exe with no arguments, as the Start Menu shortcut does (it applies any pending update, then starts the client with --from-launcher). The client signs in as saved3@example.com on its own from the UnifiedAuth token."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "wait",
+            "kind": "wait",
+            "title": "Wait for the client to come up",
+            "target": "Battle.net.exe",
+            "detail": "Poll the process list until Battle.net.exe is running, up to 0.5 s."
+          },
+          {
+            "changes": [],
+            "skipped": false,
+            "id": "verify",
+            "kind": "wait",
+            "title": "Confirm the client signed in",
+            "target": "{tmp}\\Local\\Battle.net\\Logs",
+            "detail": "Read the new run's log (battle.net-<timestamp>.log; no tokens in it) until \"Logged into Battle.net successfully\" names the account id …3d4e, up to 0.5 s. A \"Login failed\" line means the token was rejected: the snapshot is marked stale and the next step hands over to you."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "manual",
+            "kind": "wait",
+            "title": "Wait for you to sign in",
+            "target": "{tmp}\\Local\\Battle.net\\Logs",
+            "detail": "Runs only if the client rejects the stored token or does not sign in within 0.5 s. The client stays on its login page; you sign in there once as saved3@example.com with \"Keep me logged in\" on, and One Launch continues with the game as soon as the log reports the sign-in, up to 0.016666666666666666 min."
+          },
+          {
+            "changes": [],
+            "skipped": true,
+            "id": "recapture",
+            "kind": "backup",
+            "title": "Save the new session",
+            "target": "HKCU\\Software\\Blizzard Entertainment\\Battle.net\\UnifiedAuth",
+            "detail": "Runs only after a manual sign-in: the fresh UnifiedAuth value replaces the stale snapshot."
+          }
+        ],
+        "warnings": [
+          "{tmp}\\Roaming\\Battle.net\\Battle.net.config does not exist. One Launch never creates it; the saved-accounts step is skipped and the client will write the file at its next exit.",
+          "The current account's Battle.net preferences close to the system tray instead of exiting ({tmp}\\Roaming\\Battle.net\\b7c8.config: HideOnClose). The close step will wait 0.2 s and then force-close the client.",
+          "saved3@example.com cannot be put first in Client.SavedAccountNames (see the saved-accounts step), and the client only accepts the token of the login that is first, so it will ask for the password."
+        ],
+        "notes": [],
+        "executable": true,
+        "generatedAt": "<ts>"
+      }
+    }
+  ]
+}

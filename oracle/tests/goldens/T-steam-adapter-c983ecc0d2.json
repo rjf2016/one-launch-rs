@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-c983ecc0d2",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.detectInstall"
+  ],
+  "name": "accepts only steam.exe inside a folder as a located installation",
+  "calls": []
+}

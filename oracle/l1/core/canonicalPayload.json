@@ -1,0 +1,385 @@
+{
+  "function": "canonicalPayload",
+  "source": "src/main/updates/manifest.ts",
+  "note": "decode: none\narg0 is the version, arg1 the file entry { url, sha512, size }, as verifyManifest passes them after its checks; scripts/release-sign.mjs signs the same string as UTF-8 bytes.\nCases outside verifyManifest's checks (a newline in a field, a non-integer size) show the template literal's own formatting: a number prints as JS String(n) does, a missing field as 'undefined'.",
+  "cases": [
+    {
+      "id": "test-literal",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > signs a fixed, newline-separated payload"
+      },
+      "args": [
+        "1.2.3",
+        {
+          "url": "a.exe",
+          "sha512": "h",
+          "size": 7
+        }
+      ],
+      "out": "one-launch-update-v1\n1.2.3\na.exe\nh\n7\n"
+    },
+    {
+      "id": "fixture-latest",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | the version and file entry it signs"
+      },
+      "args": [
+        "1.0.0-beta.4",
+        {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        }
+      ],
+      "out": "one-launch-update-v1\n1.0.0-beta.4\nOneLaunch-1.0.0-beta.4-setup.exe\nTrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n50\n"
+    },
+    {
+      "id": "large-size",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/updates/latest.yml | size 112000000 as in test/update-manifest.test.ts"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 112000000
+        }
+      ],
+      "out": "one-launch-update-v1\n1.0.0-beta.2\nOneLaunch-1.0.0-beta.4-setup.exe\nTrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n112000000\n"
+    },
+    {
+      "id": "size-max-safe",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: size 9007199254740991 prints all its digits"
+      },
+      "args": [
+        "1.0.0",
+        {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 9007199254740991
+        }
+      ],
+      "out": "one-launch-update-v1\n1.0.0\nOneLaunch-1.0.0-beta.4-setup.exe\nTrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n9007199254740991\n"
+    },
+    {
+      "id": "size-exponent",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: size 1e21 prints as 1e+21 in JS"
+      },
+      "args": [
+        "1.0.0",
+        {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 1e+21
+        }
+      ],
+      "out": "one-launch-update-v1\n1.0.0\nOneLaunch-1.0.0-beta.4-setup.exe\nTrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n1e+21\n"
+    },
+    {
+      "id": "size-fraction",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: size 0.1 prints as 0.1"
+      },
+      "args": [
+        "1.0.0",
+        {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 0.1
+        }
+      ],
+      "out": "one-launch-update-v1\n1.0.0\nOneLaunch-1.0.0-beta.4-setup.exe\nTrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n0.1\n"
+    },
+    {
+      "id": "size-tiny",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: size 1e-7 prints as 1e-7"
+      },
+      "args": [
+        "1.0.0",
+        {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 1e-7
+        }
+      ],
+      "out": "one-launch-update-v1\n1.0.0\nOneLaunch-1.0.0-beta.4-setup.exe\nTrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n1e-7\n"
+    },
+    {
+      "id": "size-negative-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: size -0 prints as 0"
+      },
+      "args": [
+        "1.0.0",
+        {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": {
+            "$number": "-0"
+          }
+        }
+      ],
+      "out": "one-launch-update-v1\n1.0.0\nOneLaunch-1.0.0-beta.4-setup.exe\nTrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n0\n"
+    },
+    {
+      "id": "size-nan",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: size NaN prints as NaN"
+      },
+      "args": [
+        "1.0.0",
+        {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": {
+            "$number": "NaN"
+          }
+        }
+      ],
+      "out": "one-launch-update-v1\n1.0.0\nOneLaunch-1.0.0-beta.4-setup.exe\nTrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\nNaN\n"
+    },
+    {
+      "id": "size-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: size given as the string 050 is printed as it is"
+      },
+      "args": [
+        "1.0.0",
+        {
+          "url": "OneLaunch-1.0.0-beta.4-setup.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": "050"
+        }
+      ],
+      "out": "one-launch-update-v1\n1.0.0\nOneLaunch-1.0.0-beta.4-setup.exe\nTrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n050\n"
+    },
+    {
+      "id": "newline-in-url",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-manifest.test.ts > release manifest signatures > refuses fields that could smuggle a second line into the signed payload | the payload the tricky url would give"
+      },
+      "args": [
+        "1.0.0-beta.2",
+        {
+          "url": "a.exe\n1.0.0",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        }
+      ],
+      "out": "one-launch-update-v1\n1.0.0-beta.2\na.exe\n1.0.0\nTrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n50\n"
+    },
+    {
+      "id": "missing-fields",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty file entry: each field prints as undefined"
+      },
+      "args": [
+        "1.0.0",
+        {}
+      ],
+      "out": "one-launch-update-v1\n1.0.0\nundefined\nundefined\nundefined\n"
+    },
+    {
+      "id": "non-ascii",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: non-ASCII and astral characters pass through as they are"
+      },
+      "args": [
+        "1.0.0-é",
+        {
+          "url": "Ünï-😀.exe",
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        }
+      ],
+      "out": "one-launch-update-v1\n1.0.0-é\nÜnï-😀.exe\nTrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==\n50\n"
+    },
+    {
+      "id": "lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a lone high surrogate in the url stays in the string; signing would encode it as U+FFFD"
+      },
+      "args": [
+        "1.0.0",
+        {
+          "url": {
+            "$utf16": [
+              97,
+              55296,
+              46,
+              101,
+              120,
+              101
+            ]
+          },
+          "sha512": "TrVrOgassNbwx5uV5nUThQ5r3VAp7aMC1XIirwvmxC5hdsYQ0tnXsAOVXxa/O1nBsIoTsP03pTuYmyM0S2R/qw==",
+          "size": 50
+        }
+      ],
+      "out": {
+        "$utf16": [
+          111,
+          110,
+          101,
+          45,
+          108,
+          97,
+          117,
+          110,
+          99,
+          104,
+          45,
+          117,
+          112,
+          100,
+          97,
+          116,
+          101,
+          45,
+          118,
+          49,
+          10,
+          49,
+          46,
+          48,
+          46,
+          48,
+          10,
+          97,
+          55296,
+          46,
+          101,
+          120,
+          101,
+          10,
+          84,
+          114,
+          86,
+          114,
+          79,
+          103,
+          97,
+          115,
+          115,
+          78,
+          98,
+          119,
+          120,
+          53,
+          117,
+          86,
+          53,
+          110,
+          85,
+          84,
+          104,
+          81,
+          53,
+          114,
+          51,
+          86,
+          65,
+          112,
+          55,
+          97,
+          77,
+          67,
+          49,
+          88,
+          73,
+          105,
+          114,
+          119,
+          118,
+          109,
+          120,
+          67,
+          53,
+          104,
+          100,
+          115,
+          89,
+          81,
+          48,
+          116,
+          110,
+          88,
+          115,
+          65,
+          79,
+          86,
+          88,
+          120,
+          97,
+          47,
+          79,
+          49,
+          110,
+          66,
+          115,
+          73,
+          111,
+          84,
+          115,
+          80,
+          48,
+          51,
+          112,
+          84,
+          117,
+          89,
+          109,
+          121,
+          77,
+          48,
+          83,
+          50,
+          82,
+          47,
+          113,
+          119,
+          61,
+          61,
+          10,
+          53,
+          48,
+          10
+        ]
+      }
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: empty version and fields"
+      },
+      "args": [
+        "",
+        {
+          "url": "",
+          "sha512": "",
+          "size": 0
+        }
+      ],
+      "out": "one-launch-update-v1\n\n\n\n0\n"
+    }
+  ]
+}

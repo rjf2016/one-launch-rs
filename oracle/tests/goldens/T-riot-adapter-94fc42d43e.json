@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-94fc42d43e",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot library"
+  ],
+  "name": "lists the products with an .ok marker and an install folder, named from the Uninstall key or the table",
+  "calls": []
+}

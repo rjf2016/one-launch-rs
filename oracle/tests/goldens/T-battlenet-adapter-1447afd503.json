@@ -1,0 +1,9 @@
+{
+  "id": "T-battlenet-adapter-1447afd503",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "session state and capture"
+  ],
+  "name": "attributes the token by stored fingerprint, else by the last run log",
+  "calls": []
+}

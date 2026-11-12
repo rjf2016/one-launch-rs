@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-785ea05c18",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot shutdown"
+  ],
+  "name": "cuts the restart watch short as soon as the lock-file line lands, even after the core is already gone",
+  "calls": []
+}

@@ -1,0 +1,664 @@
+{
+  "function": "parseBlob",
+  "source": "src/main/launchers/battlenet/session.ts",
+  "note": "decode: none\narg0 is the stored JSON string, in memory (no decode: it comes from the vault, not a file).\nThe vault line: sessions.decrypt (DPAPI through Electron safeStorage.decryptString) yields this JSON string and sessions.encrypt takes it; that step is not pure and is not recorded. Everything here is the layout on the clear side of it. Token values are placeholders.\nAccepts v 1 and v 2 and always returns a v1 blob with the hex lower-cased; drops every other field (the v2 cookie store). The adapter shows the shape error to the user when a switch reads the blob. Invalid JSON throws the SyntaxError of V8 JSON.parse with its own message.",
+  "cases": [
+    {
+      "id": "test-v1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"01000000d08c9ddf\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": "AA11BB22",
+          "hex": "01000000d08c9ddf"
+        }
+      }
+    },
+    {
+      "id": "test-v2",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape"
+      },
+      "args": [
+        "{\"v\":2,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"01FF\"},\"cookies\":\"abcd\"}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": "AA11BB22",
+          "hex": "01ff"
+        }
+      }
+    },
+    {
+      "id": "test-no-unified-auth",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape"
+      },
+      "args": [
+        "{\"v\":1}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "test-bad-hex",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"x\",\"hex\":\"zz\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "pretty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | the v1 blob pretty-printed with CRLF"
+      },
+      "args": [
+        "{\r\n  \"v\": 1,\r\n  \"unifiedAuth\": {\r\n    \"name\": \"AA11BB22\",\r\n    \"hex\": \"01000000d08c9ddf\"\r\n  }\r\n}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": "AA11BB22",
+          "hex": "01000000d08c9ddf"
+        }
+      }
+    },
+    {
+      "id": "upper-hex",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | upper-case hex is lower-cased"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"01000000D08C9DDF\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": "AA11BB22",
+          "hex": "01000000d08c9ddf"
+        }
+      }
+    },
+    {
+      "id": "extra-fields",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | fields other than v and unifiedAuth are dropped"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\",\"type\":\"REG_BINARY\"},\"at\":\"x\"}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": "AA11BB22",
+          "hex": "00"
+        }
+      }
+    },
+    {
+      "id": "not-json",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | not JSON"
+      },
+      "args": [
+        "not json"
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Unexpected token 'o', \"not json\" is not valid JSON"
+      }
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | an empty string"
+      },
+      "args": [
+        ""
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Unexpected end of JSON input"
+      }
+    },
+    {
+      "id": "truncated",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | the v1 blob cut short"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\""
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Expected ':' after property name in JSON at position 20 (line 1 column 21)"
+      }
+    },
+    {
+      "id": "bom",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a leading U+FEFF is no JSON whitespace"
+      },
+      "args": [
+        "﻿{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"01000000d08c9ddf\"}}"
+      ],
+      "error": {
+        "name": "SyntaxError",
+        "message": "Unexpected token '﻿', \"﻿{\"v\":1,\"u\"... is not valid JSON"
+      }
+    },
+    {
+      "id": "json-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | the JSON null"
+      },
+      "args": [
+        "null"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "json-number",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | a JSON number"
+      },
+      "args": [
+        "1"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "json-array",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | a JSON array"
+      },
+      "args": [
+        "[]"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "json-string",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | a JSON string"
+      },
+      "args": [
+        "\"v\""
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "v-missing",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | no v"
+      },
+      "args": [
+        "{\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "v-3",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | v 3"
+      },
+      "args": [
+        "{\"v\":3,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "v-0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | v 0"
+      },
+      "args": [
+        "{\"v\":0,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "v-string",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | v as the string \"1\""
+      },
+      "args": [
+        "{\"v\":\"1\",\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "v-true",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | v true"
+      },
+      "args": [
+        "{\"v\":true,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "v-float-forms",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: v written 1.0: JSON.parse gives the number 1, accepted"
+      },
+      "args": [
+        "{\"v\":1.0,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": "AA11BB22",
+          "hex": "00"
+        }
+      }
+    },
+    {
+      "id": "v-exponent",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: v written 2e0, accepted as 2"
+      },
+      "args": [
+        "{\"v\":2e0,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": "AA11BB22",
+          "hex": "00"
+        }
+      }
+    },
+    {
+      "id": "v-rounds-to-one",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: v written 1.0000000000000001 rounds to the double 1 and is accepted"
+      },
+      "args": [
+        "{\"v\":1.0000000000000001,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": "AA11BB22",
+          "hex": "00"
+        }
+      }
+    },
+    {
+      "id": "v-near-one",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: v written 1.000000000000001 is a different double and is refused"
+      },
+      "args": [
+        "{\"v\":1.000000000000001,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "v-duplicate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: v given twice: JSON.parse keeps the last, so 3 then 1 is accepted"
+      },
+      "args": [
+        "{\"v\":3,\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": "AA11BB22",
+          "hex": "00"
+        }
+      }
+    },
+    {
+      "id": "proto-top",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: the whole blob under an own __proto__ key: no v of its own, refused"
+      },
+      "args": [
+        "{\"__proto__\":{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "proto-unified-auth",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: name and hex only under __proto__ inside unifiedAuth: refused"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"__proto__\":{\"name\":\"AA11BB22\",\"hex\":\"00\"}}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "ua-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | unifiedAuth null"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":null}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "ua-string",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | unifiedAuth a string"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":\"AA11BB22\"}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "ua-array",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | unifiedAuth an array"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":[\"AA11BB22\",\"00\"]}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "name-missing",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | no name"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"hex\":\"00\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "name-empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | an empty name"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"\",\"hex\":\"00\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "name-number",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | a numeric name"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":11,\"hex\":\"00\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "name-lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a \\ud800 escape in the name is kept as a lone surrogate"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"x\\ud800\",\"hex\":\"00\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": {
+            "$utf16": [
+              120,
+              55296
+            ]
+          },
+          "hex": "00"
+        }
+      }
+    },
+    {
+      "id": "name-spaces",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | a name of one space is accepted"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\" \",\"hex\":\"00\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": " ",
+          "hex": "00"
+        }
+      }
+    },
+    {
+      "id": "hex-missing",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | no hex"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "hex-empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | an empty hex"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "hex-odd",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | an odd number of hex digits"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"abc\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "hex-number",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | hex as a number"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":10}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "hex-spaces",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | hex with a space"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"01 ff\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "hex-0x",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: hex with a 0x prefix is refused (the x is no hex digit)"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"0x01\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "hex-trailing-newline",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "regex: hex followed by a newline: JS $ without the m flag matches only at the very end, so it is refused"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"01ff\\n\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "hex-fullwidth",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: full-width digits are no [0-9a-fA-F]"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"０１\"}}"
+      ],
+      "error": {
+        "name": "Error",
+        "message": "Stored Battle.net session has an unexpected shape"
+      }
+    },
+    {
+      "id": "hex-long",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > session blobs > keeps REG_BINARY values only, fingerprints them, and round-trips the stored shape | a long hex value of 62 digits"
+      },
+      "args": [
+        "{\"v\":1,\"unifiedAuth\":{\"name\":\"AA11BB22\",\"hex\":\"0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A\"}}"
+      ],
+      "out": {
+        "v": 1,
+        "unifiedAuth": {
+          "name": "AA11BB22",
+          "hex": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+        }
+      }
+    }
+  ]
+}

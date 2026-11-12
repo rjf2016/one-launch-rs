@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-c5415492fc",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot health"
+  ],
+  "name": "uses what the status pass already found out",
+  "calls": []
+}

@@ -1,0 +1,3445 @@
+{
+  "function": "updateAvailability",
+  "source": "src/main/updates/availability.ts",
+  "note": "decode: none\narg0 also carries testFeed, passed as the AvailabilityInput field of that name (src/main/index.ts sets it when ONELAUNCH_UPDATE_FEED gave a test feed).\ncall builds the InstallInput from arg0 = { isPackaged, dataDirSource, execPath, existingFiles, location }: fileExists(p) is existingFiles.includes(p) and records p; perUserInstallLocation() resolves to location (a string or null), or rejects with new Error(location.reject) when location is { reject }, and records that it was asked. The result is projected to { result, fileExists: [every path asked, in order], locationAsked: how many times the location was read }, so the Rust port is checked on the path it builds (dirname of execPath joined with 'Uninstall OneLaunch.exe', win32) and on what it does not ask.\nThe table is every combination of isPackaged, dataDirSource (default, flag, env), the uninstaller present or not, and five install locations (the exe folder, the same in upper case with a trailing separator, another folder, null, a rejection); ids name each input. Paths are under the placeholder profile C:\\Users\\someone (test/update-availability.test.ts uses another name; the bundle scan accepts only placeholders). With testFeed on and off: 120 rows.",
+  "cases": [
+    {
+      "id": "feed-0.packaged-1.source-default.uninstaller-1.location-same",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > allows an installed, per-user copy on the default data folder"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-default.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > allows an installed, per-user copy on the default data folder"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-default.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > refuses an install made for all users, whose update would need administrator rights"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "all-users-install"
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-default.uninstaller-1.location-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > refuses an install made for all users, whose update would need administrator rights"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "all-users-install"
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-default.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > refuses an install made for all users, whose update would need administrator rights"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "all-users-install"
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-default.uninstaller-0.location-same",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > refuses development runs, scratch data folders and loose copies of the exe"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "not-installed"
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-default.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "not-installed"
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-default.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "not-installed"
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-default.uninstaller-0.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "not-installed"
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-default.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "not-installed"
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-flag.uninstaller-1.location-same",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > refuses development runs, scratch data folders and loose copies of the exe"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-flag.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-flag.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-flag.uninstaller-1.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-flag.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-flag.uninstaller-0.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-flag.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-flag.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-flag.uninstaller-0.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-flag.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-env.uninstaller-1.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-env.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-env.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-env.uninstaller-1.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-env.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-env.uninstaller-0.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-env.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-env.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-env.uninstaller-0.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-1.source-env.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "custom-data-folder"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-default.uninstaller-1.location-same",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > refuses development runs, scratch data folders and loose copies of the exe"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-default.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-default.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-default.uninstaller-1.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-default.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-default.uninstaller-0.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-default.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-default.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-default.uninstaller-0.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-default.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-flag.uninstaller-1.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-flag.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-flag.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-flag.uninstaller-1.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-flag.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-flag.uninstaller-0.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-flag.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-flag.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-flag.uninstaller-0.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-flag.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-env.uninstaller-1.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-env.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-env.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-env.uninstaller-1.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-env.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-env.uninstaller-0.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-env.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-env.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-env.uninstaller-0.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-0.packaged-0.source-env.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "development"
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-default.uninstaller-1.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-default.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-default.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-default.uninstaller-1.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-default.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-default.uninstaller-0.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-default.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-default.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-default.uninstaller-0.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-default.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-flag.uninstaller-1.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-flag.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-flag.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-flag.uninstaller-1.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-flag.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-flag.uninstaller-0.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-flag.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-flag.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-flag.uninstaller-0.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-flag.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-env.uninstaller-1.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-env.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-env.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-env.uninstaller-1.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-env.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-env.uninstaller-0.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-env.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-env.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-env.uninstaller-0.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-1.source-env.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": true,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-default.uninstaller-1.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-default.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-default.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-default.uninstaller-1.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-default.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-default.uninstaller-0.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-default.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-default.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-default.uninstaller-0.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-default.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-flag.uninstaller-1.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-flag.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-flag.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-flag.uninstaller-1.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-flag.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-flag.uninstaller-0.location-same",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > lets an unpackaged test-feed run through without looking at the install"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-flag.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > lets an unpackaged test-feed run through without looking at the install"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-flag.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > lets an unpackaged test-feed run through without looking at the install"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-flag.uninstaller-0.location-null",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > lets an unpackaged test-feed run through without looking at the install"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-flag.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > lets an unpackaged test-feed run through without looking at the install"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "flag",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-env.uninstaller-1.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-env.uninstaller-1.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-env.uninstaller-1.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-env.uninstaller-1.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-env.uninstaller-1.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-env.uninstaller-0.location-same",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-env.uninstaller-0.location-same-other-case-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "C:\\USERS\\SOMEONE\\APPDATA\\LOCAL\\PROGRAMS\\ONE LAUNCH\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-env.uninstaller-0.location-elsewhere",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": "D:\\Elsewhere"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-env.uninstaller-0.location-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": null
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "feed-1.packaged-0.source-env.uninstaller-0.location-rejects",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "testFeed": true,
+          "isPackaged": false,
+          "dataDirSource": "env",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [],
+          "location": {
+            "reject": "reg.exe failed"
+          }
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "loose-copy",
+      "origin": {
+        "kind": "test",
+        "ref": "test/update-availability.test.ts > which copies may update themselves > refuses development runs, scratch data folders and loose copies of the exe"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "D:\\repo\\dist\\win-unpacked\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "not-installed"
+        },
+        "fileExists": [
+          "D:\\repo\\dist\\win-unpacked\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "exec-forward-slashes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an execPath with forward slashes: dirname keeps them and join turns them into backslashes before fileExists sees the path"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:/Users/someone/AppData/Local/Programs/One Launch/OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "location-forward-slashes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an install location with forward slashes and a trailing slash still matches"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "c:/users/someone/appdata/local/programs/one launch/"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "location-padded",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an install location with spaces around it: samePath trims them"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "  C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch  "
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "location-vdf-escaped",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an install location with doubled backslashes: samePath unescapes them"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\\\Users\\\\someone\\\\AppData\\\\Local\\\\Programs\\\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "location-parent",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an install location one folder up does not match"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "all-users-install"
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "location-empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty install location counts as none"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": ""
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "all-users-install"
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "location-dotdot",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an install location with \"..\" that resolves to the folder matches"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\x\\.."
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "location-non-ascii-case",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: samePath lowercases with toLowerCase, so a folder that differs only by İ and i̇ matches"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "E:\\İ\\OneLaunch.exe",
+          "existingFiles": [
+            "E:\\İ\\Uninstall OneLaunch.exe"
+          ],
+          "location": "e:\\i̇"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [
+          "E:\\İ\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    },
+    {
+      "id": "uninstaller-case",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: fileExists is asked the exact joined path; a stub that knows it in another case says no"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\OneLaunch.exe",
+          "existingFiles": [
+            "c:\\users\\someone\\appdata\\local\\programs\\one launch\\uninstall onelaunch.exe"
+          ],
+          "location": "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": false,
+          "reason": "not-installed"
+        },
+        "fileExists": [
+          "C:\\Users\\someone\\AppData\\Local\\Programs\\One Launch\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 0
+      }
+    },
+    {
+      "id": "exec-at-root",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an execPath at a drive root"
+      },
+      "args": [
+        {
+          "testFeed": false,
+          "isPackaged": true,
+          "dataDirSource": "default",
+          "execPath": "D:\\OneLaunch.exe",
+          "existingFiles": [
+            "D:\\Uninstall OneLaunch.exe"
+          ],
+          "location": "D:\\"
+        }
+      ],
+      "out": {
+        "result": {
+          "ok": true
+        },
+        "fileExists": [
+          "D:\\Uninstall OneLaunch.exe"
+        ],
+        "locationAsked": 1
+      }
+    }
+  ]
+}

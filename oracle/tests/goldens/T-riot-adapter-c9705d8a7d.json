@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-c9705d8a7d",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot session state"
+  ],
+  "name": "takes the last sign-in verdict from the client’s newest log, and treats a start with no saved sign-in as no attempt",
+  "calls": []
+}

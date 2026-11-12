@@ -1,0 +1,131 @@
+{
+  "clock": "2026-11-06T16:46:23.000Z",
+  "runs": 3,
+  "rules": [
+    {
+      "rule": "alias",
+      "path": "/calls/*/args/*/id",
+      "goldens": 101
+    },
+    {
+      "rule": "alias",
+      "path": "/calls/*/result/account/id",
+      "goldens": 95
+    },
+    {
+      "rule": "alias",
+      "path": "/calls/*/result/plan/account/id",
+      "goldens": 8
+    },
+    {
+      "rule": "root",
+      "path": "/calls/*/args/*/installPath",
+      "goldens": 2
+    },
+    {
+      "rule": "root",
+      "path": "/calls/*/error/message",
+      "goldens": 3
+    },
+    {
+      "rule": "root",
+      "path": "/calls/*/error/path",
+      "goldens": 1
+    },
+    {
+      "rule": "root",
+      "path": "/calls/*/result/command",
+      "goldens": 13
+    },
+    {
+      "rule": "root",
+      "path": "/calls/*/result/files/*",
+      "goldens": 12
+    },
+    {
+      "rule": "root",
+      "path": "/calls/*/result/plan/steps/*/detail",
+      "goldens": 9
+    },
+    {
+      "rule": "root",
+      "path": "/calls/*/result/plan/steps/*/target",
+      "goldens": 10
+    },
+    {
+      "rule": "root",
+      "path": "/calls/*/result/steps/*/detail",
+      "goldens": 127
+    },
+    {
+      "rule": "root",
+      "path": "/calls/*/result/steps/*/target",
+      "goldens": 27
+    },
+    {
+      "rule": "root",
+      "path": "/calls/*/result/warnings/*",
+      "goldens": 5
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/args/*",
+      "goldens": 12
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/args/*/lastSeenAt",
+      "goldens": 2
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/result/backupId",
+      "goldens": 109
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/result/finishedAt",
+      "goldens": 129
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/result/generatedAt",
+      "goldens": 27
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/result/id",
+      "goldens": 12
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/result/plan/generatedAt",
+      "goldens": 10
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/result/plan/steps/*/changes/*/after",
+      "goldens": 7
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/result/readyAt",
+      "goldens": 39
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/result/startedAt",
+      "goldens": 129
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/result/steps/*/changes/*/after",
+      "goldens": 17
+    },
+    {
+      "rule": "ts",
+      "path": "/calls/*/result/steps/*/detail",
+      "goldens": 109
+    }
+  ]
+}

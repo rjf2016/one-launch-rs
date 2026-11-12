@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-b2f1987456",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.healthCheck with what the status pass already knows"
+  ],
+  "name": "does not ask the process list again, and asks the registry less",
+  "calls": []
+}

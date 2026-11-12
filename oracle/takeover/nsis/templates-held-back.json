@@ -1,0 +1,14 @@
+{
+  "note": "Templates of the package that are recorded here by digest and not copied under templates/. Every other template is copied byte for byte.",
+  "files": [
+    {
+      "path": "templates/nsis/include/StdUtils.nsh",
+      "package": "app-builder-lib",
+      "version": "26.15.3",
+      "bytes": 16329,
+      "digest": "sha256-5o0b9+Sv0li2ATRrgzvwZChSE9j0gcqpAKFDDNq+4nU=",
+      "licence": "LGPL-2.1-or-later, as its header (lines 3-19) states",
+      "why": "Its licence header carries the plug-in author's real contact address, and whether an LGPL file is vendored here is the owner's decision; read it from node_modules/app-builder-lib/templates/nsis/include/StdUtils.nsh in the Electron repo at the pin."
+    }
+  ]
+}

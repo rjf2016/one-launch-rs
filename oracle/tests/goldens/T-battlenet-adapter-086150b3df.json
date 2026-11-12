@@ -1,0 +1,56 @@
+{
+  "id": "T-battlenet-adapter-086150b3df",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "refuses a game the client sees running before sending anything, and launches once the client has logged its exit",
+  "calls": [
+    {
+      "launcher": "battlenet",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "prometheus",
+          "name": "Overwatch"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "GameNotPlayableError",
+        "message": "Overwatch is already running. Close it, then press Play again.",
+        "code": "GAME_NOT_PLAYABLE"
+      }
+    },
+    {
+      "launcher": "battlenet",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "prometheus",
+          "name": "Overwatch"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "GameNotPlayableError",
+        "message": "Overwatch is already running. Close it, then press Play again.",
+        "code": "GAME_NOT_PLAYABLE"
+      }
+    },
+    {
+      "launcher": "battlenet",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "prometheus",
+          "name": "Overwatch"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "\"{tmp}\\Battle.net\\Battle.net.exe\" --exec=launch Pro (Battle.net started the game)"
+      }
+    }
+  ]
+}

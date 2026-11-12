@@ -1,0 +1,9 @@
+{
+  "id": "T-battlenet-adapter-d94a73d9da",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "health-checks the whole chain",
+  "calls": []
+}

@@ -1,0 +1,854 @@
+{
+  "function": "vdfInt",
+  "source": "src/main/launchers/steam/vdf.ts",
+  "note": "decode: none\ncall rebuilds arg0 recursively as null-prototype objects, as parseVdf makes them, so a key such as toString is found only when the object has it; key order is as recorded. arg1 is the key looked up.\nCaps: Number.isSafeInteger, so 2^53 - 1 is the largest accepted magnitude (cap-safe-*). trim() is the JS one: it strips U+FEFF but not U+0085 or U+180E.",
+  "cases": [
+    {
+      "id": "exact",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > looks keys up case-insensitively, exact match first"
+      },
+      "args": [
+        {
+          "Name": "exact",
+          "name": "lower",
+          "Flag": "1"
+        },
+        "Name"
+      ],
+      "out": null
+    },
+    {
+      "id": "insensitive-first-wins",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > looks keys up case-insensitively, exact match first"
+      },
+      "args": [
+        {
+          "Name": "exact",
+          "name": "lower",
+          "Flag": "1"
+        },
+        "NAME"
+      ],
+      "out": null
+    },
+    {
+      "id": "exact-later-key",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > looks keys up case-insensitively, exact match first | looked up as name: the exact key wins over the earlier Name"
+      },
+      "args": [
+        {
+          "Name": "exact",
+          "name": "lower",
+          "Flag": "1"
+        },
+        "name"
+      ],
+      "out": null
+    },
+    {
+      "id": "missing",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > looks keys up case-insensitively, exact match first"
+      },
+      "args": [
+        {
+          "Name": "exact",
+          "name": "lower",
+          "Flag": "1"
+        },
+        "missing"
+      ],
+      "out": null
+    },
+    {
+      "id": "block-value",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > parses nested blocks with quoted keys and values"
+      },
+      "args": [
+        {
+          "users": {
+            "76561198000000001": {
+              "AccountName": "user_1",
+              "PersonaName": "Persona One",
+              "RememberPassword": "1",
+              "WantsOfflineMode": "0",
+              "SkipOfflineModeWarning": "0",
+              "AutoLogin": "1",
+              "Timestamp": "1789145779"
+            },
+            "76561198000000002": {
+              "AccountName": "user_2",
+              "PersonaName": "Persona Two",
+              "RememberPassword": "1",
+              "WantsOfflineMode": "0",
+              "SkipOfflineModeWarning": "0",
+              "AutoLogin": "0",
+              "Timestamp": "1759203770"
+            },
+            "76561198000000003": {
+              "AccountName": "user_3",
+              "PersonaName": "Persona Three",
+              "RememberPassword": "1",
+              "WantsOfflineMode": "0",
+              "SkipOfflineModeWarning": "0",
+              "AutoLogin": "0",
+              "Timestamp": "1755130895"
+            },
+            "76561198000000004": {
+              "AccountName": "user_4",
+              "PersonaName": "Persona Four",
+              "RememberPassword": "1",
+              "WantsOfflineMode": "0",
+              "SkipOfflineModeWarning": "0",
+              "AutoLogin": "0",
+              "Timestamp": "1716245512"
+            }
+          }
+        },
+        "USERS"
+      ],
+      "out": null
+    },
+    {
+      "id": "empty-value",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty string value is found, not missing"
+      },
+      "args": [
+        {
+          "k": ""
+        },
+        "K"
+      ],
+      "out": null
+    },
+    {
+      "id": "empty-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the empty key is a key"
+      },
+      "args": [
+        {
+          "": "v"
+        },
+        ""
+      ],
+      "out": null
+    },
+    {
+      "id": "proto-names",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: toString is not found on a null-prototype object that lacks it"
+      },
+      "args": [
+        {
+          "a": "1"
+        },
+        "toString"
+      ],
+      "out": null
+    },
+    {
+      "id": "proto-key-own",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > does not let a hostile key touch Object.prototype"
+      },
+      "args": [
+        {
+          "__proto__": {
+            "polluted": "yes"
+          }
+        },
+        "__proto__"
+      ],
+      "out": null
+    },
+    {
+      "id": "proto-key-missing",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: looking up __proto__ on a null-prototype object without that key finds nothing"
+      },
+      "args": [
+        {
+          "a": "1"
+        },
+        "__proto__"
+      ],
+      "out": null
+    },
+    {
+      "id": "proto-key-insensitive",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: __PROTO__ finds an own __proto__ key case-insensitively"
+      },
+      "args": [
+        {
+          "__proto__": "p"
+        },
+        "__PROTO__"
+      ],
+      "out": null
+    },
+    {
+      "id": "proto-names-present",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a toString key is found case-insensitively"
+      },
+      "args": [
+        {
+          "TOSTRING": "1"
+        },
+        "toString"
+      ],
+      "out": 1
+    },
+    {
+      "id": "integer-key-first",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the case-insensitive scan follows enumeration order, so array-index keys come first"
+      },
+      "args": [
+        {
+          "2": "two",
+          "10": "ten"
+        },
+        "2"
+      ],
+      "out": null
+    },
+    {
+      "id": "kelvin",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: U+212A KELVIN SIGN lower-cases to k, so Kelvin matches kelvin"
+      },
+      "args": [
+        {
+          "Kelvin": "k"
+        },
+        "kelvin"
+      ],
+      "out": null
+    },
+    {
+      "id": "kelvin-reverse",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: looking up with U+212A finds the ASCII key"
+      },
+      "args": [
+        {
+          "kelvin": "k"
+        },
+        "Kelvin"
+      ],
+      "out": null
+    },
+    {
+      "id": "dotted-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: İ lower-cases to i plus U+0307, so it does not match i"
+      },
+      "args": [
+        {
+          "İd": "x"
+        },
+        "id"
+      ],
+      "out": null
+    },
+    {
+      "id": "dotted-i-self",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: İD and i̇d (i, U+0307, d) match under toLowerCase"
+      },
+      "args": [
+        {
+          "İD": "x"
+        },
+        "i̇d"
+      ],
+      "out": null
+    },
+    {
+      "id": "final-sigma",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ΟΔΟΣ lower-cases with a final sigma ς, so it does not match οδοσ"
+      },
+      "args": [
+        {
+          "ΟΔΟΣ": "x"
+        },
+        "οδοσ"
+      ],
+      "out": null
+    },
+    {
+      "id": "final-sigma-match",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ΟΔΟΣ matches οδος"
+      },
+      "args": [
+        {
+          "ΟΔΟΣ": "x"
+        },
+        "οδος"
+      ],
+      "out": null
+    },
+    {
+      "id": "sharp-s",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ß does not lower-case to ss; STRASSE does not match Straße"
+      },
+      "args": [
+        {
+          "Straße": "x"
+        },
+        "STRASSE"
+      ],
+      "out": null
+    },
+    {
+      "id": "dotless-i",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: ı (dotless) is not i"
+      },
+      "args": [
+        {
+          "ıd": "x"
+        },
+        "ID"
+      ],
+      "out": null
+    },
+    {
+      "id": "lone-surrogate-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a key holding a lone surrogate is matched unit for unit"
+      },
+      "args": [
+        {
+          "\ud800A": "x"
+        },
+        {
+          "$utf16": [
+            55296,
+            97
+          ]
+        }
+      ],
+      "out": null
+    },
+    {
+      "id": "test-timestamp",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > parses nested blocks with quoted keys and values"
+      },
+      "args": [
+        {
+          "AccountName": "user_1",
+          "PersonaName": "Persona One",
+          "RememberPassword": "1",
+          "WantsOfflineMode": "0",
+          "SkipOfflineModeWarning": "0",
+          "AutoLogin": "1",
+          "Timestamp": "1789145779"
+        },
+        "Timestamp"
+      ],
+      "out": 1789145779
+    },
+    {
+      "id": "test-not-number",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-vdf.test.ts > parseVdf > looks keys up case-insensitively, exact match first"
+      },
+      "args": [
+        {
+          "Name": "exact",
+          "name": "lower",
+          "Flag": "1"
+        },
+        "Name"
+      ],
+      "out": null
+    },
+    {
+      "id": "block-is-null",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a block value is not an integer"
+      },
+      "args": [
+        {
+          "n": {}
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-plain",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"1789145779\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "1789145779"
+        },
+        "n"
+      ],
+      "out": 1789145779
+    },
+    {
+      "id": "value-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"0\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "0"
+        },
+        "n"
+      ],
+      "out": 0
+    },
+    {
+      "id": "value-negative-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"-0\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "-0"
+        },
+        "n"
+      ],
+      "out": {
+        "$number": "-0"
+      }
+    },
+    {
+      "id": "value-negative",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: \"-42\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "-42"
+        },
+        "n"
+      ],
+      "out": -42
+    },
+    {
+      "id": "value-leading-zeros",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: \"00012\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "00012"
+        },
+        "n"
+      ],
+      "out": 12
+    },
+    {
+      "id": "value-spaces",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \" 7\\u{9}\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": " 7\t"
+        },
+        "n"
+      ],
+      "out": 7
+    },
+    {
+      "id": "value-nbsp",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"\\u{a0}7\\u{a0}\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": " 7 "
+        },
+        "n"
+      ],
+      "out": 7
+    },
+    {
+      "id": "value-bom",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"\\u{feff}7\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "﻿7"
+        },
+        "n"
+      ],
+      "out": 7
+    },
+    {
+      "id": "value-line-separator",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"\\u{2028}7\\u{2029}\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": " 7 "
+        },
+        "n"
+      ],
+      "out": 7
+    },
+    {
+      "id": "value-ideographic-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"\\u{3000}7\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "　7"
+        },
+        "n"
+      ],
+      "out": 7
+    },
+    {
+      "id": "value-nel",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"\\u{85}7\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "7"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-mongolian-vowel-separator",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: \"\\u{180e}7\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "᠎7"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-plus",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: \"+7\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "+7"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-hex",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: \"0x10\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "0x10"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-exponent",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: \"1e3\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "1e3"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-decimal",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: \"1.0\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "1.0"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-trailing-junk",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: \"12px\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "12px"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-inner-space",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: \"1 2\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "1 2"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-minus-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: \"-\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "-"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: \"\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": ""
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-double-minus",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: \"--1\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "--1"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-arabic-indic",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: \"\\u{661}\\u{662}\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "١٢"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-fullwidth",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: \"\\u{ff11}\\u{ff12}\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "１２"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-devanagari",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: \"\\u{967}\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "१"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-cap-safe-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"9007199254740991\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "9007199254740991"
+        },
+        "n"
+      ],
+      "out": 9007199254740991
+    },
+    {
+      "id": "value-cap-safe-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"9007199254740992\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "9007199254740992"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-cap-safe-negative-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"-9007199254740991\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "-9007199254740991"
+        },
+        "n"
+      ],
+      "out": -9007199254740991
+    },
+    {
+      "id": "value-cap-safe-negative-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"-9007199254740992\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "-9007199254740992"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-above-safe-odd",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"9007199254740993\" through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "9007199254740993"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-huge",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: \"1111111111111111111111111111111111111111\"… through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "n"
+      ],
+      "out": null
+    },
+    {
+      "id": "value-long-leading-zeros",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: \"0000000000000000000000000000000000000000\"… through trim, /^-?\\d+$/ (ASCII digits) and Number"
+      },
+      "args": [
+        {
+          "n": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005"
+        },
+        "n"
+      ],
+      "out": 5
+    }
+  ]
+}

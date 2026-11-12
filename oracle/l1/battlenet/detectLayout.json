@@ -1,0 +1,1778 @@
+{
+  "function": "detectLayout",
+  "source": "src/main/launchers/battlenet/config.ts",
+  "note": "decode: arg0=utf8\narg0 is the file text as src/main/launchers/battlenet/adapter.ts reads Battle.net.config (readLauncherText: readFileSync then toString utf8, BOM kept, invalid bytes as U+FFFD).\nparseConfig calls it on the text with the BOM still in place. It never throws. The corpus is the first 40 seed-11 cases of parseConfig.json.",
+  "cases": [
+    {
+      "id": "fixture-battlenet-config",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > detects the Qt layout and reproduces the real file byte for byte"
+      },
+      "args": [
+        {
+          "$file": "fixtures/launchers/battlenet/Battle.net.config",
+          "sha256": "7043ba330052b87e349534a8471c026d7c79e01c65d48b60c24c45845bdeb1bd"
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "fixture-user-config",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$file": "fixtures/launchers/battlenet/0a1b2c3d.config",
+          "sha256": "9b6da5e2809a5b2e03ca8631345f0432be0d94724bee016934231ca390e44237"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "test-autologin-spaces",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > refuses to rewrite a file whose layout it cannot reproduce"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAgICJ0cnVlIiwNCiAgICAgICAgIlNhdmVkQWNjb3VudE5hbWVzIjogInNhdmVkMUBleGFtcGxlLmNvbSxzYXZlZDJAZXhhbXBsZS5jb20sc2F2ZWQzQGV4YW1wbGUuY29tLHNhdmVkNEBleGFtcGxlLmNvbSxzYXZlZDVAZXhhbXBsZS5jb20iLA0KICAgICAgICAiR2FtZVNlYXJjaCI6IHsNCiAgICAgICAgICAgICJQZXJmb3JtZWRTZWFyY2giOiAidHJ1ZSINCiAgICAgICAgfSwNCiAgICAgICAgIkluc3RhbGwiOiB7DQogICAgICAgICAgICAiRGVmYXVsdEluc3RhbGxQYXRoIjogIkM6XC9Vc2Vyc1wvc29tZW9uZVwvR2FtZXMiLA0KICAgICAgICAgICAgIkRvd25sb2FkTGltaXROZXh0UGF0Y2hJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdEluQnBzIjogIjEwMDAwMDAwMDAwMCIsDQogICAgICAgICAgICAiTGFzdFVzZXJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIg0KICAgICAgICB9LA0KICAgICAgICAiR2FtZUxhdW5jaFdpbmRvd0JlaGF2aW9yIjogIjIiLA0KICAgICAgICAiTWF0dXJlTGFuZ3VhZ2VGaWx0ZXIiOiAiZmFsc2UiLA0KICAgICAgICAiVm9pY2UiOiB7DQogICAgICAgICAgICAiVHJhbnNtaXNzaW9uVHlwZSI6ICIxIg0KICAgICAgICB9LA0KICAgICAgICAiSG90S2V5Ijogew0KICAgICAgICAgICAgIkhvdEtleUFjdGlvblB1c2hUb1RhbGsiOiAiRGlyZWN0SW5wdXQ6NDY6VjpLZXlib2FyZCINCiAgICAgICAgfQ0KICAgIH0sDQogICAgIjAxMjM0NTY3ODlhYmNkZWYiOiB7DQogICAgICAgICJDbGllbnQiOiB7DQogICAgICAgICAgICAiTGFuZ3VhZ2UiOiAiZW5VUyIsDQogICAgICAgICAgICAiTG9naW5TZXR0aW5ncyI6IHsNCiAgICAgICAgICAgICAgICAiQWxsb3dlZFJlZ2lvbnMiOiAiIiwNCiAgICAgICAgICAgICAgICAiQWxsb3dlZExvY2FsZXMiOiAiIg0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiUGF0aCI6ICJDOlxcUHJvZ3JhbSBGaWxlcyAoeDg2KVxcQmF0dGxlLm5ldCIsDQogICAgICAgICJTZXJ2aWNlcyI6IHsNCiAgICAgICAgICAgICJMYXN0TG9naW5SZWdpb24iOiAiVVMiLA0KICAgICAgICAgICAgIkxhc3RMb2dpbkFkZHJlc3MiOiAidXMuYWN0dWFsLmJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIkxhc3RMb2dpblRhc3NhZGFyIjogImFjY291bnQuYmF0dGxlLm5ldCINCiAgICAgICAgfQ0KICAgIH0sDQogICAgIkdhbWVzIjogew0KICAgICAgICAiYmF0dGxlX25ldCI6IHsNCiAgICAgICAgICAgICJTZXJ2ZXJVaWQiOiAiYmF0dGxlLm5ldCIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiZm9yZSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MzE4NTA3ODMiDQogICAgICAgIH0sDQogICAgICAgICJvZGluIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXMiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzcxNzI5NjA0IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc4OTI2OTY2OCIsDQogICAgICAgICAgICAiQXV0b1VwZGF0ZUNyaXRlcmlhUGFzc2VkIjogInRydWUiLA0KICAgICAgICAgICAgIkxhc3RJbnN0YWxsZWQiOiAiMTcxNzM5NDQxNyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogInByb21ldGhldXMiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiaHNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3NzQ5OTYzNDciLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNzc0MDExNzg3IiwNCiAgICAgICAgICAgICJTZXJ2ZXJVaWQiOiAiaHNfYmV0YSIsDQogICAgICAgICAgICAiQXV0b1VwZGF0ZSI6ICJmYWxzZSIsDQogICAgICAgICAgICAiRG93bmxvYWRBbGxVcGRhdGVzIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZXN1bWFibGUiOiAiZmFsc2UiDQogICAgICAgIH0sDQogICAgICAgICJ6ZXVzIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY2MjMxMzQyMyIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE2NjIyMzI3MDYiDQogICAgICAgIH0sDQogICAgICAgICJmb3JlX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAiemV1c19iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyODU1MTc3NSINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfdmlld2VyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MiINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfdGVzdCI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiDQogICAgICAgIH0sDQogICAgICAgICJvZGluX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjI5MTU4ODg3Ig0KICAgICAgICB9LA0KICAgICAgICAicHJvbWV0aGV1c19iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MCINCiAgICAgICAgfSwNCiAgICAgICAgImRpYWJsbzMiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTg5ODk2NjYyIg0KICAgICAgICB9LA0KICAgICAgICAiczIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIg0KICAgICAgICB9LA0KICAgICAgICAid293Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgInMyX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjM5NzA4NzIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpY19lcmEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTkxMzA4MzIwIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfZXJhX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfcHRyX3giOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDY4Ig0KICAgICAgICB9LA0KICAgICAgICAiYXVrcyI6IHsNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTcwNTU0MDYyNCIsDQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzExMzMwMTI2Ig0KICAgICAgICB9DQogICAgfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "test-open-brace",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > refuses to rewrite a file whose layout it cannot reproduce"
+      },
+      "args": [
+        {
+          "$bytes": "ew=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "test-array",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > refuses to rewrite a file whose layout it cannot reproduce"
+      },
+      "args": [
+        {
+          "$bytes": "W10="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "test-user-prefs-literal",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the per-account close preferences and masks logins | the readUserPrefs literal, which readUserPrefs parses"
+      },
+      "args": [
+        {
+          "$bytes": "eyJVc2VyIjp7IkNsaWVudCI6eyJIaWRlT25DbG9zZSI6InRydWUifX19"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "mini-lf",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-lf.config"
+      },
+      "args": [
+        {
+          "$file": "l1/battlenet/files/planSavedAccountNames/mini-lf.config",
+          "sha256": "a53660030af8a65e1c711ba60afc1964d3cad6c8d2224e69e0b58138a67d66c1"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "mini-crlf",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$file": "l1/battlenet/files/planSavedAccountNames/mini-crlf.config",
+          "sha256": "333b11b4d427147ee87460f4aa7c7db316ea151658e52e795368064842936348"
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | emptied"
+      },
+      "args": [
+        {
+          "$bytes": ""
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "whitespace-only",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | only spaces and CRLF"
+      },
+      "args": [
+        {
+          "$bytes": "ICANCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | replaced by the JSON null"
+      },
+      "args": [
+        {
+          "$bytes": "bnVsbA=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | replaced by a JSON string"
+      },
+      "args": [
+        {
+          "$bytes": "IkNsaWVudCI="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | replaced by a JSON number"
+      },
+      "args": [
+        {
+          "$bytes": "MQ=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "true",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | replaced by the JSON true"
+      },
+      "args": [
+        {
+          "$bytes": "dHJ1ZQ=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "empty-object",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | replaced by an empty object on one line"
+      },
+      "args": [
+        {
+          "$bytes": "e30="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "empty-object-crlf",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | replaced by an empty object and CRLF"
+      },
+      "args": [
+        {
+          "$bytes": "e30NCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "cut-half",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | cut in half"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0SW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdE5leHRQYXRjaEluQnBzIjogIjEwMDAwMDAwMDAwMCINCiAgICAgICAgfSwNCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwNCiAgICAgICAgIk1hdHVyZUxhbmd1YWdlRmlsdGVyIjogImZhbHNlIiwNCiAgICAgICAgIlZvaWNlIjogew0KICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSINCiAgICAgICAgfSwNCiAgICAgICAgIkhvdEtleSI6IHsNCiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIkxhbmd1YWdlIjogImVuVVMiLA0KICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7DQogICAgICAgICAgICAgICAgIkFsbG93ZWRSZWdpb25zIjogIiIsDQogICAgICAgICAgICAgICAgIkFsbG93ZWRMb2NhbGVzIjogIiINCiAgICAgICAgICAgIH0NCiAgICAgICAgfSwNCiAgICAgICAgIlBhdGgiOiAiQzpcXFByb2dyYW0gRmlsZXMgKHg4NilcXEJhdHRsZS5uZXQiLA0KICAgICAgICAiU2VydmljZXMiOiB7DQogICAgICAgICAgICAiTGFzdExvZ2luUmVnaW9uIjogIlVTIiwNCiAgICAgICAgICAgICJMYXN0TG9naW5BZGRyZXNzIjogInVzLmFjdHVhbC5iYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICJHYW1lcyI6IHsNCiAgICAgICAgImJhdHRsZV9uZXQiOiB7DQogICAgICAgICAgICAiU2VydmVyVWlkIjogImJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImZvcmUiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAib2RpbiI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzIjogew0KICA="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "bom",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | UTF-8 BOM added"
+      },
+      "args": [
+        {
+          "$bytes": "77u/ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0SW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdE5leHRQYXRjaEluQnBzIjogIjEwMDAwMDAwMDAwMCINCiAgICAgICAgfSwNCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwNCiAgICAgICAgIk1hdHVyZUxhbmd1YWdlRmlsdGVyIjogImZhbHNlIiwNCiAgICAgICAgIlZvaWNlIjogew0KICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSINCiAgICAgICAgfSwNCiAgICAgICAgIkhvdEtleSI6IHsNCiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIkxhbmd1YWdlIjogImVuVVMiLA0KICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7DQogICAgICAgICAgICAgICAgIkFsbG93ZWRSZWdpb25zIjogIiIsDQogICAgICAgICAgICAgICAgIkFsbG93ZWRMb2NhbGVzIjogIiINCiAgICAgICAgICAgIH0NCiAgICAgICAgfSwNCiAgICAgICAgIlBhdGgiOiAiQzpcXFByb2dyYW0gRmlsZXMgKHg4NilcXEJhdHRsZS5uZXQiLA0KICAgICAgICAiU2VydmljZXMiOiB7DQogICAgICAgICAgICAiTGFzdExvZ2luUmVnaW9uIjogIlVTIiwNCiAgICAgICAgICAgICJMYXN0TG9naW5BZGRyZXNzIjogInVzLmFjdHVhbC5iYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICJHYW1lcyI6IHsNCiAgICAgICAgImJhdHRsZV9uZXQiOiB7DQogICAgICAgICAgICAiU2VydmVyVWlkIjogImJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImZvcmUiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAib2RpbiI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3MTcyOTYwNCIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3ODkyNjk2NjgiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGVDcml0ZXJpYVBhc3NlZCI6ICJ0cnVlIiwNCiAgICAgICAgICAgICJMYXN0SW5zdGFsbGVkIjogIjE3MTczOTQ0MTciLA0KICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJwcm9tZXRoZXVzIiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlIjogImZhbHNlIiwNCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImhzX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzc0OTk2MzQ3IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc3NDAxMTc4NyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiemV1cyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NjIzMTM0MjMiLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNjYyMjMyNzA2Ig0KICAgICAgICB9LA0KICAgICAgICAiZm9yZV9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyINCiAgICAgICAgfSwNCiAgICAgICAgInpldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2Mjg1NTE3NzUiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3ZpZXdlciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3Rlc3QiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjU0MDY1MjcyIg0KICAgICAgICB9LA0KICAgICAgICAib2Rpbl9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzAiDQogICAgICAgIH0sDQogICAgICAgICJkaWFibG8zIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU4OTg5NjY2MiINCiAgICAgICAgfSwNCiAgICAgICAgInMyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyMzk3MDg3MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvdyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpYyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJzMl9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfZXJhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX2VyYV9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X3B0cl94Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2OCINCiAgICAgICAgfSwNCiAgICAgICAgImF1a3MiOiB7DQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3MDU1NDA2MjQiLA0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTcxMTMzMDEyNiINCiAgICAgICAgfQ0KICAgIH0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": true
+      }
+    },
+    {
+      "id": "double-bom",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | two UTF-8 BOMs added"
+      },
+      "args": [
+        {
+          "$bytes": "77u/77u/ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0SW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdE5leHRQYXRjaEluQnBzIjogIjEwMDAwMDAwMDAwMCINCiAgICAgICAgfSwNCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwNCiAgICAgICAgIk1hdHVyZUxhbmd1YWdlRmlsdGVyIjogImZhbHNlIiwNCiAgICAgICAgIlZvaWNlIjogew0KICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSINCiAgICAgICAgfSwNCiAgICAgICAgIkhvdEtleSI6IHsNCiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIkxhbmd1YWdlIjogImVuVVMiLA0KICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7DQogICAgICAgICAgICAgICAgIkFsbG93ZWRSZWdpb25zIjogIiIsDQogICAgICAgICAgICAgICAgIkFsbG93ZWRMb2NhbGVzIjogIiINCiAgICAgICAgICAgIH0NCiAgICAgICAgfSwNCiAgICAgICAgIlBhdGgiOiAiQzpcXFByb2dyYW0gRmlsZXMgKHg4NilcXEJhdHRsZS5uZXQiLA0KICAgICAgICAiU2VydmljZXMiOiB7DQogICAgICAgICAgICAiTGFzdExvZ2luUmVnaW9uIjogIlVTIiwNCiAgICAgICAgICAgICJMYXN0TG9naW5BZGRyZXNzIjogInVzLmFjdHVhbC5iYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICJHYW1lcyI6IHsNCiAgICAgICAgImJhdHRsZV9uZXQiOiB7DQogICAgICAgICAgICAiU2VydmVyVWlkIjogImJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImZvcmUiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAib2RpbiI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3MTcyOTYwNCIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3ODkyNjk2NjgiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGVDcml0ZXJpYVBhc3NlZCI6ICJ0cnVlIiwNCiAgICAgICAgICAgICJMYXN0SW5zdGFsbGVkIjogIjE3MTczOTQ0MTciLA0KICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJwcm9tZXRoZXVzIiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlIjogImZhbHNlIiwNCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImhzX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzc0OTk2MzQ3IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc3NDAxMTc4NyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiemV1cyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NjIzMTM0MjMiLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNjYyMjMyNzA2Ig0KICAgICAgICB9LA0KICAgICAgICAiZm9yZV9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyINCiAgICAgICAgfSwNCiAgICAgICAgInpldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2Mjg1NTE3NzUiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3ZpZXdlciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3Rlc3QiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjU0MDY1MjcyIg0KICAgICAgICB9LA0KICAgICAgICAib2Rpbl9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzAiDQogICAgICAgIH0sDQogICAgICAgICJkaWFibG8zIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU4OTg5NjY2MiINCiAgICAgICAgfSwNCiAgICAgICAgInMyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyMzk3MDg3MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvdyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpYyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJzMl9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfZXJhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX2VyYV9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X3B0cl94Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2OCINCiAgICAgICAgfSwNCiAgICAgICAgImF1a3MiOiB7DQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3MDU1NDA2MjQiLA0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTcxMTMzMDEyNiINCiAgICAgICAgfQ0KICAgIH0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": true
+      }
+    },
+    {
+      "id": "utf16le-bom",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: the mini config behind a UTF-16LE BOM; the bytes FF FE decode to two U+FFFD, which JSON.parse refuses"
+      },
+      "args": [
+        {
+          "$bytes": "//57CiAgICAiQ2xpZW50IjogewogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsCiAgICAgICAgIlNhdmVkQWNjb3VudE5hbWVzIjogInVzZXJfMUBleGFtcGxlLmNvbSx1c2VyXzJAZXhhbXBsZS5jb20sdXNlcl8zQGV4YW1wbGUuY29tIiwKICAgICAgICAiSW5zdGFsbCI6IHsKICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJEOlwvR2FtZXMiCiAgICAgICAgfQogICAgfQp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "lf",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | CRLF made LF"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKICAgICAgICAiVmVyc2lvbiI6IHsKICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwKICAgICAgICAgICAgIlJlbGVhc2UiOiB7CiAgICAgICAgICAgICAgICAiRmlyc3RSdW4iOiAiZmFsc2UiLAogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLAogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc1ZlcnNpb24iOiAiMTc3NzgiCiAgICAgICAgICAgIH0KICAgICAgICB9LAogICAgICAgICJUb2FzdHMiOiB7CiAgICAgICAgICAgICJTY3JlZW5Qb3NpdGlvbiI6ICJCb3R0b21SaWdodCIsCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiCiAgICAgICAgfSwKICAgICAgICAiR2FDbGllbnRJZCI6ICJ1bmRlZmluZWQiLAogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsCiAgICAgICAgIlNhdmVkQWNjb3VudE5hbWVzIjogInNhdmVkMUBleGFtcGxlLmNvbSxzYXZlZDJAZXhhbXBsZS5jb20sc2F2ZWQzQGV4YW1wbGUuY29tLHNhdmVkNEBleGFtcGxlLmNvbSxzYXZlZDVAZXhhbXBsZS5jb20iLAogICAgICAgICJHYW1lU2VhcmNoIjogewogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiCiAgICAgICAgfSwKICAgICAgICAiSW5zdGFsbCI6IHsKICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwKICAgICAgICAgICAgIkRvd25sb2FkTGltaXROZXh0UGF0Y2hJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLAogICAgICAgICAgICAiRG93bmxvYWRMaW1pdEluQnBzIjogIjEwMDAwMDAwMDAwMCIsCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLAogICAgICAgICAgICAiTGFzdFVzZXJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIgogICAgICAgIH0sCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwKICAgICAgICAiTWF0dXJlTGFuZ3VhZ2VGaWx0ZXIiOiAiZmFsc2UiLAogICAgICAgICJWb2ljZSI6IHsKICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSIKICAgICAgICB9LAogICAgICAgICJIb3RLZXkiOiB7CiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiCiAgICAgICAgfQogICAgfSwKICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogewogICAgICAgICJDbGllbnQiOiB7CiAgICAgICAgICAgICJMYW5ndWFnZSI6ICJlblVTIiwKICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7CiAgICAgICAgICAgICAgICAiQWxsb3dlZFJlZ2lvbnMiOiAiIiwKICAgICAgICAgICAgICAgICJBbGxvd2VkTG9jYWxlcyI6ICIiCiAgICAgICAgICAgIH0KICAgICAgICB9LAogICAgICAgICJQYXRoIjogIkM6XFxQcm9ncmFtIEZpbGVzICh4ODYpXFxCYXR0bGUubmV0IiwKICAgICAgICAiU2VydmljZXMiOiB7CiAgICAgICAgICAgICJMYXN0TG9naW5SZWdpb24iOiAiVVMiLAogICAgICAgICAgICAiTGFzdExvZ2luQWRkcmVzcyI6ICJ1cy5hY3R1YWwuYmF0dGxlLm5ldCIsCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiCiAgICAgICAgfQogICAgfSwKICAgICJHYW1lcyI6IHsKICAgICAgICAiYmF0dGxlX25ldCI6IHsKICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJiYXR0bGUubmV0IiwKICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSIKICAgICAgICB9LAogICAgICAgICJmb3JlIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIgogICAgICAgIH0sCiAgICAgICAgIm9kaW4iOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciCiAgICAgICAgfSwKICAgICAgICAicHJvbWV0aGV1cyI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3MTcyOTYwNCIsCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc4OTI2OTY2OCIsCiAgICAgICAgICAgICJBdXRvVXBkYXRlQ3JpdGVyaWFQYXNzZWQiOiAidHJ1ZSIsCiAgICAgICAgICAgICJMYXN0SW5zdGFsbGVkIjogIjE3MTczOTQ0MTciLAogICAgICAgICAgICAiU2VydmVyVWlkIjogInByb21ldGhldXMiLAogICAgICAgICAgICAiQXV0b1VwZGF0ZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLAogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIgogICAgICAgIH0sCiAgICAgICAgImhzX2JldGEiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3NzQ5OTYzNDciLAogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3NzQwMTE3ODciLAogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLAogICAgICAgICAgICAiQXV0b1VwZGF0ZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLAogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIgogICAgICAgIH0sCiAgICAgICAgInpldXMiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NjIzMTM0MjMiLAogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE2NjIyMzI3MDYiCiAgICAgICAgfSwKICAgICAgICAiZm9yZV9iZXRhIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIgogICAgICAgIH0sCiAgICAgICAgInpldXNfYmV0YSI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyODU1MTc3NSIKICAgICAgICB9LAogICAgICAgICJwcm9tZXRoZXVzX3ZpZXdlciI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MiIKICAgICAgICB9LAogICAgICAgICJwcm9tZXRoZXVzX3Rlc3QiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiCiAgICAgICAgfSwKICAgICAgICAib2Rpbl9iZXRhIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjI5MTU4ODg3IgogICAgICAgIH0sCiAgICAgICAgInByb21ldGhldXNfYmV0YSI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MCIKICAgICAgICB9LAogICAgICAgICJkaWFibG8zIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTg5ODk2NjYyIgogICAgICAgIH0sCiAgICAgICAgInMyIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIgogICAgICAgIH0sCiAgICAgICAgIndvdyI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCIKICAgICAgICB9LAogICAgICAgICJ3b3dfY2xhc3NpYyI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCIKICAgICAgICB9LAogICAgICAgICJzMl9wdHIiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjM5NzA4NzIiCiAgICAgICAgfSwKICAgICAgICAid293X2NsYXNzaWNfZXJhIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTkxMzA4MzIwIgogICAgICAgIH0sCiAgICAgICAgIndvd19jbGFzc2ljX3B0ciI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiIKICAgICAgICB9LAogICAgICAgICJ3b3dfcHRyIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIgogICAgICAgIH0sCiAgICAgICAgIndvd19jbGFzc2ljX2VyYV9wdHIiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiCiAgICAgICAgfSwKICAgICAgICAid293X3B0cl94IjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDY4IgogICAgICAgIH0sCiAgICAgICAgImF1a3MiOiB7CiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTcwNTU0MDYyNCIsCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3MTEzMzAxMjYiCiAgICAgICAgfQogICAgfQp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "mixed-eol",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | first CRLF made LF, the rest kept"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsNCiAgICAgICAgIlZlcnNpb24iOiB7DQogICAgICAgICAgICAiRmlyc3RSdW4iOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlJlbGVhc2UiOiB7DQogICAgICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICAgICAiTGFzdEJ1aWxkVmVyc2lvbiI6ICIxNzc3OCIsDQogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc1ZlcnNpb24iOiAiMTc3NzgiDQogICAgICAgICAgICB9DQogICAgICAgIH0sDQogICAgICAgICJUb2FzdHMiOiB7DQogICAgICAgICAgICAiU2NyZWVuUG9zaXRpb24iOiAiQm90dG9tUmlnaHQiLA0KICAgICAgICAgICAgIk1vbml0b3IiOiAiMCINCiAgICAgICAgfSwNCiAgICAgICAgIkdhQ2xpZW50SWQiOiAidW5kZWZpbmVkIiwNCiAgICAgICAgIkF1dG9Mb2dpbiI6ICJ0cnVlIiwNCiAgICAgICAgIlNhdmVkQWNjb3VudE5hbWVzIjogInNhdmVkMUBleGFtcGxlLmNvbSxzYXZlZDJAZXhhbXBsZS5jb20sc2F2ZWQzQGV4YW1wbGUuY29tLHNhdmVkNEBleGFtcGxlLmNvbSxzYXZlZDVAZXhhbXBsZS5jb20iLA0KICAgICAgICAiR2FtZVNlYXJjaCI6IHsNCiAgICAgICAgICAgICJQZXJmb3JtZWRTZWFyY2giOiAidHJ1ZSINCiAgICAgICAgfSwNCiAgICAgICAgIkluc3RhbGwiOiB7DQogICAgICAgICAgICAiRGVmYXVsdEluc3RhbGxQYXRoIjogIkM6XC9Vc2Vyc1wvc29tZW9uZVwvR2FtZXMiLA0KICAgICAgICAgICAgIkRvd25sb2FkTGltaXROZXh0UGF0Y2hJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdEluQnBzIjogIjEwMDAwMDAwMDAwMCIsDQogICAgICAgICAgICAiTGFzdFVzZXJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIg0KICAgICAgICB9LA0KICAgICAgICAiR2FtZUxhdW5jaFdpbmRvd0JlaGF2aW9yIjogIjIiLA0KICAgICAgICAiTWF0dXJlTGFuZ3VhZ2VGaWx0ZXIiOiAiZmFsc2UiLA0KICAgICAgICAiVm9pY2UiOiB7DQogICAgICAgICAgICAiVHJhbnNtaXNzaW9uVHlwZSI6ICIxIg0KICAgICAgICB9LA0KICAgICAgICAiSG90S2V5Ijogew0KICAgICAgICAgICAgIkhvdEtleUFjdGlvblB1c2hUb1RhbGsiOiAiRGlyZWN0SW5wdXQ6NDY6VjpLZXlib2FyZCINCiAgICAgICAgfQ0KICAgIH0sDQogICAgIjAxMjM0NTY3ODlhYmNkZWYiOiB7DQogICAgICAgICJDbGllbnQiOiB7DQogICAgICAgICAgICAiTGFuZ3VhZ2UiOiAiZW5VUyIsDQogICAgICAgICAgICAiTG9naW5TZXR0aW5ncyI6IHsNCiAgICAgICAgICAgICAgICAiQWxsb3dlZFJlZ2lvbnMiOiAiIiwNCiAgICAgICAgICAgICAgICAiQWxsb3dlZExvY2FsZXMiOiAiIg0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiUGF0aCI6ICJDOlxcUHJvZ3JhbSBGaWxlcyAoeDg2KVxcQmF0dGxlLm5ldCIsDQogICAgICAgICJTZXJ2aWNlcyI6IHsNCiAgICAgICAgICAgICJMYXN0TG9naW5SZWdpb24iOiAiVVMiLA0KICAgICAgICAgICAgIkxhc3RMb2dpbkFkZHJlc3MiOiAidXMuYWN0dWFsLmJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIkxhc3RMb2dpblRhc3NhZGFyIjogImFjY291bnQuYmF0dGxlLm5ldCINCiAgICAgICAgfQ0KICAgIH0sDQogICAgIkdhbWVzIjogew0KICAgICAgICAiYmF0dGxlX25ldCI6IHsNCiAgICAgICAgICAgICJTZXJ2ZXJVaWQiOiAiYmF0dGxlLm5ldCIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiZm9yZSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MzE4NTA3ODMiDQogICAgICAgIH0sDQogICAgICAgICJvZGluIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXMiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzcxNzI5NjA0IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc4OTI2OTY2OCIsDQogICAgICAgICAgICAiQXV0b1VwZGF0ZUNyaXRlcmlhUGFzc2VkIjogInRydWUiLA0KICAgICAgICAgICAgIkxhc3RJbnN0YWxsZWQiOiAiMTcxNzM5NDQxNyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogInByb21ldGhldXMiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiaHNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3NzQ5OTYzNDciLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNzc0MDExNzg3IiwNCiAgICAgICAgICAgICJTZXJ2ZXJVaWQiOiAiaHNfYmV0YSIsDQogICAgICAgICAgICAiQXV0b1VwZGF0ZSI6ICJmYWxzZSIsDQogICAgICAgICAgICAiRG93bmxvYWRBbGxVcGRhdGVzIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZXN1bWFibGUiOiAiZmFsc2UiDQogICAgICAgIH0sDQogICAgICAgICJ6ZXVzIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY2MjMxMzQyMyIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE2NjIyMzI3MDYiDQogICAgICAgIH0sDQogICAgICAgICJmb3JlX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAiemV1c19iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyODU1MTc3NSINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfdmlld2VyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MiINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfdGVzdCI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiDQogICAgICAgIH0sDQogICAgICAgICJvZGluX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjI5MTU4ODg3Ig0KICAgICAgICB9LA0KICAgICAgICAicHJvbWV0aGV1c19iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MCINCiAgICAgICAgfSwNCiAgICAgICAgImRpYWJsbzMiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTg5ODk2NjYyIg0KICAgICAgICB9LA0KICAgICAgICAiczIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIg0KICAgICAgICB9LA0KICAgICAgICAid293Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgInMyX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjM5NzA4NzIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpY19lcmEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTkxMzA4MzIwIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfZXJhX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfcHRyX3giOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDY4Ig0KICAgICAgICB9LA0KICAgICAgICAiYXVrcyI6IHsNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTcwNTU0MDYyNCIsDQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzExMzMwMTI2Ig0KICAgICAgICB9DQogICAgfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "no-trailing-newline",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | final CRLF removed"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0SW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdE5leHRQYXRjaEluQnBzIjogIjEwMDAwMDAwMDAwMCINCiAgICAgICAgfSwNCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwNCiAgICAgICAgIk1hdHVyZUxhbmd1YWdlRmlsdGVyIjogImZhbHNlIiwNCiAgICAgICAgIlZvaWNlIjogew0KICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSINCiAgICAgICAgfSwNCiAgICAgICAgIkhvdEtleSI6IHsNCiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIkxhbmd1YWdlIjogImVuVVMiLA0KICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7DQogICAgICAgICAgICAgICAgIkFsbG93ZWRSZWdpb25zIjogIiIsDQogICAgICAgICAgICAgICAgIkFsbG93ZWRMb2NhbGVzIjogIiINCiAgICAgICAgICAgIH0NCiAgICAgICAgfSwNCiAgICAgICAgIlBhdGgiOiAiQzpcXFByb2dyYW0gRmlsZXMgKHg4NilcXEJhdHRsZS5uZXQiLA0KICAgICAgICAiU2VydmljZXMiOiB7DQogICAgICAgICAgICAiTGFzdExvZ2luUmVnaW9uIjogIlVTIiwNCiAgICAgICAgICAgICJMYXN0TG9naW5BZGRyZXNzIjogInVzLmFjdHVhbC5iYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICJHYW1lcyI6IHsNCiAgICAgICAgImJhdHRsZV9uZXQiOiB7DQogICAgICAgICAgICAiU2VydmVyVWlkIjogImJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImZvcmUiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAib2RpbiI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3MTcyOTYwNCIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3ODkyNjk2NjgiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGVDcml0ZXJpYVBhc3NlZCI6ICJ0cnVlIiwNCiAgICAgICAgICAgICJMYXN0SW5zdGFsbGVkIjogIjE3MTczOTQ0MTciLA0KICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJwcm9tZXRoZXVzIiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlIjogImZhbHNlIiwNCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImhzX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzc0OTk2MzQ3IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc3NDAxMTc4NyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiemV1cyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NjIzMTM0MjMiLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNjYyMjMyNzA2Ig0KICAgICAgICB9LA0KICAgICAgICAiZm9yZV9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyINCiAgICAgICAgfSwNCiAgICAgICAgInpldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2Mjg1NTE3NzUiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3ZpZXdlciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3Rlc3QiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjU0MDY1MjcyIg0KICAgICAgICB9LA0KICAgICAgICAib2Rpbl9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzAiDQogICAgICAgIH0sDQogICAgICAgICJkaWFibG8zIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU4OTg5NjY2MiINCiAgICAgICAgfSwNCiAgICAgICAgInMyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyMzk3MDg3MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvdyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpYyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJzMl9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfZXJhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX2VyYV9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X3B0cl94Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2OCINCiAgICAgICAgfSwNCiAgICAgICAgImF1a3MiOiB7DQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3MDU1NDA2MjQiLA0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTcxMTMzMDEyNiINCiAgICAgICAgfQ0KICAgIH0NCn0="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "unescaped-slashes",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | every \\/ made /"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOi9Vc2Vycy9zb21lb25lL0dhbWVzIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0SW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdE5leHRQYXRjaEluQnBzIjogIjEwMDAwMDAwMDAwMCINCiAgICAgICAgfSwNCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwNCiAgICAgICAgIk1hdHVyZUxhbmd1YWdlRmlsdGVyIjogImZhbHNlIiwNCiAgICAgICAgIlZvaWNlIjogew0KICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSINCiAgICAgICAgfSwNCiAgICAgICAgIkhvdEtleSI6IHsNCiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIkxhbmd1YWdlIjogImVuVVMiLA0KICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7DQogICAgICAgICAgICAgICAgIkFsbG93ZWRSZWdpb25zIjogIiIsDQogICAgICAgICAgICAgICAgIkFsbG93ZWRMb2NhbGVzIjogIiINCiAgICAgICAgICAgIH0NCiAgICAgICAgfSwNCiAgICAgICAgIlBhdGgiOiAiQzpcXFByb2dyYW0gRmlsZXMgKHg4NilcXEJhdHRsZS5uZXQiLA0KICAgICAgICAiU2VydmljZXMiOiB7DQogICAgICAgICAgICAiTGFzdExvZ2luUmVnaW9uIjogIlVTIiwNCiAgICAgICAgICAgICJMYXN0TG9naW5BZGRyZXNzIjogInVzLmFjdHVhbC5iYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICJHYW1lcyI6IHsNCiAgICAgICAgImJhdHRsZV9uZXQiOiB7DQogICAgICAgICAgICAiU2VydmVyVWlkIjogImJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImZvcmUiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAib2RpbiI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3MTcyOTYwNCIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3ODkyNjk2NjgiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGVDcml0ZXJpYVBhc3NlZCI6ICJ0cnVlIiwNCiAgICAgICAgICAgICJMYXN0SW5zdGFsbGVkIjogIjE3MTczOTQ0MTciLA0KICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJwcm9tZXRoZXVzIiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlIjogImZhbHNlIiwNCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImhzX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzc0OTk2MzQ3IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc3NDAxMTc4NyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiemV1cyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NjIzMTM0MjMiLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNjYyMjMyNzA2Ig0KICAgICAgICB9LA0KICAgICAgICAiZm9yZV9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyINCiAgICAgICAgfSwNCiAgICAgICAgInpldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2Mjg1NTE3NzUiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3ZpZXdlciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3Rlc3QiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjU0MDY1MjcyIg0KICAgICAgICB9LA0KICAgICAgICAib2Rpbl9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzAiDQogICAgICAgIH0sDQogICAgICAgICJkaWFibG8zIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU4OTg5NjY2MiINCiAgICAgICAgfSwNCiAgICAgICAgInMyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyMzk3MDg3MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvdyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpYyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJzMl9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfZXJhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX2VyYV9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X3B0cl94Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2OCINCiAgICAgICAgfSwNCiAgICAgICAgImF1a3MiOiB7DQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3MDU1NDA2MjQiLA0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTcxMTMzMDEyNiINCiAgICAgICAgfQ0KICAgIH0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "one-slash-unescaped",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/battlenet/Battle.net.config | the first \\/ made /, the rest kept"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOi9Vc2Vyc1wvc29tZW9uZVwvR2FtZXMiLA0KICAgICAgICAgICAgIkRvd25sb2FkTGltaXROZXh0UGF0Y2hJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdEluQnBzIjogIjEwMDAwMDAwMDAwMCIsDQogICAgICAgICAgICAiTGFzdFVzZXJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIg0KICAgICAgICB9LA0KICAgICAgICAiR2FtZUxhdW5jaFdpbmRvd0JlaGF2aW9yIjogIjIiLA0KICAgICAgICAiTWF0dXJlTGFuZ3VhZ2VGaWx0ZXIiOiAiZmFsc2UiLA0KICAgICAgICAiVm9pY2UiOiB7DQogICAgICAgICAgICAiVHJhbnNtaXNzaW9uVHlwZSI6ICIxIg0KICAgICAgICB9LA0KICAgICAgICAiSG90S2V5Ijogew0KICAgICAgICAgICAgIkhvdEtleUFjdGlvblB1c2hUb1RhbGsiOiAiRGlyZWN0SW5wdXQ6NDY6VjpLZXlib2FyZCINCiAgICAgICAgfQ0KICAgIH0sDQogICAgIjAxMjM0NTY3ODlhYmNkZWYiOiB7DQogICAgICAgICJDbGllbnQiOiB7DQogICAgICAgICAgICAiTGFuZ3VhZ2UiOiAiZW5VUyIsDQogICAgICAgICAgICAiTG9naW5TZXR0aW5ncyI6IHsNCiAgICAgICAgICAgICAgICAiQWxsb3dlZFJlZ2lvbnMiOiAiIiwNCiAgICAgICAgICAgICAgICAiQWxsb3dlZExvY2FsZXMiOiAiIg0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiUGF0aCI6ICJDOlxcUHJvZ3JhbSBGaWxlcyAoeDg2KVxcQmF0dGxlLm5ldCIsDQogICAgICAgICJTZXJ2aWNlcyI6IHsNCiAgICAgICAgICAgICJMYXN0TG9naW5SZWdpb24iOiAiVVMiLA0KICAgICAgICAgICAgIkxhc3RMb2dpbkFkZHJlc3MiOiAidXMuYWN0dWFsLmJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIkxhc3RMb2dpblRhc3NhZGFyIjogImFjY291bnQuYmF0dGxlLm5ldCINCiAgICAgICAgfQ0KICAgIH0sDQogICAgIkdhbWVzIjogew0KICAgICAgICAiYmF0dGxlX25ldCI6IHsNCiAgICAgICAgICAgICJTZXJ2ZXJVaWQiOiAiYmF0dGxlLm5ldCIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiZm9yZSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MzE4NTA3ODMiDQogICAgICAgIH0sDQogICAgICAgICJvZGluIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXMiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzcxNzI5NjA0IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc4OTI2OTY2OCIsDQogICAgICAgICAgICAiQXV0b1VwZGF0ZUNyaXRlcmlhUGFzc2VkIjogInRydWUiLA0KICAgICAgICAgICAgIkxhc3RJbnN0YWxsZWQiOiAiMTcxNzM5NDQxNyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogInByb21ldGhldXMiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiaHNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3NzQ5OTYzNDciLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNzc0MDExNzg3IiwNCiAgICAgICAgICAgICJTZXJ2ZXJVaWQiOiAiaHNfYmV0YSIsDQogICAgICAgICAgICAiQXV0b1VwZGF0ZSI6ICJmYWxzZSIsDQogICAgICAgICAgICAiRG93bmxvYWRBbGxVcGRhdGVzIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZXN1bWFibGUiOiAiZmFsc2UiDQogICAgICAgIH0sDQogICAgICAgICJ6ZXVzIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY2MjMxMzQyMyIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE2NjIyMzI3MDYiDQogICAgICAgIH0sDQogICAgICAgICJmb3JlX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAiemV1c19iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyODU1MTc3NSINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfdmlld2VyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MiINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfdGVzdCI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiDQogICAgICAgIH0sDQogICAgICAgICJvZGluX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjI5MTU4ODg3Ig0KICAgICAgICB9LA0KICAgICAgICAicHJvbWV0aGV1c19iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MCINCiAgICAgICAgfSwNCiAgICAgICAgImRpYWJsbzMiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTg5ODk2NjYyIg0KICAgICAgICB9LA0KICAgICAgICAiczIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIg0KICAgICAgICB9LA0KICAgICAgICAid293Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgInMyX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjM5NzA4NzIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpY19lcmEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTkxMzA4MzIwIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfZXJhX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfcHRyX3giOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDY4Ig0KICAgICAgICB9LA0KICAgICAgICAiYXVrcyI6IHsNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTcwNTU0MDYyNCIsDQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzExMzMwMTI2Ig0KICAgICAgICB9DQogICAgfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "indent-2",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-lf.config | two-space indent"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICJDbGllbnQiOiB7CiAgICAiQXV0b0xvZ2luIjogInRydWUiLAogICAgIlNhdmVkQWNjb3VudE5hbWVzIjogInVzZXJfMUBleGFtcGxlLmNvbSIKICB9Cn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 2,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "cap-indent-at",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-lf.config | ten-space indent, the most JSON.stringify writes"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgICAgICAgIkNsaWVudCI6IHsKICAgICAgICAgICAgICAgICAgICAiQXV0b0xvZ2luIjogInRydWUiLAogICAgICAgICAgICAgICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20iCiAgICAgICAgICB9Cn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 10,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "cap-indent-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an eleven-space indent; JSON.stringify clamps the space argument to 10, so the file does not round-trip"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgICAgICAgICJDbGllbnQiOiB7CiAgICAgICAgICAgICAgICAgICAgICAiQXV0b0xvZ2luIjogInRydWUiLAogICAgICAgICAgICAgICAgICAgICAgIlNhdmVkQWNjb3VudE5hbWVzIjogInVzZXJfMUBleGFtcGxlLmNvbSIKICAgICAgICAgICB9Cn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 11,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "tab-indent",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-lf.config | tab indent, which the indent probe does not see"
+      },
+      "args": [
+        {
+          "$bytes": "ewoJIkNsaWVudCI6IHsKCQkiQXV0b0xvZ2luIjogInRydWUiLAoJCSJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsCgkJIkluc3RhbGwiOiB7CgkJCSJEZWZhdWx0SW5zdGFsbFBhdGgiOiAiRDpcL0dhbWVzIgoJCX0KCX0KfQo="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "compact",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-lf.config | written on one line"
+      },
+      "args": [
+        {
+          "$bytes": "eyJDbGllbnQiOnsiQXV0b0xvZ2luIjoidHJ1ZSIsIlNhdmVkQWNjb3VudE5hbWVzIjoidXNlcl8xQGV4YW1wbGUuY29tLHVzZXJfMkBleGFtcGxlLmNvbSx1c2VyXzNAZXhhbXBsZS5jb20iLCJJbnN0YWxsIjp7IkRlZmF1bHRJbnN0YWxsUGF0aCI6IkQ6L0dhbWVzIn19fQ=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "duplicate-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: Client appears twice; JSON.parse keeps the last, a strict parser may refuse or keep the first"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKICAgICAgICAiQXV0b0xvZ2luIjogInRydWUiCiAgICB9LAogICAgIkNsaWVudCI6IHsKICAgICAgICAiU2F2ZWRBY2NvdW50TmFtZXMiOiAidXNlcl8xQGV4YW1wbGUuY29tIgogICAgfQp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "integer-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: integer-like keys; a JS object enumerates them first in ascending order, so the file reorders and does not round-trip"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgImIiOiAiMSIsCiAgICAiMTAiOiAiMiIsCiAgICAiMiI6ICIzIgp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "integer-like-not",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: keys that look numeric but are not array indices (leading zero, sign, 2^32-1) keep insertion order"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgImIiOiAiMSIsCiAgICAiMDEiOiAiMiIsCiAgICAiLTEiOiAiMyIsCiAgICAiNDI5NDk2NzI5NSI6ICI0IiwKICAgICI0Mjk0OTY3Mjk0IjogIjUiCn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "big-numbers",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: numbers JSON.parse turns into doubles: 1e400 is Infinity, 2^53+1 loses a unit, 1.0 is 1, -0 stays -0"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgImEiOiAxMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAsCiAgICAiYiI6IDFlNDAwLAogICAgImMiOiA5MDA3MTk5MjU0NzQwOTkzLAogICAgImQiOiAxLjAsCiAgICAiZSI6IC0wLAogICAgImYiOiAwLjEKfQo="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "escaped-lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a \\ud800 escape; JSON.parse keeps the lone surrogate and JSON.stringify writes it back lower-case"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKICAgICAgICAiU2F2ZWRBY2NvdW50TmFtZXMiOiAiXHVkODAweEBleGFtcGxlLmNvbSIKICAgIH0KfQo="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "escaped-lone-surrogate-upper",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: an upper-case \\uD800 escape; JSON.stringify writes \\ud800, so the file does not round-trip"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgInMiOiAiXHVEODAwIgp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "cesu-surrogate-bytes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: a surrogate encoded as UTF-8 bytes ED A0 80 inside a string; Node decodes it to U+FFFD three times"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgInMiOiAiYe2ggGIiCn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "invalid-utf8-in-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: a lone 0xFF and a truncated E2 82 inside strings of the mini config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKICAgICAgICAiQXV0b0xvZ2luIjogInRydWUiLAogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl//MkBleGFtcGxlLmNvbSx1c2VyXzNAZXhhbXBsZS5jb20iLAogICAgICAgICJJbnN0YWxsIjogewogICAgICAgICAgICAiRGVmYXVsdEluc3RhbGxQYXRoIjogIkQ6XC9HYeKCbWVzIgogICAgICAgIH0KICAgIH0KfQo="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "escaped-non-ascii",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a \\u00e9 escape; JSON.stringify writes the character raw, so the file does not round-trip"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgInMiOiAiY2FmXHUwMGU5Igp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "raw-non-ascii",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-lf.config | raw non-ASCII and astral characters in a string"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgInMiOiAiY2Fmw6kg8J+YgCDkuK0iCn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "control-escapes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: control characters as escapes: JSON.stringify writes \\b \\f \\n \\r \\t short and the rest as lower-case \\u00XX"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgInMiOiAiXGJcZlxuXHJcdFx1MDAwMVx1MDAxZlx1MDA3ZlwiXFwiCn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "control-escapes-upper",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: an upper-case \\u001F escape does not come back as written"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgInMiOiAiXHUwMDFGIgp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "raw-line-separator",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a raw U+2028 inside a string; JSON.stringify writes it raw"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgInMiOiAiYeKAqGIiCn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "nbsp-before-object",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a U+00A0 before the object; JSON whitespace is only space, tab, CR and LF"
+      },
+      "args": [
+        {
+          "$bytes": "wqB7fQ=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "feff-inside",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a U+FEFF after the first brace; only one leading BOM is stripped"
+      },
+      "args": [
+        {
+          "$bytes": "e++7v30="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "trailing-comma",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-lf.config | a trailing comma after the last member"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgImEiOiAiMSIsCn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "trailing-junk",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-lf.config | text after the closing brace"
+      },
+      "args": [
+        {
+          "$bytes": "e30KeA=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "single-quotes",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-lf.config | single-quoted strings"
+      },
+      "args": [
+        {
+          "$bytes": "eydhJzogJ2InfQ=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "arrays-and-empties",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-lf.config | arrays, empty arrays and empty objects, as JSON.stringify lays them out"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgImEiOiBbCiAgICAgICAgMSwKICAgICAgICAieCIsCiAgICAgICAgW10sCiAgICAgICAge30KICAgIF0sCiAgICAiYiI6IHt9LAogICAgImMiOiBbXSwKICAgICJkIjogbnVsbCwKICAgICJlIjogdHJ1ZQp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "qt-empty-object",
+      "origin": {
+        "kind": "fixture",
+        "ref": "l1/battlenet/files/planSavedAccountNames/mini-lf.config | an empty object written over two lines"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgImEiOiB7CiAgICB9Cn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "backslash-slash-in-value",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the two characters \\\\/ (an escaped backslash, then a slash) make the probe believe slashes are escaped"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgInAiOiAiQzpcXC94Igp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "proto-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: an own \"__proto__\" key; JSON.parse makes it an ordinary property and JSON.stringify writes it back"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIl9fcHJvdG9fXyI6IHsKICAgICAgICAiYSI6ICIxIgogICAgfSwKICAgICJiIjogIjIiCn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "proto-nested",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a \"__proto__\" key inside Client holding a string, an ordinary member"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKICAgICAgICAiX19wcm90b19fIjogIngiLAogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ4QGV4YW1wbGUuY29tIgogICAgfQp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-0",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=0 ops=astral from=l1/battlenet/files/planSavedAccountNames/mini-lf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKICAgICAgICAiQXV0b0xvZ2luIjogInRydWUiLArwnZ+YICAgICAgICAiU2F2ZWRBY2NvdW50TmFtZXMiOiAidXNlcl8xQGV4YW1wbGUuY29tLHVzZXJfMkBleGFtcGxlLmNvbSx1c2VyXzNAZXhhbXBsZS5jb20iLAogICAgICAgICJJbnN0YWxsIjogewogICAgICAgICAgICAiRGVmYXVsdEluc3RhbGxQYXRoIjogIkQ6XC9HYW1lcyIKICAgICAgICB9CiAgICB9Cn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-1",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=1 ops=flip,insert from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyJcIzogJnVzZXJfMUBleGFtcGxlLmNvbSx1c2VyXzJAZXhhbXBsZS5jb20sdXNlcl8zQGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkluc3RhbGwiOiB7DQogICAgICAgICAgICAiRGVmYXVsdEluc3RhbGxQYXRoIjogIkQ6XC9HYW1lcyINCiAgICAgICAgfQ0KICAgIH0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-2",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=2 ops=truncate,invalid-utf8 from=fixtures/launchers/battlenet/Battle.net.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0SW5CcHMiOiDigiIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdEluQnBzIjogIjEwMDAwMDAwMDAwMCIsDQogICAgICAgICAgICAiTGFzdFVzZXJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIg0KICAgICAgICB9LA0KICAgICAgICAiR2FtZUxhdW5jaFdpbmRvd0JlaGF2aW9yIjogIjIiLA0KICAgICAgICAiTWF0dXJlTGFuZ3VhZ2VGaWx0ZXIiOiAiZmFsc2UiLA0KICAgICAgICAiVm9pY2UiOiB7DQogICAgICAgICAgICAiVHJhbnNtaXNzaW9uVHlwZSI6ICIxIg0KICAgICAgICB9LA0KICAgICAgICAiSG90S2V5Ijogew0KICAgICAgICAgICAgIkhvdEtleUFjdGlvblB1c2hUb1RhbGsiOiAiRGlyZWN0SW5wdXQ6NDY6VjpLZXlib2FyZCINCiAgICAgICAgfQ0KICAgIH0sDQogICAgIjAxMjM0NTY3ODlhYmNkZWYiOiB7DQogICAgICAgICJDbGllbnQiOiB7DQogICAgICAgICAgICAiTGFuZ3VhZ2UiOiAiZW5VUyIsDQogICAgICAgICAgICAiTG9naW5TZXR0aW5ncyI6IHsNCiAgICAgICAgICAgICAgICAiQWxsb3dlZFJlZ2lvbnMiOiAiIiwNCiAgICAgICAgICAgICAgICAiQWxsb3dlZExvY2FsZXMiOiAiIg0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiUGF0aCI6ICJDOlxcUHJvZ3JhbSBGaWxlcyAoeDg2KVxcQmF0dGxlLm5ldCIsDQogICAgICAgICJTZXJ2aWNlcyI6IHsNCiAgICAgICAgICAgICJMYXN0TG9naW5SZWdpb24iOiAiVVMiLA0KICAgICAgICAgICAgIkxhc3RMb2dpbkFkZHJlc3MiOiAidXMuYWN0dWFsLmJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIkxhc3RMb2dpblRhc3NhZGFyIjogImFjY291bnQuYmF0dGxlLm5ldCINCiAgICAgICAgfQ0KICAgIH0sDQogICAgIkdhbWVzIjogew0KICAgICAgICAiYmF0dGxlX25ldCI6IHsNCiAgICAgICAgICAgICJTZXJ2ZXJVaWQiOiAiYmF0dGxlLm5ldCIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiZm9yZSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MzE4NTA3ODMiDQogICAgICAgIH0sDQogICAgICAgICJvZGluIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXMiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzcxNzI5NjA0IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc4OTI2OTY2OCIsDQogICAgICAgICAgICAiQXV0b1VwZGF0ZUNyaXRlcmlhUGFzc2VkIjogInRydWUiLA0KICAgICAgICAgICAgIkxhc3RJbnN0YWxsZWQiOiAiMTcxNzM5NDQxNyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogInByb21ldGhldXMiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiaHNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3NzQ5OTYzNDciLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNzc0MDExNzg="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-3",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=3 ops=flip from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQoiICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJEOlwvR2FtZXMiDQogICAgICAgIH0NCiAgICB9DQp9DQo="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-4",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=4 ops=truncate from=l1/battlenet/files/planSavedAccountNames/mini-lf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKICAgICAgICAiQXV0b0xvZ2luIjogInRydWUiLAogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsCiAgICAgICAgIkluc3RhbGwiOiB7CiAg"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-5",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=5 ops=line-delete,invalid-utf8 from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIlVzZXIiOiB7CiAgICAgICAgIkNsaWVudCI6IHsKICAgICAgICAgICAgIldpbmRvd3MiOiB7CiAgICAgICAgICAgICAgICAiQnJvd3Nlck1haW5XaW5kb3ciOiB7CiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1Bvc2l0aW9uIjogIkBQb2ludCgyMzQgMTc5KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1NpemUiOiAiQFNpemUoMTkyMCAxMTE2KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1N0YXRlIjogIjAiCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgIlNvY2lhbFBvcG91dFdpbmRvdyI6IHsKICAgICAgICAgIO2ggCAgICAgICAgICAiV2luZG93UG9zaXRpb24iOiAiQFBvaW50KDQ2MCAxOTYpIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U2l6ZSI6ICJAU2l6ZSgxMDAwIDY0MCkiLAogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTdGF0ZSI6ICIwIgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9LAogICAgICAgICAgICAiSGFzU2VlbkZpcnN0VGltZUV4cGVyaWVuY2UiOiAidHJ1ZSIsCiAgICAgICAgICAgICJIaWRlT25DbG9zZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEaXNwbGF5RXhpdFByb21wdCI6ICJmYWxzZSIsCiAgICAgICAgICAgICJXaW5kb3dOb3RpZmljYXRpb25TaG93biI6ICJ0cnVlIiwKICAgICAgICAgICAgIlNlbmRUeXBpbmdOb3RpZmljYXRpb25zIjogImZhbHNlIiwKICAgICAgICAgICAgICAgICJBY3RpdmVDaGF0U3RyZWFtIjogInc6MTAwMDAwMDAwIgogICAgICAgICAgICB9CiAgICAgICAgfSwKICAgICAgICAiR2FtZXMiOiB7CiAgICAgICAgICAgICJ6ZXVzIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjEwMDAwMDAwIgogICAgICAgICAgICB9LAogICAgICAgICAgICAicHJvbWV0aGV1cyI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIxNDUzMjYiCiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJoc19iZXRhIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjIzODA4NyIKICAgICAgICAgICAgfSwKICAgICAgICAgICAgImF1a3MiOiB7CiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMTAwMDAwMDAiCiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9Cn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-6",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=6 ops=invalid-utf8,insert,line-delete from=fixtures/launchers/battlenet/Battle.net.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0SW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdE5leHRQYXRjaEluQnBzIjogIjEwMDAwMDAwMDAwMCINCiAgICAgICAgfSwNCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwNCiAgICAgICAgIk1hdHVyZUxhbmd1YWdlRmlsdGVyIjogImZhbHNlIiwNCiAgICAgICAgIlZvaWNlIjogew0KICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSINCiAgICAgICAgfSwNCiAgICAgICAgIkhvdEtleSI6IHsNCiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIkxhbmd1YWdlIjogImVuVVMiLA0KICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7DQogICAgICAgICAgICAgICAgIkFsbG93ZWRSZWdpb25zIjogIiIsDQogICAgICAgICAgICAgICAgIkFsbG93ZWRMb2NhbGVzIjogIiINCiAgICAgICAgICAgIH0NCiAgICAgICAgfSwNCiAgICAgICAgIlBhdGgiOiAiQzpcXFByb2dyYW0gRmlsZXMgKHg4NilcXEJhdHRsZS5uZXQiLA0KICAgICAgICAiU2VydmljZXMiOiB7DQogICAgICAgIO2ggCAgICAiTGFzdExvZ2luUmVnaW9uIjogIlVTIiwNCiAgICAgICAgICAgICJMYXN0TG9naW5BZGRyZXNzIjogInVzLmFjdHVhbC5iYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICJHYW1lcyI6IHsNCiAgICAgICAgImJhdHRsZV9uZXQiOiB7DQogICAgICAgCiAgICAgIlNlcnZlclVpZCI6ICJiYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJSZXN1bWFibGUiOiAiZmFsc2UiDQogICAgICAgIH0sDQogICAgICAgICJmb3JlIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyINCiAgICAgICAgfSwNCiAgICAgICAgIm9kaW4iOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjI5MTU4ODg3Ig0KICAgICAgICAicHJvbWV0aGV1cyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3NzE3Mjk2MDQiLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNzg5MjY5NjY4IiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlQ3JpdGVyaWFQYXNzZWQiOiAidHJ1ZSIsDQogICAgICAgICAgICAiTGFzdEluc3RhbGxlZCI6ICIxNzE3Mzk0NDE3IiwNCiAgICAgICAgICAgICJTZXJ2ZXJVaWQiOiAicHJvbWV0aGV1cyIsDQogICAgICAgICAgICAiQXV0b1VwZGF0ZSI6ICJmYWxzZSIsDQogICAgICAgICAgICAiRG93bmxvYWRBbGxVcGRhdGVzIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZXN1bWFibGUiOiAiZmFsc2UiDQogICAgICAgIH0sDQogICAgICAgICJoc19iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3NDk5NjM0NyIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3NzQwMTE3ODciLA0KICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJoc19iZXRhIiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlIjogImZhbHNlIiwNCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgInpldXMiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjYyMzEzNDIzIiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTY2MjIzMjcwNiINCiAgICAgICAgfSwNCiAgICAgICAgImZvcmVfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MzE4NTA3ODMiDQogICAgICAgIH0sDQogICAgICAgICJ6ZXVzX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjI4NTUxNzc1Ig0KICAgICAgICB9LA0KICAgICAgICAicHJvbWV0aGV1c192aWV3ZXIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjU0MDY1MjcyIg0KICAgICAgICB9LA0KICAgICAgICAicHJvbWV0aGV1c190ZXN0Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MiINCiAgICAgICAgfSwNCiAgICAgICAgIm9kaW5fYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjU0MDY1MjcwIg0KICAgICAgICB9LA0KICAgICAgICAiZGlhYmxvMyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1ODk4OTY2NjIiDQogICAgICAgIH0sDQogICAgICAgICJzMiI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjM5NzA4NzIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3ciOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTkxMzA4MzIwIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWMiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTkxMzA4MzIwIg0KICAgICAgICB9LA0KICAgICAgICAiczJfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyMzk3MDg3MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX2VyYSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpY19wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpY19lcmFfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19wdHJfeCI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjgiDQogICAgICAgIH0sDQogICAgICAgICJhdWtzIjogew0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNzA1NTQwNjI0IiwNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3MTEzMzAxMjYiDQogICAgICAgIH0NCiAgICB9DQp9DQo="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-7",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=7 ops=insert,bom from=fixtures/launchers/battlenet/Battle.net.config"
+      },
+      "args": [
+        {
+          "$bytes": "77u/ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvcywg/2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0SW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdE5leHRQYXRjaEluQnBzIjogIjEwMDAwMDAwMDAwMCINCiAgICAgICAgfSwNCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwNCiAgICAgICAgIk1hdHVyZUxhbmd1YWdlRmlsdGVyIjogImZhbHNlIiwNCiAgICAgICAgIlZvaWNlIjogew0KICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSINCiAgICAgICAgfSwNCiAgICAgICAgIkhvdEtleSI6IHsNCiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIkxhbmd1YWdlIjogImVuVVMiLA0KICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7DQogICAgICAgICAgICAgICAgIkFsbG93ZWRSZWdpb25zIjogIiIsDQogICAgICAgICAgICAgICAgIkFsbG93ZWRMb2NhbGVzIjogIiINCiAgICAgICAgICAgIH0NCiAgICAgICAgfSwNCiAgICAgICAgIlBhdGgiOiAiQzpcXFByb2dyYW0gRmlsZXMgKHg4NilcXEJhdHRsZS5uZXQiLA0KICAgICAgICAiU2VydmljZXMiOiB7DQogICAgICAgICAgICAiTGFzdExvZ2luUmVnaW9uIjogIlVTIiwNCiAgICAgICAgICAgICJMYXN0TG9naW5BZGRyZXNzIjogInVzLmFjdHVhbC5iYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICJHYW1lcyI6IHsNCiAgICAgICAgImJhdHRsZV9uZXQiOiB7DQogICAgICAgICAgICAiU2VydmVyVWlkIjogImJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImZvcmUiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAib2RpbiI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3MTcyOTYwNCIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3ODkyNjk2NjgiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGVDcml0ZXJpYVBhc3NlZCI6ICJ0cnVlIiwNCiAgICAgICAgICAgICJMYXN0SW5zdGFsbGVkIjogIjE3MTczOTQ0MTciLA0KICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJwcm9tZXRoZXVzIiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlIjogImZhbHNlIiwNCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImhzX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzc0OTk2MzQ3IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc3NDAxMTc4NyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiemV1cyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NjIzMTM0MjMiLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNjYyMjMyNzA2Ig0KICAgICAgICB9LA0KICAgICAgICAiZm9yZV9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyINCiAgICAgICAgfSwNCiAgICAgICAgInpldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2Mjg1NTE3NzUiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3ZpZXdlciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3Rlc3QiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjU0MDY1MjcyIg0KICAgICAgICB9LA0KICAgICAgICAib2Rpbl9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzAiDQogICAgICAgIH0sDQogICAgICAgICJkaWFibG8zIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU4OTg5NjY2MiINCiAgICAgICAgfSwNCiAgICAgICAgInMyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyMzk3MDg3MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvdyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpYyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJzMl9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfZXJhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX2VyYV9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X3B0cl94Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2OCINCiAgICAgICAgfSwNCiAgICAgICAgImF1a3MiOiB7DQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3MDU1NDA2MjQiLA0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTcxMTMzMDEyNiINCiAgICAgICAgfQ0KICAgIH0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": true
+      }
+    },
+    {
+      "id": "corpus-11-8",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=8 ops=line-duplicate from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJEOlwvR2FtZXMiDQogICAgICAgIH0NCiAgICB9DQp9DQp9DQo="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-9",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=9 ops=truncate from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgIA=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-10",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=10 ops=invalid-utf8,lone-surrogate,lone-surrogate from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIlVzZXIiOiB7CiAgICAgICAgIkNsaWVudCI6IHsKICAgICAgICAgICAgIldpbmRvd3MiOiB7CiAgICAgICAgICAgICAgICAiQnJvd3Nlck1haW5XaW5kb3ciOiB7CiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1Bvc2l0aW9uIjogIkBQb2ludCgyMzQgMTc5KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1NpemUiOiAiQFNpemUoMTkyMCAxMTE2KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1N0YXRlIjogIjAiCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgIlNvY2lhbFBvcG91dFdpbmRvdyI6IHsKICAgICAgICAgICAgICAgICAgICAiV2luZG93UG9zaXRpb24iOiAiQFBvaW50KDQ2MCAxOTYpIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U2l6ZSI6ICJAU2l6ZSgxMDAwIDY0MCkiLAogIO24gCAgICAgICAgICAgICAgICAgICJXaW5kb3dTdGF0ZSI6ICIwIgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9LAogICAgICAgICAgICAiSGFzU2VlboBGaXJzdFRpbWVFeHBlcmllbmNlIjogInRydWUiLAogICAgICAgICAgICAiSGlkZU9uQ2xvc2UiOiAiZmFsc2UiLAogICAgICAgICAgICAiRGlzcGxheUV4aXRQcm9tcHQiOiAiZmFsc2UiLAogICAgICAgICAgICAiV2luZG93Tm90aWZpY2F0aW9uU2hvd24iOiAidHJ1ZSIsCiAgICAgICAgICAgICJTZW5kVHlwaW5nTm90aWZpY2F0aW9ucyI6ICJmYWxzZSIsCiAgICAgICAgICAgICJTb2NpYWwiOiB7CiAgICAgICAgICAgICAgICAiQWN0aXZlQ2hhdFN0cmVhbSI6ICJ3OjEwMDAwMDAwMCIKICAgICAgICAgICAgfQogICAgICAgIH0sCiAgICAgICAgIkdhbWVzIjogewogICAgICAgICAgICAiemV1cyI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIxMDAwMDAwMCIKICAgICAgICAgICAgfSwKICAgICAgICAgICAgInByb21ldGhldXMiOiB7CiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMTQ1MzI2IgogICAgICAgICAgICB9LO2gvQogICAgICAgICAgICAiaHNfYmV0YSI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIyMzgwODciCiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJhdWtzIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjEwMDAwMDAwIgogICAgICAgICAgICB9CiAgICAgICAgfQogICAgfQp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-11",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=11 ops=flip,line-swap,flip from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogIAAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgfQ0KICAgICAgICAiSW5zdGFsbCI6IHsNCiAgICAgICAgICAgICJEZWZhdWx0SW5zdGFsbFBhdGgiOiAiRDpcL0dhbWVzIg0KICAgICAgICB9DQogICAgICAgICJTYXZlZEFjY291bnRPYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsDQp9DQo="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-12",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=12 ops=bom from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "77u/ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJEOlwvR2FtZXMiDQogICAgICAgIH0NCiAgICB9DQp9DQo="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": true
+      }
+    },
+    {
+      "id": "corpus-11-13",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=13 ops=truncate,delete,line-delete from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIlVzZXIiOiB7CiAgICAgICAgIkNsaWVudCI6IHsKICAgICAgICAgICAgIldpbmRvd3MiOiB7CiAgICAgICAgICAgICAgICAiQnJvd3Nlck1haW5XaW5kb3ciOiB7CiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1Bvc2l0aW9uIjogIkBQb2ludCgyMzQgMTc5KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1NpemUiOiAiQFNpemUoMTkyMCAxMTE2KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1N0YXRlIjogIjAiCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgICAgICJXaW5kb3dQb3NpdGlvbiI6ICJAUG9pbnQoNDYwIDE5NikiLAogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTaXplIjogIkBTaXplKDEwMDAgNjQwKSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1N0YXRlIjogIjAiCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJIYXNTZWVuRmVuY2UiOiAidHJ1ZSIsCiAgICAgICAgICAgICJIaWRlT25DbG9zZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEaXNwbGE="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-14",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=14 ops=astral from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJEOlwv8KCAgEdhbWVzIg0KICAgICAgICB9DQogICAgfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-15",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=15 ops=line-duplicate,line-duplicate,line-swap from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAiU2F2ZWRBY2NvdW50TmFtZXMiOiAidXNlcl8xQGV4YW1wbGUuY29tLHVzZXJfMkBleGFtcGxlLmNvbSx1c2VyXzNAZXhhbXBsZS5jb20iLA0KICAgICAgICAiSW5zdGFsbCI6IHsNCiAgICAgICAgIkF1dG9Mb2dpbiI6ICJ0cnVlIiwNCiAgICAgICAgICAgICJEZWZhdWx0SW5zdGFsbFBhdGgiOiAiRDpcL0dhbWVzIg0KICAgICAgICB9DQogICAgfQ0KICAgIH0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-16",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=16 ops=eol,astral from=fixtures/launchers/battlenet/Battle.net.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKICAgICAgICAiVmVyc2lvbiI6IHsKICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwKICAgICAgICAgICAgIlJlbGVhc2UiOiB7CiAgICAgICAgICAgICAgICAiRmlyc3RSdW4iOiAiZmFsc2UiLAogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLAogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc1ZlcnNpb24iOiAiMTc3NzgiCiAgICAgICAgICAgIH0KICAgICAgICB9LAogICAgICAgICJUb2FzdHMiOiB7CiAgICAgICAgICAgICJTY3JlZW5Qb3NpdGlvbiI6ICJCb3R0b21SaWdodCIsCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiCiAgICAgICAgfSwKICAgICAgICAiR2FDbGllbnRJZCI6ICJ1bmRlZmluZWQiLAogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsCiAgICAgICAgIlNhdmVkQWNjb3VudE5hbWVzIjogInNhdmVkMUBleGFtcGxlLmNvbSxzYXZlZDJAZXhhbXBsZS5jb20sc2F2ZWQzQGV4YW1wbGUuY29tLHNhdmVkNEBleGFtcGxlLmNvbSxzYXZlZDVAZXhhbXBsZS5jb20iLAogICAgICAgICJHYW1lU2VhcmNoIjogewogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiCiAgICAgICAgfSwKICAgICAgICAiSW5zdGFsbCI6IHsKICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwKICAgICAgICAgICAgIkRvd25sb2FkTGltaXROZXh0UGF0Y2hJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLAogICAgICAgICAgICAiRG93bmxvYWRMaW1pdEluQnBzIjogIjEwMDAwMDAwMDAwMCIsCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLAogICAgICAgICAgICAiTGFzdFVzZXJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIgogICAgICAgIH0sCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwKICAgICAgICAiTWF0dXJlTGFuZ3VhZ2VGaWx0ZXIiOiAiZmFsc2UiLAogICAgICAgICJWb2ljZSI6IHsKICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSIKICAgICAgICB9LAogICAgICAgICJIb3RLZXkiOiB7CiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiCiAgICAgICAgfQogICAgfSwKICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogewogICAgICAgICJDbGllbnQiOiB7CiAgICAgICAgICAgICJMYW5ndWFnZSI6ICJlblVTIiwKICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7CiAgICAgICAgICAgICAgICAiQWxsb3dlZFJlZ2lvbnMiOiAiIiwKICAgICAgICAgICAgICAgICJBbGxvd2VkTG9jYWxlcyI6ICIiCiAgICAgICAgICAgIH0KICAgICAgICB9LAogICAgICAgICJQYXRoIjogIkM6XFxQcm9ncmFtIEZpbGVzICh4ODYpXFxCYXR0bGUubmV0IiwKICAgICAgICAiU2VydmljZXMiOiB7CiAgICAgICAgICAgICJMYXN0TG9naW5SZWdpb24iOiAiVVMiLAogICAgICAgICAgICAiTGFzdExvZ2luQWRkcmVzcyI6ICJ1cy5hY3R1YWwuYmF0dGxlLm5ldCIsCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiCiAgICAgICAgfQogICAgfSwKICAgICJHYW1lcyI6IHsKICAgICAgICAiYmF0dGxlX25ldCI6IHsKICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJiYXR0bGUubmV0IiwKICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSIKICAgICAgICB9LAogICAgICAgICJmb3JlIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIgogICAgICAgIH0sCiAgICAgICAgIm9kaW4iOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciCiAgICAgICAgfSwKICAgICAgICAicHJvbWV0aGV1cyI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3MTcyOTYwNCIsCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc4OTI2OTY2OCIsCiAgICAgICAgICAgICJBdXRvVXBkYXRlQ3JpdGVyaWFQYXNzZWQiOiAidHJ1ZSIsCiAgICAgICAgICAgICJMYXN0SW5zdGFsbGVkIjogIjE3MTczOTQ0MTciLAogICAgICAgICAgICAiU2VydmVyVWlkIjogInByb21ldGhldXMiLAogICAgICAgICAgICAiQXV0b1VwZGF0ZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLAogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIgogICAgICAgIH0sCiAgICAgICAgImhzX2JldGEiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3NzQ5OTYzNDciLAogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3NzQwMTE3ODciLAogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLAogICAgICAgICAgICAiQXV0b1VwZGF0ZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLAogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIgogICAgICAgIH0sCiAgICAgICAgInpldXMiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NjIzMTM0MjMiLAogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE2NjIyMzI3MDYiCiAgICAgICAgfSwKICAgICAgICAiZm9yZV9iZXRhIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIgogICAgICAgIH0sCiAgICAgICAgInpldXNfYmV0YSI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyODU1MTc3NSIKICAgICAgICB9LAogICAgICAgICJwcm9tZXRoZXVzX3ZpZXdlciI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MiIKICAgICAgICB9LAogICAgICAgICJwcm9tZXRoZXVzX3Rlc3QiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiCiAgICAgICAgfSwKICAgICAgICAib2Rpbl9iZXRhIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjI5MTU4ODg3IgogICAgICAgIH0sCiAgICAgICAgInByb21ldGhldXNfYmV0YSI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MCIKICAgICAg9I+/vyAgfSwKICAgICAgICAiZGlhYmxvMyI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU4OTg5NjY2MiIKICAgICAgICB9LAogICAgICAgICJzMiI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyMzk3MDg3MiIKICAgICAgICB9LAogICAgICAgICJ3b3ciOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiCiAgICAgICAgfSwKICAgICAgICAid293X2NsYXNzaWMiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiCiAgICAgICAgfSwKICAgICAgICAiczJfcHRyIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIgogICAgICAgIH0sCiAgICAgICAgIndvd19jbGFzc2ljX2VyYSI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCIKICAgICAgICB9LAogICAgICAgICJ3b3dfY2xhc3NpY19wdHIiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiCiAgICAgICAgfSwKICAgICAgICAid293X3B0ciI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiIKICAgICAgICB9LAogICAgICAgICJ3b3dfY2xhc3NpY19lcmFfcHRyIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIgogICAgICAgIH0sCiAgICAgICAgIndvd19wdHJfeCI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2OCIKICAgICAgICB9LAogICAgICAgICJhdWtzIjogewogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3MDU1NDA2MjQiLAogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzExMzMwMTI2IgogICAgICAgIH0KICAgIH0KfQo="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-17",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=17 ops=eol from=l1/battlenet/files/planSavedAccountNames/mini-lf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJEOlwvR2FtZXMiDQogICAgICAgIH0NCiAgICB9DQp9DQo="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-18",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=18 ops=truncate from=fixtures/launchers/battlenet/Battle.net.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0SW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdE5leHRQYXRjaEluQnBzIjogIjEwMDAwMDAwMDAwMCINCiAgICAgICAgfSwNCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwNCiAgICAgICAgIk1hdHVyZUxhbmd1YWdlRmlsdGVyIjogImZhbHNlIiwNCiAgICAgICAgIlZvaWNlIjogew0KICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSINCiAgICAgICAgfSwNCiAgICAgICAgIkhvdEtleSI6IHsNCiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIkxhbmd1YWdlIjogImVuVVMiLA0KICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7DQogICAgICAgICAgICAgICAgIkFsbG93ZWRSZWdpb25zIjogIiIsDQogICAgICAgICAgICAgICAgIkFsbG93ZWRMb2NhbGVzIjogIiINCiAgICAgICAgICAgIH0NCiAgICAgICAgfSwNCiAgICAgICAgIlBhdGgiOiAiQzpcXFByb2dyYW0gRmlsZXMgKHg4NilcXEJhdHRsZS5uZXQiLA0KICAgICAgICAiU2VydmljZXMiOiB7DQogICAgICAgICAgICAiTGFzdExvZ2luUmVnaW9uIjogIlVTIiwNCiAgICAgICAgICAgICJMYXN0TG9naW5BZGRyZXNzIjogInVzLmFjdHVhbC5iYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICJHYW1lcyI6IHsNCiAgICAgICAgImJhdHRsZV9uZXQiOiB7DQogICAgICAgICAgICAiU2VydmVyVWlkIjogImJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImZvcmUiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAib2RpbiI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3MTcyOTYwNCIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3ODkyNjk2NjgiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGVDcml0ZXJpYVBhc3NlZCI6ICJ0cnVlIiwNCiAgICAgICAgICAgICJMYXN0SW5zdGFsbGVkIjogIjE3MTczOTQ0MTciLA0KICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJwcm9tZXRoZXVzIiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlIjogImZhbHNlIiwNCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImhzX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzc0OTk2MzQ3IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc3NDAxMTc4NyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUi"
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-19",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=19 ops=line-duplicate,astral,flip from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0Kew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV49I+/v2FtcGxlLmNvbSx1c2VyXzNAZXhhbXBsZS5jb20iLA0KICAgICAgICAiSW5zdGFsbCI6IHsNCiAgICAgICAgIKAgICJEZWZhdWx0SW5zdGFsbFBhdGgiOiAiRDpcL0dhbWVzIg0KICAgICAgICB9DQogICAgfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-20",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=20 ops=line-duplicate,lone-surrogate,line-swap from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIlVzZXIiOiB7CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICJXaW5kb3dzIjogewogICAgICAgICAgICAgICAgIkJyb3dzZXJNYWluV2luZG93IjogewogICAgICAgICAgICAgICAgICAgICJXaW5kb3dQb3NpdGlvbiI6ICJAUG9pbnQoMjM0IDE3OSkiLAogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTaXplIjogIkBTaXplKDE5MjAgMTExNikiLAogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTdGF0ZSI6ICIwIgogICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgICAgICJTb2NpYWxQb3BvdXRXaW5kb3ciOiB7CiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1Bvc2l0aW9uIjogIkBQb2ludCg0NjAgMTk2KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1NpemUiOiAiQFNpemUoMTAwMCA2NDApIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U3RhdGUiOiAiMCIKICAgICAgICAiQ2xpZW50IjogewogICAgICAgICAgICB9LAogICAgICAgICAgICAiSGFzU2VlbkZpcnN0VGltZUV4cGVyaWVuY2UiOiAidHJ1ZSIsCiAgICAgICAgICAgICJIaWRlT25DbG9zZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEaXNwbGF5RXhpdFByb21wdCI6ICJmYWxzZSIsCiAgICAgICAgICAgICJXaW5kb3dOb3RpZmljYXRpb25TaG93biI6ICJ0cnXtuIBlIiwKICAgICAgICAgICAgIlNlbmRUeXBpbmdOb3RpZmljYXRpb25zIjogImZhbHNlIiwKICAgICAgICAgICAgIlNvY2lhbCI6IHsKICAgICAgICAgICAgICAgICJBY3RpdmVDaGF0U3RyZWFtIjogInc6MTAwMDAwMDAwIgogICAgICAgICAgICB9CiAgICAgICAgfSwKICAgICAgICAiR2FtZXMiOiB7CiAgICAgICAgICAgICJ6ZXVzIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjEwMDAwMDAwIgogICAgICAgICAgICB9LAogICAgICAgICAgICAicHJvbWV0aGV1cyI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIxNDUzMjYiCiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJoc19iZXRhIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjIzODA4NyIKICAgICAgICAgICAgfSwKICAgICAgICAgICAgImF1a3MiOiB7CiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMTAwMDAwMDAiCiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9Cn0KfQo="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-21",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=21 ops=delete,line-delete,line-delete from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIlVzZXIiOiB7CiAgICAgICAgIkNsaWVudCI6IHsKICAgICAgICAgICAgIldpbmRvd3MiOiB7CiAgICAgICAgICAgICAgICAiQnJvd3Nlck1haW5XaW5kb3ciOiB7CiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1Bvc2l0aW9uIjogIkBQb2ludCgyMzQgMTc5KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1NpemUiOiAiQFNpemUoMTkyMCAxMTE2KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1N0YXRlIjogIjAiCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgIlNvY2lhbFBvcG91dFdpbmRvdyI6IHsKICAgICAgICAgICAgICAgICAgICAiV2luZG93UG9zaXRpb24iOiAiQFBvaW50KDQ2MCAxOTYpIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U2l6ZSI6ICJAU2l6ZSgxMDAwIDY0MCkiLAogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTdGF0ZSI6ICIwIgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9LAogICAgICAgICAgICAiSGFzU2VlbkZpcnN0VGltZUV4cGVyaWVuY2UiOiAidHJ1ZSIsCiAgICAgICAgICAgICJIaWRlT25DbG9zZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJXaW5kb3dOb3RpZmljYXRpb25TaG93biI6ICJ0cnVlIiwKICAgICAgICAgICAgIlNlbmRUeXBpbmdOb3RpZmljYXRpb25zIjogImZhbHNlIiwKICAgICAgICAgICAgICAgICJBY3RpdmVDaGF0U3RyZWFtIjogInc6MTAwMDAwMDAwIgogICAgICAgICAgICB9CiAgICAgICAgfSwKICAgICAgICAiR2FtZXMiOiB7CiAgICAgICAgICAgICJ6ZXVzIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjEwMDAwMDAwIgogICAgICAgICAgICB9LAogICAgICAgICAgICAicHJvbWV0aGV1cyI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlbmVzQnVpbGQiOiAiMTQ1MzI2IgogICAgICAgICAgICB9LAogICAgICAgICAgICAiaHNfYmV0YSI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIyMzgwODciCiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJhdWtzIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjEwMDAwMDAwIgogICAgICAgICAgICB9CiAgICAgICAgfQogICAgfQp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-22",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=22 ops=line-swap from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIlVzZXIiOiB7CiAgICAgICAgIkNsaWVudCI6IHsKICAgICAgICAgICAgIldpbmRvd3MiOiB7CiAgICAgICAgICAgICAgICAiQnJvd3Nlck1haW5XaW5kb3ciOiB7CiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1Bvc2l0aW9uIjogIkBQb2ludCgyMzQgMTc5KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1NpemUiOiAiQFNpemUoMTkyMCAxMTE2KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1N0YXRlIjogIjAiCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgIlNvY2lhbFBvcG91dFdpbmRvdyI6IHsKICAgICAgICAgICAgICAgICAgICAiV2luZG93UG9zaXRpb24iOiAiQFBvaW50KDQ2MCAxOTYpIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U2l6ZSI6ICJAU2l6ZSgxMDAwIDY0MCkiLAogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTdGF0ZSI6ICIwIgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9LAogICAgICAgICAgICAiSGFzU2VlbkZpcnN0VGltZUV4cGVyaWVuY2UiOiAidHJ1ZSIsCiAgICAgICAgICAgIH0KICAgICAgICAgICAgIkRpc3BsYXlFeGl0UHJvbXB0IjogImZhbHNlIiwKICAgICAgICAgICAgIldpbmRvd05vdGlmaWNhdGlvblNob3duIjogInRydWUiLAogICAgICAgICAgICAiU2VuZFR5cGluZ05vdGlmaWNhdGlvbnMiOiAiZmFsc2UiLAogICAgICAgICAgICAiU29jaWFsIjogewogICAgICAgICAgICAgICAgIkFjdGl2ZUNoYXRTdHJlYW0iOiAidzoxMDAwMDAwMDAiCiAgICAgICAgICAgICJIaWRlT25DbG9zZSI6ICJmYWxzZSIsCiAgICAgICAgfSwKICAgICAgICAiR2FtZXMiOiB7CiAgICAgICAgICAgICJ6ZXVzIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjEwMDAwMDAwIgogICAgICAgICAgICB9LAogICAgICAgICAgICAicHJvbWV0aGV1cyI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIxNDUzMjYiCiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJoc19iZXRhIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjIzODA4NyIKICAgICAgICAgICAgfSwKICAgICAgICAgICAgImF1a3MiOiB7CiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMTAwMDAwMDAiCiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9Cn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-23",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=23 ops=insert from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIlVzZXIiOiB7CiAgICAgICAgIkNsaWVudCI6IHsKICAgICAgICAgICAgIldpbmRvd3MiOiB7CiAgICAgICAgICAgICAgICAiQnJvd3Nlck1haW5XaW5kb3ciOiB7CiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1Bvc2l0aW9uIjogIkBQb2ludCgyMzQgMTc5KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1NpemUiOiAiQFNpemUoMTkyMCAxMTE2KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1N0YXRlIjogIjAiCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgIlNvY2lhbFBvcG91dFdpbmRvdyI6IHsKICAgICAgICAgICAgICAgICAgICAiV2luZG93UG9zaXRpb24iOiAiQFBvaW50KDQ2MCAxOTYpIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U2l6ZSI6ICJAU2l6ZSgxMDAwIDY0MCkiLAogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTdGF0ZSI6ICIwIgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9LAogICAgICAgICAgICAiSGFzU2VlbkZpcnN0VGltZUV/eHBlcmllbmNlIjogInRydWUiLAogICAgICAgICAgICAiSGlkZU9uQ2xvc2UiOiAiZmFsc2UiLAogICAgICAgICAgICAiRGlzcGxheUV4aXRQcm9tcHQiOiAiZmFsc2UiLAogICAgICAgICAgICAiV2luZG93Tm90aWZpY2F0aW9uU2hvd24iOiAidHJ1ZSIsCiAgICAgICAgICAgICJTZW5kVHlwaW5nTm90aWZpY2F0aW9ucyI6ICJmYWxzZSIsCiAgICAgICAgICAgICJTb2NpYWwiOiB7CiAgICAgICAgICAgICAgICAiQWN0aXZlQ2hhdFN0cmVhbSI6ICJ3OjEwMDAwMDAwMCIKICAgICAgICAgICAgfQogICAgICAgIH0sCiAgICAgICAgIkdhbWVzIjogewogICAgICAgICAgICAiemV1cyI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIxMDAwMDAwMCIKICAgICAgICAgICAgfSwKICAgICAgICAgICAgInByb21ldGhldXMiOiB7CiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMTQ1MzI2IgogICAgICAgICAgICB9LAogICAgICAgICAgICAiaHNfYmV0YSI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIyMzgwODciCiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJhdWtzIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjEwMDAwMDAwIgogICAgICAgICAgICB9CiAgICAgICAgfQogICAgfQp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-24",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=24 ops=bom,astral,insert from=fixtures/launchers/battlenet/Battle.net.config"
+      },
+      "args": [
+        {
+          "$bytes": "77u/ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAjLzogICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0SW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdE5leHRQYXRjaEluQnBzIjogIjEwMDAwMDAwMDAwMCINCiAgICAgICAgfSwNCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwNCiAgICAgICAgIk1hdHVyZUxhbmd1YWdlRmlsdGVyIjogImZhbHNlIiwNCiAgICAgICAgIlZvaWNlIjogew0KICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSINCiAgICAgICAgfSwNCiAgICAgICAgIkhvdEtleSI6IHsNCiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIkxhbmd1YWdlIjogImVuVVMiLA0KICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7DQogICAgICAgICAgICAgICAgIkFsbG93ZWRSZWdpb25zIjogIiIsDQogICAgICAgICAgICAgICAgIkFsbG93ZWRMb2NhbGVzIjogIiINCiAgICAgICAgICAgIH0NCiAgICAgICAgfSwNCiAgICAgICAgIlBhdGgiOiAiQzpcXFByb2dyYW0gRmlsZXMgKHg4NilcXEJhdHRsZS5uZXQiLA0KICAgICAgICAiU2VydmljZXMiOiB7DQogICAgICAgICAgICAiTGFzdExvZ2luUmVnaW9uIjogIlVTIiwNCiAgICAgICAgICAgICJMYXN0TG9naW5BZGRyZXNzIjogInVzLmFjdHVhbC5iYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICJHYW1lcyI6IHsNCiAgICAgICAgImJhdHRsZV9uZXQiOiB7DQogICAgICAgICAgICAiU2VydmVyVWlkIjogImJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImZvcmUiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAib2RpbiI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3MTcyOTYwNCIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3ODkyNjk2NjgiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGVDcml0ZXJpYVBhc3NlZCI6ICJ0cnVlIiwNCiAgICAgICAgICAgICJMYXN0SW5zdGFsbGVkIjogIjE3MTczOTQ0MTciLA0KICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJwcm9tZXRoZXVzIiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlIjogImZhbHNlIiwNCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImhzX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzc0OTk2MzQ3IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc3NDAxMTc4NyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiemV1cyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NjIzMTM0MjMiLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNjYyMjMyNzA2Ig0KICAgICAgICB9LA0KICAgICAgICAiZm9yZV9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyINCiAgICAgICAgfSwNCiAgICAgICAgInpldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2Mjg1NTE3NzUiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3ZpZXdlciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3Rlc3QiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjU0MDY1MjcyIg0KICAgICAgICB9LA0KICAgICAgICAib2Rpbl9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzAiDQogICAgICAgIH0sDQogICAgICAgICJkaWFibG8zIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU4OTg5NjY2MiINCiAgICAgICAgfSwNCiAgICAgICAgInMyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyMzk3MDg3MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvdyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpYyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJzMl9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfZXJhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX2VyYV9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X3B0cl94Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2OCINCiAgICAgICAgfSwNCiDwn5iAICAgICAgICJhdWtzIjogew0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNzA1NTQwNjI0IiwNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3MTEzMzAxMjYiDQogICAgICAgIH0NCiAgICB9DQp9DQo="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": true
+      }
+    },
+    {
+      "id": "corpus-11-25",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=25 ops=truncate,delete,lone-surrogate from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIlVzZXIiOiB7CiAgICAgICAgIkNsaWVudCI6IHsKICAgICAgICAgICAgIldpbmRvd3MiOiB7CiAgICAgICAgICAgICAgICAiQnJvd3Nlck1haW5XaW5kb3ciOiB7CiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1Bvc2l0aW9uIjogIkBQb2ludCgyMzQgMTftoL05KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1NpemUiOiAiQFNpemUoMTkyMCAxMTE2KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1N0YXRlIjogIjAiCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgIlNvY2lhbFBvcG91dFdpbmRvdyI6IHsKICAgICAgICAgICAgICAgICAgICAiV2luZG93UG9zaXRpb24iOiAiQFBvaW50KDQ2MCAxOTYpIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U2l6ZSI6ICJAU2l6ZSgxMDAwIDY0MCkiLAogICAgICAgICAgICAgICAgICAgICJXaW4gICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9LAogICAgICAgICAgICAiSGFzU2VlbkZpcnN0VGltZUV4cGVyaWVuY2UiOiAidHJ1ZSIsCiAgICAgICAgICAgICJIaWRlT25DbG9zZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEaXNwbGF5RXhpdFByb21wdCI6ICJmYWxzZSIsCiAgICAgICAgICAgICJXaW5kb3dOb3RpZmljYXRpb25TaG93biI6ICJ0cnVlIiwKICAgICAgICAgICAgIlNlbmRUeXBpbmdOb3RpZmljYXRpb25zIjogImZhbHNlIiwKICAgICAgICAgICAgIlNvY2lhbCI6IHsKICAgICAgICAgICAgICAgICJBY3RpdmVDaGF0U3RyZWFtIjogInc6MTAwMDAwMDAwIgogICAgICAgICAgICB9CiAgICAgICAgfSwKICAgICAgICAiR2FtZXMiOiB7CiAgICAgICAgICAgICJ6ZXVzIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjEwMDAwMDAwIgogICAgICAgICAgICB9LAogICAgICAgICAgICAicHJvbWV0aGV1cyI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIxNDUzMjYiCiAgICAgICAgIA=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-26",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=26 ops=insert,truncate from=l1/battlenet/files/planSavedAccountNames/mini-lf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKICAgICAgICAiQXV0b0xvZ2luIjogInRydWUiLAogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20s"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-27",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=27 ops=line-duplicate,eol,invalid-utf8 from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJVc2VyIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIldpbmRvd3MiOiB7DQogICAgICAgICAgICAgICAgIkJyb3dzZXJNYWluV2luZG93Ijogew0KICAgICAgICAgICAgICAgICAgICAiV2luZG93UG9zaXRpb24iOiAiQFBvaW50KDIzNCAxNzkpIizDDQogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTaXplIjogIkBTaXplKDE5MjAgMTExNikiLA0KICAgICAgICAgICAgICAgICAgICAiV2luZG93U3RhdGUiOiAiMCINCiAgICAgICAgICAgICAgICB9LA0KICAgICAgICAgICAgICAgIH0sDQogICAgICAgICAgICAgICAgIlNvY2lhbFBvcG91dFdpbmRvdyI6IHsNCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1Bvc2l0aW9uIjogIkBQb2ludCg0NjAgMTk2KSIsDQogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTaXplIjogIkBTaXplKDEwMDAgNjQwKSIsDQogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTdGF0ZSI6ICIwIg0KICAgICAgICAgICAgICAgIH0NCiAgICAgICAgICAgIH0sDQogICAgICAgICAgICAiSGFzU2VlbkZpcnN0VGltZUV4cGVyaWVuY2UiOiAidHJ1ZSIsDQogICAgICAgICAgICAiSGlkZU9uQ2xvc2UiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRpc3BsYXlFeGl0UHJvbXB0IjogImZhbHNlIiwNCiAgICAgICAgICAgICJXaW5kb3dOb3RpZmljYXRpb25TaG93biI6ICJ0cnVlIiwNCiAgICAgICAgICAgICJTZW5kVHlwaW5nTm90aWZpY2F0aW9ucyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiU29jaWFsIjogew0KICAgICAgICAgICAgICAgICJBY3RpdmVDaGF0U3RyZWFtIjogInc6MTAwMDAwMDAwIg0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiR2FtZXMiOiB7DQogICAgICAgICAgICAiemV1cyI6IHsNCiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMTAwMDAwMDAiDQogICAgICAgICAgICB9LA0KICAgICAgICAgICAgInByb21ldGhldXMiOiB7DQogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjE0NTMyNiINCiAgICAgICAgICAgIH0sDQogICAgICAgICAgICAiaHNfYmV0YSI6IHsNCiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMjM4MDg3Ig0KICAgICAgICAgICAgfSwNCiAgICAgICAgICAgICJhdWtzIjogew0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIxMDAwMDAwMCINCiAgICAgICAgICAgIH0NCiAgICAgICAgfQ0KICAgIH0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-28",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=28 ops=line-delete,lone-surrogate from=fixtures/launchers/battlenet/Battle.net.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICAiVG9hc3RzIjogew0KICAgICAgICAgICAgIlNjcmVlblBvc2l0aW9uIjogIkJvdHRvbVJpZ2h0IiwNCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiDQogICAgICAgIH0sDQogICAgICAgICJHYUNsaWVudElkIjogInVuZGVmaW5lZCIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJzYXZlZDFAZXhhbXBsZS5jb20sc2F2ZWQyQGV4YW1wbGUuY29tLHNhdmVkM0BleGFtcGxlLmNvbSxzYXZlZDRAZXhhbXBsZS5jb20sc2F2ZWQ1QGV4YW1wbGUuY29tIiwNCiAgICAgICAgIkdhbWVTZWFyY2giOiB7DQogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiDQogICAgICAgIH0sDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJEb3dubG9hZExpbWl0SW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLA0KICAgICAgICAgICAgIkxhc3RVc2VyRG93bmxvYWRMaW1pdE5leHRQYXRjaEluQnBzIjogIjEwMDAwMDAwMDAwMCINCiAgICAgICAgfSwNCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwNCiAgICAgICAgIk1hdHVyZUxhbmd1YWdlRmlsdGVyIjogImZhbHNlIiwNCiAgICAgICAgIlZvaWNlIjogew0KICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSINCiAgICAgICAgfSwNCiAgICAgICAgIkhvdEtleSI6IHsNCiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIkxhbmd1YWdlIjogImVuVVMiLA0KICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7DQogICAgICAgICAgICAgICAgIkFsbG93ZWRSZWdpb25zIjogIiIsDQogICAgICAgICAgICAgICAgIkFsbG93ZWRMb2NhbGVzIjogIiINCiAgICAgICAgICAgIH0NCiAgICAgICAgfSwNCiAgICAgICAgIlBhdGgiOiAiQzpcXFByb2dyYW0gRmlsZXMgKHg4NilcXEJhdHRsZS5uZXQiLA0KICAgICAgICAiU2VydmljZXMiOiB7DQogICAgICAgICAgICAiTGFzdExvZ2luUmVnaW9uIjogIlVTIiwNCiAgICAgICAgICAgICJMYXN0TG9naW5BZGRyZXNzIjogInVzLmFjdHVhbC5iYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiDQogICAgICAgIH0NCiAgICB9LA0KICAgICJHYW1lcyI6IHsNCiAgICAgICAgImJhdHRsZV9uZXQiOiB7DQogICAgICAgICAgICAiU2VydmVyVWlkIjogImJhdHRsZS5uZXQiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImZvcmUiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIg0KICAgICAgICB9LA0KICAgICAgICAib2RpbiI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3MTcyOTYwNCIsDQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3ODkyNjk2NjgiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGVDcml0ZXJpYVBhc3NlZCI6ICJ0cnVlIiwNCiAgICAgICAgICAgICJMYXN0SW5zdGFsbGVkIjogIjE3MTczOTQ0MTciLA0KICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJwcm9tZXRoZXVzIiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlIjogImZhbHNlIiwNCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImhzX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzc0OTk2MzQ3IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc3NDAxMTc4NyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiemV1cyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NjIzMTM0MjMiLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNjYyMjMyNzA2Ig0KICAgICAgICB9LA0KICAgICAgICAiZm9yZV9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyINCiAgICAgICAgfSwNCiAgICAgICAgInpldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2Mjg1NTE3NzUiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3ZpZXdlciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3Rlc3QiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjU0MDY1MjcyIg0KICAgICAgICB9LA0KICAgICAgICAib2Rpbl9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzAiDQogICAgICAgIH0sDQogICAgICAgICJkaWFibG8zIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU4OTg5NjY2MiINCiAgICAgICAgfSwNCiAgICAgICAgInMyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyMzk3MDg3MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvdyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpYyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJzMl9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIg0KICAgICAgICB97aC9LA0KICAgICAgICAid293X2NsYXNzaWNfZXJhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX2VyYV9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X3B0cl94Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2OCINCiAgICAgICAgfSwNCiAgICAgICAgImF1a3MiOiB7DQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3MDU1NDA2MjQiLA0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTcxMTMzMDEyNiINCiAgICAgICAgfQ0KICAgIH0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-29",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=29 ops=line-swap from=l1/battlenet/files/planSavedAccountNames/mini-lf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKfQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsCiAgICAgICAgIkluc3RhbGwiOiB7CiAgICAgICAgICAgICJEZWZhdWx0SW5zdGFsbFBhdGgiOiAiRDpcL0dhbWVzIgogICAgICAgIH0KICAgIH0KICAgICAgICAiQXV0b0xvZ2luIjogInRydWUiLAo="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-30",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=30 ops=invalid-utf8,insert,line-swap from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIlVzZXIiOiB7CiAgICAgICAgIkNsaWVudCI6IHsKICAgICAgICAgICAgIldpbmRvd3MiOiB7CiAgICAgICAgICAgICAgICAiQnJvd3Nlck1haW5XaW5kb3ciOiB7CiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1Bvc2l0aW9uIjogIkBQb2ludCgyMzQgMTc5KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1NpemUiOiAiQFNpemUoMTkyMCAxMTE2KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1N0YXRlIjogIjAiCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgIlNvY2lhbFBvcG91dFdpbmRvdyI6IHsKICAgICAgICAgICAgICAgICAgICAiV2luZG93UG9zaXRpb24iOiAiQFBvaW50KDQ2MCAxOTYpIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U2l6ZSI6ICJAU2l6ZSgxMDAwIDYsAFsKNDApIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U3RhdGUiOiAiMCIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQogICAgICAgICAgICAiSGFzU2VlbkZpcnN0VGltZUV4cGVyaWVuY2UiOiAidHJ1ZSIsCiAgICAgICAgICAgICJIaWRlT25DbG9zZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEaXNwbGF5RXhpdFByb21wdCI6ICJmYWxzZSIsCiAgICAgICAgICAgICJXaW5kb3dOb3RpZmljYXRpb25TaG93biI6ICJ0cnVlIiwKICAgICAgICAgICAgIlNlbmRUeXBpbmdOb3RpZmljYXRpb25zIjogImZhbHNlIiwKICAgICAgICAgICAgIlNvY2lhbCI6IHsKICAgICAgICAgICAgICAgICJBY3RpdmVDaGF0U3RyZWFtIjogInc6MTAwMDAwMDAwIgogICAgICAgICAgICB9LAogICAgICAgIH0sCiAgICAgICAgIkdhbWVzIjogewogIMMgICAgICAgICAgInpldXMiOiB7CiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMTAwMDAwMDAiCiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJwcm9tZXRoZXVzIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjE0NTMyNiIKICAgICAgICAgICAgfSwKICAgICAgICAgICAgImhzX2JldGEiOiB7CiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMjM4MDg3IgogICAgICAgICAgICB9LAogICAgICAgICAgICAiYXVrcyI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIxMDAwMDAwMCIKICAgICAgICAgICAgfQogICAgICAgIH0KICAgIH0KfQo="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-31",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=31 ops=line-duplicate,line-duplicate,lone-surrogate from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsDQogICAgICAgICLtoL1JbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJEOlwvR2FtZXMiDQogICAgICAgIH0NCiAgICB9DQp9DQo="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-32",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=32 ops=line-swap,bom,delete from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "77u/ewogICAgIlVzZXIiOiB7CiAgICAgICAgIkNsaWVudCI6IHsKICAgICAgICAgICAgIldpbmRvd3MiOiB7CiAgICAgICAgfSwKICAgICAgICAgICAgICAgICAgICAiV2luZG93UG9zaXRpb24iOiAiQFBvaW50KDIzNCAxNzkpIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U2l6ZSI6ICJAU2l6ZSgxOTIwIDExMTYpIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U3RhdGUiOiAiMCIKICAgICAgICAgICAgICAgIH0sCiAgICAgICAgICAgICAgICAiU29jaWFsUG9wb3V0V2luZG93IjogewogICAgICAgICAgICAgICAgICAgICJXaW5kb3dQb3NpdGlvbiI6ICJAUG9pbnQoNDYwIDE5NikiLAogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTaXplIjogIkBTaXplKDEwMDAgNjQwKSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1N0YXRlIjogIjAiCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJIYXNTZWVuRmlyc3RUaW1lRXhwZXJpZW5jZSI6ICJ0cnVlIiwKICAgICAgICAgICAgIkhpZGVPbkNsb3NlIjogImZhbHNlIiwKICAgICAgICAgICAgIkRpc3BsYXlFeGl0UHJvbXB0IjogImZhbHNlIiwKICAgICAgICAgICAgIldpbmRvd05vdGlmaWNhdGlvblNob3duIjogInRydWUiLAogICAgICAgICAgICAiU2VuZFR5cGluZ05vdGlmaWNhdGlvbnMiOiAiZmFsc2UiLAogICAgICAgICAgICAiU29jaWEiOiB7CiAgICAgICAgICAgICAgICAiQWN0aXZlQ2hhdFN0cmVhbSI6ICJ3OjEwMDAwMDAwMCIKICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgIkJyb3dzZXJNYWluV2luZG93IjogewogICAgICAgICJHYW1lcyI6IHsKICAgICAgICAgICAgInpldXMiOiB7CiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMTAwMDAwMDAiCiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJwcm9tZXRoZXVzIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjE0NTMyNiIKICAgICAgICAgICAgfSwKICAgICAgICAgICAgImhzX2JldGEiOiB7CiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMjM4MDg3IgogICAgICAgICAgICB9LAogICAgICAgICAgICAiYXVrcyI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIxMDAwMDAwMCIKICAgICAgICAgICAgfQogICAgICAgIH0KICAgIH0KfQo="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": true
+      }
+    },
+    {
+      "id": "corpus-11-33",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=33 ops=truncate from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmNvbSIsDQogICAgICAgICJJbnN0YWxsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJEOlwvR2FtZXMiDQogICAgICAgIH0NCiA="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": false,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-34",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=34 ops=delete,insert from=fixtures/launchers/battlenet/Battle.net.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJWZXJzaW9uIjogew0KICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwNCiAgICAgICAgICAgICJSZWxlYXNlIjogew0KICAgICAgICAgICAgICAgICJGaXJzdFJ1biI6ICJmYWxzZSIsDQogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLA0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNWZXJzaW9uIjogIjE3Nzc4Ig0KICAgICAgICAgICAgfQ0KICAgICAgICB9LA0KICAgICAgICAiVG8gICAgICAgICJTY3JlZW5Qb3NpdGlvbiI6ICJCb3R0b21SaWdodCIsDQogICAgICAgICAgICAiTW9uaXRvciI6ICIwIg0KICAgICAgICB9LA0KICAgICAgICAiR2FDbGllbnRJZCI6ICJ1bmRlZmluZWQiLA0KICAgICAgICAiQXV0b0xvZ2luIjogInRydWUiLA0KICAgICAgICAiU2F2ZWRBY2NvdW50TmFtZXMiOiAic2F2ZWQxQGV4YW1wbGUuY29tLHNhdmVkMkBleGFtcGxlLmNvbSxzYXZlZDNAZXhhbXBsZS5jb20sc2F2ZWQ0QGV4YW1wbGUuY29tLHNhdmVkNUBleGFtcGxlLmNvbSIsDQogICAgICAgICJHYW1lU2VhcmNoIjogew0KICAgICAgICAgICAgIlBlcmZvcm1lZFNlYXJjaCI6ICJ0cnVlIg0KICAgICAgICB9LA0KICAgICAgICAiSW5zdGFsbCI6IHsNCiAgICAgICAgICAgICJEZWZhdWx0SW5zdGFsbFBhdGgiOiAiQzpcL1VzZXJzXC9zb21lb25lXC9HYW1lcyIsDQogICAgICAgICAgICAiRG93bmxvYWRMaW1pdE5leHRQYXRjaEluQnBzIjogIjEwMDAwMDAwMDAwMCIsDQogICAgICAgICAgICAiRG93bmxvYWRMaW1pdEluQnBzIjogIjEwMDAwMDAwMDAwMCIsDQogICAgICAgICAgICAiTGFzdFVzZXJEb3dubG9hZExpbWl0SW5CcHMiOiAiMTAwMDAwMDAwMDAwIiwNCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXROZXh0UGF0Y2hJbkJwcyI6ICIxMDAwMDAwMDAwMDAiDQogICAgICAgIH0sDQogICAgICAgICJHYW1lTGF1bmNoV2luZG93QmVoYXZpb3IiOiAiMiIsDQogICAgICAgICJNYXR1cmVMYW5ndWFnZUZpbHRlciI6ICJmYWxzZSIsDQogICAgICAgICJWb2ljZSI6IHsNCiAgICAgICAgICAgICJUcmFuc21pc3Npb25UeXBlIjogIjEiDQogICAgICAgIH0sDQogICAgICAgICJIb3RLZXkiOiB7DQogICAgICAgICAgICAiSG90S2V5QWN0aW9uUHVzaFRvVGFsayI6ICJEaXJlY3RJbnB1dDo0NjpWOktleWJvYXJkIg0KICAgICAgICB9DQogICAgfSwNCiAgICAiMDEyMzQ1Njc4OWFiY2RlZiI6IHsNCiAgICAgICAgIkNsaWVudCI6IHsNCiAgICAgICAgICAgICJMYW5ndWFnZSI6ICJlblVTIiwNCiAgICAgICAgICAgICJMb2dpblNldHRpbmdzIjogew0KICAgICAgICAgICAgICAgICJBbGxvd2VkUmVnaW9ucyI6ICIiLA0KICAgICAgICAgICAgICAgICJBbGxvd2VkTG9jYWxlcyI6ICIiDQogICAgICAgICAgICB9DQogICAgICAgIH0sDQogICAgICAgICJQYXRoIjogIkM6XFxQcm9ncmFtIEZpbGVzICh4ODYpXFxCYXR0bGUubmV0IiwNCiAgICAgICAgIlNlcnZpY2VzIjogew0KICAgICAgICAgICAgIkxhc3RMb2dpblJlZ2lvbiI6ICJVUyIsDQogICAgICAgICAgICAiTGFzdExvZ2luQWRkcmVzcyI6ICJ1cy5hY3R1YWwuYmF0dGxlLm5ldCIsDQogICAgICAgICAgICAiTGFzdExvZ2luVGFzc2FkYXIiOiAiYWNjb3VudC5iYXR0bGUubmV0Ig0KICAgICAgICB9DQogICAgfSwNCiAgICAiR2FtZXMiOiB7DQogICAgICAgICJiYXR0bGVfbmV0Ijogew0KICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJiYXR0bGUubmV0IiwNCiAgICAgICAgICAgICJSZXN1bWFibGUiOiAiZmFsc2UiDQogICAgICAgIH0sDQogICAgICAgICJmb3JlIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyINCiAgICAgICAgfSwNCiAgICAgICAgIm9kaW4iOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjI5MTU4ODg3Ig0KICAgICAgICB9LA0KICAgICAgICAicHJvbWV0aGV1cyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3NzE3Mjk2MDQiLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNzg5MjY5NjY4IiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlQ3JpdGVyaWFQYXNzZWQiOiAidHJ1ZSIsDQogICAgICAgICAgICAiTGFzdEluc3RhbGxlZCI6ICIxNzE3MzkiCTQ0MTciLA0KICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJwcm9tZXRoZXVzIiwNCiAgICAgICAgICAgICJBdXRvVXBkYXRlIjogImZhbHNlIiwNCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSINCiAgICAgICAgfSwNCiAgICAgICAgImhzX2JldGEiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzc0OTk2MzQ3IiwNCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc3NDAxMTc4NyIsDQogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLA0KICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIkRvd25sb2FkQWxsVXBkYXRlcyI6ICJmYWxzZSIsDQogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIg0KICAgICAgICB9LA0KICAgICAgICAiemV1cyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NjIzMTM0MjMiLA0KICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNjYyMjMyNzA2Ig0KICAgICAgICB9LA0KICAgICAgICAiZm9yZV9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyINCiAgICAgICAgfSwNCiAgICAgICAgInpldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2Mjg1NTE3NzUiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3ZpZXdlciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiDQogICAgICAgIH0sDQogICAgICAgICJwcm9tZXRoZXVzX3Rlc3QiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjU0MDY1MjcyIg0KICAgICAgICB9LA0KICAgICAgICAib2Rpbl9iZXRhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyINCiAgICAgICAgfSwNCiAgICAgICAgInByb21ldGhldXNfYmV0YSI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzAiDQogICAgICAgIH0sDQogICAgICAgICJkaWFibG8zIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU4OTg5NjY2MiINCiAgICAgICAgfSwNCiAgICAgICAgInMyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyMzk3MDg3MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvdyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfY2xhc3NpYyI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiDQogICAgICAgIH0sDQogICAgICAgICJzMl9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIg0KICAgICAgICB9LA0KICAgICAgICAid293X2NsYXNzaWNfZXJhIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX3B0ciI6IHsNCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiDQogICAgICAgIH0sDQogICAgICAgICJ3b3dfcHRyIjogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiINCiAgICAgICAgfSwNCiAgICAgICAgIndvd19jbGFzc2ljX2VyYV9wdHIiOiB7DQogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIg0KICAgICAgICB9LA0KICAgICAgICAid293X3B0cl94Ijogew0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2OCINCiAgICAgICAgfSwNCiAgICAgICAgImF1a3MiOiB7DQogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3MDU1NDA2MjQiLA0KICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTcxMTMzMDEyNiINCiAgICAgICAgfQ0KICAgIH0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-35",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=35 ops=lone-surrogate,eol from=fixtures/launchers/battlenet/Battle.net.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKICAgICAgICAiVmVyc2lvbiI6IHsKICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwKICAgICAgICAgICAgIlJlbGVhc2UiOiB7CiAgICAgICAgICAgICAgICAiRmlyc3RSdW4iOiAiZmFsc2UiLAogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLAogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc1ZlcnNpb24iOiAiMTc3NzgiCiAgICAgICAgICAgIH0KICAgICAgICB9LAogICAgICAgICJUb2FzdHMiOiB7CiAgICAgICAgICAgICJTY3JlZW5Qb3NpdGlvbiI6ICJCb3R0b21SaWdodCIsCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiCiAgICAgICAgfSwKICAgICAgICAiR2FDbGllbnRJZCI6ICJ1bmRlZmluZWQiLAogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsCiAgICAgICAgIlNhdmVkQWNjb3VudE5hbWVzIjogInNhdmVkMUBleGFtcGxlLmNvbSxzYXZlZDLtuIBAZXhhbXBsZS5jb20sc2F2ZWQzQGV4YW1wbGUuY29tLHNhdmVkNEBleGFtcGxlLmNvbSxzYXZlZDVAZXhhbXBsZS5jb20iLAogICAgICAgICJHYW1lU2VhcmNoIjogewogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiCiAgICAgICAgfSwKICAgICAgICAiSW5zdGFsbCI6IHsKICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwKICAgICAgICAgICAgIkRvd25sb2FkTGltaXROZXh0UGF0Y2hJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLAogICAgICAgICAgICAiRG93bmxvYWRMaW1pdEluQnBzIjogIjEwMDAwMDAwMDAwMCIsCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLAogICAgICAgICAgICAiTGFzdFVzZXJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIgogICAgICAgIH0sCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwKICAgICAgICAiTWF0dXJlTGFuZ3VhZ2VGaWx0ZXIiOiAiZmFsc2UiLAogICAgICAgICJWb2ljZSI6IHsKICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSIKICAgICAgICB9LAogICAgICAgICJIb3RLZXkiOiB7CiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiCiAgICAgICAgfQogICAgfSwKICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogewogICAgICAgICJDbGllbnQiOiB7CiAgICAgICAgICAgICJMYW5ndWFnZSI6ICJlblVTIiwKICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7CiAgICAgICAgICAgICAgICAiQWxsb3dlZFJlZ2lvbnMiOiAiIiwKICAgICAgICAgICAgICAgICJBbGxvd2VkTG9jYWxlcyI6ICIiCiAgICAgICAgICAgIH0KICAgICAgICB9LAogICAgICAgICJQYXRoIjogIkM6XFxQcm9ncmFtIEZpbGVzICh4ODYpXFxCYXR0bGUubmV0IiwKICAgICAgICAiU2VydmljZXMiOiB7CiAgICAgICAgICAgICJMYXN0TG9naW5SZWdpb24iOiAiVVMiLAogICAgICAgICAgICAiTGFzdExvZ2luQWRkcmVzcyI6ICJ1cy5hY3R1YWwuYmF0dGxlLm5ldCIsCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiCiAgICAgICAgfQogICAgfSwKICAgICJHYW1lcyI6IHsKICAgICAgICAiYmF0dGxlX25ldCI6IHsKICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJiYXR0bGUubmV0IiwKICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSIKICAgICAgICB9LAogICAgICAgICJmb3JlIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIgogICAgICAgIH0sCiAgICAgICAgIm9kaW4iOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjkxNTg4ODciCiAgICAgICAgfSwKICAgICAgICAicHJvbWV0aGV1cyI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTc3MTcyOTYwNCIsCiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTc4OTI2OTY2OCIsCiAgICAgICAgICAgICJBdXRvVXBkYXRlQ3JpdGVyaWFQYXNzZWQiOiAidHJ1ZSIsCiAgICAgICAgICAgICJMYXN0SW5zdGFsbGVkIjogIjE3MTczOTQ0MTciLAogICAgICAgICAgICAiU2VydmVyVWlkIjogInByb21ldGhldXMiLAogICAgICAgICAgICAiQXV0b1VwZGF0ZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLAogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIgogICAgICAgIH0sCiAgICAgICAgImhzX2JldGEiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3NzQ5OTYzNDciLAogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3NzQwMTE3ODciLAogICAgICAgICAgICAiU2VydmVyVWlkIjogImhzX2JldGEiLAogICAgICAgICAgICAiQXV0b1VwZGF0ZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEb3dubG9hZEFsbFVwZGF0ZXMiOiAiZmFsc2UiLAogICAgICAgICAgICAiUmVzdW1hYmxlIjogImZhbHNlIgogICAgICAgIH0sCiAgICAgICAgInpldXMiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NjIzMTM0MjMiLAogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE2NjIyMzI3MDYiCiAgICAgICAgfSwKICAgICAgICAiZm9yZV9iZXRhIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjMxODUwNzgzIgogICAgICAgIH0sCiAgICAgICAgInpldXNfYmV0YSI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyODU1MTc3NSIKICAgICAgICB9LAogICAgICAgICJwcm9tZXRoZXVzX3ZpZXdlciI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MiIKICAgICAgICB9LAogICAgICAgICJwcm9tZXRoZXVzX3Rlc3QiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiCiAgICAgICAgfSwKICAgICAgICAib2Rpbl9iZXRhIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjI5MTU4ODg3IgogICAgICAgIH0sCiAgICAgICAgInByb21ldGhldXNfYmV0YSI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTY1NDA2NTI3MCIKICAgICAgICB9LAogICAgICAgICJkaWFibG8zIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTg5ODk2NjYyIgogICAgICAgIH0sCiAgICAgICAgInMyIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIgogICAgICAgIH0sCiAgICAgICAgIndvdyI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCIKICAgICAgICB9LAogICAgICAgICJ3b3dfY2xhc3NpYyI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCIKICAgICAgICB9LAogICAgICAgICJzMl9wdHIiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2MjM5NzA4NzIiCiAgICAgICAgfSwKICAgICAgICAid293X2NsYXNzaWNfZXJhIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNTkxMzA4MzIwIgogICAgICAgIH0sCiAgICAgICAgIndvd19jbGFzc2ljX3B0ciI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiIKICAgICAgICB9LAogICAgICAgICJ3b3dfcHRyIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIgogICAgICAgIH0sCiAgICAgICAgIndvd19jbGFzc2ljX2VyYV9wdHIiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiCiAgICAgICAgfSwKICAgICAgICAid293X3B0cl94IjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDY4IgogICAgICAgIH0sCiAgICAgICAgImF1a3MiOiB7CiAgICAgICAgICAgICJMYXN0QWN0aW9uZWQiOiAiMTcwNTU0MDYyNCIsCiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3MTEzMzAxMjYiCiAgICAgICAgfQogICAgfQp9Cg=="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-36",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=36 ops=insert,eol,flip from=fixtures/launchers/battlenet/Battle.net.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIkNsaWVudCI6IHsKICAgICAgICAiVmVyc2lvbiI6IHsKICAgICAgICAgICAgIkZpcnN0UnVuIjogImZhbHNlIiwKICAgICAgICAgICAgIlJlbGVhc2UiOiB7CiAgICAgICAgICAgICAgICAiRmlyc3RSdW4iOiAiZmFsc2UiLAogICAgICAgICAgICAgICAgIkxhc3RCdWlsZFZlcnNpb24iOiAiMTc3NzgiLAogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc1ZlcnNpb24iOiAiMTc3NzgiCiAgICAgICAgICAgIH0KICAgICAgICB9LAogICAgICAgICJUb2FzdHMiOiB7CiAgICAgICAgICAgICJTY3JlZW5Qb3NpdGlvbiI6ICJCb3R0b21SaWdodCIsCiAgICAgICAgICAgICJNb25pdG9yIjogIjAiCiAgICAgICAgfSwKICAgICAgICAiR2FDbGllbnRJZCI6ICJ1bmRlZmluZWQiLAogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsCiAgICAgICAgIlNhdmVkQWNjb3VudE5hbWVzIjogInNhdmVkMUBleGFtcGxlLmNvbSxzYXZlZDJAZXhhbXBsZS5jb20sc2F2ZWQzQGV4YW1wbGUuY29tLHNhdmVkNEBleGFtcGxlLmNvbSxzYXZlZDVAZXhhbXBsZS5jb20iLAogICAgICAgICJHYW1lU2VhcmNoIjogewogICAgICAgICAgICAiUGVyZm9ybWVkU2VhcmNoIjogInRydWUiCiAgICAgICAgfSwKICAgICAgICAiSW5zdGFsbCI6IHsKICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6ICJDOlwvVXNlcnNcL3NvbWVvbmVcL0dhbWVzIiwKICAgICAgICAgICAgIkRvd25sb2HkTGltaXROZXh0UGF0Y2hJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLAogICAgICAgICAgICAiRG93bmxvYWRMaW1pdEluQnBzIjogIjEwMDAwMDAwMDAwMCIsCiAgICAgICAgICAgICJMYXN0VXNlckRvd25sb2FkTGltaXRJbkJwcyI6ICIxMDAwMDAwMDAwMDAiLAogICAgICAgICAgICAiTGFzdFVzZXJEb3dubG9hZExpbWl0TmV4dFBhdGNoSW5CcHMiOiAiMTAwMDAwMDAwMDAwIgogICAgICAgIH0sCiAgICAgICAgIkdhbWVMYXVuY2hXaW5kb3dCZWhhdmlvciI6ICIyIiwKICAgICAgICAiTWF0dXJlTGFuZ3VhZ2VGaWx0ZXIiOiAiZmFsc2UiLAogICAgICAgICJWb2ljZSI6IHsKICAgICAgICAgICAgIlRyYW5zbWlzc2lvblR5cGUiOiAiMSIKICAgICAgICB9LAogICAgICAgICJIb3RLZXkiOiB7CiAgICAgICAgICAgICJIb3RLZXlBY3Rpb25QdXNoVG9UYWxrIjogIkRpcmVjdElucHV0OjQ2OlY6S2V5Ym9hcmQiCiAgICAgICAgfQogICAgfSwKICAgICIwMTIzNDU2Nzg5YWJjZGVmIjogewogICAgICAgICJDbGllbnQiOiB7CiAgICAgICAgICAgICJMYW5ndWFnZSI6ICJlblVTIiwKICAgICAgICAgICAgIkxvZ2luU2V0dGluZ3MiOiB7CiAgICAgICAgICAgICAgICAiQWxsb3dlZFJlZ2lvbnMiOiAiIiwKICAgICAgICAgICAgICAgICJBbGxvd2VkTG9jYWxlcyI6ICIiCiAgICAgICAgICAgIH0KICAgICAgICB9LAogICAgICAgICJQYXRoIjogIkM6XFxQcm9ncmFtIEZpbGVzICh4ODYpXFxCYXR0bGUubmV0IiwKICAgICAgICAiU2VydmljZXMiOiB7CiAgICAgICAgICAgICJMYXN0TG9naW5SZWdpb24iOiAiVVMiLAogICAgICAgICAgICAiTGFzdExvZ2luQWRkcmVzcyI6ICJ1cy5hY3R1YWwuYmF0dGxlLm5ldCIsCiAgICAgICAgICAgICJMYXN0TG9naW5UYXNzYWRhciI6ICJhY2NvdW50LmJhdHRsZS5uZXQiCiAgICAgICAgfQogICAgfSwKICAgICJHYW1lc30jOl0iOiB7CiAgICAgICAgImJhdHRsZV9uZXQiOiB7CiAgICAgICAgICAgICJTZXJ2ZXJVaWQiOiAiYmF0dGxlLm5ldCIsCiAgICAgICAgICAgICJSZXN1bWFibGUiOiAiZmFsc2UiCiAgICAgICAgfSwKICAgICAgICAiZm9yZSI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyIKICAgICAgICB9LAogICAgICAgICJvZGluIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjI5MTU4ODg3IgogICAgICAgIH0sCiAgICAgICAgInByb21ldGhldXMiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE3NzE3Mjk2MDQiLAogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3ODkyNjk2NjgiLAogICAgICAgICAgICAiQXV0b1VwZGF0ZUNyaXRlcmlhUGFzc2VkIjogInRydWUiLAogICAgICAgICAgICAiTGFzdEluc3RhbGxlZCI6ICIxNzE3Mzk0NDE3IiwKICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJwcm9tZXRoZXVzIiwKICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLAogICAgICAgICAgICAiRG93bmxvYWRBbGxVcGRhdGVzIjogImZhbHNlIiwKICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSIKICAgICAgICB9LAogICAgICAgICJoc19iZXRhIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzc0OTk2MzQ3IiwKICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNzc0MDExNzg3IiwKICAgICAgICAgICAgIlNlcnZlclVpZCI6ICJoc19iZXRhIiwKICAgICAgICAgICAgIkF1dG9VcGRhdGUiOiAiZmFsc2UiLAogICAgICAgICAgICAiRG93bmxvYWRBbGxVcGRhdGVzIjogImZhbHNlIiwKICAgICAgICAgICAgIlJlc3VtYWJsZSI6ICJmYWxzZSIKICAgICAgICB9LAogICAgICAgICJ6ZXVzIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjYyMzEzNDIzIiwKICAgICAgICAgICAgIkxhc3RBY3Rpb25lZCI6ICIxNjYyMjMyNzA2IgogICAgICAgIH0sCiAgICAgICAgImZvcmVfYmV0YSI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYzMTg1MDc4MyIKICAgICAgICB9LAogICAgICAgICJ6ZXVzX2JldGEiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2Mjg1NTE3NzUiCiAgICAgICAgfSwKICAgICAgICAicHJvbWV0aGV1c192aWV3ZXIiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzIiCiAgICAgICAgfSwKICAgICAgICAicHJvbWV0aGV1c190ZXN0IjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjU0MDY1MjcyIgogICAgICAgIH0sCiAgICAgICAgIm9kaW5fYmV0YSI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyOTE1ODg4NyIKICAgICAgICB9LAogICAgICAgICJwcm9tZXRoZXVzX2JldGEiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE2NTQwNjUyNzAiCiAgICAgICAgfSwKICAgICAgICAiZGlhYmxvMyI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU4OTg5NjY2MiIKICAgICAgICB9LAogICAgICAgICJzMiI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTYyMzk3MDg3MiIKICAgICAgICB9LAogICAgICAgICJ3b3ciOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiCiAgICAgICAgfSwKICAgICAgICAid293X2NsYXNzaWMiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE1OTEzMDgzMjAiCiAgICAgICAgfSwKICAgICAgICAiczJfcHRyIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNjIzOTcwODcyIgogICAgICAgIH0sCiAgICAgICAgIndvd19jbGFzc2ljX2VyYSI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTU5MTMwODMyMCIKICAgICAgICB9LAogICAgICAgICJ3b3dfY2xhc3NpY19wdHIiOiB7CiAgICAgICAgICAgICJMYXN0UGxheWVkIjogIjE0ODM4Nzc0NjIiCiAgICAgICAgfSwKICAgICAgICAid293X3B0ciI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2MiIKICAgICAgICB9LAogICAgICAgICJ3b3dfY2xhc3NpY19lcmFfcHRyIjogewogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNDgzODc3NDYyIgogICAgICAgIH0sCiAgICAgICAgIndvd19wdHJfeCI6IHsKICAgICAgICAgICAgIkxhc3RQbGF5ZWQiOiAiMTQ4Mzg3NzQ2OCIKICAgICAgICB9LAogICAgICAgICJhdWtzIjogewogICAgICAgICAgICAiTGFzdEFjdGlvbmVkIjogIjE3MDU1NDA2MjQiLAogICAgICAgICAgICAiTGFzdFBsYXllZCI6ICIxNzExMzMwMTI2IgogICAgICAgIH0KICAgIH0KfQo="
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-37",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=37 ops=line-delete from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgIlVzZXIiOiB7CiAgICAgICAgIkNsaWVudCI6IHsKICAgICAgICAgICAgIldpbmRvd3MiOiB7CiAgICAgICAgICAgICAgICAiQnJvd3Nlck1haW5XaW5kb3ciOiB7CiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1Bvc2l0aW9uIjogIkBQb2ludCgyMzQgMTc5KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1NpemUiOiAiQFNpemUoMTkyMCAxMTE2KSIsCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1N0YXRlIjogIjAiCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgIlNvY2lhbFBvcG91dFdpbmRvdyI6IHsKICAgICAgICAgICAgICAgICAgICAiV2luZG93UG9zaXRpb24iOiAiQFBvaW50KDQ2MCAxOTYpIiwKICAgICAgICAgICAgICAgICAgICAiV2luZG93U2l6ZSI6ICJAU2l6ZSgxMDAwIDY0MCkiLAogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTdGF0ZSI6ICIwIgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9LAogICAgICAgICAgICAiSGFzU2VlbkZpcnN0VGltZUV4cGVyaWVuY2UiOiAidHJ1ZSIsCiAgICAgICAgICAgICJIaWRlT25DbG9zZSI6ICJmYWxzZSIsCiAgICAgICAgICAgICJEaXNwbGF5RXhpdFByb21wdCI6ICJmYWxzZSIsCiAgICAgICAgICAgICJXaW5kb3dOb3RpZmljYXRpb25TaG93biI6ICJ0cnVlIiwKICAgICAgICAgICAgIlNlbmRUeXBpbmdOb3RpZmljYXRpb25zIjogImZhbHNlIiwKICAgICAgICAgICAgIlNvY2lhbCI6IHsKICAgICAgICAgICAgICAgICJBY3RpdmVDaGF0U3RyZWFtIjogInc6MTAwMDAwMDAwIgogICAgICAgICAgICB9CiAgICAgICAgfSwKICAgICAgICAiR2FtZXMiOiB7CiAgICAgICAgICAgICJ6ZXVzIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjEwMDAwMDAwIgogICAgICAgICAgICB9LAogICAgICAgICAgICAicHJvbWV0aGV1cyI6IHsKICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIxNDUzMjYiCiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJoc19iZXRhIjogewogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjIzODA4NyIKICAgICAgICAgICAgfSwKICAgICAgICAgICAgImF1a3MiOiB7CiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9Cn0K"
+        }
+      ],
+      "out": {
+        "eol": "\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-38",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=38 ops=insert,invalid-utf8,astral from=l1/battlenet/files/planSavedAccountNames/mini-crlf.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJDbGllbnQiOiB7DQogICAgICAgICJBdXRvTG9naW4iOiAidHJ1ZSIsDQogICAgICAgICJTYXZlZEFjY291bnROYW1lcyI6ICJ1c2VyXzFAZXhhbXBsZS5jb20sdXNlcl8yQGV4YW1wbGUuY29tLHVzZXJfM0BleGFtcGxlLmMvf29tIiwNCiAgICAgICAgIkluc3RhbPCggIBsIjogew0KICAgICAgICAgICAgIkRlZmF1bHRJbnN0YWxsUGF0aCI6IOKCIkQ6XC9HYW1lcyINCiAgICAgICAgfQ0KICAgIH0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": true,
+        "bom": false
+      }
+    },
+    {
+      "id": "corpus-11-39",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=11 index=39 ops=eol,insert,delete from=fixtures/launchers/battlenet/0a1b2c3d.config"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJVc2VyIjogew0KICAgICAgICAiQ2xpZW50Ijogew0KICAgICAgICAgICAgIldpbmRvd3MiOiB7DQogICAgICAgICAgICAgICAgIkJyb3dzZXJNYWluV2luZG93Ijogew0KICAgICAgICAgICAgICAgICAgICAiV2luZG93UG9zaXRpb24iOiAiQFBvaW50KDIzNCAxNzkpIiwNCiAgICAgICAgICAgICAgICAgICAgIldpbmRvd1NpemUiOiAiQFNpemUoMTkyMCAxMTE2KSIsDQogICAgICAgICAgICAgICAgICAgICJXaW5kb3dTdGF0ZSI6ICIwIg0KICAgICAgICAgICAgICAgIH0sDQogICAgICAgICAgICAgICAgIlNvY2lhbFBvcD1vdXRXaW5kb3ciOiB7DQogICAgICAgICAgICAgICAgICAgICJXaW5kb3dQb3NpdGlvbiI6ICJAUG9pbnQoNDYwIDE5NikiLA0KICAgICAgICAgICAgICAgICAgICAiV2luZG93U2l6ZSI6ICJAU2l6ZSgxMDAwIDY0MCkiLA0KICAgICAgICAgICAgICAgICAgICAiV2luZG93U3RhdGUiOiAiMCINCiAgICAgICAgICAgICAgICB9DQogICAgICAgICAgICB9LA0KICAgICAgICAgICAgIkhhc1NlZW5GaXJzdFRpbWVFeHBlcmllbmNlIjogInRydWUiLA0KICAgICAgICAgICAgIkhpZGVPbkNsb3NlIjogImZhbHNlIiwNCiAgICAgICAgICAgICJEaXNwbGF5RXhpdFByb21wdCI6ICJmYWxzZSIsDQogICAgICAgICAgICAiV2luZG93Tm90aWZpY2F0aW9uU2hvd24iOiAidHJ1ZSIsDQogICAgICBuZ05vdGlmaWNhdGlvbnMiOiAiZmFsc2UiLA0KICAgICAgICAgICAgIlNvY2lhbCI6IHsNCiAgICAgICAgICAgICAgICAiQWN0aXZlQ2hhdFN0cmVhbSI6ICJ3OjEwMDAwMDAwMCINCiAgICAgICAgICAgIH0NCiAgICAgICAgfSwNCiAgICAgICAgIkdhbWVzIjogew0KICAgICAgICAgICAgInpldXMiOiB7DQogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjEwMDAwMDAwIg0KICAgICAgICAgICAgfSwNCiAgICAgICAgICAgICJwcm9tZXRoZXVzIjogew0KICAgICAgICAgICAgICAgICJMYXN0U2VlblBhdGNoTm90ZXNCdWlsZCI6ICIxNDUzMjYiDQogICAgICAgICAgICB9LA0KICAgICAgICAgICAgImhzX2JldGEiOiB7DQogICAgICAgICAgICAgICAgIkxhc3RTZWVuUGF0Y2hOb3Rlc0J1aWxkIjogIjIzODA4NyINCiAgICAgICAgICAgIH0sDQogICAgICAgICAgICAiYXVrcyI6IHsNCiAgICAgICAgICAgICAgICAiTGFzdFNlZW5QYXRjaE5vdGVzQnVpbGQiOiAiMTAwMDAwMDAiDQogICAgICAgICAgICB9DQogICAgICAgIH0NCiAgICB9DQp9DQo="
+        }
+      ],
+      "out": {
+        "eol": "\r\n",
+        "indent": 4,
+        "trailingNewline": true,
+        "escapeSlashes": false,
+        "bom": false
+      }
+    }
+  ]
+}

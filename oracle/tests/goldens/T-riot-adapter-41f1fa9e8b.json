@@ -1,0 +1,103 @@
+{
+  "id": "T-riot-adapter-41f1fa9e8b",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot switch (real)"
+  ],
+  "name": "starts a closed client that already holds the account’s sign-in without writing, saving the newer copy first",
+  "calls": [
+    {
+      "launcher": "riot",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:riot:riot_main",
+          "displayName": "Main",
+          "login": "riot_main",
+          "launcherUid": "11111111-1111-4111-8111-111111111111",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "riot",
+        "account": {
+          "id": "@acct:riot:riot_main",
+          "displayName": "Main",
+          "login": "riot_main",
+          "launcherUid": "11111111-1111-4111-8111-111111111111"
+        },
+        "strategy": "remembered",
+        "ok": true,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close the Riot Client",
+            "status": "skipped",
+            "detail": "Skipped: RiotClientServices.exe is not running."
+          },
+          {
+            "id": "capture",
+            "title": "Save this account's sign-in",
+            "status": "done",
+            "detail": "Saved Main's sign-in (fingerprint acd093bd)."
+          },
+          {
+            "id": "backup",
+            "title": "Back up RiotGamesPrivateSettings.yaml",
+            "status": "skipped",
+            "detail": "Skipped: the file will not be modified."
+          },
+          {
+            "id": "file",
+            "title": "Put the account's sign-in in place",
+            "status": "skipped",
+            "detail": "No change: RiotGamesPrivateSettings.yaml already holds Main's sign-in (fingerprint acd093bd)."
+          },
+          {
+            "id": "start",
+            "title": "Start the Riot Client",
+            "status": "done",
+            "detail": "Client started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the client to come up",
+            "status": "done",
+            "detail": "RiotClientServices.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the client signed in",
+            "status": "done",
+            "detail": "Signed in as riot_main."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "skipped",
+            "detail": "Runs only if the client refuses the saved sign-in or does not sign in within 0.04 s. The client stays on its login page; you sign in there once as riot_main with “Stay signed in” ticked and One Launch continues as soon as the log reports the sign-in, up to 0.0013333333333333333 min."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new sign-in",
+            "status": "skipped",
+            "detail": "Runs only after a manual sign-in: the fresh sign-in replaces the stale saved copy."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": "<ts>",
+        "startedWithGame": null,
+        "backupId": null,
+        "restored": null,
+        "error": null,
+        "needsSignIn": false,
+        "cancelled": false
+      }
+    }
+  ]
+}

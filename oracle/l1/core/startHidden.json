@@ -1,0 +1,309 @@
+{
+  "function": "startHidden",
+  "source": "src/main/window-guard.ts",
+  "note": "decode: none\narg0 is { argv, closeToTray }: process.argv and the close-to-tray setting. Every argv shape is run with closeToTray true and false.",
+  "cases": [
+    {
+      "id": "flag.close-to-tray-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > startHidden > starts in the tray only when the login item asked for it and the tray is on"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            "--start-hidden"
+          ],
+          "closeToTray": true
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "flag.close-to-tray-0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > startHidden > shows the window with the tray off, without the flag, or with a look-alike argument"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            "--start-hidden"
+          ],
+          "closeToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "flag-after-data-dir.close-to-tray-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > startHidden > starts in the tray only when the login item asked for it and the tray is on"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            "--data-dir=D:\\x",
+            "--start-hidden"
+          ],
+          "closeToTray": true
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "flag-after-data-dir.close-to-tray-0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > startHidden > starts in the tray only when the login item asked for it and the tray is on"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            "--data-dir=D:\\x",
+            "--start-hidden"
+          ],
+          "closeToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "no-flag.close-to-tray-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > startHidden > shows the window with the tray off, without the flag, or with a look-alike argument"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe"
+          ],
+          "closeToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "no-flag.close-to-tray-0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > startHidden > shows the window with the tray off, without the flag, or with a look-alike argument"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe"
+          ],
+          "closeToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "lookalikes.close-to-tray-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > startHidden > shows the window with the tray off, without the flag, or with a look-alike argument"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            "--start-hidden=false",
+            "--START-HIDDEN"
+          ],
+          "closeToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "lookalikes.close-to-tray-0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > startHidden > shows the window with the tray off, without the flag, or with a look-alike argument"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            "--start-hidden=false",
+            "--START-HIDDEN"
+          ],
+          "closeToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "empty-argv.close-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty argv"
+      },
+      "args": [
+        {
+          "argv": [],
+          "closeToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "empty-argv.close-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty argv"
+      },
+      "args": [
+        {
+          "argv": [],
+          "closeToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "flag-first.close-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the flag as the only element, in the exe position"
+      },
+      "args": [
+        {
+          "argv": [
+            "--start-hidden"
+          ],
+          "closeToTray": true
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "flag-first.close-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the flag as the only element, in the exe position"
+      },
+      "args": [
+        {
+          "argv": [
+            "--start-hidden"
+          ],
+          "closeToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "flag-padded.close-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: the flag with spaces around it is not the flag: argv items are compared whole"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            " --start-hidden "
+          ],
+          "closeToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "flag-padded.close-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: the flag with spaces around it is not the flag: argv items are compared whole"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            " --start-hidden "
+          ],
+          "closeToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "flag-twice.close-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the flag twice"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            "--start-hidden",
+            "--start-hidden"
+          ],
+          "closeToTray": true
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "flag-twice.close-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the flag twice"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            "--start-hidden",
+            "--start-hidden"
+          ],
+          "closeToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "single-dash.close-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: one dash"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            "-start-hidden"
+          ],
+          "closeToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "single-dash.close-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: one dash"
+      },
+      "args": [
+        {
+          "argv": [
+            "C:\\Program Files\\One Launch\\OneLaunch.exe",
+            "-start-hidden"
+          ],
+          "closeToTray": false
+        }
+      ],
+      "out": false
+    }
+  ]
+}

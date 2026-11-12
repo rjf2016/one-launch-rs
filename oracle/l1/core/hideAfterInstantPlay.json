@@ -1,0 +1,2439 @@
+{
+  "function": "hideAfterInstantPlay",
+  "source": "src/main/window-guard.ts",
+  "note": "decode: none\narg0 is { instant, direct, done, handOff, trayPresent, closeToTray, hideToTray }, all booleans as src/main/index.ts passes them. The cases are the full truth table, 128 rows; ids name every flag.",
+  "cases": [
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-0.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-0.done-1.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-0.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > hideAfterInstantPlay > keeps the window for a dialog Play, a switch, a failure, and whenever there is no tray to come back from"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-0.direct-1.done-1.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": false,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-0.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > hideAfterInstantPlay > keeps the window for a dialog Play, a switch, a failure, and whenever there is no tray to come back from"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-0.done-1.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": false,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > hideAfterInstantPlay > keeps the window for a dialog Play, a switch, a failure, and whenever there is no tray to come back from"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-0.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": false,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-0.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-0.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > hideAfterInstantPlay > keeps the window for a dialog Play, a switch, a failure, and whenever there is no tray to come back from"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-0.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > hideAfterInstantPlay > keeps the window for a dialog Play, a switch, a failure, and whenever there is no tray to come back from"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > hideAfterInstantPlay > keeps the window for a dialog Play, a switch, a failure, and whenever there is no tray to come back from"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-0.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > hideAfterInstantPlay > hides only after a one-click Play that needed no switch and launched"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": false,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-1.tray-present-0.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-1.tray-present-0.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": false,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-1.tray-present-1.close-to-tray-0.hide-to-tray-1",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": false,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-0",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a truth-table row no test names"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": false
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "instant-1.direct-1.done-1.hand-off-1.tray-present-1.close-to-tray-1.hide-to-tray-1",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > hideAfterInstantPlay > keeps the window when the launch ended with an instruction for the user, as a Riot launch can"
+      },
+      "args": [
+        {
+          "instant": true,
+          "direct": true,
+          "done": true,
+          "handOff": true,
+          "trayPresent": true,
+          "closeToTray": true,
+          "hideToTray": true
+        }
+      ],
+      "out": false
+    }
+  ]
+}

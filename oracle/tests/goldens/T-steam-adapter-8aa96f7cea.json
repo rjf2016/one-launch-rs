@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-8aa96f7cea",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.healthCheck"
+  ],
+  "name": "reports absent, not failing, when Steam is not installed",
+  "calls": []
+}

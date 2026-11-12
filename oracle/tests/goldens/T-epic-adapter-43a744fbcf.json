@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-43a744fbcf",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.captureSession"
+  ],
+  "name": "stores nothing when the id the log names is held by another account",
+  "calls": []
+}

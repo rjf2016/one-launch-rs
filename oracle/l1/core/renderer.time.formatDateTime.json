@@ -1,0 +1,150 @@
+{
+  "function": "formatDateTime",
+  "source": "src/renderer/src/lib/time.ts",
+  "note": "decode: none\nLocale and time zone are pinned by scripts/oracle/l1/core/renderer/locale.ts, loaded before the app module: process.env.TZ = 'UTC', and Intl.RelativeTimeFormat, Date.prototype.toLocaleString and String.prototype.localeCompare get 'en-US' when the app passes undefined (toLocaleString also gets timeZone 'UTC'), as the UI captures run. Node's own ICU (Node 24.13.1, ICU 78.2, CLDR 48.0) produces the text.\ntoLocaleString with dateStyle 'medium' and timeStyle 'short'. The out strings are ICU's exactly, separators included (this ICU puts a plain space before AM and PM, where some ICU versions put U+202F). Years before 1 are shown without an era: ISO year -1 prints as 2.",
+  "cases": [
+    {
+      "id": "oracle-clock",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of an afternoon time"
+      },
+      "args": [
+        "2026-11-06T16:46:23.000Z"
+      ],
+      "out": "Nov 6, 2026, 4:46 PM"
+    },
+    {
+      "id": "midnight",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of midnight, 12:00 AM in en-US"
+      },
+      "args": [
+        "2026-01-01T00:00:00.000Z"
+      ],
+      "out": "Jan 1, 2026, 12:00 AM"
+    },
+    {
+      "id": "noon",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of noon, 12:00 PM"
+      },
+      "args": [
+        "2026-07-04T12:00:00.000Z"
+      ],
+      "out": "Jul 4, 2026, 12:00 PM"
+    },
+    {
+      "id": "seconds-dropped",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of timeStyle short drops the seconds: no rounding up"
+      },
+      "args": [
+        "2026-07-04T12:30:59.999Z"
+      ],
+      "out": "Jul 4, 2026, 12:30 PM"
+    },
+    {
+      "id": "offset",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of an offset, shown in UTC"
+      },
+      "args": [
+        "2026-07-04T12:00:00+05:30"
+      ],
+      "out": "Jul 4, 2026, 6:30 AM"
+    },
+    {
+      "id": "date-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of a leap day, date only"
+      },
+      "args": [
+        "2024-02-29"
+      ],
+      "out": "Feb 29, 2024, 12:00 AM"
+    },
+    {
+      "id": "feb-29-not-leap",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of the 29th of February in a common year"
+      },
+      "args": [
+        "2026-02-29T00:00:00Z"
+      ],
+      "out": "Mar 1, 2026, 12:00 AM"
+    },
+    {
+      "id": "two-digit-year",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of the year 99, which must not become 1999"
+      },
+      "args": [
+        "0099-01-01T00:00:00.000Z"
+      ],
+      "out": "Jan 1, 99, 12:00 AM"
+    },
+    {
+      "id": "negative-year",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of the year 2 BC (ISO year -1)"
+      },
+      "args": [
+        "-000001-06-01T00:00:00.000Z"
+      ],
+      "out": "Jun 1, 2, 12:00 AM"
+    },
+    {
+      "id": "max-date",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of the last instant a Date can hold"
+      },
+      "args": [
+        "+275760-09-13T00:00:00.000Z"
+      ],
+      "out": "Sep 13, 275760, 12:00 AM"
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of an empty string: Invalid Date, so the empty string"
+      },
+      "args": [
+        ""
+      ],
+      "out": ""
+    },
+    {
+      "id": "garbage",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of free text"
+      },
+      "args": [
+        "yesterday"
+      ],
+      "out": ""
+    },
+    {
+      "id": "local-form",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "date: formatDateTime of no offset: local time, which is UTC here"
+      },
+      "args": [
+        "2026-11-06T16:46"
+      ],
+      "out": "Nov 6, 2026, 4:46 PM"
+    }
+  ]
+}

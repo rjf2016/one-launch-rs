@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-42dff979f6",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot shutdown"
+  ],
+  "name": "closes the core, then the window processes, politely, and touches nothing else",
+  "calls": []
+}

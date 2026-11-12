@@ -1,0 +1,596 @@
+{
+  "function": "isTrustedRendererUrl",
+  "source": "src/main/window-guard.ts",
+  "note": "decode: none\narg0 is the URL of a navigation or a new window (undefined when Electron gives none), arg1 { rendererFileUrl, devUrl } as src/main/index.ts builds them (devUrl is ELECTRON_RENDERER_URL in development, else null). URL is Node's WHATWG parser.",
+  "cases": [
+    {
+      "id": "packaged-page",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "packaged-hash",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html#/settings",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "packaged-query",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html?v=1",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "packaged-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        {
+          "$undefined": true
+        },
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        "",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-suffix",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html.evil.html",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-dotdot",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html/../other.html",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-other-file",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        "file:///C:/Users/someone/Downloads/index.html",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-https",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        "https://example.com/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-dev-url",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        "http://localhost:5173/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-artwork",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        "onelaunch-art://game/1/grid.png",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-about-blank",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > accepts only the packaged page itself, with or without a hash or query"
+      },
+      "args": [
+        "about:blank",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dev-origin",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > in development accepts the dev server origin, not an address that only starts like it"
+      },
+      "args": [
+        "http://localhost:5173",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "dev-origin-slash",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > in development accepts the dev server origin, not an address that only starts like it"
+      },
+      "args": [
+        "http://localhost:5173/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "dev-page-hash",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > in development accepts the dev server origin, not an address that only starts like it"
+      },
+      "args": [
+        "http://localhost:5173/index.html#/library",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "dev-longer-port",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > in development accepts the dev server origin, not an address that only starts like it"
+      },
+      "args": [
+        "http://localhost:51731/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dev-host-suffix",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > in development accepts the dev server origin, not an address that only starts like it"
+      },
+      "args": [
+        "http://localhost:5173.evil.test/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dev-https",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > in development accepts the dev server origin, not an address that only starts like it"
+      },
+      "args": [
+        "https://localhost:5173/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dev-ip",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > in development accepts the dev server origin, not an address that only starts like it"
+      },
+      "args": [
+        "http://127.0.0.1:5173/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dev-packaged-page",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > in development accepts the dev server origin, not an address that only starts like it"
+      },
+      "args": [
+        "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dev-not-a-url",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > in development accepts the dev server origin, not an address that only starts like it"
+      },
+      "args": [
+        "not a url",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dev-undefined",
+      "origin": {
+        "kind": "test",
+        "ref": "test/window-guard.test.ts > isTrustedRendererUrl (B19) > in development accepts the dev server origin, not an address that only starts like it"
+      },
+      "args": [
+        {
+          "$undefined": true
+        },
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-hash-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the page with an empty hash"
+      },
+      "args": [
+        "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html#",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "packaged-case",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: the packaged check is an exact string compare, so FILE: is refused"
+      },
+      "args": [
+        "FILE:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-unencoded",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the same path with raw spaces is refused"
+      },
+      "args": [
+        "file:///C:/Program Files/One Launch/resources/app.asar/out/renderer/index.html",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-trailing-slash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a trailing slash is refused"
+      },
+      "args": [
+        "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "packaged-backslash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: backslashes are refused"
+      },
+      "args": [
+        "file:\\\\\\C:\\Program%20Files\\One%20Launch\\resources\\app.asar\\out\\renderer\\index.html",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": null
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dev-upper-host",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: the origin lowercases the host"
+      },
+      "args": [
+        "http://LOCALHOST:5173/x",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "dev-userinfo",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: localhost:5173 as user info: the host is evil.test"
+      },
+      "args": [
+        "http://localhost:5173@evil.test/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dev-userinfo-kept",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: user info does not change the origin"
+      },
+      "args": [
+        "http://u:p@localhost:5173/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "dev-default-port",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: port 80 on http is the default and drops out of the origin"
+      },
+      "args": [
+        "http://localhost:80/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost"
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "dev-outer-spaces",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: the URL parser strips outer spaces"
+      },
+      "args": [
+        " http://localhost:5173/ ",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "dev-tab-inside",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: the URL parser removes a tab inside the host"
+      },
+      "args": [
+        "http://local\thost:5173/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "dev-idn",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a punycode-looking host that is not localhost"
+      },
+      "args": [
+        "http://xn--localhost-:5173/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dev-invalid-dev-url",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an unparsable devUrl makes every URL untrusted"
+      },
+      "args": [
+        "http://localhost:5173/",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "not a url"
+        }
+      ],
+      "out": false
+    },
+    {
+      "id": "dev-empty-dev-url",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty devUrl is falsy, so the packaged check applies"
+      },
+      "args": [
+        "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": ""
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "dev-file-origins",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: two file: URLs both have the opaque origin \"null\", so any file URL is trusted under a file: devUrl"
+      },
+      "args": [
+        "file:///D:/anything.html",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "file:///C:/dev/index.html"
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "dev-about-origins",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: about: and data: URLs both have the opaque origin \"null\""
+      },
+      "args": [
+        "about:blank",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "data:text/html,x"
+        }
+      ],
+      "out": true
+    },
+    {
+      "id": "dev-empty-url",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty URL is refused before parsing"
+      },
+      "args": [
+        "",
+        {
+          "rendererFileUrl": "file:///C:/Program%20Files/One%20Launch/resources/app.asar/out/renderer/index.html",
+          "devUrl": "http://localhost:5173"
+        }
+      ],
+      "out": false
+    }
+  ]
+}

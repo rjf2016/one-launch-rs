@@ -1,0 +1,56 @@
+{
+  "id": "T-epic-adapter-55291cbb6d",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter with a non-UTF-8 settings file"
+  ],
+  "name": "refuses to read or plan against a UTF-16 GameUserSettings.ini instead of rewriting it",
+  "calls": [
+    {
+      "launcher": "epic",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:epic:alt@example.com",
+          "displayName": "Alt",
+          "login": "alt@example.com",
+          "launcherUid": "22222222222222222222222222222222",
+          "hasSecret": false
+        },
+        {
+          "dryRun": true
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "LauncherFileError",
+        "message": "GameUserSettings.ini is not UTF-8 (UTF-16 or binary content); One Launch will not rewrite it: {tmp}\\Local\\EpicGamesLauncher\\Saved\\Config\\Windows\\GameUserSettings.ini",
+        "path": "{tmp}\\Local\\EpicGamesLauncher\\Saved\\Config\\Windows\\GameUserSettings.ini",
+        "code": "LAUNCHER_FILE"
+      }
+    },
+    {
+      "launcher": "epic",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:epic:alt@example.com",
+          "displayName": "Alt",
+          "login": "alt@example.com",
+          "launcherUid": "22222222222222222222222222222222",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "LauncherFileError",
+        "message": "GameUserSettings.ini is not UTF-8 (UTF-16 or binary content); One Launch will not rewrite it: {tmp}\\Local\\EpicGamesLauncher\\Saved\\Config\\Windows\\GameUserSettings.ini",
+        "path": "{tmp}\\Local\\EpicGamesLauncher\\Saved\\Config\\Windows\\GameUserSettings.ini",
+        "code": "LAUNCHER_FILE"
+      }
+    }
+  ]
+}

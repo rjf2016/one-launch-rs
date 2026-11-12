@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-e6e21ef07f",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.healthCheck"
+  ],
+  "name": "is all green on the expected layout and never includes a blob",
+  "calls": []
+}

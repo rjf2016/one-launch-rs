@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-6dd1e3a830",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot session state"
+  ],
+  "name": "reports the saved sign-in and whose it is: a stored snapshot first, then the account id the file names",
+  "calls": []
+}

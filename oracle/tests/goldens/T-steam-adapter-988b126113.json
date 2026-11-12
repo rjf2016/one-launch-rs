@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-988b126113",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.healthCheck"
+  ],
+  "name": "warns when the registry and loginusers.vdf disagree, and fails on a broken library file",
+  "calls": []
+}

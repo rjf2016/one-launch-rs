@@ -1,0 +1,119 @@
+{
+  "id": "T-battlenet-adapter-1a1a2e864a",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "real switches"
+  ],
+  "name": "an abort after the sign-in is confirmed cuts the capture wait and the grace short; the switch still counts",
+  "calls": [
+    {
+      "launcher": "battlenet",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:battlenet:new@example.com",
+          "displayName": "New",
+          "login": "new@example.com",
+          "launcherUid": null,
+          "hasSecret": true
+        },
+        {
+          "dryRun": false,
+          "onAttention": {
+            "$function": "onAttention"
+          },
+          "signal": {
+            "$object": "AbortSignal",
+            "value": {}
+          },
+          "onProgress": {
+            "$function": "onProgress"
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "battlenet",
+        "account": {
+          "id": "@acct:battlenet:new@example.com",
+          "displayName": "New",
+          "login": "new@example.com",
+          "launcherUid": null
+        },
+        "strategy": "credentials",
+        "ok": true,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Battle.net",
+            "status": "skipped",
+            "detail": "Skipped: Battle.net.exe is not running."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing session",
+            "status": "done",
+            "detail": "Main's stored session is already current."
+          },
+          {
+            "id": "backup",
+            "title": "Back up Battle.net.config and the UnifiedAuth value",
+            "status": "done",
+            "detail": "{tmp}\\backups\\battlenet\\<ts>"
+          },
+          {
+            "id": "registry",
+            "title": "Sign the client out",
+            "status": "done",
+            "detail": "UnifiedAuth cleared."
+          },
+          {
+            "id": "file",
+            "title": "Put the login first in the saved-accounts list",
+            "status": "done",
+            "detail": "new@example.com is now first of 6 saved accounts."
+          },
+          {
+            "id": "start",
+            "title": "Start Battle.net",
+            "status": "done",
+            "detail": "Client started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the client to come up",
+            "status": "done",
+            "detail": "Battle.net.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the client signed in",
+            "status": "skipped",
+            "detail": "Handed over to you: the client is on its login page."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "done",
+            "detail": "Signed in as new@example.com. Linked to Battle.net account …4e5f."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new session",
+            "status": "done",
+            "detail": "The client has not written a new token yet; it is saved at the next switch."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": "<ts>",
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": null,
+        "error": null,
+        "needsSignIn": false,
+        "cancelled": false
+      }
+    }
+  ]
+}

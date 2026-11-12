@@ -1,0 +1,1850 @@
+{
+  "function": "parseAppManifest",
+  "source": "src/main/launchers/steam/manifests.ts",
+  "note": "decode: arg0=utf8\narg0 is the file text as src/main/launchers/steam/adapter.ts reads it: readLauncherText(path, MAX_VDF_BYTES) (src/main/launchers/read-file.ts: readFileSync, then toString utf8, BOM kept). The 1 MiB MAX_VDF_BYTES limit is that caller’s, not this function’s.\nErrors: ManifestFormatError (code MANIFEST_FORMAT) with three messages (no AppState block, no numeric appid, no installdir naming the appid); VdfParseError as it is.\nNumbers come from vdfInt (safe integers only; -0 is kept where ?? or a plain read keeps it). No cap of its own.\nNo corpus case was dropped.",
+  "cases": [
+    {
+      "id": "fixture",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-files.test.ts > parseAppManifest > reads the fields the library needs and nothing sensitive"
+      },
+      "args": [
+        {
+          "$file": "fixtures/launchers/steam/appmanifest_252950.acf",
+          "sha256": "070eb2e8e342c30eab8327087542d9f39e93d3bd4a95ff7f92207ef05132fd28"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "no-appid",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-files.test.ts > parseAppManifest > rejects manifests without appid or installdir"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIiB7ICJuYW1lIiAieCIgImluc3RhbGxkaXIiICJ4IiB9"
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest has no numeric appid",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "no-installdir",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-files.test.ts > parseAppManifest > rejects manifests without appid or installdir"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIiB7ICJhcHBpZCIgIjEiICJuYW1lIiAieCIgfQ=="
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest 1 has no installdir",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "no-appstate",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-files.test.ts > parseAppManifest > rejects manifests without appid or installdir"
+      },
+      "args": [
+        {
+          "$bytes": "Ik90aGVyIiB7IH0="
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest has no \"AppState\" block",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "appstate-is-string",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an AppState key whose value is a string is no block"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIiAieCI="
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest has no \"AppState\" block",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "vdf-error",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a VdfParseError propagates as it is"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIiB7ICJhcHBpZCIgfQ=="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Key \"appid\" has no value (line 1)",
+        "line": 1,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "minimal",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: only appid and installdir: name falls back to \"App <id>\", the numbers to their defaults"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiNyIKCSJpbnN0YWxsZGlyIgkJInNldmVuIgp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "7",
+        "name": "App 7",
+        "installDir": "seven",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "keys-any-case",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: every key is looked up case-insensitively"
+      },
+      "args": [
+        {
+          "$bytes": "ImFwcHN0YXRlIiB7ICJBUFBJRCIgIjkiICJJbnN0YWxsRGlyIiAibmluZSIgIk5BTUUiICJOaW5lIiAic3RhdGVmbGFncyIgIjQiICJCVUlMRElEIiAiMyIgfQ=="
+        }
+      ],
+      "out": {
+        "appId": "9",
+        "name": "Nine",
+        "installDir": "nine",
+        "stateFlags": 4,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": "3"
+      }
+    },
+    {
+      "id": "appid-trimmed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: appid and installdir are trimmed with the JS trim, NBSP and U+FEFF included"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiwqAgNDLvu78iCgkiaW5zdGFsbGRpciIJCSLjgIBkaXIJIgp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "42",
+        "name": "App 42",
+        "installDir": "dir",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "appid-nel",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: JS trim keeps U+0085, so the appid is not numeric"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiwoU0MiIKCSJpbnN0YWxsZGlyIgkJIngiCn0K"
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest has no numeric appid",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "appid-unicode-digits",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: an appid in Arabic-Indic digits is not numeric (\\d without u)"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQki2aTZoiIKCSJpbnN0YWxsZGlyIgkJIngiCn0K"
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest has no numeric appid",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "appid-fullwidth",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-digit: an appid in fullwidth digits is not numeric"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQki77yU77ySIgoJImluc3RhbGxkaXIiCQkieCIKfQo="
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest has no numeric appid",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "appid-signed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: a signed appid is not numeric"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiKzQyIgoJImluc3RhbGxkaXIiCQkieCIKfQo="
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest has no numeric appid",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "appid-empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an empty appid is missing"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiICIKCSJpbnN0YWxsZGlyIgkJIngiCn0K"
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest has no numeric appid",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "appid-leading-zeros",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: an appid keeps its leading zeros: it is a string"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMDA3IgoJImluc3RhbGxkaXIiCQkieCIKfQo="
+        }
+      ],
+      "out": {
+        "appId": "007",
+        "name": "App 007",
+        "installDir": "x",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "appid-block",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an appid that is a block is missing"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIiB7ICJhcHBpZCIgeyB9ICJpbnN0YWxsZGlyIiAieCIgfQ=="
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest has no numeric appid",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "installdir-empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: an installdir of only spaces and NBSP is missing; the message names the appid"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiNDIiCgkiaW5zdGFsbGRpciIJCSIgwqAiCn0K"
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest 42 has no installdir",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "name-blank",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a blank name falls back to \"App <id>\""
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIm5hbWUiCQkiIOKAqCAiCn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "App 252950",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "name-trimmed",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: the name is trimmed"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMSIKCSJpbnN0YWxsZGlyIgkJIngiCgkibmFtZSIJCSIJIFNwYWNlZCDCoCIKfQo="
+        }
+      ],
+      "out": {
+        "appId": "1",
+        "name": "Spaced",
+        "installDir": "x",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "buildid-blank",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a blank buildid is an empty string, not null"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJidWlsZGlkIgkJIiAgIgp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": ""
+      }
+    },
+    {
+      "id": "stateflags-junk",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "parseint: StateFlags that is not an integer is 0"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJTdGF0ZUZsYWdzIgkJIjB4NiIKfQo="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "stateflags-negative-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: StateFlags -0 is kept as -0 (vdfInt returns -0 and ?? keeps it)"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJTdGF0ZUZsYWdzIgkJIi0wIgp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": {
+          "$number": "-0"
+        },
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "stateflags-negative",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: a negative StateFlags is kept"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJTdGF0ZUZsYWdzIgkJIi00Igp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": -4,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "lastplayed-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: LastPlayed 0 is null"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJMYXN0UGxheWVkIgkJIjAiCn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "lastplayed-negative-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: LastPlayed -0 is null"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJMYXN0UGxheWVkIgkJIi0wIgp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "lastplayed-negative",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: a negative LastPlayed is null"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJMYXN0UGxheWVkIgkJIi0xIgp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "lastplayed-padded",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a padded LastPlayed is read"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJMYXN0UGxheWVkIgkJIsKgMTc4NTExNzI2NCAiCn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "cap-size-safe-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: SizeOnDisk 2^53 - 1 is read"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJTaXplT25EaXNrIgkJIjkwMDcxOTkyNTQ3NDA5OTEiCn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": 9007199254740991,
+        "buildId": null
+      }
+    },
+    {
+      "id": "cap-size-safe-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: SizeOnDisk 2^53 is null"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJTaXplT25EaXNrIgkJIjkwMDcxOTkyNTQ3NDA5OTIiCn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "size-negative-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "number: SizeOnDisk -0 is -0"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJTaXplT25EaXNrIgkJIi0wIgp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": {
+          "$number": "-0"
+        },
+        "buildId": null
+      }
+    },
+    {
+      "id": "lastowner-not-surfaced",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: LastOwner and unknown keys never reach the result"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiCn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "proto-key",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a __proto__ key in AppState is an ordinary key and does not reach the result"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJfX3Byb3RvX18iCQkieCIKfQo="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "astral-name",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an astral name is kept whole"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIm5hbWUiCQki8J+agCBMYXVuY2giCn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "🚀 Launch",
+        "installDir": "rocketleague",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "invalid-utf8-installdir",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: an overlong 0xC0 0xAF in installdir becomes two U+FFFD"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIiB7ICJhcHBpZCIgIjEiICJpbnN0YWxsZGlyIiAiYcCvYiIgfQ=="
+        }
+      ],
+      "out": {
+        "appId": "1",
+        "name": "App 1",
+        "installDir": "a��b",
+        "stateFlags": 0,
+        "lastPlayed": null,
+        "sizeOnDisk": null,
+        "buildId": null
+      }
+    },
+    {
+      "id": "corpus-51-0",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=0 ops=line-delete,insert,insert from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiQXV0b1VwZGF0ZUJlaGF2aW9yIgkJIjAiCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIgoJIlNjaGVkdWxlZEF1dG9VcGRhdGUiCQkiMTc4OTgwNDQ2MCIKCSJJbnN0YWxsZWREZXBvdHMiCgl7CgkJIjI1Mjk1PTEiCgkJewoJCQkibWFuaWZlc3QiCQkiODg5Mjg2OTU5MjI5MTM0MDA3NiIKCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiCgkJfQoJfQoJIkluc3RhbGxTY3JpcHRzIgoJewoJCSIyNTI5NTEiCQkiYXBwaW5mby52ZGYiCgl9CgkiU2hhcmVkRGVwb3RzIgoJewoJCSIyMjg5ODkiCQkiMjI4OTgwIgoJCSIyMjg5OTAiCQkiMjJ/XV3/ODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-1",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=1 ops=insert,delete from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7DQkN/woJImFwcGlkIgkJIjI1Mjk1MCIKCSJ1bml2ZXJzZSIJCSIxIgoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiCgkibmFtZSIJCSJSb2NrZXQgTGVhZ3VlIgoJIlN0YXRlRmxhZ3MiCQkiNiIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJMYXN0VXBkYXRlZCIJCSIxNzg2MDY5NTk4IgoJIkxhc3RQbGF5ZWQiCQkiMTc4NTExNzI2NCIKCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2IgoJIlN0YWdpbmdTaXplIgkJIjAiCgkiYnVpbGRpZCIJCSIyNDQyMTk0OSIKCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiCgkiRG93bmxvYWRUeXBlIgkJIjQiCgkiVXBkYXRlUmVzdWx0IgkJIjAiCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCIKCSJCeXRlc0Rvd25sb2FkZWQiCQkiMCIKCSJCeXRlc1RvU3RhZ2UiCQkiMCIKCSJCeXRlc1N0YWdlZCIJCSIwIgoJIlRhcmdldEJ1aWxkSUQiCQkiMjQ5MzgyMDMiCgkiQXV0b1VwZGF0ZUJlaGF2aW9yIgkJIjAiCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIgoJIlNjaGVkdWxlZEF1dG9VcGRhdGUiCQkiMTc4OTgwNDQ2MCIKCSJJbnN0YWxsZWREZXBvdHMiCgl7CgkJIjI1Mjk1MSIKCQl7CgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2IgoJCQkic2l6ZSIJCSI0Mjc5NTg3ODY4NiIKCQl9Cgl9CgkiSW5zdGFsbFNjcmlwdHMiCgl7CgkJIjI1Mjk1MSIJCSIiCgl9CgkiU2hhcmVkRGVwb3RzIgoJewoJCSIyMjg5ODkiCQkiMjI4OTgwIgoJCSIyMjg5OTAiCQkiMjI4OTgwIgoJCSIyMjkwMzMiCQkiMjI4OTgwIgoJfQoJIlVzZXJDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9CgkiTW91bnRlZENvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KfQo="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unexpected \"{\" where a key was expected (line 26)",
+        "line": 26,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-2",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=2 ops=line-delete,line-delete,line-delete from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "ewoJImFwcGlkIgkJIjI1Mjk1MCIKCSJ1bml2ZXJzZSIJCSIxIgoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiCgkibmFtZSIJCSJSb2NrZXQgTGVhZ3VlIgoJIlN0YXRlRmxhZ3MiCQkiNiIKCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSIKCSJMYXN0VXBkYXRlZCIJCSIxNzg2MDY5NTk4IgoJIkxhc3RQbGF5ZWQiCQkiMTc4NTExNzI2NCIKCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2IgoJIlN0YWdpbmdTaXplIgkJIjAiCgkiYnVpbGRpZCIJCSIyNDQyMTk0OSIKCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiCgkiRG93bmxvYWRUeXBlIgkJIjQiCgkiVXBkYXRlUmVzdWx0IgkJIjAiCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCIKCSJCeXRlc0Rvd25sb2FkZWQiCQkiMCIKCSJCeXRlc1RvU3RhZ2UiCQkiMCIKCSJCeXRlc1N0YWdlZCIJCSIwIgoJIlRhcmdldEJ1aWxkSUQiCQkiMjQ5MzgyMDMiCgkiQXV0b1VwZGF0ZUJlaGF2aW9yIgkJIjAiCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unexpected \"{\" where a key was expected (line 1)",
+        "line": 1,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-3",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=3 ops=line-delete,line-swap,astral from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJewoJIkxhc3RQbGF5ZWQiCQkiMTc4NTExNzI2NCIKCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2IgoJIlN0YWdpbmdTaXplIgkJIjAiCgkiYnVpbGRpZCIJCSIyNDQyMTk0OSIKCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiCgkiRG93bmxvYWRUeXBlIgkJIjQiCgkiVXBkYXRlUmVzdWx0IgkJIjAiCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCIKCSJCeXRlc0Rvd25sb2FkZWQiCQkiMCIKCSJCeXRlc1RvU3RhZ2UiCQkiMCIKCSJCeXRlc1N0YWdlZCIJCSIwIgoJIlRhcmdldEJ1aWxkSUQiCQkiMjQ5MzgyMDMiCgkiQXV0b1VwZGF0ZUJlaGF2aW9yIgkJIjAiCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIgoJIlNjaGVkdWxlZEF1dG9VcGRhdGUiCQkiMTc4OTgwNDQ2MCIKCSJJbnN0YWxsZWREZXBvdHMiCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCIKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkw8KCAgCIJCSIyMjg5ODAiCgkJIjIyOTAzMyIJCSIyMjg5ODAiCgl9CgkiVXNlckNvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KCSJNb3VudGVkQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQp9Cg=="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unexpected \"{\" where a key was expected (line 9)",
+        "line": 9,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-4",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=4 ops=astral,line-swap from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkJIjIyOTAzMyIJCSIyMjg5ODAiCgkidW5pdmVyc2UiCQkiMSIKCSJMYXVuY2hlclBhdGgiCQkiRDpcXEdhbWVzXFxTdGVhbVxcc3RlYW0uZXhlIgoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSIKCSJTdGF0ZUZsYWdzIgkJIjYiCgkiaW5zdGFsbGRpciIJCSJyb2NrZXRsZWFndWUiCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCIKCSJMYXN0UGxheWVkIgkJIjE3ODUxMTcyNjQiCgkiU2l6ZU9uRGlzayIJCSI0Mjc5NTg3ODY4NiIKCSJTdGFnaW5nU2l6ZSIJCSIwIgoJImJ1aWxkaWQiCQkiMjQ0MjE5NDkiCgkiTGFzdE93bmVyIgkJIjc2NTYxMTk4MDAwMDAwMDAxIgoJIkRvd25sb2FkVHlwZSIJCSI0IgoJIlVwZGF0ZVJlc3VsdCIJCSIwIgoJIkJ5dGVzVG9Eb3dubG9hZCIJCSIyOTg5Nzc4MDgiCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiCgkiQnl0ZXNUb1N0YWdlIgkJIjAiCgkiQnl0ZXNTdGFnZWQiCQkiMCIKCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIgoJIkF1dG9VcGRhdGVCZWhhdmlvciIJCSIwIgoJIkFsbG93T3RoZXJEb3dubG9hZHNXaGlsZVJ1bm5pbmciCQkiMCIKCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiCgkiSW5zdGFsbGVkRGVwb3RzIgoJewoJCSIyNTI5NTEiCgkJewoJCQkibWFuaWZlc3QiCQkiODg5Mjg2OTU5MjI5MTM0MDA3NiIKCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiCgkJfQoJfQoJIkluc3RhbGxTY3JpcHRzIgoJewoJCSIyNTI5NTEiCQkiYXBwaW5mby52ZGYiCgl9CgkiU2hhcmVkRGVwb3RzIgoJewoJCSIyMjg5ODkiCQkiMjI4OTgwIgoJCSIyMjg5OTAiCQkiMjI4OTgw8KCAgCIKCSJhcHBpZCIJCSIyNTI5NTAiCgl9CgkiVXNlckNvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KCSJNb3VudGVkQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQp9Cg=="
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest has no numeric appid",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "corpus-51-5",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=5 ops=bom from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-6",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=6 ops=line-swap,line-duplicate,eol from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI4OTkwIgkJIjIyODk4MCINCgkJIjIyOTAzMyIJCSIyMjg5ODAiDQoJfQ0KCSJVc2VyQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KCSJNb3VudGVkQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-7",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=7 ops=eol,bom from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI4OTkwIgkJIjIyODk4MCINCgkJIjIyOTAzMyIJCSIyMjg5ODAiDQoJfQ0KCSJVc2VyQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KCSJNb3VudGVkQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-8",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=8 ops=truncate from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3Q="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unterminated string (line 7)",
+        "line": 7,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-9",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=9 ops=invalid-utf8 from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIsMJCSI0Mjc5NTg3ODY4NiIKCQl9Cgl9CgkiSW5zdGFsbFNjcmlwdHMiCgl7CgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiIKCX0KCSJTaGFyZWREZXBvdHMiCgl7CgkJIjIyODk4OSIJCSIyMjg5ODAiCgkJIjIyODk5MCIJCSIyMjg5ODAiCgkJIjIyOTAzMyIJCSIyMjg5ODAiCgl9CgkiVXNlckNvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KCSJNb3VudGVkQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQp9Cg=="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Key \"42795878686\" has no value (line 30)",
+        "line": 30,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-10",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=10 ops=insert,insert from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkjCv8JIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDbyNuZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-11",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=11 ops=flip from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkgTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unterminated string (line 49)",
+        "line": 49,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-12",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=12 ops=eol from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI4OTkwIgkJIjIyODk4MCINCgkJIjIyOTAzMyIJCSIyMjg5ODAiDQoJfQ0KCSJVc2VyQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KCSJNb3VudGVkQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-13",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=13 ops=lone-surrogate,flip from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCWJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgrtoL0JewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unterminated string (line 49)",
+        "line": 49,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-14",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=14 ops=lone-surrogate from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQ7aC9YXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-15",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=15 ops=line-delete,bom from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJfQoJIkluc3RhbGxTY3JpcHRzIgoJewoJCSIyNTI5NTEiCQkiYXBwaW5mby52ZGYiCgl9CgkiU2hhcmVkRGVwb3RzIgoJewoJCSIyMjg5ODkiCQkiMjI4OTgwIgoJCSIyMjg5OTAiCQkiMjI4OTgwIgoJCSIyMjkwMzMiCQkiMjI4OTgwIgoJfQoJIlVzZXJDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9CgkiTW91bnRlZENvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KfQo="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Missing \"}\" for block opened (line 2)",
+        "line": 2,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-16",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=16 ops=bom,eol from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI4OTkwIgkJIjIyODk4MCINCgkJIjIyOTAzMyIJCSIyMjg5ODAiDQoJfQ0KCSJVc2VyQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KCSJNb3VudGVkQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-17",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=17 ops=eol from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI4OTkwIgkJIjIyODk4MCINCgkJIjIyOTAzMyIJCSIyMjg5ODAiDQoJfQ0KCSJVc2VyQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KCSJNb3VudGVkQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-18",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=18 ops=bom,line-delete,eol from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI4OTkwIgkJIjIyODk4MCINCgkJIjIyOTAzMyIJCSIyMjg5ODAiDQoJfQ0KCSJVc2VyQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KCSJNb3VudGVkQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-19",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=19 ops=bom,eol from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI4OTkwIgkJIjIyODk4MCINCgkJIjIyOTAzMyIJCSIyMjg5ODAiDQoJfQ0KCSJVc2VyQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KCSJNb3VudGVkQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-20",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=20 ops=line-duplicate,insert,astral from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4NjjwnZ+YNiIKCQl9Cgl9CgkiSW5zdGFsbFNjcmlwdHMiCgl7CgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiIKCX0KCSJTaGFyZWREZXBvdHMiCgl7CgkJIjIyODk4OSIJCSIyMjg5ODAiCgkJIjIyODk5MCIJCSIyMjg5ODAiCgkJIjIyOTAzMyIsCQkiMjI4OTgwIgoJfQoJIlVzZXJDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9CgkiTW91bnRlZENvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KCX0KfQo="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Key \"228980\" has no value (line 41)",
+        "line": 41,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-21",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=21 ops=astral,invalid-utf8,bom from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCLDCgkiYnVpbGRpZCIJCSIyNDQyMTk0OSIKCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiCgkiRG93bmxvYWRUeXBlIgkJIjQiCgkiVXBkYXRlUmVzdWx0IgkJIjAiCgkiQnl0ZXNUb/CfmIBEb3dubG9hZCIJCSIyOTg5Nzc4MDgiCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiCgkiQnl0ZXNUb1N0YWdlIgkJIjAiCgkiQnl0ZXNTdGFnZWQiCQkiMCIKCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIgoJIkF1dG9VcGRhdGVCZWhhdmlvciIJCSIwIgoJIkFsbG93T3RoZXJEb3dubG9hZHNXaGlsZVJ1bm5pbmciCQkiMCIKCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiCgkiSW5zdGFsbGVkRGVwb3RzIgoJewoJCSIyNTI5NTEiCgkJewoJCQkibWFuaWZlc3QiCQkiODg5Mjg2OTU5MjI5MTM0MDA3NiIKCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiCgkJfQoJfQoJIkluc3RhbGxTY3JpcHRzIgoJewoJCSIyNTI5NTEiCQkiYXBwaW5mby52ZGYiCgl9CgkiU2hhcmVkRGVwb3RzIgoJewoJCSIyMjg5ODkiCQkiMjI4OTgwIgoJCSIyMjg5OTAiCQkiMjI4OTgwIgoJCSIyMjkwMzMiCQkiMjI4OTgwIgoJfQoJIlVzZXJDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9CgkiTW91bnRlZENvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KfQo="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unexpected \"{\" where a key was expected (line 26)",
+        "line": 26,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-22",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=22 ops=truncate,line-duplicate,line-delete from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjI="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unterminated string (line 41)",
+        "line": 41,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-23",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=23 ops=line-delete,flip,eol from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRFdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI5MDMzIgkJIjIyODk4MCINCgl9DQoJIlVzZXJDb25maWciDQoJew0KCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCINCgl9DQoJIk1vdW50ZWRDb25maWciDQoJew0KCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCINCgl9DQp9DQo="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-24",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=24 ops=invalid-utf8,insert from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxwzk0OSIKCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiCgkiRG93bmxvYWRUeXBlIgkJIjQiCgkiVXBkYXRlUmVzdWx0IgkJIjAiCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCIKCSJCeXRlc0Rvd25sb2FkZWQiCQkiMCIKCSJCeXRlc1RvU3RhZ2UiCQkiMCIKCSJCeXRlc1N0YWdlZCIJCSIwIn0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIgoJIkF1dG9VcGRhdGVCZWhhdmlvciIJCSIwIgoJIkFsbG93T3RoZXJEb3dubG9hZHNXaGlsZVJ1bm5pbmciCQkiMCIKCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiCgkiSW5zdGFsbGVkRGVwb3RzIgoJewoJCSIyNTI5NTEiCgkJewoJCQkibWFuaWZlc3QiCQkiODg5Mjg2OTU5MjI5MTM0MDA3NiIKCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiCgkJfQoJfQoJIkluc3RhbGxTY3JpcHRzIgoJewoJCSIyNTI5NTEiCQkiYXBwaW5mby52ZGYiCgl9CgkiU2hhcmVkRGVwb3RzIgoJewoJCSIyMjg5ODkiCQkiMjI4OTgwIgoJCSIyMjg5OTAiCQkiMjI4OTgwIgoJCSIyMjkwMzMiCQkiMjI4OTgwIgoJfQoJIlVzZXJDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9CgkiTW91bnRlZENvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KfQo="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unexpected \"}\" (line 51)",
+        "line": 51,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-25",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=25 ops=flip from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSAKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unterminated string (line 49)",
+        "line": 49,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-26",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=26 ops=eol from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI4OTkwIgkJIjIyODk4MCINCgkJIjIyOTAzMyIJCSIyMjg5ODAiDQoJfQ0KCSJVc2VyQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KCSJNb3VudGVkQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-27",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=27 ops=bom,eol from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI4OTkwIgkJIjIyODk4MCINCgkJIjIyOTAzMyIJCSIyMjg5ODAiDQoJfQ0KCSJVc2VyQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KCSJNb3VudGVkQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-28",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=28 ops=truncate,delete from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0ODg5"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unterminated string (line 29)",
+        "line": 29,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-29",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=29 ops=line-swap from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCX0KCSJTdGF0ZUZsYWdzIgkJIjYiCgkiaW5zdGFsbGRpciIJCSJyb2NrZXRsZWFndWUiCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCIKCSJMYXN0UGxheWVkIgkJIjE3ODUxMTcyNjQiCgkiU2l6ZU9uRGlzayIJCSI0Mjc5NTg3ODY4NiIKCSJTdGFnaW5nU2l6ZSIJCSIwIgoJImJ1aWxkaWQiCQkiMjQ0MjE5NDkiCgkiTGFzdE93bmVyIgkJIjc2NTYxMTk4MDAwMDAwMDAxIgoJIkRvd25sb2FkVHlwZSIJCSI0IgoJIlVwZGF0ZVJlc3VsdCIJCSIwIgoJIkJ5dGVzVG9Eb3dubG9hZCIJCSIyOTg5Nzc4MDgiCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiCgkiQnl0ZXNUb1N0YWdlIgkJIjAiCgkiQnl0ZXNTdGFnZWQiCQkiMCIKCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIgoJIkF1dG9VcGRhdGVCZWhhdmlvciIJCSIwIgoJIkFsbG93T3RoZXJEb3dubG9hZHNXaGlsZVJ1bm5pbmciCQkiMCIKCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiCgkiSW5zdGFsbGVkRGVwb3RzIgoJewoJCSIyNTI5NTEiCgkJewoJCQkibWFuaWZlc3QiCQkiODg5Mjg2OTU5MjI5MTM0MDA3NiIKCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiCgkJfQoJfQoJIkluc3RhbGxTY3JpcHRzIgoJewoJCSIyNTI5NTEiCQkiYXBwaW5mby52ZGYiCgl9CgkiU2hhcmVkRGVwb3RzIgoJewoJCSIyMjg5ODkiCQkiMjI4OTgwIgoJCSIyMjg5OTAiCQkiMjI4OTgwIgoJCSIyMjkwMzMiCQkiMjI4OTgwIgoJfQoJIlVzZXJDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgkibmFtZSIJCSJSb2NrZXQgTGVhZ3VlIgoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "error": {
+        "name": "ManifestFormatError",
+        "message": "appmanifest 252950 has no installdir",
+        "code": "MANIFEST_FORMAT"
+      }
+    },
+    {
+      "id": "corpus-51-30",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=30 ops=line-delete from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiQXV0b1VwZGF0ZUJlaGF2aW9yIgkJIjAiCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIgoJIlNjaGVkdWxlZEF1dG9VcGRhdGUiCQkiMTc4OTgwNDQ2MCIKCSJJbnN0YWxsZWREZXBvdHMiCgl7CgkJIjI1Mjk1MSIKCQl7CgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2IgoJCQkic2l6ZSIJCSI0Mjc5NTg3ODY4NiIKCQl9Cgl9CgkiSW5zdGFsbFNjcmlwdHMiCgl7CgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiIKCX0KCSJTaGFyZWREZXBvdHMiCgl7CgkJIjIyODk4OSIJCSIyMjg5ODAiCgkJIjIyODk5MCIJCSIyMjg5ODAiCgkJIjIyOTAzMyIJCSIyMjg5ODAiCgl9CgkiVXNlckNvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KCSJNb3VudGVkQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-31",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=31 ops=line-delete from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-32",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=32 ops=invalid-utf8 from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJIvCfmGxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-33",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=33 ops=line-swap from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCSIyMjkwMzMiCQkiMjI4OTgwIgoJCQkibWFuaWZlc3QiCQkiODg5Mjg2OTU5MjI5MTM0MDA3NiIKCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiCgkJfQoJfQoJIkluc3RhbGxTY3JpcHRzIgoJewoJCSIyNTI5NTEiCQkiYXBwaW5mby52ZGYiCgl9CgkiU2hhcmVkRGVwb3RzIgoJewoJCSIyMjg5ODkiCQkiMjI4OTgwIgoJCSIyMjg5OTAiCQkiMjI4OTgwIgoJCXsKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Key \"42795878686\" has no value (line 30)",
+        "line": 30,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-34",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=34 ops=truncate,delete,line-delete from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0VXBkYXRlZCIJCSIxNzg2MDY5NTk4IgoJIkxhc3RQbGF5ZWQiCQkiMTc4NTExNzI2NCIKCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2IgoJIlN0YWdpbmdTaXplIgkJIjAiCgkiYnVpbGRpZCIJCSIyNDQyMTk0OSIKCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiCgkiRG93bmxvYWRUeXBlIgkJIjQiCgkiVXBkYXRlUmVzdWx0IgkJIjAiCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCIKCSJCeXRlc1RvU3RhZ2UiCQkiMCIKCSJCeXRlc1N0YWdlZCIJCSIwIgoJIlRhcmdldEJ1aWxkSUQiCQkiMjQ5MzgyMDMiCgkiQXV0b1VwZGF0ZUJlaGF2aW9yIgkJIjAiCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIgoJIlNjaGVkdWxlZEF1dG9VcGRhdGUiCQkiMTc4OTgwNDQ2MCIKCSJJbnN0YWxsZWREZXBvdHMiCgl7CgkJIjI1Mjk1MSIKCQl7CgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2IgoJCQkic2l6ZSIJCSI0Mjc5NTg3ODY4NiIKCQl9Cgl9CgkiSW5zdGFsbFNjcmlwdHMiCgl7CgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiIKCX0KCSJTaGFyZWREZXBvdHMiCgl7CgkJIjIyODk4OSIJCSIyMjg5ODAiCgkJIjIyODk5MCIJCSIy"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unterminated string (line 38)",
+        "line": 38,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-35",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=35 ops=delete,eol,flip from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvRXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1MjlmIg0KCX0NCgkiU2hhcmVkRGVwb3RzIg0KCXsNCgkJIjIyODk4OSIJCSIyMjg5ODAiDQoJCSIyMjg5OTAiCQkiMjI4OTgwIg0KCQkiMjI5MDMzIgkJIjIyODk4MCINCgl9DQoJIlVzZXJDb25maWciDQoJew0KCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCINCgl9DQoJIk1vdW50ZWRDb25maWciDQoJew0KCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCINCgl9DQp9DQo="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Key \"2529f\" has no value (line 35)",
+        "line": 35,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-36",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=36 ops=line-duplicate,bom from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiQnl0ZXNTdGFnZWQiCQkiMCIKCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIgoJIkF1dG9VcGRhdGVCZWhhdmlvciIJCSIwIgoJIkFsbG93T3RoZXJEb3dubG9hZHNXaGlsZVJ1bm5pbmciCQkiMCIKCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiCgkiSW5zdGFsbGVkRGVwb3RzIgoJewoJCSIyNTI5NTEiCgkJewoJCQkibWFuaWZlc3QiCQkiODg5Mjg2OTU5MjI5MTM0MDA3NiIKCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiCgkJfQoJfQoJIkluc3RhbGxTY3JpcHRzIgoJewoJCSIyNTI5NTEiCQkiYXBwaW5mby52ZGYiCgl9CgkiU2hhcmVkRGVwb3RzIgoJewoJCSIyMjg5ODkiCQkiMjI4OTgwIgoJCSIyMjg5OTAiCQkiMjI4OTgwIgoJCSIyMjkwMzMiCQkiMjI4OTgwIgoJfQoJIlVzZXJDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9CgkiTW91bnRlZENvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KfQo="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-37",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=37 ops=eol from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI4OTkwIgkJIjIyODk4MCINCgkJIjIyOTAzMyIJCSIyMjg5ODAiDQoJfQ0KCSJVc2VyQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KCSJNb3VudGVkQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KfQ0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-38",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=38 ops=eol,eol,line-swap from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJCeXRlc1RvU3RhZ2UiCQkiMCIKCSJTdGF0ZUZsYWdzIgkJIjYiCgkiaW5zdGFsbGRpciIJCSJyb2NrZXRsZWFndWUiCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCIKCSJMYXN0UGxheWVkIgkJIjE3ODUxMTcyNjQiCgkiU2l6ZU9uRGlzayIJCSI0Mjc5NTg3ODY4NiIKCSJTdGFnaW5nU2l6ZSIJCSIwIgoJImJ1aWxkaWQiCQkiMjQ0MjE5NDkiCgkiTGFzdE93bmVyIgkJIjc2NTYxMTk4MDAwMDAwMDAxIgoJIkRvd25sb2FkVHlwZSIJCSI0IgoJIlVwZGF0ZVJlc3VsdCIJCSIwIgoJIkJ5dGVzVG9Eb3dubG9hZCIJCSIyOTg5Nzc4MDgiCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiCgkibmFtZSIJCSJSb2NrZXQgTGVhZ3VlIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-39",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=39 ops=astral,eol from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkiU3RhdGVGbGFncyIJCSI2Ig0KCSJpbnN0YWxsZGlyIgkJInJvY2tldGxlYWd1ZSINCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCINCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0Ig0KCSJTaXplT25EaXNrIgkJIjQyNzk1ODc4Njg2Ig0KCSJTdGFnaW5nU2l6ZSIJCSIwIg0KCSJidWlsZGlkIgkJIjI0NDIxOTQ5Ig0KCSJMYXN0T3duZXIiCQkiNzY1NjExOTgwMDAwMDAwMDEiDQoJIkRvd25sb2FkVHlwZSIJCSI0Ig0KCSJVcGRhdGVSZXN1bHQiCQkiMCINCgkiQnl0ZXNUb0Rvd25sb2FkIgkJIjI5ODk3NzgwOCINCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiDQoJIkJ5dGVzVG9TdGFnZSIJCSIwIg0KCSJCeXRlc1N0YWdlZCIJCSIwIg0KCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIg0KCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCINCgkiQWxsb3dPdGhlckRvd25sb2Fkc1doaWxlUnVubmluZyIJCSIwIg0KCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiDQoJIkluc3RhbGxlZERlcG90cyINCgl7DQoJCSIyNTI5NTEiDQoJCXsNCgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2Ig0KCQkJInNpemUiCQkiNDI3OTU4Nzg2ODYiDQoJCX0NCgl9DQoJIkluc3RhbGxTY3JpcHRzIg0KCXsNCgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiINCgl9DQoJIlNoYXJlZERlcG90cyINCgl7DQoJCSIyMjg5ODkiCQkiMjI4OTgwIg0KCQkiMjI4OTkwIgkJIjIyODk4MCINCgkJIjIyOTAzMyIJCSIyMjg5ODAiDQoJfQ0KCSJVc2VyQ29uZmlnIg0KCXsNCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giDQoJfQ0KCSJNb3VudGVkQ29uZvCfmIBpZyINCgl7DQoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIg0KCX0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-40",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=40 ops=insert from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc6f38AODY4NiIKCQl9Cgl9CgkiSW5zdGFsbFNjcmlwdHMiCgl7CgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiIKCX0KCSJTaGFyZWREZXBvdHMiCgl7CgkJIjIyODk4OSIJCSIyMjg5ODAiCgkJIjIyODk5MCIJCSIyMjg5ODAiCgkJIjIyOTAzMyIJCSIyMjg5ODAiCgl9CgkiVXNlckNvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KCSJNb3VudGVkQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-41",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=41 ops=flip,bom from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSMKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unterminated string (line 49)",
+        "line": 49,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-42",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=42 ops=eol,astral from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbfSPv79lIgkJIlJvY2tldCBMZWFndWUiDQoJIlN0YXRlRmxhZ3MiCQkiNiINCgkiaW5zdGFsbGRpciIJCSJyb2NrZXRsZWFndWUiDQoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiDQoJIkxhc3RQbGF5ZWQiCQkiMTc4NTExNzI2NCINCgkiU2l6ZU9uRGlzayIJCSI0Mjc5NTg3ODY4NiINCgkiU3RhZ2luZ1NpemUiCQkiMCINCgkiYnVpbGRpZCIJCSIyNDQyMTk0OSINCgkiTGFzdE93bmVyIgkJIjc2NTYxMTk4MDAwMDAwMDAxIg0KCSJEb3dubG9hZFR5cGUiCQkiNCINCgkiVXBkYXRlUmVzdWx0IgkJIjAiDQoJIkJ5dGVzVG9Eb3dubG9hZCIJCSIyOTg5Nzc4MDgiDQoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIg0KCSJCeXRlc1RvU3RhZ2UiCQkiMCINCgkiQnl0ZXNTdGFnZWQiCQkiMCINCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyINCgkiQXV0b1VwZGF0ZUJlaGF2aW9yIgkJIjAiDQoJIkFsbG93T3RoZXJEb3dubG9hZHNXaGlsZVJ1bm5pbmciCQkiMCINCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIg0KCSJJbnN0YWxsZWREZXBvdHMiDQoJew0KCQkiMjUyOTUxIg0KCQl7DQoJCQkibWFuaWZlc3QiCQkiODg5Mjg2OTU5MjI5MTM0MDA3NiINCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2Ig0KCQl9DQoJfQ0KCSJJbnN0YWxsU2NyaXB0cyINCgl7DQoJCSIyNTI5NTEiCQkiYXBwaW5mby52ZGYiDQoJfQ0KCSJTaGFyZWREZXBvdHMiDQoJew0KCQkiMjI4OTg5IgkJIjIyODk4MCINCgkJIjIyODk5MCIJCSIyMjg5ODAiDQoJCSIyMjkwMzMiCQkiMjI4OTgwIg0KCX0NCgkiVXNlckNvbmZpZyINCgl7DQoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIg0KCX0NCgkiTW91bnRlZENvbmZpZyINCgl7DQoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIg0KCX0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "App 252950",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-43",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=43 ops=line-swap,line-delete from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiaW5zdGFsbGRpciIJCSJyb2NrZXRsZWFndWUiCgkiTGFzdFVwZGF0ZWQiCQkiMTc4NjA2OTU5OCIKCSJMYXN0UGxheWVkIgkJIjE3ODUxMTcyNjQiCgkiU2l6ZU9uRGlzayIJCSI0Mjc5NTg3ODY4NiIKCSJTdGFnaW5nU2l6ZSIJCSIwIgoJImJ1aWxkaWQiCQkiMjQ0MjE5NDkiCgkiTGFzdE93bmVyIgkJIjc2NTYxMTk4MDAwMDAwMDAxIgoJIkRvd25sb2FkVHlwZSIJCSI0IgoJIlVwZGF0ZVJlc3VsdCIJCSIwIgoJIkJ5dGVzVG9Eb3dubG9hZCIJCSIyOTg5Nzc4MDgiCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiCgkiQnl0ZXNUb1N0YWdlIgkJIjAiCgkiQnl0ZXNTdGFnZWQiCQkiMCIKCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIgoJIkF1dG9VcGRhdGVCZWhhdmlvciIJCSIwIgoJIlVzZXJDb25maWciCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9CgkiTW91bnRlZENvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KfQo="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unexpected \"{\" where a key was expected (line 25)",
+        "line": 25,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-44",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=44 ops=line-delete,astral,truncate from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXDw"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unterminated string (line 3)",
+        "line": 3,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-45",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=45 ops=eol,bom,invalid-utf8 from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxc9JCAgEdhbWVzXFxTdGVhbVxcc3RlYW0uZXhlIg0KCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiDQoJIlN0YXRlRmxhZ3MiCQkiNiINCgkiaW5zdGFsbGRpciIJCSJyb2NrZXRsZWFndWUiDQoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiDQoJIkxhc3RQbGF5ZWQiCQkiMTc4NTExNzI2NCINCgkiU2l6ZU9uRGlzayIJCSI0Mjc5NTg3ODY4NiINCgkiU3RhZ2luZ1NpemUiCQkiMCINCgkiYnVpbGRpZCIJCSIyNDQyMTk0OSINCgkiTGFzdE93bmVyIgkJIjc2NTYxMTk4MDAwMDAwMDAxIg0KCSJEb3dubG9hZFR5cGUiCQkiNCINCgkiVXBkYXRlUmVzdWx0IgkJIjAiDQoJIkJ5dGVzVG9Eb3dubG9hZCIJCSIyOTg5Nzc4MDgiDQoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIg0KCSJCeXRlc1RvU3RhZ2UiCQkiMCINCgkiQnl0ZXNTdGFnZWQiCQkiMCINCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyINCgkiQXV0b1VwZGF0ZUJlaGF2aW9yIgkJIjAiDQoJIkFsbG93T3RoZXJEb3dubG9hZHNXaGlsZVJ1bm5pbmciCQkiMCINCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIg0KCSJJbnN0YWxsZWREZXBvdHMiDQoJew0KCQkiMjUyOTUxIg0KCQl7DQoJCQkibWFuaWZlc3QiCQkiODg5Mjg2OTU5MjI5MTM0MDA3NiINCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2Ig0KCQl9DQoJfQ0KCSJJbnN0YWxsU2NyaXB0cyINCgl7DQoJCSIyNTI5NTEiCQkiYXBwaW5mby52ZGYiDQoJfQ0KCSJTaGFyZWREZXBvdHMiDQoJew0KCQkiMjI4OTg5IgkJIjIyODk4MCINCgkJIjIyODk5MCIJCSIyMjg5ODAiDQoJCSIyMjkwMzMiCQkiMjI4OTgwIg0KCX0NCgkiVXNlckNvbmZpZyINCgl7DQoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIg0KCX0NCgkiTW91bnRlZENvbmZpZyINCgl7DQoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIg0KCX0NCn0NCg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-46",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=46 ops=truncate from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7Cgk="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Missing \"}\" for block opened (line 48)",
+        "line": 48,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-47",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=47 ops=lone-surrogate,bom,line-duplicate from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNO24gDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": null,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-48",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=48 ops=lone-surrogate,bom from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIu24gAkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Key \"42795878686\" has no value (line 30)",
+        "line": 30,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-49",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=49 ops=flip from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIldpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": null,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-50",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=50 ops=bom,astral from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZvCdn5hvLnZkZiIKCX0KCSJTaGFyZWREZXBvdHMiCgl7CgkJIjIyODk4OSIJCSIyMjg5ODAiCgkJIjIyODk5MCIJCSIyMjg5ODAiCgkJIjIyOTAzMyIJCSIyMjg5ODAiCgl9CgkiVXNlckNvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KCSJNb3VudGVkQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQp9Cg=="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-51",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=51 ops=line-delete from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-52",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=52 ops=bom,flip,astral from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJ8J2fmAl9Cgl9CgkiSW5zdGFsbFNjcmlwdHMiCgl7CgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiIKCX0KCSJTaGFyZWREZXBvdHMiCgl7CgkJIjIyODk4OSIJCSIyMjg5ODAiCgkJIjIyODk5MCIJCSIyMjg5ODAiCgkJIjIyOTAzMyIJCSIyMjg5ODAiCgl9CgkiVXNlckNvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KCSJNb3VudGXkQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQp9Cg=="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Key \"𝟘\" has no value (line 31)",
+        "line": 31,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-53",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=53 ops=astral from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgnwn5iAIlNjaGVkdWxlZEF1dG9VcGRhdGUiCQkiMTc4OTgwNDQ2MCIKCSJJbnN0YWxsZWREZXBvdHMiCgl7CgkJIjI1Mjk1MSIKCQl7CgkJCSJtYW5pZmVzdCIJCSI4ODkyODY5NTkyMjkxMzQwMDc2IgoJCQkic2l6ZSIJCSI0Mjc5NTg3ODY4NiIKCQl9Cgl9CgkiSW5zdGFsbFNjcmlwdHMiCgl7CgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiIKCX0KCSJTaGFyZWREZXBvdHMiCgl7CgkJIjIyODk4OSIJCSIyMjg5ODAiCgkJIjIyODk5MCIJCSIyMjg5ODAiCgkJIjIyOTAzMyIJCSIyMjg5ODAiCgl9CgkiVXNlckNvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KCSJNb3VudGVkQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQp9Cg=="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unexpected \"{\" where a key was expected (line 26)",
+        "line": 26,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-54",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=54 ops=line-duplicate,eol,lone-surrogate from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIg0Kew0KCSJhcHBpZCIJCSIyNTI5NTAiDQoJInVuaXZlcnNlIgkJIjEiDQoJIkxhdW5jaGVyUGF0aCIJCSJEOlxcR2FtZXNcXFN0ZWFtXFxzdGVhbS5leGUiDQoJIm5hbWUiCQkiUm9ja2V0IExlYWd1ZSINCgkibmFtZSIJCSJSb2NrZXQgTGVhZ3VlIg0KCSJTdGF0ZUZsYWdzIgkJIjYiDQoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIg0KCSJMYXN0VXBkYXRlZCIJCSIxNzg2MDY5NTk4Ig0KCSJMYXN0UGxheWVkIgkJIjE3ODUxMTcyNjQiDQoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiDQoJIlN0YWdpbmdTaXplIgkJIjAiDQoJImJ1aWxkaWQiCQkiMjQ0MjE5NDkiDQoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSINCgkiRG93bmxvYWRUeXBlIgkJIjQiDQoJIlVwZGF0ZVJlc3VsdCIJCSIwIg0KCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4Ig0KCSJCeXRlc0Rvd25sb2FkZWQiCQkiMCINCgkiQnl0ZXNUb1N0YWdlIgkJIjAiDQoJIkJ5dGVzU3RhZ2VkIgkJIjAiDQoJIlRhcmdldEJ1aWxkSUQiCQkiMjQ5MzgyMDMiDQoJIkF1dG9VcGRhdGVCZWhhdmlvciIJCSIwIg0KCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiDQoJIlNjaGVkdWxlZEF1dG9VcGRhdGUiCQkiMTc4OTgwNDQ2MCINCgkiSW5zdGFsbGVkRGVwb3RzIg0KCXsNCgkJIjI1Mjk1MSINCgkJew0K7biACQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiDQoJCQkic2l6ZSIJCSI0Mjc5NTg3ODY4NiINCgkJfQ0KCX0NCgkiSW5zdGFsbFNjcmlwdHMiDQoJew0KCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIg0KCX0NCgkiU2hhcmVkRGVwb3RzIg0KCXsNCgkJIjIyODk4OSIJCSIyMjg5ODAiDQoJCSIyMjg5OTAiCQkiMjI4OTgwIg0KCQkiMjI5MDMzIgkJIjIyODk4MCINCgl9DQoJIlVzZXJDb25maWciDQoJew0KCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCINCgl9DQoJIk1vdW50ZWRDb25maWciDQoJew0KCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCINCgl9DQp9DQo="
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Key \"42795878686\" has no value (line 31)",
+        "line": 31,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-55",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=55 ops=delete from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bHRVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unexpected \"{\" where a key was expected (line 25)",
+        "line": 25,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-56",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=56 ops=delete,insert from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAxIgoJIkRvd25sb2FkVHlwZSIJCSI0IgoJIlVwZGF0ZVJlc3VsdCIJCSIwIgoJIkJ5dGVzVG9Eb3dubG9hZCIJCSIyOTg5Nzc4MDgiCgkiQnl0ZXNEb3dubG9hZGVkIgkJIjAiCgkiQnl0ZXNUb1N0YWdlIgkJIjAiCgkiQnl0ZXNTdGFnZWQiCQkiMCIKCSJUYXJnZXRCdWlsZElEIgkJIjI0OTM4MjAzIgoJIkF1dG9VcGRhdGVCZWhhdmlvciIJCSIwIgoJIkFsbG93T3RoZXJEb3dubG9hZHNXaGlsZVJ1bm5pbmciCQkiMCIKCSJTY2hlZHVsZWRBdXRvVXBkYXRlIgkJIjE3ODk4MDQ0NjAiCgkiSW5zdGFsbGVkRGVwb3RzIgoJewoJCSIyNTI5NTEiCgkJewoJCQkibWFuaWZlc3QiCQkiODg5Mjg2OTU5MjI5MTM0MDA3NiIKCQkJInNpemUiCQkiNP8AfzI3OTU4Nzg2ODYiCgkJfQoJfQoJIkluc3RhbGxTY3JpcHRzIgoJewoJCSIyNTI5NTEiCQkiYXBwaW5mby52ZGYiCgl9CgkiU2hhcmVkRGVwb3RzIgoJewoJCSIyMjg5ODkiCQkiMjI4OTgwIgoJCSIyMjg5OTAiCQkiMjI4OTgwIgoJCSIyMjkwMzMiCQkiMjI4OTgwIgoJfQoJIlVzZXJDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9CgkiTW91bnRlZENvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGlzaCIKCX0KfQo="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-57",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=57 ops=flip from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJASI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "error": {
+        "name": "VdfParseError",
+        "message": "Unexpected \"{\" where a key was expected (line 26)",
+        "line": 26,
+        "code": "VDF_PARSE"
+      }
+    },
+    {
+      "id": "corpus-51-58",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=58 ops=insert,invalid-utf8,flip from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQygDc5NTg3ODY4NiIKCQl9Cgl9CgkiSW5zdGFsbFNjcmlwdHMiCgl7CgkJIjI1Mjk1MSIJCSJhcHBpbmZvLnZkZiIKCX0KCSJTaGFyZWREZXBvdHMiCgl7CgkJIjIyODk4LFwsIzkiCQkiMjI4OTgwIgoJCSIyMjg5OTAiCQkiMjI4OTgwIgoJCSIyMjkwMzMiCQkiMjI4OTgwIgoJfQoJIlVzZXJDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9CgkiTW91bnRlZENvbmZpZyIKCXsKCQkibGFuZ3VhZ2UiCQkiZW5nbGl3aCIKCX0KfQo="
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    },
+    {
+      "id": "corpus-51-59",
+      "origin": {
+        "kind": "corpus",
+        "ref": "seed=51 index=59 ops=bom from=fixtures/launchers/steam/appmanifest_252950.acf"
+      },
+      "args": [
+        {
+          "$bytes": "77u/IkFwcFN0YXRlIgp7CgkiYXBwaWQiCQkiMjUyOTUwIgoJInVuaXZlcnNlIgkJIjEiCgkiTGF1bmNoZXJQYXRoIgkJIkQ6XFxHYW1lc1xcU3RlYW1cXHN0ZWFtLmV4ZSIKCSJuYW1lIgkJIlJvY2tldCBMZWFndWUiCgkiU3RhdGVGbGFncyIJCSI2IgoJImluc3RhbGxkaXIiCQkicm9ja2V0bGVhZ3VlIgoJIkxhc3RVcGRhdGVkIgkJIjE3ODYwNjk1OTgiCgkiTGFzdFBsYXllZCIJCSIxNzg1MTE3MjY0IgoJIlNpemVPbkRpc2siCQkiNDI3OTU4Nzg2ODYiCgkiU3RhZ2luZ1NpemUiCQkiMCIKCSJidWlsZGlkIgkJIjI0NDIxOTQ5IgoJIkxhc3RPd25lciIJCSI3NjU2MTE5ODAwMDAwMDAwMSIKCSJEb3dubG9hZFR5cGUiCQkiNCIKCSJVcGRhdGVSZXN1bHQiCQkiMCIKCSJCeXRlc1RvRG93bmxvYWQiCQkiMjk4OTc3ODA4IgoJIkJ5dGVzRG93bmxvYWRlZCIJCSIwIgoJIkJ5dGVzVG9TdGFnZSIJCSIwIgoJIkJ5dGVzU3RhZ2VkIgkJIjAiCgkiVGFyZ2V0QnVpbGRJRCIJCSIyNDkzODIwMyIKCSJBdXRvVXBkYXRlQmVoYXZpb3IiCQkiMCIKCSJBbGxvd090aGVyRG93bmxvYWRzV2hpbGVSdW5uaW5nIgkJIjAiCgkiU2NoZWR1bGVkQXV0b1VwZGF0ZSIJCSIxNzg5ODA0NDYwIgoJIkluc3RhbGxlZERlcG90cyIKCXsKCQkiMjUyOTUxIgoJCXsKCQkJIm1hbmlmZXN0IgkJIjg4OTI4Njk1OTIyOTEzNDAwNzYiCgkJCSJzaXplIgkJIjQyNzk1ODc4Njg2IgoJCX0KCX0KCSJJbnN0YWxsU2NyaXB0cyIKCXsKCQkiMjUyOTUxIgkJImFwcGluZm8udmRmIgoJfQoJIlNoYXJlZERlcG90cyIKCXsKCQkiMjI4OTg5IgkJIjIyODk4MCIKCQkiMjI4OTkwIgkJIjIyODk4MCIKCQkiMjI5MDMzIgkJIjIyODk4MCIKCX0KCSJVc2VyQ29uZmlnIgoJewoJCSJsYW5ndWFnZSIJCSJlbmdsaXNoIgoJfQoJIk1vdW50ZWRDb25maWciCgl7CgkJImxhbmd1YWdlIgkJImVuZ2xpc2giCgl9Cn0K"
+        }
+      ],
+      "out": {
+        "appId": "252950",
+        "name": "Rocket League",
+        "installDir": "rocketleague",
+        "stateFlags": 6,
+        "lastPlayed": 1785117264,
+        "sizeOnDisk": 42795878686,
+        "buildId": "24421949"
+      }
+    }
+  ]
+}

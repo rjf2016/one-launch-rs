@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-4254d886a1",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot health"
+  ],
+  "name": "is absent when nothing finds the client, and warns when the chosen folder no longer holds it",
+  "calls": []
+}

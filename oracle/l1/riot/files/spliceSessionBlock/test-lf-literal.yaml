@@ -1,0 +1,9 @@
+﻿psl:
+    authorization:
+        riot-client:
+            id_token: "a"
+            nested:
+                deep: 1
+
+            refresh_token: "b"
+other: 1

@@ -1,0 +1,541 @@
+{
+  "function": "parseInstalls",
+  "source": "src/main/launchers/riot/products.ts",
+  "note": "decode: arg0=utf8\narg0 is %ProgramData%\\Riot Games\\RiotClientInstalls.json as src/main/launchers/riot/adapter.ts reads it (readLauncherText: readFileSync, then toString utf8; a BOM stays as U+FEFF, so JSON.parse fails on it and the result is the empty one).\ncall projects the result: associatedClients, a Map, is recorded as its entries in iteration order ([folder, exe] pairs), which is the order Object.entries gives the parsed object (integer-like keys first, then insertion order).\nThe function relies on readLauncherText for its size cap (4 MiB) and enforces none itself.",
+  "cases": [
+    {
+      "id": "fixture",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-adapter.test.ts > Riot metadata parsers > reads RiotClientInstalls.json and shrugs at junk"
+      },
+      "args": [
+        {
+          "$file": "fixtures/launchers/riot/RiotClientInstalls.json",
+          "sha256": "811fc162a0fee54a54bbb139eaf372528806dc886bf644f1e3d805a2536f50bf"
+        }
+      ],
+      "out": {
+        "rcDefault": "D:/Games/Riot Games/Riot Client/RiotClientServices.exe",
+        "rcLive": "D:/Games/Riot Games/Riot Client/RiotClientServices.exe",
+        "associatedClients": [
+          [
+            "D:/Games/Riot Games/VALORANT/live/",
+            "D:/Games/Riot Games/Riot Client/RiotClientServices.exe"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "junk-empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-adapter.test.ts > Riot metadata parsers > reads RiotClientInstalls.json and shrugs at junk"
+      },
+      "args": [
+        {
+          "$bytes": ""
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "junk-open-brace",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-adapter.test.ts > Riot metadata parsers > reads RiotClientInstalls.json and shrugs at junk"
+      },
+      "args": [
+        {
+          "$bytes": "ew=="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "junk-array",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-adapter.test.ts > Riot metadata parsers > reads RiotClientInstalls.json and shrugs at junk"
+      },
+      "args": [
+        {
+          "$bytes": "W10="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "junk-wrong-types",
+      "origin": {
+        "kind": "test",
+        "ref": "test/riot-adapter.test.ts > Riot metadata parsers > reads RiotClientInstalls.json and shrugs at junk"
+      },
+      "args": [
+        {
+          "$bytes": "eyJyY19kZWZhdWx0IjogNSwgImFzc29jaWF0ZWRfY2xpZW50IjogIngifQ=="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | the JSON literal null"
+      },
+      "args": [
+        {
+          "$bytes": "bnVsbA=="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "number",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | a bare number"
+      },
+      "args": [
+        {
+          "$bytes": "NDI="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "string",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | a bare string"
+      },
+      "args": [
+        {
+          "$bytes": "IkQ6L0dhbWVzL1Jpb3QgR2FtZXMvUmlvdCBDbGllbnQvUmlvdENsaWVudFNlcnZpY2VzLmV4ZSI="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "empty-object",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | an empty object"
+      },
+      "args": [
+        {
+          "$bytes": "e30="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "array-with-items",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | an array at the top: typeof object, so it is read and every field is missing"
+      },
+      "args": [
+        {
+          "$bytes": "WyJEOi9HYW1lcy9SaW90IEdhbWVzL1Jpb3QgQ2xpZW50L1Jpb3RDbGllbnRTZXJ2aWNlcy5leGUiXQ=="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "bom",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | UTF-8 BOM added"
+      },
+      "args": [
+        {
+          "$bytes": "77u/ewogICAgImFzc29jaWF0ZWRfY2xpZW50IjogewogICAgICAgICJEOi9HYW1lcy9SaW90IEdhbWVzL1ZBTE9SQU5UL2xpdmUvIjogIkQ6L0dhbWVzL1Jpb3QgR2FtZXMvUmlvdCBDbGllbnQvUmlvdENsaWVudFNlcnZpY2VzLmV4ZSIKICAgIH0sCiAgICAicGF0Y2hsaW5lcyI6IHsKICAgICAgICAiS2V5c3RvbmVGb3VuZGF0aW9uTGl2ZVdpbiI6ICJEOi9HYW1lcy9SaW90IEdhbWVzL1Jpb3QgQ2xpZW50L1Jpb3RDbGllbnRTZXJ2aWNlcy5leGUiCiAgICB9LAogICAgInJjX2RlZmF1bHQiOiAiRDovR2FtZXMvUmlvdCBHYW1lcy9SaW90IENsaWVudC9SaW90Q2xpZW50U2VydmljZXMuZXhlIiwKICAgICJyY19saXZlIjogIkQ6L0dhbWVzL1Jpb3QgR2FtZXMvUmlvdCBDbGllbnQvUmlvdENsaWVudFNlcnZpY2VzLmV4ZSIKfQo="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "crlf",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | LF made CRLF"
+      },
+      "args": [
+        {
+          "$bytes": "ew0KICAgICJhc3NvY2lhdGVkX2NsaWVudCI6IHsNCiAgICAgICAgIkQ6L0dhbWVzL1Jpb3QgR2FtZXMvVkFMT1JBTlQvbGl2ZS8iOiAiRDovR2FtZXMvUmlvdCBHYW1lcy9SaW90IENsaWVudC9SaW90Q2xpZW50U2VydmljZXMuZXhlIg0KICAgIH0sDQogICAgInBhdGNobGluZXMiOiB7DQogICAgICAgICJLZXlzdG9uZUZvdW5kYXRpb25MaXZlV2luIjogIkQ6L0dhbWVzL1Jpb3QgR2FtZXMvUmlvdCBDbGllbnQvUmlvdENsaWVudFNlcnZpY2VzLmV4ZSINCiAgICB9LA0KICAgICJyY19kZWZhdWx0IjogIkQ6L0dhbWVzL1Jpb3QgR2FtZXMvUmlvdCBDbGllbnQvUmlvdENsaWVudFNlcnZpY2VzLmV4ZSIsDQogICAgInJjX2xpdmUiOiAiRDovR2FtZXMvUmlvdCBHYW1lcy9SaW90IENsaWVudC9SaW90Q2xpZW50U2VydmljZXMuZXhlIg0KfQ0K"
+        }
+      ],
+      "out": {
+        "rcDefault": "D:/Games/Riot Games/Riot Client/RiotClientServices.exe",
+        "rcLive": "D:/Games/Riot Games/Riot Client/RiotClientServices.exe",
+        "associatedClients": [
+          [
+            "D:/Games/Riot Games/VALORANT/live/",
+            "D:/Games/Riot Games/Riot Client/RiotClientServices.exe"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "truncated",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | cut in the middle"
+      },
+      "args": [
+        {
+          "$bytes": "ewogICAgImFzc29jaWF0ZWRfY2xpZW50IjogewogICAgICAgICJEOi9HYW1lcy9SaW90IEdhbWVzL1ZBTE9SQU5UL2xpdmUvIjogIkQ6L0dhbWVzL1Jpb3QgR2FtZXMvUmlvdCBDbGllbnQvUmlvdENsaWVudFNl"
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "blank-and-non-string-values",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | blank, whitespace-only, null and non-string values everywhere"
+      },
+      "args": [
+        {
+          "$bytes": "eyJyY19kZWZhdWx0IjogIiIsICJyY19saXZlIjogIiAgICIsICJhc3NvY2lhdGVkX2NsaWVudCI6IHsiRDovYS8iOiAiIiwgIkQ6L2IvIjogIiBcdCAiLCAiRDovYy8iOiBudWxsLCAiRDovZC8iOiA3LCAiRDovZS8iOiB7IngiOiAxfSwgIkQ6L2YvIjogIkQ6L0dhbWVzL1Jpb3QgR2FtZXMvUmlvdCBDbGllbnQvUmlvdENsaWVudFNlcnZpY2VzLmV4ZSJ9fQ=="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": [
+          [
+            "D:/f/",
+            "D:/Games/Riot Games/Riot Client/RiotClientServices.exe"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "value-kept-untrimmed",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | values with outer spaces: the check trims, the value is returned as it is"
+      },
+      "args": [
+        {
+          "$bytes": "eyJyY19kZWZhdWx0IjogIiAgRDovR2FtZXMvUmlvdCBHYW1lcy9SaW90IENsaWVudC9SaW90Q2xpZW50U2VydmljZXMuZXhlICIsICJyY19saXZlIjogIlx0RDoveCJ9"
+        }
+      ],
+      "out": {
+        "rcDefault": "  D:/Games/Riot Games/Riot Client/RiotClientServices.exe ",
+        "rcLive": "\tD:/x",
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "associated-null-and-array",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | associated_client null, then an array, which Object.entries reads by index"
+      },
+      "args": [
+        {
+          "$bytes": "eyJhc3NvY2lhdGVkX2NsaWVudCI6IFsiRDovR2FtZXMvUmlvdCBHYW1lcy9SaW90IENsaWVudC9SaW90Q2xpZW50U2VydmljZXMuZXhlIiwgIiJdLCAicmNfbGl2ZSI6IG51bGx9"
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": [
+          [
+            "0",
+            "D:/Games/Riot Games/Riot Client/RiotClientServices.exe"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "associated-null",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/launchers/riot/RiotClientInstalls.json | associated_client null"
+      },
+      "args": [
+        {
+          "$bytes": "eyJhc3NvY2lhdGVkX2NsaWVudCI6IG51bGwsICJyY19kZWZhdWx0IjogIkQ6L3guZXhlIn0="
+        }
+      ],
+      "out": {
+        "rcDefault": "D:/x.exe",
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "adv-json-duplicates",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: duplicate keys at both levels: JSON.parse keeps the last, and a re-set key keeps its first position"
+      },
+      "args": [
+        {
+          "$bytes": "eyJyY19kZWZhdWx0IjogIkQ6L2ZpcnN0LmV4ZSIsICJhc3NvY2lhdGVkX2NsaWVudCI6IHsiRDovYS8iOiAiRDovMS5leGUiLCAiRDovYi8iOiAiRDovMi5leGUiLCAiRDovYS8iOiAiRDovMy5leGUifSwgInJjX2RlZmF1bHQiOiAiRDovc2Vjb25kLmV4ZSJ9"
+        }
+      ],
+      "out": {
+        "rcDefault": "D:/second.exe",
+        "rcLive": null,
+        "associatedClients": [
+          [
+            "D:/a/",
+            "D:/3.exe"
+          ],
+          [
+            "D:/b/",
+            "D:/2.exe"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "adv-json-integer-keys",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: integer-like folder keys come first in Object.entries, in ascending order, whatever the file order; \"01\" and \"4294967295\" are not array indices and stay in place"
+      },
+      "args": [
+        {
+          "$bytes": "eyJhc3NvY2lhdGVkX2NsaWVudCI6IHsiRDovei8iOiAiRDovei5leGUiLCAiMTAiOiAiRDovMTAuZXhlIiwgIjAxIjogIkQ6LzAxLmV4ZSIsICIyIjogIkQ6LzIuZXhlIiwgIjQyOTQ5NjcyOTUiOiAiRDovbWF4LmV4ZSIsICI0Mjk0OTY3Mjk0IjogIkQ6L2lkeC5leGUifX0="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": [
+          [
+            "2",
+            "D:/2.exe"
+          ],
+          [
+            "10",
+            "D:/10.exe"
+          ],
+          [
+            "4294967294",
+            "D:/idx.exe"
+          ],
+          [
+            "D:/z/",
+            "D:/z.exe"
+          ],
+          [
+            "01",
+            "D:/01.exe"
+          ],
+          [
+            "4294967295",
+            "D:/max.exe"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "adv-json-proto",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a __proto__ key: JSON.parse makes it an own property, so it is one more associated folder; at the top it is just an unknown key"
+      },
+      "args": [
+        {
+          "$bytes": "eyJfX3Byb3RvX18iOiB7InJjX2RlZmF1bHQiOiAiRDovaW5oZXJpdGVkLmV4ZSJ9LCAiYXNzb2NpYXRlZF9jbGllbnQiOiB7Il9fcHJvdG9fXyI6ICJEOi9wcm90by5leGUiLCAiRDovYS8iOiAiRDovYS5leGUifX0="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": [
+          [
+            "__proto__",
+            "D:/proto.exe"
+          ],
+          [
+            "D:/a/",
+            "D:/a.exe"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "adv-json-lone-surrogate",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "lone-surrogate: a \\ud800 escape in a value and in a key: JSON.parse accepts it and the strings carry a lone surrogate; serde_json refuses the document"
+      },
+      "args": [
+        {
+          "$bytes": "eyJyY19kZWZhdWx0IjogIkQ6L1Jpb3RcdWQ4MDAuZXhlIiwgImFzc29jaWF0ZWRfY2xpZW50IjogeyJEOi9cdWRjMDAvIjogIkQ6L3guZXhlIn19"
+        }
+      ],
+      "out": {
+        "rcDefault": {
+          "$utf16": [
+            68,
+            58,
+            47,
+            82,
+            105,
+            111,
+            116,
+            55296,
+            46,
+            101,
+            120,
+            101
+          ]
+        },
+        "rcLive": null,
+        "associatedClients": [
+          [
+            {
+              "$utf16": [
+                68,
+                58,
+                47,
+                56320,
+                47
+              ]
+            },
+            "D:/x.exe"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "adv-json-escapes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: escaped slashes, a \\u0041 escape and an escaped astral pair"
+      },
+      "args": [
+        {
+          "$bytes": "eyJyY19kZWZhdWx0IjogIkQ6XC9HYW1lc1wvXHUwMDQxXHVkODNjXHVkZmFlLmV4ZSJ9"
+        }
+      ],
+      "out": {
+        "rcDefault": "D:/Games/A🎮.exe",
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "adv-trim-bom-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a value of U+FEFF alone: JS trim removes it, so it counts as blank (null); Rust str::trim keeps U+FEFF"
+      },
+      "args": [
+        {
+          "$bytes": "eyJyY19kZWZhdWx0IjogIlx1ZmVmZiIsICJyY19saXZlIjogIlx1MzAwMFx1MDBhMCIsICJhc3NvY2lhdGVkX2NsaWVudCI6IHsiRDovYS8iOiAiXHUyMDI4In19"
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "adv-trim-nel-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: a value of U+0085 alone: JS trim keeps it (not JS whitespace), so it is returned; Rust str::trim removes U+0085"
+      },
+      "args": [
+        {
+          "$bytes": "eyJyY19kZWZhdWx0IjogIlx1MDA4NSIsICJyY19saXZlIjogIlx1MTgwZSJ9"
+        }
+      ],
+      "out": {
+        "rcDefault": "",
+        "rcLive": "᠎",
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "adv-invalid-utf8",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: fixtures/launchers/riot/RiotClientInstalls.json with a lone 0xC0 inside a path; Node decodes it to U+FFFD and JSON.parse keeps it"
+      },
+      "args": [
+        {
+          "$bytes": "eyJyY19kZWZhdWx0IjogIkQ6L1Jpb3TAIEdhbWVzL1Jpb3RDbGllbnRTZXJ2aWNlcy5leGUifQ=="
+        }
+      ],
+      "out": {
+        "rcDefault": "D:/Riot� Games/RiotClientServices.exe",
+        "rcLive": null,
+        "associatedClients": []
+      }
+    },
+    {
+      "id": "adv-big-number-value",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: a number too large for a double as a value, and leading whitespace JSON allows"
+      },
+      "args": [
+        {
+          "$bytes": "IA0KCXsicmNfZGVmYXVsdCI6IDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MCwgInJjX2xpdmUiOiAiRDoveC5leGUifQ=="
+        }
+      ],
+      "out": {
+        "rcDefault": null,
+        "rcLive": "D:/x.exe",
+        "associatedClients": []
+      }
+    }
+  ]
+}

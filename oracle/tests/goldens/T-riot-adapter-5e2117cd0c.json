@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-5e2117cd0c",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot captureSession"
+  ],
+  "name": "needs the client closed, a saved account, and a saved sign-in",
+  "calls": []
+}

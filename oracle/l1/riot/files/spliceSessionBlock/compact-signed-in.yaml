@@ -1,0 +1,21 @@
+psl:
+    authorization:
+        riot-client:
+            claims: {}
+            id_token: "placeholder.eyJzdWIiOiJhYWFhYWFhYS1hYWFhLTRhYWEtOGFhYS1hYWFhYWFhYWFhYWEiLCJhY2N0Ijp7ImdhbWVfbmFtZSI6IlBsYWNlaG9sZGVyIiwidGFnX2xpbmUiOiIwMDAwIn19.s"
+            is_dpop_bound: false
+            refresh_token: "placeholder-refresh-1"
+            refresh_token_write_count: 3
+            scopes:
+            - "openid"
+            - "account"
+riot-login:
+    persist:
+        region: "NA"
+        scopes:
+        - "openid"
+rso-authenticator:
+    tdid:
+        expiryTime: 1790000000
+        name: "tdid"
+        value: "placeholder-tdid"

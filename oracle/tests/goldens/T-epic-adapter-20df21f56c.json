@@ -1,0 +1,110 @@
+{
+  "id": "T-epic-adapter-20df21f56c",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.switchAccount (real)"
+  ],
+  "name": "reports cancelled when the user stops waiting, rolling nothing back",
+  "calls": [
+    {
+      "launcher": "epic",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:epic:alt@example.com",
+          "displayName": "Alt",
+          "login": "alt@example.com",
+          "launcherUid": "22222222222222222222222222222222",
+          "hasSecret": false
+        },
+        {
+          "dryRun": false,
+          "signal": {
+            "$object": "AbortSignal",
+            "value": {}
+          },
+          "onAttention": {
+            "$function": "onAttention"
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "epic",
+        "account": {
+          "id": "@acct:epic:alt@example.com",
+          "displayName": "Alt",
+          "login": "alt@example.com",
+          "launcherUid": "22222222222222222222222222222222"
+        },
+        "strategy": "remembered",
+        "ok": false,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Epic Games Launcher",
+            "status": "skipped",
+            "detail": "Skipped: EpicGamesLauncher.exe is not running."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing session",
+            "status": "done",
+            "detail": "Main's stored session is already current."
+          },
+          {
+            "id": "backup",
+            "title": "Back up GameUserSettings.ini",
+            "status": "done",
+            "detail": "{tmp}\\backups\\epic\\<ts>"
+          },
+          {
+            "id": "file",
+            "title": "Put the account's session in place",
+            "status": "done",
+            "detail": "[RememberMe] now holds the snapshot (fingerprint 79a15d60) in 1 file."
+          },
+          {
+            "id": "start",
+            "title": "Start Epic Games Launcher",
+            "status": "done",
+            "detail": "Launcher started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the launcher to come up",
+            "status": "done",
+            "detail": "EpicGamesLauncher.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the launcher signed in",
+            "status": "failed",
+            "detail": "The launcher rejected the session: Sorry the refresh token '…' is invalid. Reason: TOKEN_EXPIRED errorcode=18036."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "failed",
+            "detail": "Stopped waiting."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new session",
+            "status": "skipped",
+            "detail": "Runs only after a manual sign-in: the fresh [RememberMe] replaces the stale snapshot."
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": null,
+        "cancelled": true,
+        "needsSignIn": false,
+        "error": "Stopped waiting for the sign-in as alt@example.com. Epic Games Launcher was left on its sign-in page; signing in there finishes the switch, and the session is saved at the next one."
+      }
+    }
+  ]
+}

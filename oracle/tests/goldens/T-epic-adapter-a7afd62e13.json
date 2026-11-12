@@ -1,0 +1,9 @@
+{
+  "id": "T-epic-adapter-a7afd62e13",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.detectInstall"
+  ],
+  "name": "looks in the folder chosen in Settings first, and says so when the launcher is no longer in it",
+  "calls": []
+}

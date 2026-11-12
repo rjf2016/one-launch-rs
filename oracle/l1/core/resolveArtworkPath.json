@@ -1,0 +1,595 @@
+{
+  "function": "resolveArtworkPath",
+  "source": "src/main/services/artwork-url.ts",
+  "note": "decode: none\narg0 is the request URL the onelaunch-art protocol handler receives, arg1 the artwork folder (getAppPaths().artworkDir). URL is the WHATWG parser of Node (as in the Electron main process): onelaunch-art is not a special scheme there, so its host is opaque. path.resolve is win32 on Windows.\nEvery artwork folder given is absolute: a relative one would be resolved against the working directory, which is not part of a vector.",
+  "cases": [
+    {
+      "id": "resolves-grid-jpg-query",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > resolves only <uuid>/<kind>.<ext> inside the artwork folder"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg?v=1",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "resolves-hero-webp",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > resolves only <uuid>/<kind>.<ext> inside the artwork folder"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/hero.webp",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\hero.webp"
+    },
+    {
+      "id": "resolves-logo-png",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > resolves only <uuid>/<kind>.<ext> inside the artwork folder"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/logo.png",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\logo.png"
+    },
+    {
+      "id": "resolves-grid-ico-query",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > resolves only <uuid>/<kind>.<ext> inside the artwork folder"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.ico?v=2",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.ico"
+    },
+    {
+      "id": "traversal-root",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://art/../onelaunch.db",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "traversal-up-two",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/../../onelaunch.db",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "encoded-slash",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/..%2F..%2Fonelaunch.db",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "encoded-dots",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://art/%2E%2E/%2E%2E/onelaunch.db",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "extra-segment",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg/extra",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "bad-extension",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.exe",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "double-extension",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg.tmp",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "upper-file",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/GRID.JPG",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "no-file",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "not-a-uuid",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://art/not-a-uuid/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "drive-path",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://art/C:/Windows/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "other-host",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "onelaunch-art://other/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "file-scheme",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "file:///3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "https-scheme",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "https://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "not-a-url",
+      "origin": {
+        "kind": "test",
+        "ref": "test/artwork-url.test.ts > artwork urls > rejects traversal, other schemes, other hosts, and anything not on the allowlist"
+      },
+      "args": [
+        "not a url",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "fixture-45973642-1c2e-49d3-bb17-13ba0ff75471-grid.webp",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/45973642-1c2e-49d3-bb17-13ba0ff75471/grid.webp | its url under the fixture data folder"
+      },
+      "args": [
+        "onelaunch-art://art/45973642-1c2e-49d3-bb17-13ba0ff75471/grid.webp",
+        "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork"
+      ],
+      "out": "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork\\45973642-1c2e-49d3-bb17-13ba0ff75471\\grid.webp"
+    },
+    {
+      "id": "fixture-7494eca8-f8d1-432f-92e2-714aeb48109b-grid.jpg",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/7494eca8-f8d1-432f-92e2-714aeb48109b/grid.jpg | its url under the fixture data folder"
+      },
+      "args": [
+        "onelaunch-art://art/7494eca8-f8d1-432f-92e2-714aeb48109b/grid.jpg",
+        "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork"
+      ],
+      "out": "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork\\7494eca8-f8d1-432f-92e2-714aeb48109b\\grid.jpg"
+    },
+    {
+      "id": "fixture-7494eca8-f8d1-432f-92e2-714aeb48109b-hero.jpg",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/7494eca8-f8d1-432f-92e2-714aeb48109b/hero.jpg | its url under the fixture data folder"
+      },
+      "args": [
+        "onelaunch-art://art/7494eca8-f8d1-432f-92e2-714aeb48109b/hero.jpg",
+        "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork"
+      ],
+      "out": "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork\\7494eca8-f8d1-432f-92e2-714aeb48109b\\hero.jpg"
+    },
+    {
+      "id": "fixture-7494eca8-f8d1-432f-92e2-714aeb48109b-logo.png",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/7494eca8-f8d1-432f-92e2-714aeb48109b/logo.png | its url under the fixture data folder"
+      },
+      "args": [
+        "onelaunch-art://art/7494eca8-f8d1-432f-92e2-714aeb48109b/logo.png",
+        "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork"
+      ],
+      "out": "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork\\7494eca8-f8d1-432f-92e2-714aeb48109b\\logo.png"
+    },
+    {
+      "id": "fixture-a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad-grid.jpg",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad/grid.jpg | its url under the fixture data folder"
+      },
+      "args": [
+        "onelaunch-art://art/a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad/grid.jpg",
+        "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork"
+      ],
+      "out": "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork\\a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad\\grid.jpg"
+    },
+    {
+      "id": "fixture-a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad-hero.jpg",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad/hero.jpg | its url under the fixture data folder"
+      },
+      "args": [
+        "onelaunch-art://art/a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad/hero.jpg",
+        "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork"
+      ],
+      "out": "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork\\a5c2b1cc-41d0-4d70-b41d-9fb7ee70a4ad\\hero.jpg"
+    },
+    {
+      "id": "fixture-b1da8942-3c88-4084-90fd-1cfdeeed454a-grid.png",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/b1da8942-3c88-4084-90fd-1cfdeeed454a/grid.png | its url under the fixture data folder"
+      },
+      "args": [
+        "onelaunch-art://art/b1da8942-3c88-4084-90fd-1cfdeeed454a/grid.png",
+        "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork"
+      ],
+      "out": "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork\\b1da8942-3c88-4084-90fd-1cfdeeed454a\\grid.png"
+    },
+    {
+      "id": "fixture-d48e5d4d-e887-4471-bab7-a5bc4d58ca17-grid.ico",
+      "origin": {
+        "kind": "fixture",
+        "ref": "fixtures/data-folder/artwork/d48e5d4d-e887-4471-bab7-a5bc4d58ca17/grid.ico | its url under the fixture data folder"
+      },
+      "args": [
+        "onelaunch-art://art/d48e5d4d-e887-4471-bab7-a5bc4d58ca17/grid.ico",
+        "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork"
+      ],
+      "out": "C:\\Users\\someone\\AppData\\Roaming\\OneLaunch\\artwork\\d48e5d4d-e887-4471-bab7-a5bc4d58ca17\\grid.ico"
+    },
+    {
+      "id": "every-kind-and-ext",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: logo.ico and hero.ico are on the allowlist too"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/hero.ico",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\hero.ico"
+    },
+    {
+      "id": "scheme-upper",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: the URL parser lowercases the scheme"
+      },
+      "args": [
+        "ONELAUNCH-ART://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "host-upper",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: a non-special URL keeps an opaque host as written, so ART is not art"
+      },
+      "args": [
+        "onelaunch-art://ART/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "host-percent",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an opaque host is not percent-decoded: %61rt is not art"
+      },
+      "args": [
+        "onelaunch-art://%61rt/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "credentials-and-port",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: user info and a port do not change the hostname"
+      },
+      "args": [
+        "onelaunch-art://u:p@art:8080/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "dot-segment",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the URL parser removes \".\" and \"..\" segments before the check"
+      },
+      "args": [
+        "onelaunch-art://art/x/../3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/./grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "encoded-dot-segment",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the URL parser treats %2e and %2E%2e as dot segments"
+      },
+      "args": [
+        "onelaunch-art://art/%2e/x/%2E%2e/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "empty-segments",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: empty segments are dropped before counting"
+      },
+      "args": [
+        "onelaunch-art://art//3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f//grid.jpg/",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "backslash-separator",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a backslash is not a separator in a non-special URL"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "hash",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a fragment is ignored"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg#x",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "outer-spaces",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: the URL parser strips leading and trailing C0 controls and spaces"
+      },
+      "args": [
+        " \t onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg \n",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "inner-tab-newline",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: the URL parser removes tabs and newlines anywhere"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/gr\tid.j\npg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "nbsp-not-stripped",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "unicode-space: U+00A0 is not stripped by the URL parser"
+      },
+      "args": [
+        " onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "upper-uuid",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "case-mapping: an upper-case game id is refused (a synthetic id: the bundle scan refuses the upper-case form of the test id)"
+      },
+      "args": [
+        "onelaunch-art://art/8F3C1A2B-0000-4000-8000-00000000ABCD/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "encoded-file-name",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a percent-encoded letter in the file name is not decoded"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/gr%69d.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "non-ascii-path",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a non-ASCII file name is percent-encoded by the parser and refused"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grïd.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "opaque-path",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: onelaunch-art:art/... without // has no host"
+      },
+      "args": [
+        "onelaunch-art:art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    },
+    {
+      "id": "dir-trailing-separator",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a trailing separator on the artwork folder is resolved away"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:\\data\\OneLaunch\\artwork\\"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "dir-forward-slashes",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an artwork folder with forward slashes and dot segments"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "D:/data/./OneLaunch/x/../artwork"
+      ],
+      "out": "D:\\data\\OneLaunch\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "dir-drive-root",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an artwork folder at a drive root never resolves: root + sep is C:\\\\, which the file path does not start with"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "C:\\"
+      ],
+      "out": null
+    },
+    {
+      "id": "dir-unc",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: an artwork folder on a UNC share"
+      },
+      "args": [
+        "onelaunch-art://art/3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f/grid.jpg",
+        "\\\\server\\share\\artwork"
+      ],
+      "out": "\\\\server\\share\\artwork\\3f2c9b1e-6d4a-4f0b-9c1d-2a7e8b5c4d3f\\grid.jpg"
+    },
+    {
+      "id": "empty-url",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: the empty string is not a URL"
+      },
+      "args": [
+        "",
+        "D:\\data\\OneLaunch\\artwork"
+      ],
+      "out": null
+    }
+  ]
+}

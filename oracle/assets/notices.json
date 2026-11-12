@@ -1,0 +1,17 @@
+{
+  "licence": {
+    "file": "assets/LICENSE.txt",
+    "source": "LICENSE",
+    "spdx": "MIT"
+  },
+  "electronInstallerPage": {
+    "file": "assets/installer-licence-page.txt",
+    "source": "build/license.txt as scripts/third-party-notices.mjs last wrote it (gitignored, not run here)",
+    "shape": "the MIT licence, a line of four dashes, then where the third-party licences are installed"
+  },
+  "rustInstallerMustCarry": [
+    "The MIT licence text of One Launch, exactly as assets/LICENSE.txt holds it.",
+    "Where the program is installed (the install folder), so the user can find the licence files next to the exe."
+  ],
+  "notCarried": "The Electron build lists npm packages, Electron and Chromium (THIRD-PARTY-NOTICES.txt, LICENSE.electron.txt, LICENSES.chromium.html). Those are specific to the npm build; the design says the Rust installer carries only the MIT text and the install location."
+}

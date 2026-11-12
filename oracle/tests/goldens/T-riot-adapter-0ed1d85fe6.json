@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-0ed1d85fe6",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot shutdown"
+  ],
+  "name": "does nothing when the client is not running, and closes window processes left behind without a core",
+  "calls": []
+}

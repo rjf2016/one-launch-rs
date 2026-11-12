@@ -1,0 +1,272 @@
+{
+  "function": "readLoginLogSince",
+  "source": "src/main/launchers/steam/login-log.ts",
+  "note": "decode: none\narg0 stands for the log file: { file: <bytes> } when <SteamPath>\\logs\\steamui_login.txt exists, {} when it does not. call writes the bytes to steamui_login.txt in a fresh temporary folder, passes that path, and removes the folder; the path never reaches the result.\narg1 is the mark; arg2 is maxBytes, undefined for the default MAX_TAIL_BYTES (512 KiB). The result is the decoded text (toString utf8).\nCaps: maxBytes at and over with small values (cap-max-*); the default is exercised by outcomeSince’s cap-tail-*.\ngap: src/main/launchers/steam/login-log.ts:85:11 catch, reached only when stat or read fails on a path that exists (a folder named like the log, a locked or unreadable file); no file content reaches it.\nThe default parameter maxBytes = MAX_TAIL_BYTES is not measured by the coverage tool (V8 keeps no counter for it); the cases with arg2 undefined use it.",
+  "cases": [
+    {
+      "id": "tail-100",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > reading only what Steam appends > reads the end of a log that is larger than one read, not its start"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "W3hdIFsgV2FpdGluZ0ZvclNlcnZlclJlc3BvbnNlIF0gU2V0TG9naW5TdGF0ZTogV2FpdGluZ0ZvckNyZWRlbnRpYWxzIC0gSW52YWxpZCBQYXNzd29yZApbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgV2FpdGluZ0ZvckxpYnJhcnlSZWFkeSBdIFNldExvZ2luU3RhdGU6IFN1Y2Nlc3MgLSBPSwo="
+          }
+        },
+        0,
+        100
+      ],
+      "out": "[x] [ None ] Starting login\n[x] [ WaitingForLibraryReady ] SetLoginState: Success - OK\n"
+    },
+    {
+      "id": "tail-100-from-old",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > reading only what Steam appends > reads the end of a log that is larger than one read, not its start"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "W3hdIFsgV2FpdGluZ0ZvclNlcnZlclJlc3BvbnNlIF0gU2V0TG9naW5TdGF0ZTogV2FpdGluZ0ZvckNyZWRlbnRpYWxzIC0gSW52YWxpZCBQYXNzd29yZApbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgTm9uZSBdIFN0YXJ0aW5nIGxvZ2luClt4XSBbIE5vbmUgXSBTdGFydGluZyBsb2dpbgpbeF0gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4KW3hdIFsgV2FpdGluZ0ZvckxpYnJhcnlSZWFkeSBdIFNldExvZ2luU3RhdGU6IFN1Y2Nlc3MgLSBPSwo="
+          }
+        },
+        89,
+        100
+      ],
+      "out": "[x] [ None ] Starting login\n[x] [ WaitingForLibraryReady ] SetLoginState: Success - OK\n"
+    },
+    {
+      "id": "appended-since-mark",
+      "origin": {
+        "kind": "test",
+        "ref": "test/steam-login-log.test.ts > reading only what Steam appends > ignores history before the mark and sees lines added after it"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "WzIwMjYtMDktMTIgMTU6MDA6NDNdIENsaWVudCB2ZXJzaW9uOiAxNzg4NjUyMjE1DQpbMjAyNi0wOS0xMiAxNTowMDo0M10gWyBOb25lIF0gU3RhcnRpbmcgbG9naW4NClsyMDI2LTA5LTEyIDE1OjAwOjQzXSBbIE5vbmUgXSBTZXRMb2dpblN0YXRlOiBXYWl0aW5nRm9yTmV0d29yayAtIE9LDQpbMjAyNi0wOS0xMiAxNTowMDo0M10gWyBXYWl0aW5nRm9yTmV0d29yayBdIFNldExvZ2luU3RhdGU6IFdhaXRpbmdGb3JTZXJ2ZXJSZXNwb25zZSAtIE9LDQpbMjAyNi0wOS0xMiAxNTowMDo0NV0gWyBXYWl0aW5nRm9yU2VydmVyUmVzcG9uc2UgXSBSZWNlaXZlZCBsb2dvbiBmYWlsdXJlIHJlc3BvbnNlDQpbMjAyNi0wOS0xMiAxNTowMDo0NV0gWyBXYWl0aW5nRm9yU2VydmVyUmVzcG9uc2UgXSBTZXRMb2dpblN0YXRlOiBXYWl0aW5nRm9yQ3JlZGVudGlhbHMgLSBBY2NvdW50IExvZ29uIERlbmllZA0KWzIwMjYtMDktMTIgMTU6MDA6NDVdIFsgV2FpdGluZ0ZvckNyZWRlbnRpYWxzIF0gVUkgUmVxdWVzdDogY29ubmVjdApbeF0gWyBXYWl0aW5nRm9yTGlicmFyeVJlYWR5IF0gU2V0TG9naW5TdGF0ZTogU3VjY2VzcyAtIE9LCg=="
+          }
+        },
+        521,
+        {
+          "$undefined": true
+        }
+      ],
+      "out": "[x] [ WaitingForLibraryReady ] SetLoginState: Success - OK\n"
+    },
+    {
+      "id": "missing-file",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a missing log reads as empty"
+      },
+      "args": [
+        {},
+        0,
+        {
+          "$undefined": true
+        }
+      ],
+      "out": ""
+    },
+    {
+      "id": "rotated",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a log smaller than the mark is read from its start"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "c2hvcnQK"
+          }
+        },
+        1000,
+        {
+          "$undefined": true
+        }
+      ],
+      "out": "short\n"
+    },
+    {
+      "id": "mark-at-end",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: nothing appended"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "YWJjCg=="
+          }
+        },
+        4,
+        {
+          "$undefined": true
+        }
+      ],
+      "out": ""
+    },
+    {
+      "id": "cap-max-at",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: exactly maxBytes after the mark: no clip, the first line is kept"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "Zmlyc3QKc2Vjb25kCg=="
+          }
+        },
+        0,
+        13
+      ],
+      "out": "first\nsecond\n"
+    },
+    {
+      "id": "cap-max-over",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: one byte over maxBytes: the clipped first line is dropped"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "Zmlyc3QKc2Vjb25kCg=="
+          }
+        },
+        0,
+        12
+      ],
+      "out": "second\n"
+    },
+    {
+      "id": "clip-no-newline",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a clipped read with no newline in it is empty"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "YWJjZGVmZ2hpag=="
+          }
+        },
+        0,
+        5
+      ],
+      "out": ""
+    },
+    {
+      "id": "clip-at-newline",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: a clip that starts on a newline drops only that newline"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "YWJjCmRlZgo="
+          }
+        },
+        0,
+        5
+      ],
+      "out": "def\n"
+    },
+    {
+      "id": "max-zero",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: maxBytes 0 reads nothing"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "YWJjCg=="
+          }
+        },
+        0,
+        0
+      ],
+      "out": ""
+    },
+    {
+      "id": "clip-mid-character",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: a clip inside a multi-byte character: the partial first line with its U+FFFD is dropped"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "YWLwn5iAY2QKbmV4dAo="
+          }
+        },
+        0,
+        10
+      ],
+      "out": "next\n"
+    },
+    {
+      "id": "mark-mid-character",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: a mark inside a multi-byte character with no clip: the continuation bytes stay as U+FFFD"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "8J+YgHgK"
+          }
+        },
+        2,
+        {
+          "$undefined": true
+        }
+      ],
+      "out": "��x\n"
+    },
+    {
+      "id": "bom-kept",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf8-decode: a BOM at the start of an unclipped read is kept as U+FEFF"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "77u/YQo="
+          }
+        },
+        0,
+        {
+          "$undefined": true
+        }
+      ],
+      "out": "﻿a\n"
+    },
+    {
+      "id": "crlf-kept",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: line endings are returned as they are"
+      },
+      "args": [
+        {
+          "file": {
+            "$bytes": "YQ0KYg0K"
+          }
+        },
+        0,
+        {
+          "$undefined": true
+        }
+      ],
+      "out": "a\r\nb\r\n"
+    }
+  ]
+}

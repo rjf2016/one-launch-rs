@@ -1,0 +1,859 @@
+{
+  "function": "groupSteps",
+  "source": "src/renderer/src/lib/phases.ts",
+  "note": "decode: none\narg0 is the job steps (JobStep[]: id, title, status, detail), arg1 whether the job is still running. out is Phase[]: id, status and current, the JobStep object itself or null.",
+  "cases": [
+    {
+      "id": "test-running-switch",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > groupSteps > collapses a running switch into phases and points at the running step"
+      },
+      "args": [
+        [
+          {
+            "id": "close",
+            "status": "done",
+            "title": "close",
+            "detail": ""
+          },
+          {
+            "id": "backup",
+            "status": "done",
+            "title": "backup",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "status": "running",
+            "title": "Write loginusers.vdf",
+            "detail": ""
+          },
+          {
+            "id": "registry",
+            "status": "pending",
+            "title": "registry",
+            "detail": ""
+          },
+          {
+            "id": "start",
+            "status": "pending",
+            "title": "start",
+            "detail": ""
+          },
+          {
+            "id": "verify",
+            "status": "pending",
+            "title": "verify",
+            "detail": ""
+          },
+          {
+            "id": "launch",
+            "status": "pending",
+            "title": "launch",
+            "detail": ""
+          }
+        ],
+        true
+      ],
+      "out": [
+        {
+          "id": "close",
+          "status": "done",
+          "current": null
+        },
+        {
+          "id": "switch",
+          "status": "running",
+          "current": {
+            "id": "file",
+            "status": "running",
+            "title": "Write loginusers.vdf",
+            "detail": ""
+          }
+        },
+        {
+          "id": "start",
+          "status": "pending",
+          "current": null
+        },
+        {
+          "id": "signin",
+          "status": "pending",
+          "current": null
+        },
+        {
+          "id": "launch",
+          "status": "pending",
+          "current": null
+        }
+      ]
+    },
+    {
+      "id": "test-gap",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > groupSteps > shows the gap between two steps as still running"
+      },
+      "args": [
+        [
+          {
+            "id": "backup",
+            "status": "done",
+            "title": "backup",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "status": "pending",
+            "title": "file",
+            "detail": ""
+          },
+          {
+            "id": "start",
+            "status": "pending",
+            "title": "start",
+            "detail": ""
+          }
+        ],
+        true
+      ],
+      "out": [
+        {
+          "id": "switch",
+          "status": "running",
+          "current": null
+        },
+        {
+          "id": "start",
+          "status": "pending",
+          "current": null
+        }
+      ]
+    },
+    {
+      "id": "test-handover",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > groupSteps > marks a phase done when its last step is done even if an earlier one failed"
+      },
+      "args": [
+        [
+          {
+            "id": "verify",
+            "status": "failed",
+            "title": "Automatic sign-in",
+            "detail": ""
+          },
+          {
+            "id": "manual",
+            "status": "done",
+            "title": "Handed over",
+            "detail": ""
+          }
+        ],
+        false
+      ],
+      "out": [
+        {
+          "id": "signin",
+          "status": "done",
+          "current": null
+        }
+      ]
+    },
+    {
+      "id": "test-stopped-midway",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > groupSteps > marks the phase failed when the job stopped mid-way and names the failed step"
+      },
+      "args": [
+        [
+          {
+            "id": "close",
+            "status": "done",
+            "title": "close",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "status": "failed",
+            "title": "Write config",
+            "detail": ""
+          },
+          {
+            "id": "registry",
+            "status": "pending",
+            "title": "registry",
+            "detail": ""
+          }
+        ],
+        false
+      ],
+      "out": [
+        {
+          "id": "close",
+          "status": "done",
+          "current": null
+        },
+        {
+          "id": "switch",
+          "status": "failed",
+          "current": {
+            "id": "file",
+            "status": "failed",
+            "title": "Write config",
+            "detail": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "test-running-stopped",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > groupSteps > turns a running phase into failed once the job is no longer running"
+      },
+      "args": [
+        [
+          {
+            "id": "close",
+            "status": "done",
+            "title": "close",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "status": "running",
+            "title": "file",
+            "detail": ""
+          }
+        ],
+        false
+      ],
+      "out": [
+        {
+          "id": "close",
+          "status": "done",
+          "current": null
+        },
+        {
+          "id": "switch",
+          "status": "failed",
+          "current": {
+            "id": "file",
+            "status": "running",
+            "title": "file",
+            "detail": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "test-all-skipped",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > groupSteps > skips a phase whose steps were all skipped and drops phases with no steps"
+      },
+      "args": [
+        [
+          {
+            "id": "close",
+            "status": "skipped",
+            "title": "close",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "status": "done",
+            "title": "file",
+            "detail": ""
+          },
+          {
+            "id": "start",
+            "status": "done",
+            "title": "start",
+            "detail": ""
+          }
+        ],
+        false
+      ],
+      "out": [
+        {
+          "id": "close",
+          "status": "skipped",
+          "current": null
+        },
+        {
+          "id": "switch",
+          "status": "done",
+          "current": null
+        },
+        {
+          "id": "start",
+          "status": "done",
+          "current": null
+        }
+      ]
+    },
+    {
+      "id": "test-unknown-id",
+      "origin": {
+        "kind": "test",
+        "ref": "test/phases.test.ts > groupSteps > files unknown step ids under the switch phase"
+      },
+      "args": [
+        [
+          {
+            "id": "something-new",
+            "status": "done",
+            "title": "something-new",
+            "detail": ""
+          }
+        ],
+        false
+      ],
+      "out": [
+        {
+          "id": "switch",
+          "status": "done",
+          "current": null
+        }
+      ]
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: groupSteps with no steps: no phases"
+      },
+      "args": [
+        [],
+        true
+      ],
+      "out": []
+    },
+    {
+      "id": "all-pending",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: groupSteps with every step pending"
+      },
+      "args": [
+        [
+          {
+            "id": "close",
+            "status": "pending",
+            "title": "close",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "status": "pending",
+            "title": "file",
+            "detail": ""
+          }
+        ],
+        true
+      ],
+      "out": [
+        {
+          "id": "close",
+          "status": "pending",
+          "current": null
+        },
+        {
+          "id": "switch",
+          "status": "pending",
+          "current": null
+        }
+      ]
+    },
+    {
+      "id": "gap-stopped-no-failure",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: groupSteps gap between steps when the job stopped: failed, current is the last live step"
+      },
+      "args": [
+        [
+          {
+            "id": "backup",
+            "status": "done",
+            "title": "backup",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "status": "pending",
+            "title": "file",
+            "detail": ""
+          }
+        ],
+        false
+      ],
+      "out": [
+        {
+          "id": "switch",
+          "status": "failed",
+          "current": {
+            "id": "file",
+            "status": "pending",
+            "title": "file",
+            "detail": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "gap-stopped-earlier-failure",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: groupSteps gap after a failed step when the job stopped: current is the last failed step"
+      },
+      "args": [
+        [
+          {
+            "id": "backup",
+            "status": "failed",
+            "title": "Back up",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "status": "done",
+            "title": "file",
+            "detail": ""
+          },
+          {
+            "id": "registry",
+            "status": "pending",
+            "title": "registry",
+            "detail": ""
+          }
+        ],
+        false
+      ],
+      "out": [
+        {
+          "id": "switch",
+          "status": "failed",
+          "current": {
+            "id": "backup",
+            "status": "failed",
+            "title": "Back up",
+            "detail": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "last-failed-running-job",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: groupSteps last step failed while the job still runs: failed"
+      },
+      "args": [
+        [
+          {
+            "id": "file",
+            "status": "done",
+            "title": "file",
+            "detail": ""
+          },
+          {
+            "id": "registry",
+            "status": "failed",
+            "title": "Write key",
+            "detail": ""
+          }
+        ],
+        true
+      ],
+      "out": [
+        {
+          "id": "switch",
+          "status": "failed",
+          "current": {
+            "id": "registry",
+            "status": "failed",
+            "title": "Write key",
+            "detail": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "two-failures",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: groupSteps two failed steps: current is the later one"
+      },
+      "args": [
+        [
+          {
+            "id": "file",
+            "status": "failed",
+            "title": "First",
+            "detail": ""
+          },
+          {
+            "id": "registry",
+            "status": "failed",
+            "title": "Second",
+            "detail": ""
+          }
+        ],
+        false
+      ],
+      "out": [
+        {
+          "id": "switch",
+          "status": "failed",
+          "current": {
+            "id": "registry",
+            "status": "failed",
+            "title": "Second",
+            "detail": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "skipped-last",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: groupSteps a skipped step after a done one: the done step is the last live one"
+      },
+      "args": [
+        [
+          {
+            "id": "file",
+            "status": "done",
+            "title": "file",
+            "detail": ""
+          },
+          {
+            "id": "registry",
+            "status": "skipped",
+            "title": "registry",
+            "detail": ""
+          }
+        ],
+        false
+      ],
+      "out": [
+        {
+          "id": "switch",
+          "status": "done",
+          "current": null
+        }
+      ]
+    },
+    {
+      "id": "two-running",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: groupSteps two running steps in one phase: current is the first"
+      },
+      "args": [
+        [
+          {
+            "id": "file",
+            "status": "running",
+            "title": "One",
+            "detail": ""
+          },
+          {
+            "id": "registry",
+            "status": "running",
+            "title": "Two",
+            "detail": ""
+          }
+        ],
+        true
+      ],
+      "out": [
+        {
+          "id": "switch",
+          "status": "running",
+          "current": {
+            "id": "file",
+            "status": "running",
+            "title": "One",
+            "detail": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "out-of-order",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "sort: groupSteps steps out of phase order: phases come in the fixed order"
+      },
+      "args": [
+        [
+          {
+            "id": "launch",
+            "status": "pending",
+            "title": "launch",
+            "detail": ""
+          },
+          {
+            "id": "start",
+            "status": "done",
+            "title": "start",
+            "detail": ""
+          },
+          {
+            "id": "close",
+            "status": "done",
+            "title": "close",
+            "detail": ""
+          }
+        ],
+        false
+      ],
+      "out": [
+        {
+          "id": "close",
+          "status": "done",
+          "current": null
+        },
+        {
+          "id": "start",
+          "status": "done",
+          "current": null
+        },
+        {
+          "id": "launch",
+          "status": "pending",
+          "current": null
+        }
+      ]
+    },
+    {
+      "id": "duplicate-ids",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: groupSteps the same step id twice"
+      },
+      "args": [
+        [
+          {
+            "id": "file",
+            "status": "done",
+            "title": "A",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "status": "running",
+            "title": "B",
+            "detail": ""
+          }
+        ],
+        true
+      ],
+      "out": [
+        {
+          "id": "switch",
+          "status": "running",
+          "current": {
+            "id": "file",
+            "status": "running",
+            "title": "B",
+            "detail": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "done-then-pending",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: groupSteps done followed by pending in a running job: running with no current step"
+      },
+      "args": [
+        [
+          {
+            "id": "start",
+            "status": "done",
+            "title": "start",
+            "detail": ""
+          },
+          {
+            "id": "wait",
+            "status": "pending",
+            "title": "wait",
+            "detail": ""
+          }
+        ],
+        true
+      ],
+      "out": [
+        {
+          "id": "start",
+          "status": "running",
+          "current": null
+        }
+      ]
+    },
+    {
+      "id": "proto-step-id",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "json: groupSteps a step whose id names an Object.prototype member: phaseOf returns a function, which matches no phase, so the step disappears"
+      },
+      "args": [
+        [
+          {
+            "id": "constructor",
+            "status": "running",
+            "title": "constructor",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "status": "done",
+            "title": "file",
+            "detail": ""
+          }
+        ],
+        true
+      ],
+      "out": [
+        {
+          "id": "switch",
+          "status": "done",
+          "current": null
+        }
+      ]
+    },
+    {
+      "id": "every-phase-done",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "other: groupSteps every phase done after the job finished"
+      },
+      "args": [
+        [
+          {
+            "id": "close",
+            "status": "done",
+            "title": "close",
+            "detail": ""
+          },
+          {
+            "id": "capture",
+            "status": "done",
+            "title": "capture",
+            "detail": ""
+          },
+          {
+            "id": "backup",
+            "status": "done",
+            "title": "backup",
+            "detail": ""
+          },
+          {
+            "id": "file",
+            "status": "done",
+            "title": "file",
+            "detail": ""
+          },
+          {
+            "id": "registry",
+            "status": "done",
+            "title": "registry",
+            "detail": ""
+          },
+          {
+            "id": "registry-user",
+            "status": "done",
+            "title": "registry-user",
+            "detail": ""
+          },
+          {
+            "id": "registry-remember",
+            "status": "done",
+            "title": "registry-remember",
+            "detail": ""
+          },
+          {
+            "id": "start",
+            "status": "done",
+            "title": "start",
+            "detail": ""
+          },
+          {
+            "id": "wait",
+            "status": "done",
+            "title": "wait",
+            "detail": ""
+          },
+          {
+            "id": "verify",
+            "status": "done",
+            "title": "verify",
+            "detail": ""
+          },
+          {
+            "id": "login",
+            "status": "done",
+            "title": "login",
+            "detail": ""
+          },
+          {
+            "id": "manual",
+            "status": "done",
+            "title": "manual",
+            "detail": ""
+          },
+          {
+            "id": "recapture",
+            "status": "done",
+            "title": "recapture",
+            "detail": ""
+          },
+          {
+            "id": "launch",
+            "status": "done",
+            "title": "launch",
+            "detail": ""
+          }
+        ],
+        false
+      ],
+      "out": [
+        {
+          "id": "close",
+          "status": "done",
+          "current": null
+        },
+        {
+          "id": "switch",
+          "status": "done",
+          "current": null
+        },
+        {
+          "id": "start",
+          "status": "done",
+          "current": null
+        },
+        {
+          "id": "signin",
+          "status": "done",
+          "current": null
+        },
+        {
+          "id": "launch",
+          "status": "done",
+          "current": null
+        }
+      ]
+    }
+  ]
+}

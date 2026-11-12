@@ -1,0 +1,2518 @@
+{
+  "lucide": {
+    "package": "lucide-react",
+    "version": "1.45.0",
+    "react": "19.3.0",
+    "reactDom": "19.3.0",
+    "rendered": "react-dom/server renderToStaticMarkup of each export with no props: the package defaults (24 px box, stroke 2, currentColor)",
+    "distinctImports": 56,
+    "icons": [
+      {
+        "name": "AlertTriangle",
+        "file": "assets/icons/lucide/AlertTriangle.svg",
+        "class": "lucide lucide-triangle-alert lucide-alert-triangle",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/BackupsPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/ConfirmDialog.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/GameCard.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 2
+          },
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/RecoveryDialog.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/BackupsPanel.tsx",
+            "line": 69,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-3.5 shrink-0"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/ConfirmDialog.tsx",
+            "line": 38,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-5 shrink-0 text-warning"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/GameCard.tsx",
+            "line": 94,
+            "as": "element",
+            "props": {
+              "className": "size-3"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 552,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-3.5 shrink-0"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 581,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-3.5 shrink-0 text-warning"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 614,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-3.5 shrink-0 text-warning"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 71,
+            "as": "element",
+            "props": {
+              "className": "size-3"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/RecoveryDialog.tsx",
+            "line": 57,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-5 shrink-0 text-warning"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 130,
+            "as": "element",
+            "props": {
+              "className": "size-4"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 46,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-3.5 shrink-0"
+            }
+          }
+        ],
+        "sizes": [
+          "size-3",
+          "size-3.5",
+          "size-4",
+          "size-5"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Archive",
+        "file": "assets/icons/lucide/Archive.svg",
+        "class": "lucide lucide-archive",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 8,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "ArrowDownUp",
+        "file": "assets/icons/lucide/ArrowDownUp.svg",
+        "class": "lucide lucide-arrow-down-up",
+        "imports": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 366,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "ArrowLeft",
+        "file": "assets/icons/lucide/ArrowLeft.svg",
+        "class": "lucide lucide-arrow-left",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SetupGuide.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SetupGuide.tsx",
+            "line": 332,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 395,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "ArrowRight",
+        "file": "assets/icons/lucide/ArrowRight.svg",
+        "class": "lucide lucide-arrow-right",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SetupGuide.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SetupGuide.tsx",
+            "line": 263,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuide.tsx",
+            "line": 265,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "ArrowRightLeft",
+        "file": "assets/icons/lucide/ArrowRightLeft.svg",
+        "class": "lucide lucide-arrow-right-left",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 3
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 499,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 653,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Check",
+        "file": "assets/icons/lucide/Check.svg",
+        "class": "lucide lucide-check",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/Dropdown.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/ImportAccountsDialog.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 4
+          },
+          {
+            "file": "src/renderer/src/components/LaunchHost.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/RecoveryDialog.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/Dropdown.tsx",
+            "line": 189,
+            "as": "element",
+            "props": {
+              "className": "{`size-3.5 ${selected ? 'text-accent' : 'invisible'}`}"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/ImportAccountsDialog.tsx",
+            "line": 189,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 81,
+            "as": "element",
+            "props": {
+              "className": "{`${cls} text-success`}"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 266,
+            "as": "element",
+            "props": {
+              "className": "size-3 text-white"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 649,
+            "as": "element",
+            "props": {
+              "className": "size-3"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchHost.tsx",
+            "line": 45,
+            "as": "value",
+            "where": "job.state === 'done' ? Check : XCircle"
+          },
+          {
+            "file": "src/renderer/src/components/RecoveryDialog.tsx",
+            "line": 55,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-5 shrink-0 text-success"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 184,
+            "as": "element",
+            "props": {
+              "className": "size-3.5"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 82,
+            "as": "element",
+            "props": {
+              "className": "size-3"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 119,
+            "as": "element",
+            "props": {
+              "className": "size-3"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 279,
+            "as": "element",
+            "props": {
+              "className": "size-3"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 397,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 431,
+            "as": "element",
+            "props": {
+              "className": "size-3.5 text-accent"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 472,
+            "as": "element",
+            "props": {
+              "className": "size-7"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 312,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 474,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 663,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "className={`${cls} text-success`}",
+          "className={`size-3.5 ${selected ? 'text-accent' : 'invisible'}`}",
+          "none on the element",
+          "size-3",
+          "size-3.5",
+          "size-5",
+          "size-7"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "ChevronDown",
+        "file": "assets/icons/lucide/ChevronDown.svg",
+        "class": "lucide lucide-chevron-down",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/Collapsible.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/Dropdown.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/MenuButton.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/Collapsible.tsx",
+            "line": 22,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/Dropdown.tsx",
+            "line": 158,
+            "as": "element",
+            "props": {
+              "className": "{`ml-0.5 text-faint transition-transform duration-150 ${dense ? 'size-3.5' : 'size-4'} ${open ? 'rotate-180' : ''}`}"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 60,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/MenuButton.tsx",
+            "line": 122,
+            "as": "element",
+            "props": {
+              "className": "{`-mr-0.5 size-3.5 transition-transform duration-150 ${variant === 'primary' ? 'text-white/70' : 'text-faint'} ${open ? 'rotate-180' : ''}`}"
+            }
+          }
+        ],
+        "sizes": [
+          "className={`ml-0.5 text-faint transition-transform duration-150 ${dense ? 'size-3.5' : 'size-4'} ${open ? 'rotate-180' : ''}`}",
+          "none on the element",
+          "size-3.5"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "ChevronRight",
+        "file": "assets/icons/lucide/ChevronRight.svg",
+        "class": "lucide lucide-chevron-right",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/BackupsPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/Collapsible.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/BackupsPanel.tsx",
+            "line": 103,
+            "as": "element",
+            "props": {
+              "className": "{`size-3.5 shrink-0 text-faint transition-transform duration-150 ${open ? 'rotate-90' : ''}`}"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/Collapsible.tsx",
+            "line": 22,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 60,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 25,
+            "as": "element",
+            "props": {
+              "className": "guide-rise size-4 shrink-0 text-faint",
+              "style": "{{ animationDelay: '80ms' }}"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 37,
+            "as": "element",
+            "props": {
+              "className": "guide-rise size-4 shrink-0 text-faint",
+              "style": "{{ animationDelay: '220ms' }}"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 83,
+            "as": "element",
+            "props": {
+              "className": "size-4 shrink-0 text-faint transition-colors group-hover:text-muted"
+            }
+          }
+        ],
+        "sizes": [
+          "className={`size-3.5 shrink-0 text-faint transition-transform duration-150 ${open ? 'rotate-90' : ''}`}",
+          "none on the element",
+          "size-4"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "CircleArrowDown",
+        "file": "assets/icons/lucide/CircleArrowDown.svg",
+        "class": "lucide lucide-circle-arrow-down lucide-arrow-down-circle",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 127,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-3.5 shrink-0 text-accent-hover"
+            }
+          }
+        ],
+        "sizes": [
+          "size-3.5"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "CircleDashed",
+        "file": "assets/icons/lucide/CircleDashed.svg",
+        "class": "lucide lucide-circle-dashed",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 5
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 84,
+            "as": "element",
+            "props": {
+              "className": "{`${cls} text-faint`}"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 85,
+            "as": "element",
+            "props": {
+              "className": "{`${cls} text-faint`}"
+            }
+          }
+        ],
+        "sizes": [
+          "className={`${cls} text-faint`}"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "CircleStop",
+        "file": "assets/icons/lucide/CircleStop.svg",
+        "class": "lucide lucide-circle-stop lucide-stop-circle",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 6
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 772,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Clock",
+        "file": "assets/icons/lucide/Clock.svg",
+        "class": "lucide lucide-clock",
+        "imports": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 419,
+            "as": "element",
+            "props": {
+              "className": "size-3.5"
+            }
+          }
+        ],
+        "sizes": [
+          "size-3.5"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Copy",
+        "file": "assets/icons/lucide/Copy.svg",
+        "class": "lucide lucide-copy",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 7
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 235,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 239,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 262,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 265,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Download",
+        "file": "assets/icons/lucide/Download.svg",
+        "class": "lucide lucide-download",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/ImportAccountsDialog.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/ImportAccountsDialog.tsx",
+            "line": 189,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 169,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 185,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "ExternalLink",
+        "file": "assets/icons/lucide/ExternalLink.svg",
+        "class": "lucide lucide-external-link",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/ArtworkPanel.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/ArtworkPanel.tsx",
+            "line": 163,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Eye",
+        "file": "assets/icons/lucide/Eye.svg",
+        "class": "lucide lucide-eye",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/WhatsNewDevPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/WhatsNewDevPanel.tsx",
+            "line": 39,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 307,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 505,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "EyeOff",
+        "file": "assets/icons/lucide/EyeOff.svg",
+        "class": "lucide lucide-eye-off",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 8
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 780,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 307,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 505,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "FileText",
+        "file": "assets/icons/lucide/FileText.svg",
+        "class": "lucide lucide-file-text",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 9,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Filter",
+        "file": "assets/icons/lucide/Filter.svg",
+        "class": "lucide lucide-funnel lucide-filter",
+        "imports": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 350,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "FlaskConical",
+        "file": "assets/icons/lucide/FlaskConical.svg",
+        "class": "lucide lucide-flask-conical",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 9
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 598,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-4 shrink-0 text-warning"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 248,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-3.5 shrink-0 text-warning"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 92,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-3.5 shrink-0"
+            }
+          }
+        ],
+        "sizes": [
+          "size-3.5",
+          "size-4"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "FolderOpen",
+        "file": "assets/icons/lucide/FolderOpen.svg",
+        "class": "lucide lucide-folder-open",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/BackupsPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/SettingsView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/BackupsPanel.tsx",
+            "line": 185,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/SettingsView.tsx",
+            "line": 350,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/SettingsView.tsx",
+            "line": 353,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "FolderSearch",
+        "file": "assets/icons/lucide/FolderSearch.svg",
+        "class": "lucide lucide-folder-search",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 46,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 124,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Gamepad2",
+        "file": "assets/icons/lucide/Gamepad2.svg",
+        "class": "lucide lucide-gamepad-2",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 154,
+            "as": "element",
+            "props": {
+              "className": "size-4 shrink-0 text-accent"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 401,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element",
+          "size-4"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Hourglass",
+        "file": "assets/icons/lucide/Hourglass.svg",
+        "class": "lucide lucide-hourglass",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 12,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "ImagePlus",
+        "file": "assets/icons/lucide/ImagePlus.svg",
+        "class": "lucide lucide-image-plus",
+        "imports": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 391,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Images",
+        "file": "assets/icons/lucide/Images.svg",
+        "class": "lucide lucide-images",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/ArtworkPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/ArtworkPanel.tsx",
+            "line": 145,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 204,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-4 shrink-0 text-accent"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 294,
+            "as": "element",
+            "props": {
+              "className": "size-3.5 animate-pulse"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 304,
+            "as": "element",
+            "props": {
+              "className": "size-3.5"
+            }
+          }
+        ],
+        "sizes": [
+          "none on the element",
+          "size-3.5",
+          "size-4"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Info",
+        "file": "assets/icons/lucide/Info.svg",
+        "class": "lucide lucide-info",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 10
+          },
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 94,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-3.5 shrink-0"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 57,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-3.5 shrink-0"
+            }
+          }
+        ],
+        "sizes": [
+          "size-3.5"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "KeyRound",
+        "file": "assets/icons/lucide/KeyRound.svg",
+        "class": "lucide lucide-key-round",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 11
+          },
+          {
+            "file": "src/renderer/src/components/LaunchHost.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 216,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-4 shrink-0 text-warning"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 661,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-4 shrink-0"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 723,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/LaunchHost.tsx",
+            "line": 45,
+            "as": "value",
+            "where": "job.attention ? KeyRound : Loader2"
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 29,
+            "as": "element",
+            "props": {
+              "className": "size-4 shrink-0 text-accent"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 239,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 278,
+            "as": "element",
+            "props": {
+              "className": "size-4"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 322,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 49,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 180,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element",
+          "size-4"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "LayoutGrid",
+        "file": "assets/icons/lucide/LayoutGrid.svg",
+        "class": "lucide lucide-layout-grid",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SetupGuide.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SetupGuide.tsx",
+            "line": 259,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 16,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "ListChecks",
+        "file": "assets/icons/lucide/ListChecks.svg",
+        "class": "lucide lucide-list-checks",
+        "imports": [
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 380,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Loader2",
+        "file": "assets/icons/lucide/Loader2.svg",
+        "class": "lucide lucide-loader-circle lucide-loader-2",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/GameCard.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 12
+          },
+          {
+            "file": "src/renderer/src/components/LaunchHost.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/GameCard.tsx",
+            "line": 101,
+            "as": "element",
+            "props": {
+              "className": "animate-spin"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 82,
+            "as": "element",
+            "props": {
+              "className": "{`${cls} animate-spin text-accent`}"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchHost.tsx",
+            "line": 45,
+            "as": "value",
+            "where": "job.attention ? KeyRound : Loader2"
+          },
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 46,
+            "as": "element",
+            "props": {
+              "className": "animate-spin"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 85,
+            "as": "element",
+            "props": {
+              "className": "size-4 animate-spin text-accent"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 124,
+            "as": "element",
+            "props": {
+              "className": "animate-spin"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 158,
+            "as": "element",
+            "props": {
+              "className": "size-3.5 animate-spin"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 397,
+            "as": "element",
+            "props": {
+              "className": "animate-spin"
+            }
+          }
+        ],
+        "sizes": [
+          "className={`${cls} animate-spin text-accent`}",
+          "none on the element",
+          "size-3.5",
+          "size-4"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "MoreHorizontal",
+        "file": "assets/icons/lucide/MoreHorizontal.svg",
+        "class": "lucide lucide-ellipsis lucide-more-horizontal",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/GameCard.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/GameCard.tsx",
+            "line": 112,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "PanelLeftClose",
+        "file": "assets/icons/lucide/PanelLeftClose.svg",
+        "class": "lucide lucide-panel-left-close lucide-sidebar-close",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 145,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "PanelLeftOpen",
+        "file": "assets/icons/lucide/PanelLeftOpen.svg",
+        "class": "lucide lucide-panel-left-open lucide-sidebar-open",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 145,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Play",
+        "file": "assets/icons/lucide/Play.svg",
+        "class": "lucide lucide-play",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/GameCard.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 13
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/GameCard.tsx",
+            "line": 101,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 499,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 653,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-4 shrink-0 text-accent"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 42,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideArt.tsx",
+            "line": 69,
+            "as": "element",
+            "props": {
+              "className": "size-3.5 shrink-0 text-accent"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 11,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element",
+          "size-3.5",
+          "size-4"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Plus",
+        "file": "assets/icons/lucide/Plus.svg",
+        "class": "lucide lucide-plus",
+        "imports": [
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 170,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 186,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Power",
+        "file": "assets/icons/lucide/Power.svg",
+        "class": "lucide lucide-power",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 14
+          },
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 132,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-4 shrink-0"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 742,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 7,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element",
+          "size-4"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "RefreshCw",
+        "file": "assets/icons/lucide/RefreshCw.svg",
+        "class": "lucide lucide-refresh-cw",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/ArtworkPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/BackupsPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/UpdatesPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/ArtworkPanel.tsx",
+            "line": 137,
+            "as": "element",
+            "props": {
+              "className": "{busy === 'rescan' ? 'animate-spin' : ''}"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/BackupsPanel.tsx",
+            "line": 182,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/LauncherStatusPanel.tsx",
+            "line": 160,
+            "as": "element",
+            "props": {
+              "className": "{status.loading ? 'animate-spin' : ''}"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 112,
+            "as": "element",
+            "props": {
+              "className": "{query.loading ? 'animate-spin' : ''}"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/UpdatesPanel.tsx",
+            "line": 109,
+            "as": "element",
+            "props": {
+              "className": "{busy ? 'animate-spin motion-reduce:animate-none' : ''}"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 307,
+            "as": "element",
+            "props": {
+              "className": "{scanning ? 'animate-spin' : ''}"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 390,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 409,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "className={busy === 'rescan' ? 'animate-spin' : ''}",
+          "className={busy ? 'animate-spin motion-reduce:animate-none' : ''}",
+          "className={query.loading ? 'animate-spin' : ''}",
+          "className={scanning ? 'animate-spin' : ''}",
+          "className={status.loading ? 'animate-spin' : ''}",
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Repeat",
+        "file": "assets/icons/lucide/Repeat.svg",
+        "class": "lucide lucide-repeat",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 236,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "RotateCcw",
+        "file": "assets/icons/lucide/RotateCcw.svg",
+        "class": "lucide lucide-rotate-ccw",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/BackupsPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 15
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/BackupsPanel.tsx",
+            "line": 80,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/BackupsPanel.tsx",
+            "line": 133,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 788,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "RotateCw",
+        "file": "assets/icons/lucide/RotateCw.svg",
+        "class": "lucide lucide-rotate-cw",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/UpdatesPanel.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/UpdatesPanel.tsx",
+            "line": 104,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Save",
+        "file": "assets/icons/lucide/Save.svg",
+        "class": "lucide lucide-save",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 117,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Search",
+        "file": "assets/icons/lucide/Search.svg",
+        "class": "lucide lucide-search",
+        "imports": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 315,
+            "as": "element",
+            "props": {
+              "className": "pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint"
+            }
+          }
+        ],
+        "sizes": [
+          "size-4"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "SearchX",
+        "file": "assets/icons/lucide/SearchX.svg",
+        "class": "lucide lucide-search-x",
+        "imports": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 456,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Settings",
+        "file": "assets/icons/lucide/Settings.svg",
+        "class": "lucide lucide-settings",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 18,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "ShieldCheck",
+        "file": "assets/icons/lucide/ShieldCheck.svg",
+        "class": "lucide lucide-shield-check",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/SettingsView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 130,
+            "as": "element",
+            "props": {
+              "className": "size-4"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 71,
+            "as": "element",
+            "props": {
+              "className": "size-3.5 shrink-0 text-success"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuideSteps.tsx",
+            "line": 242,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 274,
+            "as": "element",
+            "props": {
+              "className": "size-4"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/SettingsView.tsx",
+            "line": 329,
+            "as": "element",
+            "props": {
+              "className": "size-4"
+            }
+          }
+        ],
+        "sizes": [
+          "none on the element",
+          "size-3.5",
+          "size-4"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "ShieldOff",
+        "file": "assets/icons/lucide/ShieldOff.svg",
+        "class": "lucide lucide-shield-off",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/SettingsView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 137,
+            "as": "element",
+            "props": {
+              "className": "size-4"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/SettingsView.tsx",
+            "line": 158,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-4 shrink-0"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/SettingsView.tsx",
+            "line": 325,
+            "as": "element",
+            "props": {
+              "className": "size-4"
+            }
+          },
+          {
+            "file": "src/renderer/src/views/SettingsView.tsx",
+            "line": 334,
+            "as": "element",
+            "props": {
+              "className": "size-4"
+            }
+          }
+        ],
+        "sizes": [
+          "size-4"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "SlidersHorizontal",
+        "file": "assets/icons/lucide/SlidersHorizontal.svg",
+        "class": "lucide lucide-sliders-horizontal",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SwitchPlanView.tsx",
+            "line": 10,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "StickyNote",
+        "file": "assets/icons/lucide/StickyNote.svg",
+        "class": "lucide lucide-sticky-note",
+        "imports": [
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 66,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Trash2",
+        "file": "assets/icons/lucide/Trash2.svg",
+        "class": "lucide lucide-trash lucide-trash-2",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/ArtworkPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/ArtworkPanel.tsx",
+            "line": 159,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 169,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/SessionPanel.tsx",
+            "line": 177,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 696,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/AccountDetailView.tsx",
+            "line": 704,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "UserPlus",
+        "file": "assets/icons/lucide/UserPlus.svg",
+        "class": "lucide lucide-user-plus",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/SetupGuide.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/SetupGuide.tsx",
+            "line": 256,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "UserRound",
+        "file": "assets/icons/lucide/UserRound.svg",
+        "class": "lucide lucide-user-round lucide-user-2",
+        "imports": [
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/views/AccountsView.tsx",
+            "line": 49,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "Users",
+        "file": "assets/icons/lucide/Users.svg",
+        "class": "lucide lucide-users",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/Sidebar.tsx",
+            "line": 17,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 389,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "X",
+        "file": "assets/icons/lucide/X.svg",
+        "class": "lucide lucide-x",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/ImportAccountsDialog.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 16
+          },
+          {
+            "file": "src/renderer/src/components/LaunchHost.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuide.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/TagInput.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/components/WhatsNewDialog.tsx",
+            "line": 1
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/ImportAccountsDialog.tsx",
+            "line": 154,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 543,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/LaunchHost.tsx",
+            "line": 60,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/SetupGuide.tsx",
+            "line": 296,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/TagInput.tsx",
+            "line": 49,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/components/WhatsNewDialog.tsx",
+            "line": 117,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 342,
+            "as": "element",
+            "props": {}
+          },
+          {
+            "file": "src/renderer/src/views/LibraryView.tsx",
+            "line": 465,
+            "as": "element",
+            "props": {}
+          }
+        ],
+        "sizes": [
+          "none on the element"
+        ],
+        "strokeWidths": []
+      },
+      {
+        "name": "XCircle",
+        "file": "assets/icons/lucide/XCircle.svg",
+        "class": "lucide lucide-circle-x lucide-x-circle",
+        "imports": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 17
+          },
+          {
+            "file": "src/renderer/src/components/LaunchHost.tsx",
+            "line": 1
+          }
+        ],
+        "uses": [
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 83,
+            "as": "element",
+            "props": {
+              "className": "{`${cls} text-danger`}"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 631,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-4 shrink-0"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 669,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-4 shrink-0"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchDialog.tsx",
+            "line": 711,
+            "as": "element",
+            "props": {
+              "className": "mt-0.5 size-4 shrink-0"
+            }
+          },
+          {
+            "file": "src/renderer/src/components/LaunchHost.tsx",
+            "line": 45,
+            "as": "value",
+            "where": "job.state === 'done' ? Check : XCircle"
+          }
+        ],
+        "sizes": [
+          "className={`${cls} text-danger`}",
+          "size-4"
+        ],
+        "strokeWidths": []
+      }
+    ]
+  },
+  "brandMark": {
+    "file": "assets/icons/brand-mark.svg",
+    "source": "src/renderer/src/components/BrandMark.tsx, rendered with no className",
+    "same": [
+      "assets/icons/build-icon-mono.svg"
+    ]
+  },
+  "buildIcons": [
+    {
+      "file": "assets/icons/build-icon.svg",
+      "source": "build/icon.svg"
+    },
+    {
+      "file": "assets/icons/build-icon-mono.svg",
+      "source": "build/icon-mono.svg"
+    }
+  ],
+  "appIco": {
+    "file": "assets/icons/app.ico",
+    "source": "dist/.icon-ico/icon.ico",
+    "from": "an existing packaged build output (electron-builder writes it from build/icon.png); not rebuilt here",
+    "sha256": "90a51a8eb8de38d3627cd262e2ec0da5b817c3672942cb46e6fcb95b9a57dcee",
+    "images": [
+      {
+        "width": 16,
+        "height": 16,
+        "bitsPerPixel": 32,
+        "bytes": 734,
+        "png": true
+      },
+      {
+        "width": 24,
+        "height": 24,
+        "bitsPerPixel": 32,
+        "bytes": 1466,
+        "png": true
+      },
+      {
+        "width": 32,
+        "height": 32,
+        "bitsPerPixel": 32,
+        "bytes": 1441,
+        "png": true
+      },
+      {
+        "width": 48,
+        "height": 48,
+        "bitsPerPixel": 32,
+        "bytes": 3208,
+        "png": true
+      },
+      {
+        "width": 64,
+        "height": 64,
+        "bitsPerPixel": 32,
+        "bytes": 2818,
+        "png": true
+      },
+      {
+        "width": 128,
+        "height": 128,
+        "bitsPerPixel": 32,
+        "bytes": 7527,
+        "png": true
+      },
+      {
+        "width": 256,
+        "height": 256,
+        "bitsPerPixel": 32,
+        "bytes": 18488,
+        "png": true
+      }
+    ]
+  },
+  "tray": {
+    "folder": "assets/icons/tray",
+    "made": "by capture.mjs (tray.cjs under Electron); see tray/tray.json"
+  }
+}

@@ -1,0 +1,1460 @@
+{
+  "electron": "44.7.0",
+  "clock": "2026-11-06T16:46:23.000Z",
+  "viewport": [
+    1280,
+    800
+  ],
+  "properties": [
+    "display",
+    "visibility",
+    "opacity",
+    "position",
+    "overflow-x",
+    "overflow-y",
+    "transform",
+    "color",
+    "background-color",
+    "background-image",
+    "font-family",
+    "font-size",
+    "font-weight",
+    "line-height",
+    "letter-spacing",
+    "text-decoration-line",
+    "border-top-width",
+    "border-right-width",
+    "border-bottom-width",
+    "border-left-width",
+    "border-top-style",
+    "border-right-style",
+    "border-bottom-style",
+    "border-left-style",
+    "border-top-color",
+    "border-right-color",
+    "border-bottom-color",
+    "border-left-color",
+    "border-top-left-radius",
+    "border-top-right-radius",
+    "border-bottom-right-radius",
+    "border-bottom-left-radius",
+    "padding-top",
+    "padding-right",
+    "padding-bottom",
+    "padding-left",
+    "box-shadow",
+    "outline-style",
+    "outline-width",
+    "outline-color",
+    "outline-offset",
+    "cursor"
+  ],
+  "primitives": [
+    {
+      "name": "nav-item",
+      "page": "Library",
+      "tag": "button",
+      "cls": "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] whitespace-nowrap transition-colors duration-150 [&>svg]:size-5 [&>svg]:shrink-0 text-muted hover:bg-surface-2/60 hover:text-text",
+      "label": "Accounts",
+      "normal": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "relative",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#8f97ab",
+        "background-color": "#00000000",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "15px",
+        "font-weight": "400",
+        "line-height": "21.75px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "0px",
+        "border-right-width": "0px",
+        "border-bottom-width": "0px",
+        "border-left-width": "0px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#8f97ab",
+        "border-right-color": "#8f97ab",
+        "border-bottom-color": "#8f97ab",
+        "border-left-color": "#8f97ab",
+        "border-top-left-radius": "8px",
+        "border-top-right-radius": "8px",
+        "border-bottom-right-radius": "8px",
+        "border-bottom-left-radius": "8px",
+        "padding-top": "10px",
+        "padding-right": "12px",
+        "padding-bottom": "10px",
+        "padding-left": "12px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#8f97ab",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "color": "#e8eaf0",
+            "background-color": "#1a1e2899",
+            "border-top-color": "#e8eaf0",
+            "border-right-color": "#e8eaf0",
+            "border-bottom-color": "#e8eaf0",
+            "border-left-color": "#e8eaf0",
+            "outline-color": "#e8eaf0"
+          }
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {
+            "color": "#e8eaf0",
+            "background-color": "#1a1e2899",
+            "border-top-color": "#e8eaf0",
+            "border-right-color": "#e8eaf0",
+            "border-bottom-color": "#e8eaf0",
+            "border-left-color": "#e8eaf0",
+            "outline-color": "#e8eaf0"
+          }
+        }
+      }
+    },
+    {
+      "name": "nav-item-current",
+      "page": "Library",
+      "tag": "button",
+      "cls": "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] whitespace-nowrap transition-colors duration-150 [&>svg]:size-5 [&>svg]:shrink-0 bg-surface-2 text-text-strong",
+      "label": "Library",
+      "normal": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "relative",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#ffffff",
+        "background-color": "#1a1e28",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "15px",
+        "font-weight": "400",
+        "line-height": "21.75px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "0px",
+        "border-right-width": "0px",
+        "border-bottom-width": "0px",
+        "border-left-width": "0px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#ffffff",
+        "border-right-color": "#ffffff",
+        "border-bottom-color": "#ffffff",
+        "border-left-color": "#ffffff",
+        "border-top-left-radius": "8px",
+        "border-top-right-radius": "8px",
+        "border-bottom-right-radius": "8px",
+        "border-bottom-left-radius": "8px",
+        "padding-top": "10px",
+        "padding-right": "12px",
+        "padding-bottom": "10px",
+        "padding-left": "12px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#ffffff",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {}
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        }
+      }
+    },
+    {
+      "name": "icon-button",
+      "page": "Library",
+      "tag": "button",
+      "cls": "flex size-9 shrink-0 items-center justify-center rounded-lg text-faint transition-colors duration-150 hover:bg-surface-2 hover:text-text [&>svg]:size-[18px]",
+      "label": "Collapse sidebar",
+      "normal": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#7f879b",
+        "background-color": "#00000000",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "400",
+        "line-height": "20.3px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "0px",
+        "border-right-width": "0px",
+        "border-bottom-width": "0px",
+        "border-left-width": "0px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#7f879b",
+        "border-right-color": "#7f879b",
+        "border-bottom-color": "#7f879b",
+        "border-left-color": "#7f879b",
+        "border-top-left-radius": "8px",
+        "border-top-right-radius": "8px",
+        "border-bottom-right-radius": "8px",
+        "border-bottom-left-radius": "8px",
+        "padding-top": "0px",
+        "padding-right": "0px",
+        "padding-bottom": "0px",
+        "padding-left": "0px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#7f879b",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "color": "#e8eaf0",
+            "background-color": "#1a1e28",
+            "border-top-color": "#e8eaf0",
+            "border-right-color": "#e8eaf0",
+            "border-bottom-color": "#e8eaf0",
+            "border-left-color": "#e8eaf0",
+            "outline-color": "#e8eaf0"
+          }
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {
+            "color": "#e8eaf0",
+            "background-color": "#1a1e28",
+            "border-top-color": "#e8eaf0",
+            "border-right-color": "#e8eaf0",
+            "border-bottom-color": "#e8eaf0",
+            "border-left-color": "#e8eaf0",
+            "outline-color": "#e8eaf0"
+          }
+        }
+      }
+    },
+    {
+      "name": "button-secondary",
+      "page": "Library",
+      "tag": "button",
+      "cls": "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 disabled:opacity-50 bg-surface-2 text-text border border-border hover:bg-surface-3 hover:border-border-strong disabled:hover:bg-surface-2 ",
+      "label": "Rescan",
+      "normal": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#e8eaf0",
+        "background-color": "#1a1e28",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "500",
+        "line-height": "20px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "1px",
+        "border-right-width": "1px",
+        "border-bottom-width": "1px",
+        "border-left-width": "1px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#262b38",
+        "border-right-color": "#262b38",
+        "border-bottom-color": "#262b38",
+        "border-left-color": "#262b38",
+        "border-top-left-radius": "8px",
+        "border-top-right-radius": "8px",
+        "border-bottom-right-radius": "8px",
+        "border-bottom-left-radius": "8px",
+        "padding-top": "6px",
+        "padding-right": "12px",
+        "padding-bottom": "6px",
+        "padding-left": "12px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#e8eaf0",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "background-color": "#222736",
+            "border-top-color": "#343a4b",
+            "border-right-color": "#343a4b",
+            "border-bottom-color": "#343a4b",
+            "border-left-color": "#343a4b"
+          }
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {
+            "background-color": "#222736",
+            "border-top-color": "#343a4b",
+            "border-right-color": "#343a4b",
+            "border-bottom-color": "#343a4b",
+            "border-left-color": "#343a4b"
+          }
+        },
+        "disabled": {
+          "how": "the disabled attribute set on the element, then removed",
+          "changes": {
+            "opacity": "0.5",
+            "cursor": "not-allowed"
+          }
+        }
+      }
+    },
+    {
+      "name": "dropdown-trigger",
+      "page": "Library",
+      "tag": "button",
+      "cls": "inline-flex items-center rounded-lg border whitespace-nowrap transition-colors duration-150 focus-visible:border-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60  gap-2 py-1.5 px-3 text-sm font-medium border-border bg-surface-2 text-text hover:border-border-strong hover:bg-surface-3 shrink-0",
+      "label": "Filter",
+      "normal": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#e8eaf0",
+        "background-color": "#1a1e28",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "500",
+        "line-height": "20px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "1px",
+        "border-right-width": "1px",
+        "border-bottom-width": "1px",
+        "border-left-width": "1px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#262b38",
+        "border-right-color": "#262b38",
+        "border-bottom-color": "#262b38",
+        "border-left-color": "#262b38",
+        "border-top-left-radius": "8px",
+        "border-top-right-radius": "8px",
+        "border-bottom-right-radius": "8px",
+        "border-bottom-left-radius": "8px",
+        "padding-top": "6px",
+        "padding-right": "12px",
+        "padding-bottom": "6px",
+        "padding-left": "12px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#e8eaf0",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "background-color": "#222736",
+            "border-top-color": "#343a4b",
+            "border-right-color": "#343a4b",
+            "border-bottom-color": "#343a4b",
+            "border-left-color": "#343a4b"
+          }
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "border-top-color": "#8b5cf6",
+            "border-right-color": "#8b5cf6",
+            "border-bottom-color": "#8b5cf6",
+            "border-left-color": "#8b5cf6",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {
+            "background-color": "#222736",
+            "border-top-color": "#343a4b",
+            "border-right-color": "#343a4b",
+            "border-bottom-color": "#343a4b",
+            "border-left-color": "#343a4b"
+          }
+        },
+        "disabled": {
+          "how": "the disabled attribute set on the element, then removed",
+          "changes": {
+            "opacity": "0.6",
+            "cursor": "not-allowed"
+          }
+        }
+      }
+    },
+    {
+      "name": "search-input",
+      "page": "Library",
+      "tag": "input",
+      "cls": "w-full rounded-lg border border-border bg-surface py-1.5 pr-9 pl-9 text-sm text-text placeholder:text-faint transition-colors duration-150 hover:border-border-strong focus:border-accent focus:outline-none disabled:opacity-60 disabled:hover:border-border",
+      "label": "Search games",
+      "normal": {
+        "display": "inline-block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "clip",
+        "overflow-y": "clip",
+        "transform": "none",
+        "color": "#e8eaf0",
+        "background-color": "#12151c",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "400",
+        "line-height": "20px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "1px",
+        "border-right-width": "1px",
+        "border-bottom-width": "1px",
+        "border-left-width": "1px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#262b38",
+        "border-right-color": "#262b38",
+        "border-bottom-color": "#262b38",
+        "border-left-color": "#262b38",
+        "border-top-left-radius": "8px",
+        "border-top-right-radius": "8px",
+        "border-bottom-right-radius": "8px",
+        "border-bottom-left-radius": "8px",
+        "padding-top": "6px",
+        "padding-right": "36px",
+        "padding-bottom": "6px",
+        "padding-left": "36px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#e8eaf0",
+        "outline-offset": "0px",
+        "cursor": "text"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "border-top-color": "#343a4b",
+            "border-right-color": "#343a4b",
+            "border-bottom-color": "#343a4b",
+            "border-left-color": "#343a4b"
+          }
+        },
+        "focus": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "border-top-color": "#8b5cf6",
+            "border-right-color": "#8b5cf6",
+            "border-bottom-color": "#8b5cf6",
+            "border-left-color": "#8b5cf6",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "disabled": {
+          "how": "the disabled attribute set on the element, then removed",
+          "changes": {
+            "opacity": "0.6",
+            "cursor": "default"
+          }
+        }
+      }
+    },
+    {
+      "name": "game-card",
+      "page": "Library",
+      "tag": "div",
+      "cls": "group relative overflow-hidden rounded-panel border border-border bg-surface text-left transition-colors duration-150 hover:border-border-strong focus-within:border-accent",
+      "label": "UpdateRocket LeagueSteam · 3 months ago",
+      "normal": {
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "relative",
+        "overflow-x": "hidden",
+        "overflow-y": "hidden",
+        "transform": "none",
+        "color": "#e8eaf0",
+        "background-color": "#12151c",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "400",
+        "line-height": "20.3px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "1px",
+        "border-right-width": "1px",
+        "border-bottom-width": "1px",
+        "border-left-width": "1px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#262b38",
+        "border-right-color": "#262b38",
+        "border-bottom-color": "#262b38",
+        "border-left-color": "#262b38",
+        "border-top-left-radius": "12px",
+        "border-top-right-radius": "12px",
+        "border-bottom-right-radius": "12px",
+        "border-bottom-left-radius": "12px",
+        "padding-top": "0px",
+        "padding-right": "0px",
+        "padding-bottom": "0px",
+        "padding-left": "0px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#e8eaf0",
+        "outline-offset": "0px",
+        "cursor": "auto"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "border-top-color": "#343a4b",
+            "border-right-color": "#343a4b",
+            "border-bottom-color": "#343a4b",
+            "border-left-color": "#343a4b"
+          }
+        },
+        "focus-within": {
+          "how": "CSS.forcePseudoState focus-within",
+          "changes": {
+            "border-top-color": "#8b5cf6",
+            "border-right-color": "#8b5cf6",
+            "border-bottom-color": "#8b5cf6",
+            "border-left-color": "#8b5cf6"
+          }
+        }
+      }
+    },
+    {
+      "name": "game-card-play",
+      "page": "Library",
+      "tag": "button",
+      "cls": "block w-full text-left focus-visible:outline-none",
+      "label": "Play Rocket League",
+      "normal": {
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#e8eaf0",
+        "background-color": "#00000000",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "400",
+        "line-height": "20.3px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "0px",
+        "border-right-width": "0px",
+        "border-bottom-width": "0px",
+        "border-left-width": "0px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#e8eaf0",
+        "border-right-color": "#e8eaf0",
+        "border-bottom-color": "#e8eaf0",
+        "border-left-color": "#e8eaf0",
+        "border-top-left-radius": "0px",
+        "border-top-right-radius": "0px",
+        "border-bottom-right-radius": "0px",
+        "border-bottom-left-radius": "0px",
+        "padding-top": "0px",
+        "padding-right": "0px",
+        "padding-bottom": "0px",
+        "padding-left": "0px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#e8eaf0",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {}
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {}
+        }
+      }
+    },
+    {
+      "name": "card-menu-button",
+      "page": "Library",
+      "tag": "button",
+      "cls": "absolute top-2 right-2 flex size-7 items-center justify-center rounded-md border border-border bg-bg/80 text-muted opacity-0 backdrop-blur transition-opacity duration-150 group-hover:opacity-100 hover:text-text focus-visible:opacity-100 [&>svg]:size-4",
+      "label": "More for Rocket League",
+      "normal": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "0",
+        "position": "absolute",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#8f97ab",
+        "background-color": "#0b0d12cc",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "400",
+        "line-height": "20.3px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "1px",
+        "border-right-width": "1px",
+        "border-bottom-width": "1px",
+        "border-left-width": "1px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#262b38",
+        "border-right-color": "#262b38",
+        "border-bottom-color": "#262b38",
+        "border-left-color": "#262b38",
+        "border-top-left-radius": "6px",
+        "border-top-right-radius": "6px",
+        "border-bottom-right-radius": "6px",
+        "border-bottom-left-radius": "6px",
+        "padding-top": "0px",
+        "padding-right": "0px",
+        "padding-bottom": "0px",
+        "padding-left": "0px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#8f97ab",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "color": "#e8eaf0",
+            "outline-color": "#e8eaf0"
+          }
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "opacity": "1",
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {
+            "color": "#e8eaf0",
+            "outline-color": "#e8eaf0"
+          }
+        }
+      }
+    },
+    {
+      "name": "menu-option",
+      "page": "Library",
+      "tag": "div",
+      "cls": "flex cursor-pointer items-center gap-2 rounded-md py-1.5 pr-2 pl-2.5 text-sm whitespace-nowrap bg-surface-3 text-text-strong",
+      "label": "Steam (1)",
+      "normal": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#ffffff",
+        "background-color": "#222736",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "400",
+        "line-height": "20px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "0px",
+        "border-right-width": "0px",
+        "border-bottom-width": "0px",
+        "border-left-width": "0px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#ffffff",
+        "border-right-color": "#ffffff",
+        "border-bottom-color": "#ffffff",
+        "border-left-color": "#ffffff",
+        "border-top-left-radius": "6px",
+        "border-top-right-radius": "6px",
+        "border-bottom-right-radius": "6px",
+        "border-bottom-left-radius": "6px",
+        "padding-top": "6px",
+        "padding-right": "8px",
+        "padding-bottom": "6px",
+        "padding-left": "10px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#ffffff",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {}
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {}
+        }
+      }
+    },
+    {
+      "name": "button-primary",
+      "page": "Accounts",
+      "tag": "button",
+      "cls": "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 disabled:opacity-50 bg-accent text-white hover:bg-accent-hover disabled:hover:bg-accent ",
+      "label": "Add account",
+      "normal": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#ffffff",
+        "background-color": "#8b5cf6",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "500",
+        "line-height": "20px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "0px",
+        "border-right-width": "0px",
+        "border-bottom-width": "0px",
+        "border-left-width": "0px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#ffffff",
+        "border-right-color": "#ffffff",
+        "border-bottom-color": "#ffffff",
+        "border-left-color": "#ffffff",
+        "border-top-left-radius": "8px",
+        "border-top-right-radius": "8px",
+        "border-bottom-right-radius": "8px",
+        "border-bottom-left-radius": "8px",
+        "padding-top": "6px",
+        "padding-right": "12px",
+        "padding-bottom": "6px",
+        "padding-left": "12px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#ffffff",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "background-color": "#9d75ff"
+          }
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {
+            "background-color": "#9d75ff"
+          }
+        },
+        "disabled": {
+          "how": "the disabled attribute set on the element, then removed",
+          "changes": {
+            "opacity": "0.5",
+            "cursor": "not-allowed"
+          }
+        }
+      }
+    },
+    {
+      "name": "list-row",
+      "page": "Accounts",
+      "tag": "button",
+      "cls": "group flex w-full items-center gap-4 px-4 py-3 text-left transition-colors duration-150 hover:bg-surface-2/60 focus-visible:bg-surface-2/60",
+      "label": "Persona Oneuser_1Not used yet",
+      "normal": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#e8eaf0",
+        "background-color": "#00000000",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "400",
+        "line-height": "20.3px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "0px",
+        "border-right-width": "0px",
+        "border-bottom-width": "1px",
+        "border-left-width": "0px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#262b38",
+        "border-right-color": "#262b38",
+        "border-bottom-color": "#262b38",
+        "border-left-color": "#262b38",
+        "border-top-left-radius": "0px",
+        "border-top-right-radius": "0px",
+        "border-bottom-right-radius": "0px",
+        "border-bottom-left-radius": "0px",
+        "padding-top": "12px",
+        "padding-right": "16px",
+        "padding-bottom": "12px",
+        "padding-left": "16px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#e8eaf0",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "background-color": "#1a1e2899"
+          }
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "background-color": "#1a1e2899",
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {
+            "background-color": "#1a1e2899"
+          }
+        }
+      }
+    },
+    {
+      "name": "button-ghost",
+      "page": "Account",
+      "tag": "button",
+      "cls": "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 disabled:opacity-50 text-muted hover:text-text hover:bg-surface-2 -ml-3 text-text mb-1",
+      "label": "Accounts",
+      "normal": {
+        "display": "inline-flex",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#e8eaf0",
+        "background-color": "#00000000",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "500",
+        "line-height": "20px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "0px",
+        "border-right-width": "0px",
+        "border-bottom-width": "0px",
+        "border-left-width": "0px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#e8eaf0",
+        "border-right-color": "#e8eaf0",
+        "border-bottom-color": "#e8eaf0",
+        "border-left-color": "#e8eaf0",
+        "border-top-left-radius": "8px",
+        "border-top-right-radius": "8px",
+        "border-bottom-right-radius": "8px",
+        "border-bottom-left-radius": "8px",
+        "padding-top": "6px",
+        "padding-right": "12px",
+        "padding-bottom": "6px",
+        "padding-left": "12px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#e8eaf0",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "background-color": "#1a1e28"
+          }
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {
+            "background-color": "#1a1e28"
+          }
+        },
+        "disabled": {
+          "how": "the disabled attribute set on the element, then removed",
+          "changes": {
+            "opacity": "0.5",
+            "cursor": "not-allowed"
+          }
+        }
+      }
+    },
+    {
+      "name": "button-danger",
+      "page": "Account",
+      "tag": "button",
+      "cls": "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 disabled:opacity-50 border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20 hover:border-danger/70 disabled:hover:bg-danger/10 ",
+      "label": "Delete account",
+      "normal": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#f25f5c",
+        "background-color": "#f25f5c1a",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "500",
+        "line-height": "20px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "1px",
+        "border-right-width": "1px",
+        "border-bottom-width": "1px",
+        "border-left-width": "1px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#f25f5c66",
+        "border-right-color": "#f25f5c66",
+        "border-bottom-color": "#f25f5c66",
+        "border-left-color": "#f25f5c66",
+        "border-top-left-radius": "8px",
+        "border-top-right-radius": "8px",
+        "border-bottom-right-radius": "8px",
+        "border-bottom-left-radius": "8px",
+        "padding-top": "6px",
+        "padding-right": "12px",
+        "padding-bottom": "6px",
+        "padding-left": "12px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#f25f5c",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "background-color": "#f25f5c33",
+            "border-top-color": "#f25f5cb3",
+            "border-right-color": "#f25f5cb3",
+            "border-bottom-color": "#f25f5cb3",
+            "border-left-color": "#f25f5cb3"
+          }
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {
+            "background-color": "#f25f5c33",
+            "border-top-color": "#f25f5cb3",
+            "border-right-color": "#f25f5cb3",
+            "border-bottom-color": "#f25f5cb3",
+            "border-left-color": "#f25f5cb3"
+          }
+        },
+        "disabled": {
+          "how": "the disabled attribute set on the element, then removed",
+          "changes": {
+            "opacity": "0.5",
+            "cursor": "not-allowed"
+          }
+        }
+      }
+    },
+    {
+      "name": "tab",
+      "page": "Settings",
+      "tag": "button",
+      "cls": "-mb-px border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors duration-150 border-transparent text-muted hover:text-text",
+      "label": "Launchers",
+      "normal": {
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#8f97ab",
+        "background-color": "#00000000",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "400",
+        "line-height": "20px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "0px",
+        "border-right-width": "0px",
+        "border-bottom-width": "2px",
+        "border-left-width": "0px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#00000000",
+        "border-right-color": "#00000000",
+        "border-bottom-color": "#00000000",
+        "border-left-color": "#00000000",
+        "border-top-left-radius": "0px",
+        "border-top-right-radius": "0px",
+        "border-bottom-right-radius": "0px",
+        "border-bottom-left-radius": "0px",
+        "padding-top": "8px",
+        "padding-right": "12px",
+        "padding-bottom": "8px",
+        "padding-left": "12px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#8f97ab",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {
+            "color": "#e8eaf0",
+            "outline-color": "#e8eaf0"
+          }
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {
+            "color": "#e8eaf0",
+            "outline-color": "#e8eaf0"
+          }
+        }
+      }
+    },
+    {
+      "name": "tab-selected",
+      "page": "Settings",
+      "tag": "button",
+      "cls": "-mb-px border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors duration-150 border-accent text-text-strong",
+      "label": "General",
+      "normal": {
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#ffffff",
+        "background-color": "#00000000",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "400",
+        "line-height": "20px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "0px",
+        "border-right-width": "0px",
+        "border-bottom-width": "2px",
+        "border-left-width": "0px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#8b5cf6",
+        "border-right-color": "#8b5cf6",
+        "border-bottom-color": "#8b5cf6",
+        "border-left-color": "#8b5cf6",
+        "border-top-left-radius": "0px",
+        "border-top-right-radius": "0px",
+        "border-bottom-right-radius": "0px",
+        "border-bottom-left-radius": "0px",
+        "padding-top": "8px",
+        "padding-right": "12px",
+        "padding-bottom": "8px",
+        "padding-left": "12px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#ffffff",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {}
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        }
+      }
+    },
+    {
+      "name": "switch",
+      "page": "Settings",
+      "tag": "button",
+      "cls": "relative h-6 w-11 shrink-0 rounded-full border transition-colors duration-150 disabled:opacity-50 border-border-strong bg-surface-3",
+      "label": "Start with Windows",
+      "normal": {
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "relative",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#8f97ab",
+        "background-color": "#222736",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "400",
+        "line-height": "20px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "1px",
+        "border-right-width": "1px",
+        "border-bottom-width": "1px",
+        "border-left-width": "1px",
+        "border-top-style": "solid",
+        "border-right-style": "solid",
+        "border-bottom-style": "solid",
+        "border-left-style": "solid",
+        "border-top-color": "#343a4b",
+        "border-right-color": "#343a4b",
+        "border-bottom-color": "#343a4b",
+        "border-left-color": "#343a4b",
+        "border-top-left-radius": "3.35544e+07px",
+        "border-top-right-radius": "3.35544e+07px",
+        "border-bottom-right-radius": "3.35544e+07px",
+        "border-bottom-left-radius": "3.35544e+07px",
+        "padding-top": "0px",
+        "padding-right": "0px",
+        "padding-bottom": "0px",
+        "padding-left": "0px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#8f97ab",
+        "outline-offset": "0px",
+        "cursor": "pointer"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {}
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {}
+        },
+        "disabled": {
+          "how": "the disabled attribute set on the element, then removed",
+          "changes": {
+            "opacity": "0.5",
+            "cursor": "not-allowed"
+          }
+        }
+      }
+    },
+    {
+      "name": "checkbox",
+      "page": "Import",
+      "tag": "input",
+      "cls": "size-4 accent-accent",
+      "label": "",
+      "normal": {
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow-x": "visible",
+        "overflow-y": "visible",
+        "transform": "none",
+        "color": "#e8eaf0",
+        "background-color": "#00000000",
+        "background-image": "none",
+        "font-family": "\"Segoe UI Variable Text\", \"Segoe UI\", ui-sans-serif, system-ui, -apple-system, \"Helvetica Neue\", Arial, sans-serif",
+        "font-size": "14px",
+        "font-weight": "400",
+        "line-height": "20.3px",
+        "letter-spacing": "normal",
+        "text-decoration-line": "none",
+        "border-top-width": "0px",
+        "border-right-width": "0px",
+        "border-bottom-width": "0px",
+        "border-left-width": "0px",
+        "border-top-style": "none",
+        "border-right-style": "none",
+        "border-bottom-style": "none",
+        "border-left-style": "none",
+        "border-top-color": "#e8eaf0",
+        "border-right-color": "#e8eaf0",
+        "border-bottom-color": "#e8eaf0",
+        "border-left-color": "#e8eaf0",
+        "border-top-left-radius": "0px",
+        "border-top-right-radius": "0px",
+        "border-bottom-right-radius": "0px",
+        "border-bottom-left-radius": "0px",
+        "padding-top": "0px",
+        "padding-right": "0px",
+        "padding-bottom": "0px",
+        "padding-left": "0px",
+        "box-shadow": "none",
+        "outline-style": "none",
+        "outline-width": "3px",
+        "outline-color": "#e8eaf0",
+        "outline-offset": "0px",
+        "cursor": "default"
+      },
+      "states": {
+        "hover": {
+          "how": "CSS.forcePseudoState hover",
+          "changes": {}
+        },
+        "focus-visible": {
+          "how": "CSS.forcePseudoState focus, focus-visible",
+          "changes": {
+            "outline-style": "solid",
+            "outline-width": "2px",
+            "outline-color": "#8b5cf6",
+            "outline-offset": "2px"
+          }
+        },
+        "active": {
+          "how": "CSS.forcePseudoState active, hover",
+          "changes": {}
+        },
+        "disabled": {
+          "how": "the disabled attribute set on the element, then removed",
+          "changes": {}
+        }
+      }
+    }
+  ]
+}

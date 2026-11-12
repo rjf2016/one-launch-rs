@@ -1,0 +1,183 @@
+{
+  "function": "maskLogin",
+  "source": "src/main/launchers/battlenet/config.ts",
+  "note": "decode: none\narg0 is a saved login, in memory. planSavedAccountNames shows every login but the target through it. It slices by UTF-16 unit.",
+  "cases": [
+    {
+      "id": "email",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the per-account close preferences and masks logins"
+      },
+      "args": [
+        "someone@example.com"
+      ],
+      "out": "s…@example.com"
+    },
+    {
+      "id": "two-chars",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the per-account close preferences and masks logins"
+      },
+      "args": [
+        "ab"
+      ],
+      "out": "ab"
+    },
+    {
+      "id": "battletag",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the per-account close preferences and masks logins"
+      },
+      "args": [
+        "battletag"
+      ],
+      "out": "b…"
+    },
+    {
+      "id": "empty",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the per-account close preferences and masks logins | an empty login"
+      },
+      "args": [
+        ""
+      ],
+      "out": ""
+    },
+    {
+      "id": "one-char",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the per-account close preferences and masks logins | a one-character login"
+      },
+      "args": [
+        "a"
+      ],
+      "out": "a"
+    },
+    {
+      "id": "cap-short-at",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the per-account close preferences and masks logins | two characters, the longest login shown whole"
+      },
+      "args": [
+        "xy"
+      ],
+      "out": "xy"
+    },
+    {
+      "id": "cap-short-over",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the per-account close preferences and masks logins | three characters"
+      },
+      "args": [
+        "xyz"
+      ],
+      "out": "x…"
+    },
+    {
+      "id": "at-first",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the per-account close preferences and masks logins | the @ is the first character"
+      },
+      "args": [
+        "@example.com"
+      ],
+      "out": "@…"
+    },
+    {
+      "id": "at-second",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the per-account close preferences and masks logins | one character before the @"
+      },
+      "args": [
+        "a@example.com"
+      ],
+      "out": "a…@example.com"
+    },
+    {
+      "id": "two-ats",
+      "origin": {
+        "kind": "test",
+        "ref": "test/battlenet-files.test.ts > Battle.net.config > reads the per-account close preferences and masks logins | two @ signs: the first one splits"
+      },
+      "args": [
+        "a@b@example.com"
+      ],
+      "out": "a…@b@example.com"
+    },
+    {
+      "id": "astral-first",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an astral first character: login[0] is its high surrogate alone"
+      },
+      "args": [
+        "😀x@example.com"
+      ],
+      "out": {
+        "$utf16": [
+          55357,
+          8230,
+          64,
+          101,
+          120,
+          97,
+          109,
+          112,
+          108,
+          101,
+          46,
+          99,
+          111,
+          109
+        ]
+      }
+    },
+    {
+      "id": "astral-only",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: a single astral character is two UTF-16 units, so it is shown whole"
+      },
+      "args": [
+        "😀"
+      ],
+      "out": "😀"
+    },
+    {
+      "id": "astral-tag",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: an astral character then a letter: three units, masked to a lone high surrogate"
+      },
+      "args": [
+        "😀x"
+      ],
+      "out": {
+        "$utf16": [
+          55357,
+          8230
+        ]
+      }
+    },
+    {
+      "id": "combining",
+      "origin": {
+        "kind": "adversarial",
+        "ref": "utf16-length: a base letter and a combining mark: two units, shown whole"
+      },
+      "args": [
+        "é"
+      ],
+      "out": "é"
+    }
+  ]
+}

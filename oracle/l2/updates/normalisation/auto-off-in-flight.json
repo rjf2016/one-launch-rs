@@ -1,0 +1,41 @@
+{
+  "condition": "auto-off-in-flight",
+  "runs": 3,
+  "digests": [
+    "ace8fc2f94a8662a98a63c6abc3a0f7c61746fe7ba70a9e13b8aafacbdc08325",
+    "ace8fc2f94a8662a98a63c6abc3a0f7c61746fe7ba70a9e13b8aafacbdc08325",
+    "ace8fc2f94a8662a98a63c6abc3a0f7c61746fe7ba70a9e13b8aafacbdc08325"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    },
+    {
+      "rule": "transient",
+      "path": "/steps/manual/states",
+      "runs": 3
+    },
+    {
+      "rule": "root",
+      "path": "/steps/*/log/*/text"
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    1,
+    1,
+    1
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "id": "T-battlenet-adapter-a5c003daed",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "starts games with --exec and confirms the start from the client log; the URI form only opens the game page",
+  "calls": [
+    {
+      "launcher": "battlenet",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "prometheus",
+          "name": "Overwatch"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "\"{tmp}\\Battle.net\\Battle.net.exe\" --exec=launch Pro (Battle.net started the game)"
+      }
+    },
+    {
+      "launcher": "battlenet",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "prometheus",
+          "name": "Overwatch"
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "command": "battlenet://game/pro (this link only opens the game page: press Play there, or switch the Battle.net launch setting to the launch command)"
+      }
+    },
+    {
+      "launcher": "battlenet",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "unknowngame",
+          "name": "Unknown"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "No launch code is known for Unknown (unknowngame); it is not in One Launch's product table or in product.db."
+      }
+    },
+    {
+      "launcher": "battlenet",
+      "method": "launchGame",
+      "args": [
+        {
+          "launcherGameId": "bad name",
+          "name": "x"
+        }
+      ],
+      "outcome": "threw",
+      "error": {
+        "name": "Error",
+        "message": "Not a Battle.net product codename: bad name"
+      }
+    }
+  ]
+}

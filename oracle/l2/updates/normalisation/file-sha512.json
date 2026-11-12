@@ -1,0 +1,32 @@
+{
+  "condition": "file-sha512",
+  "runs": 3,
+  "digests": [
+    "e66c500df6fa614f588b41b79a55feeb110fe1d326e853063615762634f8ee9c",
+    "e66c500df6fa614f588b41b79a55feeb110fe1d326e853063615762634f8ee9c",
+    "e66c500df6fa614f588b41b79a55feeb110fe1d326e853063615762634f8ee9c"
+  ],
+  "rules": [
+    {
+      "rule": "noCache",
+      "path": "/steps/*/requests/*/query/noCache",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/dataFolder/devAppUpdateYml",
+      "runs": 3
+    },
+    {
+      "rule": "port",
+      "path": "/steps/*/requests/*/transport/host",
+      "runs": 3
+    }
+  ],
+  "volatile": [],
+  "transientDropped": [
+    0,
+    0,
+    0
+  ]
+}

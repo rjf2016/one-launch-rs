@@ -1,0 +1,9 @@
+{
+  "id": "T-steam-adapter-99d8ae43e7",
+  "file": "test/steam-adapter.test.ts",
+  "suite": [
+    "SteamAdapter.listInstalledGames"
+  ],
+  "name": "scans every library folder, keeps only fully installed games, and skips tools and broken manifests",
+  "calls": []
+}

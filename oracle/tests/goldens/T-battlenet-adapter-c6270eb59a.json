@@ -1,0 +1,9 @@
+{
+  "id": "T-battlenet-adapter-c6270eb59a",
+  "file": "test/battlenet-adapter.test.ts",
+  "suite": [
+    "detection and library"
+  ],
+  "name": "finds products with a registry search and one small read each, never by dumping the whole Uninstall tree",
+  "calls": []
+}

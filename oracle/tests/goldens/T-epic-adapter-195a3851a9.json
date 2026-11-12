@@ -1,0 +1,106 @@
+{
+  "id": "T-epic-adapter-195a3851a9",
+  "file": "test/epic-adapter.test.ts",
+  "suite": [
+    "EpicAdapter.switchAccount (real)"
+  ],
+  "name": "fails and rolls back when the user signs in as a different account than the one linked",
+  "calls": [
+    {
+      "launcher": "epic",
+      "method": "switchAccount",
+      "args": [
+        {
+          "id": "@acct:epic:new@example.com",
+          "displayName": "New",
+          "login": "new@example.com",
+          "launcherUid": "44444444444444444444444444444444",
+          "hasSecret": true
+        },
+        {
+          "dryRun": false,
+          "onAttention": {
+            "$function": "onAttention"
+          }
+        }
+      ],
+      "outcome": "returned",
+      "result": {
+        "launcher": "epic",
+        "account": {
+          "id": "@acct:epic:new@example.com",
+          "displayName": "New",
+          "login": "new@example.com",
+          "launcherUid": "44444444444444444444444444444444"
+        },
+        "strategy": "credentials",
+        "ok": false,
+        "steps": [
+          {
+            "id": "close",
+            "title": "Close Epic Games Launcher",
+            "status": "skipped",
+            "detail": "Skipped: EpicGamesLauncher.exe is not running."
+          },
+          {
+            "id": "capture",
+            "title": "Save the outgoing session",
+            "status": "done",
+            "detail": "Main's stored session is already current."
+          },
+          {
+            "id": "backup",
+            "title": "Back up GameUserSettings.ini",
+            "status": "done",
+            "detail": "{tmp}\\backups\\epic\\<ts>"
+          },
+          {
+            "id": "file",
+            "title": "Sign the launcher out",
+            "status": "done",
+            "detail": "[RememberMe] cleared in 1 file."
+          },
+          {
+            "id": "start",
+            "title": "Start Epic Games Launcher",
+            "status": "done",
+            "detail": "Launcher started."
+          },
+          {
+            "id": "wait",
+            "title": "Wait for the launcher to come up",
+            "status": "done",
+            "detail": "EpicGamesLauncher.exe is running."
+          },
+          {
+            "id": "verify",
+            "title": "Confirm the launcher signed in",
+            "status": "failed",
+            "detail": "Waiting for you."
+          },
+          {
+            "id": "manual",
+            "title": "Wait for you to sign in",
+            "status": "failed",
+            "detail": "Signed in as a different account."
+          },
+          {
+            "id": "recapture",
+            "title": "Save the new session",
+            "status": "pending",
+            "detail": ""
+          }
+        ],
+        "startedAt": "<ts>",
+        "finishedAt": "<ts>",
+        "readyAt": null,
+        "startedWithGame": null,
+        "backupId": "<ts>",
+        "restored": true,
+        "error": "Epic Games Launcher signed in as Main (account …333333) instead of New (…444444). Sign in to the launcher as new@example.com, or fix the launcher account ID on the account page.",
+        "needsSignIn": false,
+        "cancelled": false
+      }
+    }
+  ]
+}

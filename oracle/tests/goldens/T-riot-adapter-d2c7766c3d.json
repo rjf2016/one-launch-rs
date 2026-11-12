@@ -1,0 +1,9 @@
+{
+  "id": "T-riot-adapter-d2c7766c3d",
+  "file": "test/riot-adapter.test.ts",
+  "suite": [
+    "Riot health"
+  ],
+  "name": "reads the newest run’s build and sign-in verdict from the log, and warns when the saved sign-in was refused",
+  "calls": []
+}
