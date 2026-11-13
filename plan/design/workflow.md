@@ -14,7 +14,28 @@ Principle: if a rule can be code, it is not a prompt.
 
 ## Owner-approved paths
 
-CODEOWNERS plus ruleset: `spec/`, `oracle/`, `.github/`, `.claude/`, `deny.toml`, `plan/waivers.toml`, `plan/triage.toml`, and the policy code in `xtask`.
+CODEOWNERS plus ruleset: `spec/`, `oracle/`, `.github/`, `.claude/`, `deny.toml`, and the policy code in `xtask`.
+
+`plan/triage.toml` and `plan/waivers.toml` are guarded by a policy check instead: a row with `source` `""` or `"plan"` and a waiver category change only with the owner's approval; agents add `delegated` rows and waivers as the next section says.
+
+## Differences from Electron
+
+The owner's rule of 2026-11-13: the Rust app is the same app for the user (same features and flows, same main UI, lighter and faster), not a translation of the Electron code. The Electron app is a proof of concept. Where its code is wrong, unneeded or fragile, the port does the better thing.
+
+| The better way... | Examples | Who decides | Record |
+| --- | --- | --- | --- |
+| changes no oracle artefact and no catalogued test | internal structure, a lighter algorithm, push in place of polling | the implementer | none |
+| changes an artefact or a test, and nothing a user would notice | a JavaScript quirk on malformed input, the engine's own error text, a bug on odd input, dead code, a test of an implementation detail | ticket-prep, or the diagnostician for a parked ticket | a `delegated` row in `plan/triage.toml` with `affects`; a waiver for a test that is not ported |
+| changes what the app does for the user | a flow, a setting, copy or layout on a main screen, a timing the user sees | the same, by judgement; the owner is asked first when it removes or changes something a user would notice or care about | the same row, with what the user would notice in `why` |
+
+What keeps this honest:
+
+- An implementer never adds or edits a row or a waiver. If its ticket cannot pass without one, it stops and the ticket goes back to prep or parks.
+- A PR that touches `plan/triage.toml` or `plan/waivers.toml` may not touch `crates/`.
+- The verifier treats a recorded difference as expected and anything unrecorded as a failure. For each row a ticket cites it checks that the Rust behaviour is what the row says.
+- The gate report lists every row and waiver added in the milestone, those with a user-visible effect first. The owner may overrule any; an overruled row becomes a ticket.
+- Not open to judgement: what existing installs depend on (`takeover.md`), the keys and values a switch writes to launcher-owned files and registry keys, the safety rules, the dependency list.
+- A lighter way is preferred whenever the user sees the same result; the budgets against `oracle/perf/baseline.json` are gates, not hopes.
 
 ## Ticket
 
@@ -86,6 +107,7 @@ Stop and ask the owner when:
 
 - a safety hook or lint trips
 - Electron contradicts the spec or the triage table
+- a difference from Electron would remove or change something a user would notice or care about
 - a dependency or protected-path change is needed
 - three parks share a cause, or more than a quarter of a wave parks
 - a canary passes the verifier
@@ -99,7 +121,7 @@ Stop and ask the owner when:
 | Verifier rubber-stamps | Verdict bound to the commit with re-executable receipts; read-only agent type; canaries |
 | Both sides agree on the wrong thing | Expectations extracted by running the TS; `xtask probe` differential fuzzing; ticket-prep writes translations; TS coverage under the oracle measured in Milestone 0 and gaps listed |
 | Normaliser hides differences | Volatile fields are those that differ between repeated Electron recordings, nothing else; normaliser is protected |
-| Ledger gaming | Ledger computed from `#[parity("T-0412")]`-tagged tests that ran and passed; waivers only in `plan/waivers.toml`; covered never falls, waivers never rise |
+| Ledger gaming | Ledger computed from `#[parity("T-0412")]`-tagged tests that ran and passed; waivers only in `plan/waivers.toml`; covered never falls; a waiver or a recorded difference never comes from the PR that needs it and is listed at the gate |
 | Spec drift | A PR touching `spec/` may not touch `crates/`; an amendment is clause plus citation plus a new vector from Electron; a checker resolves every `path:line` at the pin |
 | Weakened tests | Test-inventory diff (removed, renamed or `#[ignore]`d fails); per-test assertion count cannot drop; snapshot-accept banned for parity; oracle hash manifest verified; `cargo mutants --in-diff` with zero missed in switch, restore, journal, backup, vault and platform |
 | Worktree conflicts | Disjoint `write_scope` scheduling; hook rejects edits outside it; serial interface ticket per milestone; single-writer hot files |

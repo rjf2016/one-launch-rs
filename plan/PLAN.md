@@ -2,7 +2,7 @@
 
 ## Context
 
-One Launch is a Windows Electron app (about 28k lines of TypeScript, 1031 tests) at `1.0.0-beta.3`. The decision is made to rewrite it in Rust with GPUI, 1:1, lighter and faster, with all the work done by AI agents. This plan says what the agents check their work against, how the work is cut up, who does what, and where you step in.
+One Launch is a Windows Electron app (about 28k lines of TypeScript, 1031 tests) at `1.0.0-beta.3`. The decision is made to rewrite it in Rust with GPUI as the same app for the user, lighter and faster, with all the work done by AI agents. This plan says what the agents check their work against, how the work is cut up, who does what, and where you step in.
 
 What exists today:
 
@@ -20,7 +20,7 @@ Made by you in this session:
 | --- | --- |
 | Reference for agents | Spec plus the frozen Electron source, read-only |
 | Existing installs | In-place takeover: same data folder, DB, vault format and installer identity; the current auto-updater delivers the Rust build |
-| Known bugs and dead code | Match behaviour exactly; one keep-or-drop triage table approved before any Rust is written |
+| Known bugs and dead code | Not carried over where leaving them out changes nothing for the user; see "What must match" (amended 2026-11-13; before that: match behaviour exactly) |
 | Review | Agents review and merge their own PRs; you review at milestone gates |
 | Agent login | A separate bot account, scoped to the new repo |
 | Installer runs | Agents may run installers on GitHub-hosted runners only, never on your PC |
@@ -37,12 +37,24 @@ My recommended answers to the spec's open product questions (§12.1), approved w
 - Settings stay string key/value on disk, with typed accessors in Rust.
 - A full copy inventory is extracted automatically in Milestone 0.
 
-## What 1:1 is checked against
+## What must match
+
+Your rule of 2026-11-13. The goal is the same working app in Rust: the same features and flows, the same main UI, less time and memory. The Electron app is a proof of concept to match in what it does for the user, not code to translate line by line.
+
+- **Not carried over:** what is wrong, unneeded or fragile in the Electron code, when leaving it out changes nothing a user would notice. The agents decide these.
+- **Changes to what the app does:** noted and decided by the agents' judgement; you are asked first when one removes or changes something a user would notice or care about.
+- **Recorded, not silent:** where the reference data or a catalogued test would differ, the difference is a row in `plan/triage.toml` or `plan/waivers.toml`, added before the code is written and never by the agent writing that code. Every one added in a milestone is in its gate report, and you may overrule any.
+- **Still exact:** what existing installs depend on (data folder, DB, vault format, installer identity, update feed), the keys and values a switch writes to launcher-owned files, and the safety rules.
+- **Performance is the point.** Where Electron's way costs startup time, memory or idle CPU, the lighter way wins if the user sees the same result.
+
+## What the app is checked against
+
+The reference data records what the Electron app does. A recorded difference is expected; an unrecorded one is a defect.
 
 | Check | What is compared | Covers |
 | --- | --- | --- |
 | Vectors | Output of every pure TS function on fixed inputs, against the Rust port. `xtask probe` adds differential fuzzing against the live TS | Parsers, byte-exact rewriters, redaction, update manifest, request validators |
-| Ported tests | All 1031 tests are catalogued; each maps to a Rust test or to a waiver you approved | Adapter flows, services |
+| Ported tests | All 1031 tests are catalogued; each maps to a Rust test or to a waiver in a category you approved | Adapter flows, services |
 | Replay | 22 scripted scenarios run headlessly on Electron's real services with fake launchers. The Rust backend replays the same script; job states, the ordered platform operations (registry writes, file writes, process starts and closes) and the final data folder must match | The whole backend |
 | UI parity | 174 screenshots, each with a layout file listing every text run and control (role, name, box, style). The Rust app must match text exactly and boxes within 2 px | Every screen |
 | Takeover rehearsal | On a GitHub-hosted VM: install the public Electron release, seed data, run the Rust installer with the exact arguments Electron's updater uses, then check files, registry, shortcuts, vault and DB | Installer, updater, data compatibility |
@@ -125,9 +137,9 @@ Copilot review stays on as a second model's opinion; the verifier triages its co
 
 ### Guardrails that are code, not prompts
 
-- **Protected paths** need your approval as code owner: `spec/`, `oracle/`, `.github/`, `.claude/`, `deny.toml`, `plan/triage.toml`, `plan/waivers.toml`, and the policy code in `xtask`.
+- **Protected paths** need your approval as code owner: `spec/`, `oracle/`, `.github/`, `.claude/`, `deny.toml`, and the policy code in `xtask`. In `plan/triage.toml` and `plan/waivers.toml` the rows you decided change only with your approval; the agents add their own rows, in a PR that touches no code.
 - **Spec amendments** are their own PRs (clause, Electron citation, a new vector generated from Electron) and may not touch `crates/`.
-- **The ledger is computed.** A row counts as covered only when CI finds a tagged test that ran and passed. Covered never falls; waivers never rise without you.
+- **The ledger is computed.** A row counts as covered only when CI finds a tagged test that ran and passed. Covered never falls. A waiver or a recorded difference is never added by the PR that needs it; each one is checked by the verifier and listed in the gate report.
 - **Test integrity.** Removing, renaming or ignoring a test fails CI, as does a drop in a test's assertion count. The oracle's hash manifest is verified.
 - **Verifier canaries.** About one verifier run in ten gets a diff with a planted defect. Passing it stops the wave.
 - **Scope.** A hook rejects edits outside the ticket's files; CI re-checks; 15 files per PR at most.

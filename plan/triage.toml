@@ -1,18 +1,24 @@
 # Triage table for the Rust rewrite: one row per item in spec/SPEC.md section 11 (known issues and bloat)
 # and section 12 (open questions), then the rows found during planning and during Milestone 0 (ids X-..).
-# The owner approves this table before any Rust is written. Agents never decide these ad hoc.
+# The owner approved this table at Milestone 0.
+#
+# The owner's rule of 2026-11-13: the Rust app is the same app for the user, not a translation of the Electron code.
+# What is wrong, unneeded or fragile in that code is not carried over when leaving it out changes nothing a user
+# would notice; the agents decide those and record them here as `delegated` rows. plan/design/workflow.md,
+# "Differences from Electron", says who adds a row and when the owner is asked first.
 #
 # How to fill it in: set `decision` on every row whose `decision` is empty.
-#   decision = "keep"   port it exactly as the Electron code behaves, quirks included
+#   decision = "keep"   what the app does for the user stays as it is in Electron. It does not oblige the port to
+#                       reproduce a quirk of the code that no user would notice
 #   decision = "drop"   do not port it (dead surface, dev weight, Electron-only cost)
 #   decision = "fix"    port the corrected or deliberately changed behaviour described in `why`
 # A note may follow after a colon, for example "fix: cap at 4 MiB".
 # `recommend` is the planning recommendation; "decide" means it needs your product answer and `why` lists the options.
 # Rows with source = "plan" were settled when the rewrite plan was approved and are pre-filled.
-# Rows with source = "delegated" are technical rows with no product effect, which the owner left to the agents
-# ("I will make product decisions, you make technical decisions"); the owner may overrule any of them.
-# `affects` lists the oracle artefacts a non-keep decision changes; it is filled during Milestone 0.
-# This file is a protected path: changes need the owner's approval.
+# Rows with source = "delegated" are rows the owner left to the agents ("I will make product decisions, you make
+# technical decisions"); `why` says what a user would notice, if anything. The owner may overrule any of them.
+# `affects` lists the oracle artefacts a non-keep decision changes.
+# Rows with source "" or "plan" are the owner's and change only with the owner's approval.
 
 # ---------------------------------------------------------------------------
 # 11.1 Memory and CPU
