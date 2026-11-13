@@ -8,8 +8,40 @@
 #   native-platform   tests of the reg.exe and PowerShell layer that the native platform layer replaces. The reason
 #                     names the Rust test that covers the same behaviour, or says the test is only about reg.exe or
 #                     PowerShell text
+#   windows-drawn     rows of `oracle/SCREENSHOTS.md` that Windows or the stock installer draws, not the app. The
+#                     owner decided on 2026-11-13 that these need no reference image and are not compared
 #
 # [[waiver]]
-# id = "T-0000"                 catalogue or ledger id
+# id = "T-0000"                 catalogue or ledger id; `UI-<row>` for a row of `oracle/SCREENSHOTS.md`
 # category = "web-only"         one of the categories above
 # reason = "..."                one sentence
+
+[[waiver]]
+id = "UI-169"
+category = "windows-drawn"
+reason = "The tray icon's menu and tooltip are drawn by Windows; the menu items and the tooltip text are in the spec."
+
+[[waiver]]
+id = "UI-170"
+category = "windows-drawn"
+reason = "A desktop shot of the taskbar and tray with the window hidden shows nothing the app draws."
+
+[[waiver]]
+id = "UI-171"
+category = "windows-drawn"
+reason = "The five installer pages are the stock assisted installer's; what the installer does is in oracle/takeover/contract.md."
+
+[[waiver]]
+id = "UI-172"
+category = "windows-drawn"
+reason = "The SmartScreen prompt is drawn by Windows."
+
+[[waiver]]
+id = "UI-173"
+category = "windows-drawn"
+reason = "The Startup Apps page is drawn by Windows; the Run value behind it is in oracle/takeover/contract.md."
+
+[[waiver]]
+id = "UI-174"
+category = "windows-drawn"
+reason = "The uninstall confirmation is the stock uninstaller's."

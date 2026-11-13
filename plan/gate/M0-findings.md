@@ -4,6 +4,8 @@ What the subagents found in the Electron app at the pin, in the plan and in the 
 
 Decided since: rows X-11 to X-20 of `plan/triage.toml` cover items 1 to 4, 14, 17, 18, 20, 23, 25, 28, 29 and 48. Every other item is ported as the app behaves. Items 40 and 41 are corrected in `PLAN.md` and `design/oracle.md`, item 22 is amended in the spec (7.5 step 6), and item 43's three categories are approved in `plan/waivers.toml`. `plan/design/takeover.md` is left as written: `oracle/takeover/contract.md` is its checked form and wins where the two differ (items 28 to 39).
 
+Ticket M0-T09: an agent captured the window chrome and rows 131 and 164 to 168 from the repo's own builds on scratch folders (`oracle/ui/owner/captures.json` says how). The owner waived rows 169 to 174 on 2026-11-13 (`plan/waivers.toml`, category `windows-drawn`). `oracle/takeover/installed-registry.json` is not produced: the registry values are read on a GitHub-hosted runner after installing the public release (contract O7, the checks tagged `runner-reg`).
+
 ## Could crash or hang the app
 
 1. **VDF parser never returns** (`src/main/launchers/steam/vdf.ts`, `tokenize`). A `\s` character the whitespace skip does not handle (vertical tab confirmed by the coordinator; form feed, NBSP, U+2028/2029, U+3000 and the rest of Zs by the same reading), outside a quoted string or comment, makes the bare-token loop push empty tokens until the heap is exhausted. A corrupted `loginusers.vdf`, `libraryfolders.vdf` or app manifest takes down the main process. No vector can record it.

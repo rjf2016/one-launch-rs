@@ -1,0 +1,184 @@
+{
+  "captures": [
+    {
+      "row": null,
+      "file": "window-chrome.png",
+      "capturedBy": "agent",
+      "build": "unpackaged",
+      "how": "The unpackaged build on a scratch data folder and the all-four fake launchers, Library open once the startup scan and artwork queue were done, the whole window captured with PrintWindow.",
+      "title": "One Launch",
+      "text": null,
+      "width": 1282,
+      "height": 801
+    },
+    {
+      "row": 167,
+      "file": "native-file-picker-locate.png",
+      "capturedBy": "agent",
+      "build": "unpackaged",
+      "how": "Settings > Launchers, the Steam row expanded, Locate… clicked over CDP; the dialog moved to a scratch folder of two empty placeholder .exe files through its own file-name field, the pinned folders that are not Windows defaults (and any other non-default entry) removed from the navigation tree of this dialog with TVM_DELETEITEM, captured, then cancelled with IDCANCEL.",
+      "title": "Locate steam.exe",
+      "text": {
+        "title": "Locate steam.exe",
+        "message": [],
+        "buttons": [
+          "Open",
+          "Cancel"
+        ],
+        "fileName": "File name:",
+        "fileTypes": [
+          "Files of type:",
+          "Steam (*.exe)"
+        ]
+      },
+      "width": 1186,
+      "height": 713
+    },
+    {
+      "row": 168,
+      "file": "native-file-picker-image.png",
+      "capturedBy": "agent",
+      "build": "unpackaged",
+      "how": "Library, the Rocket League® card's menu > Choose portrait image… clicked over CDP; the dialog moved to a scratch folder of two placeholder PNGs through its own file-name field, the pinned folders that are not Windows defaults (and any other non-default entry) removed from the navigation tree of this dialog with TVM_DELETEITEM, captured, then cancelled with IDCANCEL.",
+      "title": "Choose an image",
+      "text": {
+        "title": "Choose an image",
+        "message": [],
+        "buttons": [
+          "Open",
+          "Cancel"
+        ],
+        "fileName": "File name:",
+        "fileTypes": [
+          "Files of type:",
+          "Images (*.png;*.jpg;*.jpeg;*.webp)"
+        ]
+      },
+      "width": 1186,
+      "height": 713
+    },
+    {
+      "row": 131,
+      "file": "settings-updates-unavailable-custom-folder.png",
+      "capturedBy": "agent",
+      "build": "packaged",
+      "how": "The packaged exe started with --data-dir= on a scratch folder (real launchers, read only), the setup guide skipped, Settings > General once updates:status answered custom-data-folder; a CDP screenshot at 1280x800 with en-US and UTC.",
+      "title": "One Launch",
+      "text": {
+        "title": "One Launch",
+        "message": [
+          "Updates are off while One Launch runs from a custom data folder."
+        ],
+        "buttons": []
+      },
+      "width": 1280,
+      "height": 800
+    },
+    {
+      "row": 166,
+      "file": "native-startup-error.png",
+      "capturedBy": "agent",
+      "build": "packaged",
+      "how": "The packaged exe started with --data-dir= on a scratch folder whose onelaunch.db is a one-line text file; the error box captured from the spawned process, then closed with WM_CLOSE.",
+      "title": "Error",
+      "text": {
+        "title": "Error",
+        "message": [
+          "One Launch could not start",
+          "The One Launch database is damaged (file is not a database). Restore a copy from the backups\\db folder in the data directory, or move the file aside to start over.\n\nDetails are in the log:\n{scratch}\\startup\\data\\logs\\onelaunch.log\n\nData folder:\n{scratch}\\startup\\data"
+        ],
+        "buttons": [
+          "OK"
+        ]
+      },
+      "width": 558,
+      "height": 254
+    },
+    {
+      "row": 164,
+      "file": "native-quit-during-switch.png",
+      "capturedBy": "agent",
+      "build": "unpackaged",
+      "how": "The all-four fake launchers with Epic never signing in, the tray setting off, Play Rocket League® as the Epic account Alt until \"Sign in…\", WM_CLOSE posted to the app window; the prompt captured, then answered Keep running with WM_CLOSE (its cancel id), the switch stopped from the page.",
+      "title": "A switch is still running",
+      "text": {
+        "title": "A switch is still running",
+        "message": [
+          "One Launch is still switching to Alt.",
+          "Quitting stops the switch. If Epic Games has not been started again yet, its files are put back first; after that Epic Games carries on signing in on its own. Left alone, the switch finishes once the launcher reports the sign-in."
+        ],
+        "buttons": [
+          "Keep running",
+          "Quit anyway"
+        ]
+      },
+      "width": 558,
+      "height": 179
+    },
+    {
+      "row": 165,
+      "file": "native-crash-dialog.png",
+      "capturedBy": "agent",
+      "build": "unpackaged",
+      "how": "The unpackaged build on the all-four fake launchers started with Node's inspector on main (--inspect on a free port); a setTimeout that throws evaluated there after checking process.pid is the spawned one, so main's uncaughtException handler showed the dialog; captured, then answered Keep running with WM_CLOSE (its cancel id).",
+      "title": "One Launch hit an unexpected error",
+      "text": {
+        "title": "One Launch hit an unexpected error",
+        "message": [
+          "Something went wrong inside One Launch.",
+          "placeholder: an error thrown on purpose from a timer in the main process\n\nThe details are in {scratch}\\crash\\data\\logs\\onelaunch.log. Relaunching is the safe choice; keeping it running may leave things half-done."
+        ],
+        "buttons": [
+          "Relaunch",
+          "Keep running"
+        ]
+      },
+      "width": 558,
+      "height": 194
+    }
+  ],
+  "waived": [
+    {
+      "row": 169,
+      "waivedBy": "owner",
+      "category": "windows-drawn",
+      "reason": "drawn by Windows or by the stock installer, not by the app; the owner decided it is not compared"
+    },
+    {
+      "row": 170,
+      "waivedBy": "owner",
+      "category": "windows-drawn",
+      "reason": "drawn by Windows or by the stock installer, not by the app; the owner decided it is not compared"
+    },
+    {
+      "row": 171,
+      "waivedBy": "owner",
+      "category": "windows-drawn",
+      "reason": "drawn by Windows or by the stock installer, not by the app; the owner decided it is not compared"
+    },
+    {
+      "row": 172,
+      "waivedBy": "owner",
+      "category": "windows-drawn",
+      "reason": "drawn by Windows or by the stock installer, not by the app; the owner decided it is not compared"
+    },
+    {
+      "row": 173,
+      "waivedBy": "owner",
+      "category": "windows-drawn",
+      "reason": "drawn by Windows or by the stock installer, not by the app; the owner decided it is not compared"
+    },
+    {
+      "row": 174,
+      "waivedBy": "owner",
+      "category": "windows-drawn",
+      "reason": "drawn by Windows or by the stock installer, not by the app; the owner decided it is not compared"
+    }
+  ],
+  "notProduced": [
+    {
+      "file": "takeover/installed-registry.json",
+      "reason": "the owner runs no installer for it; the registry values the installer writes are read on a GitHub-hosted runner after installing the public release (takeover/contract.md, O7 and the checks tagged runner-reg)"
+    }
+  ]
+}

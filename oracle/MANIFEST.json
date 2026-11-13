@@ -6,7 +6,7 @@
   },
   "tooling": {
     "branch": "oracle-tooling",
-    "commit": "05fd47b04da5af637f0fe0a30c667f3578b71691",
+    "commit": "6c0f169b44cd9224059185a6239c35af3fa41a55",
     "dirty": false
   },
   "files": {
@@ -801,6 +801,14 @@
     "tests/goldens/T-steam-adapter-f70fe94054.json": "54071ff45d56c4cf82b6608bed0a640aaad3b2cc630525c14d51233e56a19cc8",
     "tests/goldens/T-steam-adapter-f8d9ff4469.json": "453639dd48caf947c8f68ad3b019dff9dd9a5c7d5993bbb08e709fe63335f420",
     "tests/goldens/T-steam-adapter-fb00471eff.json": "a05f33719d0fc6fd8b46a7abbe930f9dbae12e38cdfa8e51a8a12d1a65af57fb",
+    "ui/owner/captures.json": "7acae825bfdfba83e3d1f09a0e1e4e24780c238c95a561e6a15eb7218f35dcd7",
+    "ui/owner/native-crash-dialog.png": "378b828027be11b7fde68e56e55ecb8ef9eb30dc3061c2b5a7c057c2e2aa4292",
+    "ui/owner/native-file-picker-image.png": "1ba357a2099da854fff9e820d9760cdbae254e38b480ebf5992c5f5a83b6c0dc",
+    "ui/owner/native-file-picker-locate.png": "423438339f5f4bb968c96a47909f61c7dd52b1a87ec671d4f3b72be976612e04",
+    "ui/owner/native-quit-during-switch.png": "a0c658e1a3fca0612b3fa1517527ec7853629c2263a37367ab841cb0a248d103",
+    "ui/owner/native-startup-error.png": "f53b170d77856e6a337ac366543776b7a3673d24a7950e04a448383d43e65268",
+    "ui/owner/settings-updates-unavailable-custom-folder.png": "4676b5c8a2253443bb1c44686d78e5d30a3ddef99c4f28f0ca248b3718497eaa",
+    "ui/owner/window-chrome.png": "01a9f2dde732300677e345d18d56ea272dd30bc914cc21015d4516cac9bfe33d",
     "ui/repeat/accounts.json": "3ac883d22e58c727b7fd6d6fc0be59773a59afbdc31000426704f81e1ea735c8",
     "ui/repeat/dialogs.json": "56db9fc83c8f29460bc59b109f88143a8500fef4f7c77917943e5ec0102321da",
     "ui/repeat/launch.json": "6ea957ae70937bfd5f9dd9724fcbd5597bed2ee32537146d5340602e40cca141",
