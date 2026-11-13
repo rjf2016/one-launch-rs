@@ -2,7 +2,7 @@
 
 ## Context
 
-One Launch is a Windows Electron app (about 28k lines of TypeScript, 971 tests) at `1.0.0-beta.3`. The decision is made to rewrite it in Rust with GPUI, 1:1, lighter and faster, with all the work done by AI agents. This plan says what the agents check their work against, how the work is cut up, who does what, and where you step in.
+One Launch is a Windows Electron app (about 28k lines of TypeScript, 1031 tests) at `1.0.0-beta.3`. The decision is made to rewrite it in Rust with GPUI, 1:1, lighter and faster, with all the work done by AI agents. This plan says what the agents check their work against, how the work is cut up, who does what, and where you step in.
 
 What exists today:
 
@@ -42,7 +42,7 @@ My recommended answers to the spec's open product questions (§12.1), approved w
 | Check | What is compared | Covers |
 | --- | --- | --- |
 | Vectors | Output of every pure TS function on fixed inputs, against the Rust port. `xtask probe` adds differential fuzzing against the live TS | Parsers, byte-exact rewriters, redaction, update manifest, request validators |
-| Ported tests | All 971 tests are catalogued; each maps to a Rust test or to a waiver you approved | Adapter flows, services |
+| Ported tests | All 1031 tests are catalogued; each maps to a Rust test or to a waiver you approved | Adapter flows, services |
 | Replay | 22 scripted scenarios run headlessly on Electron's real services with fake launchers. The Rust backend replays the same script; job states, the ordered platform operations (registry writes, file writes, process starts and closes) and the final data folder must match | The whole backend |
 | UI parity | 174 screenshots, each with a layout file listing every text run and control (role, name, box, style). The Rust app must match text exactly and boxes within 2 px | Every screen |
 | Takeover rehearsal | On a GitHub-hosted VM: install the public Electron release, seed data, run the Rust installer with the exact arguments Electron's updater uses, then check files, registry, shortcuts, vault and DB | Installer, updater, data compatibility |
@@ -165,7 +165,7 @@ Runs in the Electron repo on a branch `oracle-tooling` that never merges and nev
 | T5 | Headless replay harness and 22 scripts | Five runs identical; five scripts cross-checked through real Electron |
 | T6 | Update transcripts for six feed conditions | Three runs identical |
 | T7 | Screenshot and layout capture (five agents by area) | All 174 rows captured, waived or marked yours; no user paths in any file |
-| T8 | Copy inventory, style tables, tokens, 54 icons, What's New data | Every observed text run maps to a source string |
+| T8 | Copy inventory, style tables, tokens, 56 icons, What's New data | Every observed text run maps to a source string |
 | T9 | Your captures: tray, native dialogs, installer pages, window chrome | Captured or waived |
 | T10 | Performance baseline: warm starts, memory, idle CPU, install size | Numbers for every metric |
 | T11 | Takeover contract and vault fixtures | Installer contract written down; vault cross-read vector exists |

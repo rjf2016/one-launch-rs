@@ -136,7 +136,7 @@ One more owner capture: real window chrome. Caption buttons are an OS overlay an
 ## Assets and copy
 
 - Copy inventory: a TypeScript-compiler walk over `src/` collects JSX text, literals and templates with `file:line`, unioned with text observed in sidecars and replay step titles.
-- Lucide: 54 distinct imports; render each with `react-dom/server` for exact SVG.
+- Lucide: 56 distinct imports; render each with `react-dom/server` for exact SVG.
 - `.ico` from the `npm run build` output; tray PNGs via a `scripts/render-icon.cjs`-style script so the resize output is exact.
 - Tokens from `E\src\renderer\src\index.css`, checked against runtime `getComputedStyle`.
 - What's New entries as JSON. Notices are npm-specific; carry only the MIT text and install location.

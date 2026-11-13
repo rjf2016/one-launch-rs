@@ -1,5 +1,5 @@
 # Triage table for the Rust rewrite: one row per item in spec/SPEC.md section 11 (known issues and bloat)
-# and section 12 (open questions), then the rows found during planning (ids X-..).
+# and section 12 (open questions), then the rows found during planning and during Milestone 0 (ids X-..).
 # The owner approves this table before any Rust is written. Agents never decide these ad hoc.
 #
 # How to fill it in: set `decision` on every row whose `decision` is empty.
@@ -9,6 +9,8 @@
 # A note may follow after a colon, for example "fix: cap at 4 MiB".
 # `recommend` is the planning recommendation; "decide" means it needs your product answer and `why` lists the options.
 # Rows with source = "plan" were settled when the rewrite plan was approved and are pre-filled.
+# Rows with source = "delegated" are technical rows with no product effect, which the owner left to the agents
+# ("I will make product decisions, you make technical decisions"); the owner may overrule any of them.
 # `affects` lists the oracle artefacts a non-keep decision changes; it is filled during Milestone 0.
 # This file is a protected path: changes need the owner's approval.
 
@@ -947,3 +949,107 @@ why = "The same item as S11.4-01."
 decision = "drop: compiled out of release builds; available only behind the fake cargo feature"
 source = "plan"
 affects = []
+
+# ---------------------------------------------------------------------------
+# Rows found during Milestone 0, while capturing the oracle
+# ---------------------------------------------------------------------------
+
+[[item]]
+id = "X-11"
+spec = "milestone 0"
+summary = "Battle.net: an install path holding a letter outside ASCII is cut at that letter (D:/Jeux/Été becomes D:\\Jeux), so the game gets the wrong folder."
+recommend = "fix"
+why = "A visible bug for any accented folder name. The port reads the whole path; nothing else about the product database reader changes."
+decision = "fix"
+source = ""
+affects = ["l1/battlenet/parseProductDb.json"]
+
+[[item]]
+id = "X-12"
+spec = "milestone 0"
+summary = "Masking misses letters outside ASCII: an email whose name or domain holds one reaches the log unmasked or half masked (the logger and the Battle.net sign-in failure text), and a saved account name holding a letter such as İ is not masked by the logger."
+recommend = "fix"
+why = "The masking exists to keep these out of the log. Everything the Electron patterns mask stays masked; the port masks these as well."
+decision = "fix"
+source = ""
+affects = ["l1/battlenet/maskReason.json", "l1/core/redactString.json"]
+
+[[item]]
+id = "X-13"
+spec = "milestone 0"
+summary = "Epic: splitIni drops the last character of the last line when a file has a CRLF somewhere but ends in a bare LF, and the next session write puts the damaged line back into Epic's settings file."
+recommend = "fix"
+why = "It damages a launcher-owned file. The last line keeps its last character; no other INI behaviour changes."
+decision = "fix"
+source = ""
+affects = ["l1/epic/splitIni.json", "l1/epic/joinIni.roundtrip.json", "l1/epic/planSessionWrite.json"]
+
+[[item]]
+id = "X-14"
+spec = "milestone 0"
+summary = "The stock installer re-launches itself elevated when an all-users install exists, and electron-updater falls back to elevate.exe when the installer cannot be started (oracle/takeover/contract.md, I1.7 and the updater section)."
+recommend = "drop"
+why = "One Launch installs per user. The Rust installer and updater handle per-user installs only and never ask for admin rights; revisit only if a beta user turns out to have an all-users install."
+decision = "drop: per-user installs only, no admin prompt"
+source = ""
+affects = ["takeover/contract.md"]
+
+[[item]]
+id = "X-15"
+spec = "milestone 0"
+summary = "Steam: the VDF reader never returns on a whitespace character it does not skip (vertical tab, form feed, no-break space and the other Unicode spaces) outside a quoted string, and the main process runs out of memory."
+recommend = "fix"
+why = "A damaged loginusers.vdf, libraryfolders.vdf or app manifest must not take the app down. The port skips every such character as whitespace. No vector can record a hang, so the port carries its own test. Electron stays as it is: nothing merges into its master while two date-bound tests fail there, and the owner chose not to fix those."
+decision = "fix"
+source = ""
+affects = []
+
+[[item]]
+id = "X-16"
+spec = "milestone 0"
+summary = "Vault: a stored value of v10 followed by fewer than 12 bytes ends the Electron process inside safeStorage with nothing to catch, and an empty stored value decrypts to an empty string."
+recommend = "fix"
+why = "The app never writes either (its shortest real value is 31 bytes), so both mean damaged data. The port reports VAULT_UNREADABLE for any value too short to hold the prefix, the nonce and the tag, the empty one included. Electron stays as it is, for the reason in X-15."
+decision = "fix"
+source = ""
+affects = ["takeover/vault/portable-v10.json"]
+
+[[item]]
+id = "X-17"
+spec = "milestone 0"
+summary = "Name lookups on plain JavaScript objects return inherited members for names such as __proto__, constructor and toString (the Battle.net product codes, the renderer's phase table)."
+recommend = "fix"
+why = "A Rust map has no inherited members, so such a name is simply unknown. The vector cases that record the inherited values are marked."
+decision = "fix"
+source = "delegated"
+affects = ["l1/battlenet/productCodes.json", "l1/core/renderer.phases.phaseOf.json"]
+
+[[item]]
+id = "X-18"
+spec = "milestone 0"
+summary = "Updates: a cancelled download keeps its connection open until quit and leaves an empty temp file in the pending folder; after a dropped connection the library can still finish the download after the cancel."
+recommend = "fix"
+why = "Library behaviour, not the app's. The port's cancel ends the request and removes its temp file; the states and messages the user sees are unchanged."
+decision = "fix"
+source = "delegated"
+affects = ["l2/updates/auto-off-during-download.json"]
+
+[[item]]
+id = "X-19"
+spec = "milestone 0"
+summary = "Updates: the release manifest's size is accepted in any YAML 1.1 number form (0x32, 050, 0o62, +50, 5e1, 50.0)."
+recommend = "fix"
+why = "The port reads the manifest with a strict subset parser (plan/design/takeover.md) and the sign tool writes plain decimal digits. Any other form is refused with the existing refusal for a size that is not a number."
+decision = "fix: sizes are plain decimal digits only"
+source = "delegated"
+affects = ["l1/core/verifyManifest.json"]
+
+[[item]]
+id = "X-20"
+spec = "milestone 0"
+summary = "Several messages the user can see embed V8's own JSON.parse error text and position (Epic manifests, the Epic and Battle.net session blobs, the Battle.net config)."
+recommend = "fix"
+why = "A Rust parser cannot reproduce V8's wording. The sentence around it stays and the engine's part becomes fixed wording; the affected vector cases compare the message up to the engine's text."
+decision = "fix: fixed wording in place of the engine's text; the owner approves the wording before the first affected ticket"
+source = "delegated"
+affects = ["l1/battlenet/parseBlob.json", "l1/battlenet/parseConfig.json", "l1/battlenet/planSavedAccountNames.json", "l1/epic/parseBlob.json", "l1/epic/parseItemManifest.json", "l1/epic/parseLauncherInstalled.json"]

@@ -1,5 +1,15 @@
 # Tests and parity rows that will not be ported. Owner-approved only; the count may not rise without the owner.
+#
+# Categories the owner approved at Milestone 0. `oracle/tests/README.md` says which tests are candidates for each
+# (68 of the 1031 catalogued tests: 7, 25 and 36).
+#   web-only          behaviour that exists because the UI is a web page in Electron: the preload bridge, the
+#                     renderer's IPC client and query hook
+#   tooling           tests of the Electron repo's scripts and test data, which do not ship
+#   native-platform   tests of the reg.exe and PowerShell layer that the native platform layer replaces. The reason
+#                     names the Rust test that covers the same behaviour, or says the test is only about reg.exe or
+#                     PowerShell text
+#
 # [[waiver]]
 # id = "T-0000"                 catalogue or ledger id
-# category = "web-only"         one of the categories approved at the Milestone 0 gate
+# category = "web-only"         one of the categories above
 # reason = "..."                one sentence
