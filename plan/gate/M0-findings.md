@@ -94,3 +94,9 @@ Ticket M0-T09: an agent captured the window chrome and rows 131 and 164 to 168 f
 60. Four adapters each carry their own copy of the same helper strings, so a shown string often cannot name one source (45 copy runs stay "open" between equal candidates in `assets/copy-map.json`).
 61. About 460 ms of each ~760 ms warm start passes before any app code runs (`processToNodeMs`); `startup:library-frame` is a rAF time about 20 ms before the frame is presented.
 62. Inline sort callbacks in `LibraryView.tsx`, `LaunchDialog.tsx` and `BackupsPanel.tsx` are not exported, so no vector reaches them.
+
+## Found at the gate (ticket M0-T12)
+
+63. The replay recorder cannot name an id in a log line when two ids of one recording end in the same four characters: the app's logger keeps only that tail, and `aliasUuidTails` leaves a shared tail as written. The five recordings then do not normalise to one, and the generator refuses. With about 23 ids a recording and three of them logged, roughly one full capture of the 22 scripts in ten stops this way; a second run passes. A replay runner that compares the WARN and ERROR lines has the same exposure on every run, so the Rust one takes its ids from a seeded source in replay mode, or names an id before the logger cuts it.
+64. `assets/copy-map.json` and the `observedData` list of `assets/copy.json` quote the text of every run, the volatile ones too. Built from a second capture's sidecars they differ in exactly those runs (40 values in 23 runs of 17 sidecars at the gate) and nowhere else. They repeat byte for byte only from the sidecars they were built from, which is how `scripts/oracle/gate/self-diff.mjs` builds them.
+65. A second capture of the native windows gives the same titles, texts and sizes; the PNGs differ in the title bar strip (Windows tints it by focus) and, on another scratch folder, where the folder's path is drawn.
