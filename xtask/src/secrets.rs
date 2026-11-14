@@ -113,7 +113,6 @@ fn whole_run(id: &'static str, pattern: &str, value: Value) -> Rule {
 
 struct Scanner {
     rules: Vec<Rule>,
-    placeholder: Regex,
     allow: BTreeSet<String>,
 }
 
@@ -157,13 +156,9 @@ impl Scanner {
                             .then(|| found[0].to_owned())
                     },
                 ),
-                whole_run(
-                    "steamid64",
-                    r"76561(?:19|20)([0-9]{10})",
-                    |scanner, found, _| {
-                        (!scanner.synthetic(&found[1])).then(|| found[0].to_owned())
-                    },
-                ),
+                whole_run("steamid64", r"76561(?:19|20)([0-9]{10})", |_, found, _| {
+                    (!filler(&found[1])).then(|| found[0].to_owned())
+                }),
                 whole_run(
                     "uuid",
                     r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}",
@@ -182,11 +177,6 @@ impl Scanner {
                     },
                 ),
             ],
-            // A made-up value says so in its first word; `eyJ` may come before it, so that a made-up JWT keeps its shape.
-            placeholder: Regex::new(
-                r"(?i)^[^a-z0-9]*(?:eyj|eyai)?(?:placeholder|fake|dummy|example|sample|test)(?:[^a-z]|$)",
-            )
-            .expect("a fixed pattern"),
         }
     }
 
@@ -228,26 +218,32 @@ impl Scanner {
 
     fn unless_synthetic<const GROUP: usize>(&self, found: &Captures, _: &str) -> Option<String> {
         let value = &found[GROUP];
-        (!self.synthetic(value)).then(|| value.to_owned())
+        (!filler(value)).then(|| value.to_owned())
     }
+}
 
-    // Only a value made up from end to end is let off: a made-up stretch inside it, or a word beside it, excuses nothing.
-    fn synthetic(&self, value: &str) -> bool {
-        let chars: Vec<char> = value
-            .to_ascii_lowercase()
-            .chars()
-            .filter(char::is_ascii_alphanumeric)
-            .collect();
-        let mut counts: BTreeMap<char, usize> = BTreeMap::new();
-        for c in &chars {
-            *counts.entry(*c).or_default() += 1;
-        }
-        let few_chars = counts.len() <= 3;
-        let mostly_one_char = counts.values().any(|count| count * 2 >= chars.len());
-        let periodic = (1..=16.min(chars.len() / 2))
-            .any(|period| chars[period..] == chars[..chars.len() - period]);
-        few_chars || mostly_one_char || periodic || self.placeholder.is_match(value)
+// A value is let off only when it is filler along its whole length, with no room in it for more than four characters of a secret; a word in it, such as "example", says nothing.
+fn filler(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    let groups: Vec<Vec<char>> = lower
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|group| !group.is_empty())
+        .map(|group| group.chars().collect())
+        .collect();
+    let chars: Vec<char> = groups.concat();
+    let mut counts: BTreeMap<char, usize> = BTreeMap::new();
+    for c in &chars {
+        *counts.entry(*c).or_default() += 1;
     }
+    let most = counts.values().max().copied().unwrap_or_default();
+    let few_chars = counts.len() <= 3;
+    let nearly_one_char = chars.len() - most <= 4;
+    let one_char_groups = groups
+        .iter()
+        .all(|group| group.iter().all(|c| *c == group[0]));
+    let short_period =
+        (1..=4.min(chars.len() / 2)).any(|period| chars[period..] == chars[..chars.len() - period]);
+    few_chars || nearly_one_char || one_char_groups || short_period
 }
 
 fn safe_domain(domain: &str) -> bool {
@@ -425,18 +421,45 @@ mod tests {
     }
 
     #[test]
-    fn values_that_show_they_are_made_up_pass() {
+    fn a_value_that_is_filler_along_its_whole_length_passes() {
         for line in [
             "11111111-1111-4111-8111-111111111111".to_owned(),
-            "0123456789abcdef0123456789abcdef".to_owned(),
+            "11111111-2222-3333-4444-555555555555".to_owned(),
             "7656119".to_owned() + "0000000000",
             format!("gh{}_{}", "p", "x".repeat(36)),
-            format!("ey{}PLACEHOLDER.ey{}PLACEHOLDER.PLACEHOLDER", "J", "J"),
-            r#"let password = "fake-password-for-the-vault";"#.to_owned(),
-            format!("Authorization: Bearer {}", "example-token-".repeat(2)),
+            format!("ey{}{}.{}", "J", "x".repeat(20), "x".repeat(30)),
+            format!("let password = \"{}\";", "a".repeat(24)),
+            format!("Authorization: Bearer {}", "abcd".repeat(6)),
         ] {
             assert_eq!(rules(&line), Vec::<String>::new(), "{line}");
         }
+    }
+
+    #[test]
+    fn a_word_or_a_long_pattern_in_a_value_does_not_excuse_it() {
+        for value in [
+            ["fake", "password", "for", "the", "vault"].join("-"),
+            format!("example-{}", random(BASE62, 16)),
+            format!("test_{}", random(BASE62, 20)),
+            random(BASE62, 11) + &"a".repeat(11),
+            random(BASE62, 16).repeat(2),
+            random(BASE62, 5) + &"x".repeat(30),
+        ] {
+            let line = format!("let password = \"{value}\";");
+            assert_eq!(rules(&line), ["credential"], "{value}");
+        }
+        assert_eq!(rules(&"0123456789abcdef".repeat(2)), ["hex32"]);
+        assert_eq!(
+            rules(&format!("ey{0}{1}.ey{0}{1}.{1}", "J", "PLACEHOLDER")),
+            ["jwt"]
+        );
+        assert_eq!(
+            rules(&format!(
+                "Authorization: Bearer {}",
+                "example-token-".repeat(2)
+            )),
+            ["authorization"]
+        );
     }
 
     #[test]
