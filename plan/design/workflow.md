@@ -10,7 +10,10 @@ Principle: if a rule can be code, it is not a prompt.
 - The app replaced the plan's bot account at the M0 gate: a bot account's token cannot be limited to one repo under a personal account, and an app needs no second account. If the token step cannot be made to work in Milestone 1, the fallback is a bot account in an organization that owns the repo.
 - Contents access would let the app create a release, so a tag ruleset only the owner bypasses blocks every tag creation, update and deletion.
 - GitHub merges, not an agent: auto-merge (squash) on required checks. `gh pr merge` without `--auto` is hook-blocked.
-- One aggregate required check (`gate`). Required checks are pinned to the Actions app. The owner adds it to the `main` ruleset once CI reports it; until then the ruleset holds pull requests only, squash merges, code-owner review and no bypass.
+- Auto-merge is requested only while the pull request is blocked on `gate`, with the head commit pinned (`--match-head-commit`). On a pull request that is already mergeable the same command merges at once, which is an agent merging.
+- The request carries the squash commit's subject and body (`--subject`, `--body`). Left to its default, GitHub ends the message with a `Co-authored-by` trailer naming the app: that happened on #2. With an explicit message there is none: #3. After each merge the commit on `main` is read back.
+- One aggregate required check (`gate`), accepted only from the Actions app. It has been on the `main` ruleset since 2026-11-14, beside pull requests only, squash merges, code-owner review and no bypass.
+- A branch cut before a workflow change needs no merge from `main` to be checked: the run uses the workflow of the branch merged into `main`, so any new push starts it.
 - No strict up-to-date rule. Main runs the full suite after each merge; a red main is auto-reverted and stops the line.
 - Existing installs update from the old repo's releases. The app is not installed there, so agents cannot ship to users.
 
