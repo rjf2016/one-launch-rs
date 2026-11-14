@@ -90,12 +90,40 @@ function Invoke-AgentApi {
 }
 
 function New-AgentToken {
-    param([string]$Jwt = (New-AgentJwt))
+    param(
+        [string]$Jwt = (New-AgentJwt),
+        [switch]$ListingOnly
+    )
     $installation = Invoke-AgentApi -Path "/repos/$script:Owner/$script:Repo/installation" -Bearer $Jwt
-    Invoke-AgentApi -Method POST -Path "/app/installations/$($installation.id)/access_tokens" -Bearer $Jwt -Body @{
-        repositories = @($script:Repo)
-        permissions  = $script:Permissions
+    $scope = if ($ListingOnly) {
+        @{ permissions = @{ metadata = 'read' } }
+    }
+    else {
+        @{ repositories = @($script:Repo); permissions = $script:Permissions }
+    }
+    Invoke-AgentApi -Method POST -Path "/app/installations/$($installation.id)/access_tokens" -Bearer $Jwt -Body $scope
+}
+
+function Invoke-WithEnvironment {
+    param(
+        [Parameter(Mandatory)][hashtable]$Environment,
+        [Parameter(Mandatory)][scriptblock]$Body
+    )
+    $before = @{}
+    foreach ($name in $Environment.Keys) {
+        $before[$name] = [Environment]::GetEnvironmentVariable($name)
+    }
+    try {
+        foreach ($name in $Environment.Keys) {
+            [Environment]::SetEnvironmentVariable($name, $Environment[$name])
+        }
+        & $Body
+    }
+    finally {
+        foreach ($name in $before.Keys) {
+            [Environment]::SetEnvironmentVariable($name, $before[$name])
+        }
     }
 }
 
-Export-ModuleMember -Function Get-AgentIdentity, New-AgentJwt, Invoke-AgentApi, New-AgentToken
+Export-ModuleMember -Function Get-AgentIdentity, New-AgentJwt, Invoke-AgentApi, New-AgentToken, Invoke-WithEnvironment

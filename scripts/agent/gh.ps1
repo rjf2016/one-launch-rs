@@ -2,10 +2,15 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'AgentApp.psm1') -Force
 
 $identity = Get-AgentIdentity
-Remove-Item Env:GITHUB_TOKEN, Env:GH_ENTERPRISE_TOKEN, Env:GITHUB_ENTERPRISE_TOKEN -ErrorAction SilentlyContinue
-$env:GH_TOKEN = (New-AgentToken).token
-$env:GH_REPO = "$($identity.Owner)/$($identity.Repo)"
-$env:GH_PROMPT_DISABLED = '1'
+$forward = $args
+$environment = @{
+    GH_TOKEN                = (New-AgentToken).token
+    GH_REPO                 = "$($identity.Owner)/$($identity.Repo)"
+    GH_PROMPT_DISABLED      = '1'
+    GITHUB_TOKEN            = $null
+    GH_ENTERPRISE_TOKEN     = $null
+    GITHUB_ENTERPRISE_TOKEN = $null
+}
 
-& gh @args
+Invoke-WithEnvironment $environment { & gh @forward }
 exit $LASTEXITCODE
