@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Result;
 use regex::{Captures, Regex};
@@ -8,37 +8,55 @@ use crate::workspace;
 const ALLOW: &str = "xtask/secrets.allow";
 const SAFE_USER_FOLDERS: [&str; 4] = ["someone", "placeholder", "public", "default"];
 
+// Cargo.lock is all checksums.
+const LOCK: &str = "Cargo.lock";
+// The oracle's ids, sessions and profile paths are made up but shaped like real ones, and it was scanned when it was captured.
+const SEALED: &str = "oracle/";
+const NEVER_MADE_UP: [&str; 3] = ["private-key", "github-token", "authorization"];
+
 pub fn check(files: &[String]) -> Result<Vec<String>> {
     let scanner = Scanner::new(allowed(&workspace::read(ALLOW)?));
     let mut problems = Vec::new();
     for file in files {
-        if skipped(file) {
+        if file == LOCK {
             continue;
         }
-        for finding in scanner.scan(file) {
-            problems.push(format!("{file}: in the file name: {finding}"));
+        let sealed = file.starts_with(SEALED);
+        let in_name = scanner.scan(file, sealed);
+        let shown = redacted(file, &in_name);
+        for finding in &in_name {
+            problems.push(format!("{shown}: in the file name: {finding}"));
         }
         let path = workspace::root().join(file);
         let bytes = match std::fs::read(&path) {
             Ok(bytes) => bytes,
             Err(_) if !path.exists() => continue,
             Err(error) => {
-                problems.push(format!("{file}: could not be read ({error})"));
+                problems.push(format!("{shown}: could not be read ({error})"));
                 continue;
             }
         };
         for (index, line) in text(bytes).lines().enumerate() {
-            for finding in scanner.scan(line) {
-                problems.push(format!("{file}:{}: {finding}", index + 1));
+            for finding in scanner.scan(line, sealed) {
+                problems.push(format!("{shown}:{}: {finding}", index + 1));
             }
         }
     }
     Ok(problems)
 }
 
-// oracle/ is sealed by its manifest and was scanned when it was captured; Cargo.lock is all checksums.
-fn skipped(file: &str) -> bool {
-    file.starts_with("oracle/") || file == "Cargo.lock"
+fn redacted(text: &str, findings: &[Finding]) -> String {
+    let mut spans: Vec<&Finding> = findings.iter().collect();
+    spans.sort_by_key(|finding| finding.span.0);
+    let mut shown = String::new();
+    let mut from = 0;
+    for finding in spans {
+        shown.push_str(&text[from..finding.span.0]);
+        shown.push_str(&finding.masked);
+        from = finding.span.1;
+    }
+    shown.push_str(&text[from..]);
+    shown
 }
 
 // Without its NUL bytes UTF-16 text reads as ASCII, and so do the strings inside a binary file.
@@ -53,6 +71,18 @@ fn allowed(list: &str) -> BTreeSet<String> {
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .map(str::to_owned)
         .collect()
+}
+
+struct Finding {
+    rule: &'static str,
+    masked: String,
+    span: (usize, usize),
+}
+
+impl std::fmt::Display for Finding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.rule, self.masked)
+    }
 }
 
 type Value = fn(&Scanner, &Captures, &str) -> Option<String>;
@@ -152,17 +182,22 @@ impl Scanner {
                     },
                 ),
             ],
+            // A made-up value says so in its first word; `eyJ` may come before it, so that a made-up JWT keeps its shape.
             placeholder: Regex::new(
-                r"(?i)placeholder|fake|dummy|example|sample|(?:^|[^a-z])test(?:[^a-z]|$)",
+                r"(?i)^[^a-z0-9]*(?:eyj|eyai)?(?:placeholder|fake|dummy|example|sample|test)(?:[^a-z]|$)",
             )
             .expect("a fixed pattern"),
         }
     }
 
-    fn scan(&self, line: &str) -> Vec<String> {
+    fn scan(&self, line: &str, sealed: bool) -> Vec<Finding> {
         let mut findings = Vec::new();
         let mut taken: Vec<(usize, usize)> = Vec::new();
-        for rule in &self.rules {
+        let rules = self
+            .rules
+            .iter()
+            .filter(|rule| !sealed || NEVER_MADE_UP.contains(&rule.id));
+        for rule in rules {
             for found in rule.pattern.captures_iter(line) {
                 let whole = found.get(0).expect("group 0 always matches");
                 let (start, end) = (whole.start(), whole.end());
@@ -179,7 +214,11 @@ impl Scanner {
                 if let Some(value) = (rule.value)(self, &found, line) {
                     taken.push((start, end));
                     if !self.allow.contains(&value) {
-                        findings.push(format!("{} {}", rule.id, mask(&value)));
+                        findings.push(Finding {
+                            rule: rule.id,
+                            masked: mask(&value),
+                            span: (start, end),
+                        });
                     }
                 }
             }
@@ -192,19 +231,22 @@ impl Scanner {
         (!self.synthetic(value)).then(|| value.to_owned())
     }
 
-    // A word beside the value excuses nothing: only the value itself can show that it is made up.
+    // Only a value made up from end to end is let off: a made-up stretch inside it, or a word beside it, excuses nothing.
     fn synthetic(&self, value: &str) -> bool {
-        let chars: Vec<char> = value.to_ascii_lowercase().chars().collect();
-        let one_char_run = chars.windows(6).any(|run| run.iter().all(|c| *c == run[0]));
+        let chars: Vec<char> = value
+            .to_ascii_lowercase()
+            .chars()
+            .filter(char::is_ascii_alphanumeric)
+            .collect();
+        let mut counts: BTreeMap<char, usize> = BTreeMap::new();
+        for c in &chars {
+            *counts.entry(*c).or_default() += 1;
+        }
+        let few_chars = counts.len() <= 3;
+        let mostly_one_char = counts.values().any(|count| count * 2 >= chars.len());
         let periodic = (1..=16.min(chars.len() / 2))
             .any(|period| chars[period..] == chars[..chars.len() - period]);
-        let few_chars = chars
-            .iter()
-            .filter(|c| **c != '-')
-            .collect::<BTreeSet<_>>()
-            .len()
-            <= 3;
-        one_char_run || periodic || few_chars || self.placeholder.is_match(value)
+        few_chars || mostly_one_char || periodic || self.placeholder.is_match(value)
     }
 }
 
@@ -240,9 +282,9 @@ mod tests {
 
     fn rules(line: &str) -> Vec<String> {
         Scanner::new(BTreeSet::new())
-            .scan(line)
+            .scan(line, false)
             .into_iter()
-            .map(|finding| finding.split(' ').next().unwrap().to_owned())
+            .map(|finding| finding.rule.to_owned())
             .collect()
     }
 
@@ -415,6 +457,77 @@ mod tests {
     }
 
     #[test]
+    fn a_made_up_stretch_does_not_excuse_the_rest() {
+        for value in [
+            random(BASE62, 16) + &"a".repeat(6),
+            "0".repeat(6) + &random(BASE62, 16),
+            format!("{}example{}", random(BASE62, 10), random(BASE62, 10)),
+            format!("{}-sample-{}", random(BASE62, 10), random(BASE62, 10)),
+            format!("Example{}", random(BASE62, 20)),
+            format!("{}-test", random(BASE62, 20)),
+        ] {
+            let line = format!("let password = \"{value}\";");
+            assert_eq!(rules(&line), ["credential"], "{value}");
+        }
+        let hex = random(HEX, 26) + "000000";
+        assert_eq!(rules(&format!("account {hex}")), ["hex32"]);
+    }
+
+    #[test]
+    fn in_the_oracle_only_what_is_never_made_up_is_reported() {
+        let scanner = Scanner::new(BTreeSet::new());
+        let sealed = |line: &str| -> Vec<&'static str> {
+            scanner
+                .scan(line, true)
+                .into_iter()
+                .map(|finding| finding.rule)
+                .collect()
+        };
+        let hex = random(HEX, 32);
+        for line in [
+            format!("account {hex}"),
+            format!("id {}{}", "7656119", "8134509276"),
+            format!(r"C:\{}\{}\AppData", "Users", "jdoe"),
+            format!(
+                "ssid: \"ey{}{}.{}\"",
+                "J",
+                random(BASE62, 20),
+                random(BASE62, 30)
+            ),
+        ] {
+            assert_eq!(sealed(&line), Vec::<&str>::new(), "{line}");
+        }
+        assert_eq!(
+            sealed(&format!("gh{}_{}", "s", random(BASE62, 36))),
+            ["github-token"]
+        );
+        assert_eq!(
+            sealed(&format!("-----BEGIN {} KEY-----", "RSA PRIVATE")),
+            ["private-key"]
+        );
+        assert_eq!(
+            sealed(&format!("Authorization: Bearer {}", random(BASE62, 32))),
+            ["authorization"]
+        );
+    }
+
+    #[test]
+    fn a_file_name_that_holds_a_finding_is_never_shown_whole() {
+        let token = format!("gh{}_{}", "s", random(BASE62, 36));
+        let hex = random(HEX, 32);
+        let name = format!("notes/{token}/acct_{hex}_grid.png");
+        let problems = check(std::slice::from_ref(&name)).unwrap();
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        for problem in &problems {
+            assert!(problem.starts_with("notes/ghs_…"), "{problem}");
+            assert!(!problem.contains(&token) && !problem.contains(&hex));
+        }
+        let in_the_oracle = check(&[format!("oracle/{token}/acct_{hex}_grid.png")]).unwrap();
+        assert_eq!(in_the_oracle.len(), 1, "{in_the_oracle:?}");
+        assert!(in_the_oracle[0].contains(&hex) && !in_the_oracle[0].contains(&token));
+    }
+
+    #[test]
     fn a_user_profile_path_is_found() {
         let windows = format!(r"C:\{}\{}\AppData\Roaming", "Users", "jdoe");
         assert_eq!(rules(&windows), ["user-folder"]);
@@ -444,7 +557,7 @@ mod tests {
     #[test]
     fn a_finding_never_shows_the_whole_value() {
         let token = format!("gh{}_{}", "s", random(BASE62, 36));
-        let finding = &Scanner::new(BTreeSet::new()).scan(&token)[0];
+        let finding = Scanner::new(BTreeSet::new()).scan(&token, false)[0].to_string();
         assert!(!finding.contains(&token));
         assert!(finding.starts_with("github-token ghs_…"));
     }

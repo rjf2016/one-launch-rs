@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::sync::LazyLock;
 
 use anyhow::Result;
 use regex::Regex;
@@ -8,11 +9,26 @@ use crate::workspace::{self, CRATES_IO, Member, Workspace};
 const CARGO_CONFIG: &str = ".cargo/config.toml";
 const THE_ALIAS: &str = "[alias]\nxtask = \"run --locked --package xtask --\"\n";
 
+static HEADER: LazyLock<Regex> = LazyLock::new(|| {
+    let key = r"(?:[A-Za-z0-9_-]+|'cfg\([^']*\)')";
+    Regex::new(&format!(
+        r"^\[{{1,2}} *({key}(?:\.{key})*) *\]{{1,2}} *(?:#.*)?$"
+    ))
+    .expect("a fixed pattern")
+});
+static ENTRY: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)* *= *(\S.*)$").expect("a fixed pattern")
+});
+
 pub fn check(workspace: &Workspace) -> Result<Vec<String>> {
-    let mut problems = workspace_dependencies(&workspace::read("Cargo.toml")?);
+    let root = workspace::read("Cargo.toml")?;
+    let mut problems = unreadable("Cargo.toml", &root);
+    problems.extend(workspace_dependencies(&root));
     for member in &workspace.members {
         let path = format!("{}/Cargo.toml", member.dir);
-        problems.extend(member_dependencies(&path, &workspace::read(&path)?));
+        let manifest = workspace::read(&path)?;
+        problems.extend(unreadable(&path, &manifest));
+        problems.extend(member_dependencies(&path, &manifest));
     }
     problems.extend(lock_sources(&workspace::read("Cargo.lock")?));
     problems.extend(resolved(&workspace.members));
@@ -161,6 +177,10 @@ fn lock_sources(lock: &str) -> Vec<String> {
         .collect()
 }
 
+fn header(line: &str) -> Option<&str> {
+    Some(HEADER.captures(line)?.get(1)?.as_str())
+}
+
 fn entries(manifest: &str) -> Vec<(&str, &str)> {
     let mut table = "";
     let mut entries = Vec::new();
@@ -168,18 +188,56 @@ fn entries(manifest: &str) -> Vec<(&str, &str)> {
         if line.starts_with('#') {
             continue;
         }
-        let before_comment = line.split('#').next().unwrap_or_default().trim();
-        if let Some(header) = before_comment
-            .strip_prefix('[')
-            .and_then(|rest| rest.strip_suffix(']'))
-        {
-            table = header.trim_matches(['[', ']', ' ']);
+        if let Some(name) = header(line) {
+            table = name;
             entries.push((table, ""));
         } else if !line.is_empty() {
             entries.push((table, line));
         }
     }
     entries
+}
+
+// TOML spells one table many ways (quoted keys, spaces round the dots, a value over several lines) and cargo reads them all, so a line outside the one spelling read here fails.
+fn unreadable(path: &str, manifest: &str) -> Vec<String> {
+    manifest
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .filter(|line| header(line).is_none())
+        .filter(|line| !ENTRY.captures(line).is_some_and(|found| closed(&found[1])))
+        .map(|line| {
+            format!(
+                "{path}: `{line}` is neither a table name nor a one-line entry, with plain keys"
+            )
+        })
+        .collect()
+}
+
+fn closed(value: &str) -> bool {
+    if value.contains("\"\"\"") || value.contains("'''") {
+        return false;
+    }
+    let (mut depth, mut quote, mut escaped) = (0_i32, None, false);
+    for c in value.chars() {
+        match quote {
+            Some('"') if escaped => escaped = false,
+            Some('"') if c == '\\' => escaped = true,
+            Some(open) if c == open => quote = None,
+            Some(_) => {}
+            None => match c {
+                '"' | '\'' => quote = Some(c),
+                '[' | '{' => depth += 1,
+                ']' | '}' => depth -= 1,
+                '#' => break,
+                _ => {}
+            },
+        }
+        if depth < 0 {
+            return false;
+        }
+    }
+    depth == 0 && quote.is_none()
 }
 
 #[cfg(test)]
@@ -358,6 +416,82 @@ source = "registry+https://example.com/index"
         ] {
             assert_eq!(workspace_dependencies(manifest).len(), 1, "{manifest}");
         }
+    }
+
+    #[test]
+    fn the_one_spelling_is_readable() {
+        let manifest = r##"
+[package]
+name = "x"
+description = "a [bracket], a # hash, a \" quote and an = sign"
+keywords = ["a", 'b#c']
+
+[[bin]]
+name = "OneLaunch"
+
+[ dependencies ] # runtime
+serde.workspace = true
+windows = { workspace = true, features = ["Win32_Foundation"] }
+
+[target.'cfg(any(windows, feature = "a#b"))'.dependencies]
+windows.workspace = true
+"##;
+        assert_eq!(unreadable("x/Cargo.toml", manifest), Vec::<String>::new());
+        assert_eq!(
+            member_dependencies("x/Cargo.toml", manifest),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn another_spelling_of_a_table_or_a_key_is_unreadable() {
+        for line in [
+            r#"["dependencies"]"#,
+            "['dependencies']",
+            r#"[workspace."dependencies"]"#,
+            "[workspace . dependencies]",
+            r#"[target."cfg(windows)".dependencies]"#,
+            r#""serde" = "=1.0.229""#,
+            r#""dependencies".serde = "=1.0.229""#,
+            r#"dependencies . serde = "=1.0.229""#,
+        ] {
+            let problems = unreadable("x/Cargo.toml", &format!("{line}\n"));
+            assert_eq!(problems.len(), 1, "{line}");
+        }
+    }
+
+    #[test]
+    fn a_value_over_several_lines_is_unreadable() {
+        for (manifest, lines) in [
+            ("[features]\ndefault = [\n    \"a\",\n]\n", 3),
+            ("[package]\ndescription = \"\"\"\ntext\n\"\"\"\n", 3),
+            ("[package]\ndescription = '''\ntext'''\n", 2),
+            ("[dependencies]\nserde = { workspace = true,\n}\n", 2),
+            ("[package]\nname = \"x\n", 1),
+            ("[package]\nname =\n", 1),
+        ] {
+            assert_eq!(
+                unreadable("x/Cargo.toml", manifest).len(),
+                lines,
+                "{manifest}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_table_name_inside_a_value_hides_nothing() {
+        for hidden in [
+            "[dependencies]\nserde = { workspace = true, x = [ # }\n[true]\n] }\nsysinfo = \"=0.31.4\"\n",
+            "[dependencies]\nserde = { workspace = true, x = \"\"\" }\n[package]\n\"\"\" }\nsysinfo = \"=0.31.4\"\n",
+        ] {
+            assert!(
+                member_dependencies("x/Cargo.toml", hidden).is_empty(),
+                "the text check alone is fooled, which is what this test is about"
+            );
+            assert!(!unreadable("x/Cargo.toml", hidden).is_empty(), "{hidden}");
+        }
+        let cfg = "[package]\nname = \"x\"\n[target.'cfg(feature = \"a#b\")'.dependencies]\nsysinfo = \"=0.31.4\"\n";
+        assert_eq!(member_dependencies("x/Cargo.toml", cfg).len(), 1);
     }
 
     #[test]
