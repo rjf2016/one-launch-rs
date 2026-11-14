@@ -1,9 +1,9 @@
+use std::collections::BTreeSet;
+
 use anyhow::Result;
 use regex::Regex;
 
-use crate::workspace::{self, Workspace};
-
-const CRATES_IO: &str = r#"source = "registry+https://github.com/rust-lang/crates.io-index""#;
+use crate::workspace::{self, CRATES_IO, Member, Workspace};
 
 pub fn check(workspace: &Workspace) -> Result<Vec<String>> {
     let mut problems = workspace_dependencies(&workspace::read("Cargo.toml")?);
@@ -12,7 +12,39 @@ pub fn check(workspace: &Workspace) -> Result<Vec<String>> {
         problems.extend(member_dependencies(&path, &workspace::read(&path)?));
     }
     problems.extend(lock_sources(&workspace::read("Cargo.lock")?));
+    problems.extend(resolved(&workspace.members));
+    for package in &workspace.foreign {
+        problems.push(format!(
+            "Cargo.lock: {package} does not come from crates.io"
+        ));
+    }
     Ok(problems)
+}
+
+// What cargo resolved, whatever way a manifest spells it: the text checks above read one spelling only.
+fn resolved(members: &[Member]) -> Vec<String> {
+    let names: BTreeSet<&str> = members.iter().map(|member| member.name.as_str()).collect();
+    let mut problems = Vec::new();
+    for member in members {
+        let name = &member.name;
+        for edge in &member.edges {
+            let (dependency, requirement) = (&edge.name, &edge.requirement);
+            match edge.source.as_deref() {
+                Some(CRATES_IO) if requirement.starts_with('=') => {}
+                Some(CRATES_IO) => problems.push(format!(
+                    "{name}: asks for {dependency} {requirement}, which is not an exact `=` version"
+                )),
+                Some(other) => problems.push(format!(
+                    "{name}: takes {dependency} from {other}, not from crates.io"
+                )),
+                None if names.contains(dependency.as_str()) => {}
+                None => problems.push(format!(
+                    "{name}: {dependency} is a path dependency outside the workspace"
+                )),
+            }
+        }
+    }
+    problems
 }
 
 fn workspace_dependencies(manifest: &str) -> Vec<String> {
@@ -68,8 +100,9 @@ fn member_dependencies(path: &str, manifest: &str) -> Vec<String> {
 }
 
 fn lock_sources(lock: &str) -> Vec<String> {
+    let crates_io = format!("source = \"{CRATES_IO}\"");
     lock.lines()
-        .filter(|line| line.starts_with("source = ") && *line != CRATES_IO)
+        .filter(|line| line.starts_with("source = ") && *line != crates_io)
         .map(|line| format!("Cargo.lock: `{line}` is not crates.io"))
         .collect()
 }
@@ -97,6 +130,7 @@ fn entries(manifest: &str) -> Vec<(&str, &str)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::workspace::Edge;
 
     #[test]
     fn exact_versions_pass() {
@@ -227,6 +261,44 @@ version = "1.0.0"
 source = "registry+https://example.com/index"
 "#;
         assert_eq!(lock_sources(lock).len(), 2);
+    }
+
+    #[test]
+    fn what_cargo_resolved_is_checked_too() {
+        let edge = |name: &str, requirement: &str, source: Option<&str>| Edge {
+            name: name.to_owned(),
+            requirement: requirement.to_owned(),
+            source: source.map(str::to_owned),
+            ..Edge::default()
+        };
+        let member = |name: &str, edges: Vec<Edge>| Member {
+            name: name.to_owned(),
+            dir: format!("crates/{name}"),
+            edges,
+            roots: Vec::new(),
+            reach: BTreeSet::new(),
+        };
+        let git = "git+https://github.com/zed-industries/zed?rev=d2a4fb6";
+        let members = [
+            member("ol-model", vec![edge("serde", "=1.0.229", Some(CRATES_IO))]),
+            member(
+                "ol-formats",
+                vec![
+                    edge("ol-model", "=0.0.0", None),
+                    edge("regex", "^1.13", Some(CRATES_IO)),
+                    edge("gpui", "*", Some(git)),
+                    edge("vendored", "*", None),
+                ],
+            ),
+        ];
+        assert_eq!(
+            resolved(&members),
+            [
+                "ol-formats: asks for regex ^1.13, which is not an exact `=` version".to_owned(),
+                format!("ol-formats: takes gpui from {git}, not from crates.io"),
+                "ol-formats: vendored is a path dependency outside the workspace".to_owned(),
+            ]
+        );
     }
 
     #[test]

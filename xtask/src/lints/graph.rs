@@ -191,6 +191,7 @@ After the table.
             move |name: &&str| Edge {
                 name: (*name).to_owned(),
                 dev,
+                ..Edge::default()
             }
         };
         Member {

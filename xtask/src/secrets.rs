@@ -112,8 +112,8 @@ impl Scanner {
                 rule(
                     "steamid64",
                     r"\b7656119([0-9]{10})\b",
-                    |scanner, found, line| {
-                        (!scanner.synthetic(&found[1], line)).then(|| found[0].to_owned())
+                    |scanner, found, _| {
+                        (!scanner.synthetic(&found[1])).then(|| found[0].to_owned())
                     },
                 ),
                 rule(
@@ -170,12 +170,13 @@ impl Scanner {
         findings
     }
 
-    fn unless_synthetic<const GROUP: usize>(&self, found: &Captures, line: &str) -> Option<String> {
+    fn unless_synthetic<const GROUP: usize>(&self, found: &Captures, _: &str) -> Option<String> {
         let value = &found[GROUP];
-        (!self.synthetic(value, line)).then(|| value.to_owned())
+        (!self.synthetic(value)).then(|| value.to_owned())
     }
 
-    fn synthetic(&self, value: &str, line: &str) -> bool {
+    // A word beside the value excuses nothing: only the value itself can show that it is made up.
+    fn synthetic(&self, value: &str) -> bool {
         let chars: Vec<char> = value.to_ascii_lowercase().chars().collect();
         let one_char_run = chars.windows(6).any(|run| run.iter().all(|c| *c == run[0]));
         let periodic = (1..=16.min(chars.len() / 2))
@@ -186,11 +187,7 @@ impl Scanner {
             .collect::<BTreeSet<_>>()
             .len()
             <= 3;
-        one_char_run
-            || periodic
-            || few_chars
-            || self.placeholder.is_match(value)
-            || self.placeholder.is_match(line)
+        one_char_run || periodic || few_chars || self.placeholder.is_match(value)
     }
 }
 
@@ -334,18 +331,35 @@ mod tests {
     }
 
     #[test]
-    fn placeholders_pass() {
-        let hex = random(HEX, 32);
+    fn values_that_show_they_are_made_up_pass() {
         for line in [
-            format!("placeholder account {hex}"),
-            format!("fake id {}{}", "7656119", "8134509276"),
             "11111111-1111-4111-8111-111111111111".to_owned(),
             "0123456789abcdef0123456789abcdef".to_owned(),
             "7656119".to_owned() + "0000000000",
-            format!("example: Authorization: Bearer {}", random(BASE62, 32)),
+            format!("gh{}_{}", "p", "x".repeat(36)),
+            format!("ey{}PLACEHOLDER.ey{}PLACEHOLDER.PLACEHOLDER", "J", "J"),
+            r#"let password = "fake-password-for-the-vault";"#.to_owned(),
+            format!("Authorization: Bearer {}", "example-token-".repeat(2)),
         ] {
             assert_eq!(rules(&line), Vec::<String>::new(), "{line}");
         }
+    }
+
+    #[test]
+    fn a_word_beside_a_value_does_not_excuse_it() {
+        let hex = random(HEX, 32);
+        assert_eq!(rules(&format!("placeholder account {hex}")), ["hex32"]);
+        assert_eq!(
+            rules(&format!("fake test id {}{}", "7656119", "8134509276")),
+            ["steamid64"]
+        );
+        assert_eq!(
+            rules(&format!(
+                "example: Authorization: Bearer {}",
+                random(BASE62, 32)
+            )),
+            ["authorization"]
+        );
     }
 
     #[test]

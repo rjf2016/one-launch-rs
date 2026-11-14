@@ -5,8 +5,11 @@ use std::process::{Command, Stdio};
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
+pub const CRATES_IO: &str = "registry+https://github.com/rust-lang/crates.io-index";
+
 pub struct Workspace {
     pub members: Vec<Member>,
+    pub foreign: Vec<String>,
 }
 
 pub struct Member {
@@ -17,9 +20,12 @@ pub struct Member {
     pub reach: BTreeSet<String>,
 }
 
+#[derive(Default)]
 pub struct Edge {
     pub name: String,
     pub dev: bool,
+    pub requirement: String,
+    pub source: Option<String>,
 }
 
 impl Member {
@@ -77,6 +83,8 @@ impl Workspace {
                     .map(|dependency| Edge {
                         name: dependency.name.clone(),
                         dev: dependency.kind.as_deref() == Some("dev"),
+                        requirement: dependency.req.clone(),
+                        source: dependency.source.clone(),
                     })
                     .collect(),
                 roots: package
@@ -88,7 +96,14 @@ impl Workspace {
             });
         }
         members.sort_by(|a, b| a.name.cmp(&b.name));
-        Ok(Self { members })
+        let foreign = metadata
+            .packages
+            .iter()
+            .filter(|package| !metadata.workspace_members.contains(&package.id))
+            .filter(|package| package.source.as_deref() != Some(CRATES_IO))
+            .map(|package| format!("{} {}", package.name, package.version))
+            .collect();
+        Ok(Self { members, foreign })
     }
 
     pub fn gpui_free(&self) -> Vec<&str> {
@@ -194,7 +209,9 @@ struct Metadata {
 #[derive(Deserialize)]
 struct Package {
     name: String,
+    version: String,
     id: String,
+    source: Option<String>,
     manifest_path: String,
     dependencies: Vec<Dependency>,
     targets: Vec<Target>,
@@ -204,6 +221,8 @@ struct Package {
 struct Dependency {
     name: String,
     kind: Option<String>,
+    req: String,
+    source: Option<String>,
 }
 
 #[derive(Deserialize)]
