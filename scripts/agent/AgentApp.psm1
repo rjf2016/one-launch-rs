@@ -121,6 +121,20 @@ function Get-ForwardedArguments {
     , @($Parsed)
 }
 
+function Set-ProcessVariable {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        $Value
+    )
+    # Given $null for a string, PowerShell hands .NET an empty one, and .NET then sets an empty variable where it should remove it.
+    if ($null -eq $Value) {
+        [Environment]::SetEnvironmentVariable($Name, [NullString]::Value)
+    }
+    else {
+        [Environment]::SetEnvironmentVariable($Name, [string]$Value)
+    }
+}
+
 function Invoke-WithEnvironment {
     param(
         [Parameter(Mandatory)][hashtable]$Environment,
@@ -132,13 +146,13 @@ function Invoke-WithEnvironment {
     }
     try {
         foreach ($name in $Environment.Keys) {
-            [Environment]::SetEnvironmentVariable($name, $Environment[$name])
+            Set-ProcessVariable $name $Environment[$name]
         }
         & $Body
     }
     finally {
         foreach ($name in $before.Keys) {
-            [Environment]::SetEnvironmentVariable($name, $before[$name])
+            Set-ProcessVariable $name $before[$name]
         }
     }
 }
