@@ -19,7 +19,7 @@ acceptance:
   checks:
     - "`cargo xtask ops verdict check` rejects a verdict bound to another commit than the head, and one that falls short of any minimum its ticket's kind requires (table below); it accepts a spike's verdict that has no mutation receipt and no probe"
     - "a canary run: the script hands the verifier a diff with a planted defect; a passing verdict stops the wave and writes the stop into the wave summary"
-    - "one real wave of two tickets, F2 and F3, runs end to end: implemented in slots, verified, auto-merge requested by the app, merged by GitHub, state on `ops`, a wave summary with tokens and wall time per ticket"
+    - "one real wave of two tickets, F2 and F3, runs end to end: implemented in slots, verified, auto-merge requested by the app, merged by GitHub, no `Co-authored-by` trailer on either squash commit, state on `ops`, a wave summary with tokens and wall time per ticket"
     - "killing the script mid-ticket and starting `run-wave` again resumes that ticket from its branch as a new round"
 owner_step: "1. Read the one changed rule in `CLAUDE.md` in this pull request, and overrule it if it is not what you meant."
 ---
@@ -48,7 +48,8 @@ The diagnostician and the audits (first use). Mutation receipts re-run by CI (Mi
 
 ## Traps
 
-- No agent merges. The script calls `scripts/agent/gh.ps1 pr merge --auto --squash` and then only watches.
+- No agent merges. The script calls `scripts/agent/gh.ps1 pr merge --auto --squash` with the head commit pinned, and only once GitHub shows the pull request blocked on `gate`; then it only watches. Requested on a pull request that is already mergeable, the same command merges at once, which is an agent merging.
+- GitHub's default squash message ends in a `Co-authored-by` trailer that names the app: it is on the squash commit of #2. The owner's rule is that no commit carries one. The script must leave none on `main`: after each merge it reads the squash commit back and stops the wave if a trailer is there. Giving the squash commit its subject and body explicitly is the first thing to try.
 - A pull request that touches an owner-approved path or holds a workflow commit cannot finish inside a wave. The script parks it as "waiting for the owner" and goes on; that is not a failed round.
 - The verifier is never a weaker model than the implementer, and round two and later escalate.
 - A dead agent is replaced by a fresh one that resumes from the branch. That counts as a round.

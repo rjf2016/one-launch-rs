@@ -30,7 +30,7 @@ owner_step: "1. Push the workflow commit: `git push origin <branch>`."
 3. **Tickets are immutable.** No pull request changes a ticket file that exists on the base. A pull request that adds ticket files touches nothing outside `plan/`.
 4. **Plan and code apart.** A pull request that touches `plan/triage.toml`, `plan/waivers.toml` or `spec/` touches no path under `crates/`.
 5. **The owner's rows.** In `plan/triage.toml` a row with `source` `""` or `"plan"` is unchanged and not removed; in `plan/waivers.toml` no category is added, changed or removed. The check passes these only when the owner has approved the pull request at its head commit.
-6. **Attribution.** No commit message and no pull request body carries an AI attribution line.
+6. **Attribution.** No commit message and no pull request body carries an AI attribution line or a `Co-authored-by` trailer. The run on `main` after a merge applies the rule to the new commit as well: GitHub writes the squash commit's message, and its default adds such a trailer naming the app.
 7. **Dependencies.** `Cargo.lock`, `[workspace.dependencies]` and `deny.toml` change only in a ticket of `kind: deps` or `interface`.
 8. **Evidence.** The pull request body has the Summary, Evidence and Merge Danger sections, and its evidence block parses. What the block must contain is fixed by F6e and later tickets; here an empty block is valid.
 
