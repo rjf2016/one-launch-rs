@@ -14,6 +14,15 @@ Principle: if a rule can be code, it is not a prompt.
 - No strict up-to-date rule. Main runs the full suite after each merge; a red main is auto-reverted and stops the line.
 - Existing installs update from the old repo's releases. The app is not installed there, so agents cannot ship to users.
 
+### Acting as the app
+
+Checked in Milestone 1 (`../decisions/M1-F0.md`).
+
+- `scripts/agent/git.ps1 <git arguments>` runs git with the app's name and address, over HTTPS with SSH switched off, with a credential helper that mints a token when GitHub asks for one, and with every extra HTTP header from git's config cleared, so no other credential can ride along. `scripts/agent/gh.ps1 <gh arguments>` runs gh with a fresh token. A token reaches this repo only, with contents and pull requests, and lasts one hour. None is written to disk or printed, and neither wrapper leaves a variable changed in the session that called it.
+- `scripts/agent/check.ps1` reads back the app's permissions and every repo it is installed on, and fails on any difference from the first bullet of this section.
+- On the owner's PC a plain `gh` and a plain `git push` act as the owner, with admin rights. Agents use the two wrappers for everything that reaches GitHub; the hooks of F6 enforce it.
+- Workflow files: GitHub refuses any push from the app that creates or changes a file under `.github/workflows/`. The agent commits the change on its branch and stops. The owner pushes that commit (`git push origin <branch>`), the app opens the pull request, and the owner approves it as code owner. An agent never pushes with the owner's login.
+
 ## Owner-approved paths
 
 CODEOWNERS plus ruleset: `spec/`, `oracle/`, `.github/`, `.claude/`, `deny.toml`, and the policy code in `xtask`.
