@@ -27,15 +27,46 @@ implementations of ol-platform-api: ol-platform-win, ol-net (real) | ol-platform
 | `ol-net` | `HttpClient` on ureq with host allowlists and caps; the Riot loopback POST | fetch use in `artwork.ts`, `riot\local-launch.ts` |
 | `ol-platform-fake`, `ol-sim` | Static registry, processes and login item, recording clipboard, operation log; simulators, scenario and knobs | `registry.ts` (StaticRegistry), `processes.ts` (Static/Sim controllers), `E\src\main\launchers\sim\*` |
 | `ol-testkit`, `ol-replay` | Vector loader, JSON normalisers; headless replay runner | new |
+| `ol-testkit-macros` | The `#[parity]` attribute that marks a test ported from the oracle; a proc-macro crate with no dependency, re-exported by `ol-testkit` | new |
 | `ol-ui-kit`, `ol-ui`, `ol-automation`, `ol-app` | The only GPUI crates. `ol-app` builds `OneLaunch.exe` | `E\src\renderer\**`, `index.ts` |
 | `xtask`, `installer\` | Packaging, `latest.yml`, notices, sign tool, lint gates | `E\scripts\*`, `E\build\installer.nsh` |
 
 Enforcement:
 
-- `#![forbid(unsafe_code)]` in every crate except `ol-platform-win`.
+- `#![forbid(unsafe_code)]` is the first line of code in every crate root except `ol-platform-win`'s. The spikes under `spikes/` are exempt, and have no place in the crate graph.
 - The CI core job tests the workspace with the four GPUI crates excluded.
 - Pure crates use `winpath` instead of `std::path`, so they also test on Linux runners.
 - Crate graph and public-API snapshot are checked in CI.
+
+### Crate graph
+
+The diagram above gives the layers. This table is the record: `cargo xtask check` reads it and fails when a manifest and a row differ, when a crate outside the four GPUI crates reaches a `gpui` package through any dependency, or when a crate depends on a spike. "Depends on" is the crate's dependencies and build dependencies on other members, optional ones included; "In tests" is its dev-dependencies.
+
+| Crate | Depends on | In tests |
+| --- | --- | --- |
+| `ol-model` | none | `ol-testkit` |
+| `ol-formats` | `ol-model` | `ol-testkit` |
+| `ol-platform-api` | `ol-model` | `ol-testkit` |
+| `ol-runtime` | `ol-model`, `ol-platform-api` | `ol-testkit` |
+| `ol-store` | `ol-model` | `ol-testkit` |
+| `ol-vault` | `ol-model`, `ol-platform-api` | `ol-testkit` |
+| `ol-adapters` | `ol-formats`, `ol-model`, `ol-platform-api`, `ol-runtime`, `ol-store`, `ol-vault` | `ol-platform-fake`, `ol-sim`, `ol-testkit` |
+| `ol-services` | `ol-adapters`, `ol-formats`, `ol-model`, `ol-platform-api`, `ol-runtime`, `ol-store`, `ol-vault` | `ol-platform-fake`, `ol-sim`, `ol-testkit` |
+| `ol-api` | `ol-adapters`, `ol-model`, `ol-platform-api`, `ol-runtime`, `ol-services`, `ol-store`, `ol-vault` | `ol-platform-fake`, `ol-sim`, `ol-testkit` |
+| `ol-platform-win` | `ol-model`, `ol-platform-api` | `ol-testkit` |
+| `ol-net` | `ol-model`, `ol-platform-api` | `ol-testkit` |
+| `ol-platform-fake` | `ol-model`, `ol-platform-api` | `ol-testkit` |
+| `ol-sim` | `ol-formats`, `ol-model`, `ol-platform-api`, `ol-platform-fake`, `ol-runtime` | `ol-testkit` |
+| `ol-testkit-macros` | none | none |
+| `ol-testkit` | `ol-testkit-macros` | none |
+| `ol-replay` | `ol-api`, `ol-model`, `ol-platform-api`, `ol-platform-fake`, `ol-runtime`, `ol-sim`, `ol-testkit` | none |
+| `ol-ui-kit` | none | `ol-testkit` |
+| `ol-ui` | `ol-api`, `ol-model`, `ol-runtime`, `ol-ui-kit` | `ol-platform-fake`, `ol-sim`, `ol-testkit` |
+| `ol-automation` | `ol-api`, `ol-model`, `ol-platform-fake`, `ol-ui-kit` | `ol-testkit` |
+| `ol-app` | `ol-api`, `ol-automation`, `ol-model`, `ol-net`, `ol-platform-api`, `ol-platform-fake`, `ol-platform-win`, `ol-replay`, `ol-runtime`, `ol-sim`, `ol-ui`, `ol-ui-kit` | `ol-testkit` |
+| `xtask` | none | none |
+
+In `ol-app`, `ol-automation` is behind the feature `automation`, and `ol-platform-fake`, `ol-sim` and `ol-replay` behind the feature `fake`.
 
 ## Platform traits
 
@@ -135,7 +166,7 @@ Poster grid: virtualised by rows; columns computed from `repeat(auto-fill, minma
 
 Approved:
 
-- UI: `gpui-pre` (exact pin), `gpui-pre-platform`, `gpui-kit` (exact pin, `ol-ui-kit` only), `image`.
+- UI: `gpui-pre` (exact pin), `gpui-pre-platform`, `gpui-kit` (exact pin, default features off, `ol-ui-kit` only), `image`.
 - Storage and platform: `rusqlite` (bundled, backup), `windows` (`ol-platform-win` only).
 - Serialisation: `serde`, `serde_json` with `preserve_order`.
 - Crypto: `aes-gcm`, `sha2`, `base64`, `ed25519-dalek`, `getrandom`, `zeroize`.
@@ -153,6 +184,8 @@ Banned:
 - Wrappers implemented in-house: `arboard`, `clipboard-win`, `keyring`, DPAPI wrappers, single-instance and auto-launch crates, `rfd`.
 - Updaters: `self_update`, `velopack`, the cargo-packager updater.
 - Lineage: crates.io `gpui` 0.2.x and all git sources.
+
+A ban covers our crates and everything they pull in. GPUI itself brings two banned crates, `chrono` and, in a build script, `winreg`; `deny.toml` allows each under the crates that bring it and nowhere else (`../decisions/M1-gpui-pin.md`). Every version in `[workspace.dependencies]` is exact, and every member takes its dependencies from there.
 
 ## Risks the design contains
 

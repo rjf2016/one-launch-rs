@@ -1,0 +1,40 @@
+[package]
+name = "ol-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "OneLaunch"
+path = "src/main.rs"
+
+[features]
+automation = ["dep:ol-automation"]
+fake = ["dep:ol-platform-fake", "dep:ol-replay", "dep:ol-sim"]
+
+[dependencies]
+anyhow.workspace = true
+gpui.workspace = true
+gpui_platform.workspace = true
+ol-api.workspace = true
+ol-automation = { workspace = true, optional = true }
+ol-model.workspace = true
+ol-net.workspace = true
+ol-platform-api.workspace = true
+ol-platform-fake = { workspace = true, optional = true }
+ol-platform-win.workspace = true
+ol-replay = { workspace = true, optional = true }
+ol-runtime.workspace = true
+ol-sim = { workspace = true, optional = true }
+ol-ui.workspace = true
+ol-ui-kit.workspace = true
+
+[dev-dependencies]
+ol-testkit.workspace = true
+
+[build-dependencies]
+winresource.workspace = true
+
+[lints]
+workspace = true

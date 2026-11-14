@@ -1,0 +1,16 @@
+[package]
+name = "s05"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+gpui.workspace = true
+gpui_platform.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+windows.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,19 @@
+[package]
+name = "ol-net"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+ol-model.workspace = true
+ol-platform-api.workspace = true
+thiserror.workspace = true
+ureq.workspace = true
+
+[dev-dependencies]
+ol-testkit.workspace = true
+
+[lints]
+workspace = true

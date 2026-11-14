@@ -1,0 +1,71 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "spikes/*", "xtask"]
+default-members = ["crates/*", "xtask"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.100.0"
+publish = false
+
+[workspace.dependencies]
+ol-adapters = { version = "=0.0.0", path = "crates/ol-adapters" }
+ol-api = { version = "=0.0.0", path = "crates/ol-api" }
+ol-automation = { version = "=0.0.0", path = "crates/ol-automation" }
+ol-formats = { version = "=0.0.0", path = "crates/ol-formats" }
+ol-model = { version = "=0.0.0", path = "crates/ol-model" }
+ol-net = { version = "=0.0.0", path = "crates/ol-net" }
+ol-platform-api = { version = "=0.0.0", path = "crates/ol-platform-api" }
+ol-platform-fake = { version = "=0.0.0", path = "crates/ol-platform-fake" }
+ol-platform-win = { version = "=0.0.0", path = "crates/ol-platform-win" }
+ol-replay = { version = "=0.0.0", path = "crates/ol-replay" }
+ol-runtime = { version = "=0.0.0", path = "crates/ol-runtime" }
+ol-services = { version = "=0.0.0", path = "crates/ol-services" }
+ol-sim = { version = "=0.0.0", path = "crates/ol-sim" }
+ol-store = { version = "=0.0.0", path = "crates/ol-store" }
+ol-testkit = { version = "=0.0.0", path = "crates/ol-testkit" }
+ol-testkit-macros = { version = "=0.0.0", path = "crates/ol-testkit-macros" }
+ol-ui = { version = "=0.0.0", path = "crates/ol-ui" }
+ol-ui-kit = { version = "=0.0.0", path = "crates/ol-ui-kit" }
+ol-vault = { version = "=0.0.0", path = "crates/ol-vault" }
+s05 = { version = "=0.0.0", path = "spikes/s05" }
+
+gpui = { package = "gpui-pre", version = "=0.3.12" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.12" }
+gpui-kit = { version = "=0.9.1", default-features = false }
+image = { version = "=0.25.10", default-features = false, features = ["ico", "jpeg", "png", "webp"] }
+
+rusqlite = { version = "=0.42.0", features = ["backup", "bundled"] }
+windows = { version = "=0.62.2" }
+
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.154", features = ["preserve_order"] }
+
+aes-gcm = { version = "=0.11.1" }
+base64 = { version = "=0.23.1" }
+ed25519-dalek = { version = "=3.0.0" }
+getrandom = { version = "=0.4.3" }
+sha2 = { version = "=0.11.1" }
+zeroize = { version = "=1.9.1" }
+
+anyhow = { version = "=1.0.104" }
+regex = { version = "=1.13.1" }
+semver = { version = "=1.0.28" }
+thiserror = { version = "=2.0.21" }
+time = { version = "=0.3.55", features = ["formatting", "macros", "parsing"] }
+uuid = { version = "=1.29.2", features = ["v4"] }
+
+async-channel = { version = "=2.5.0" }
+async-task = { version = "=4.7.1" }
+async-trait = { version = "=0.1.92" }
+event-listener = { version = "=5.4.2" }
+futures-lite = { version = "=2.6.1" }
+
+ureq = { version = "=3.5.2", default-features = false, features = ["rustls"] }
+
+winresource = { version = "=0.1.34" }
+
+[workspace.lints.cargo]
+# Every member declares its dependencies ahead of the code that uses them.
+unused_dependencies = "allow"
