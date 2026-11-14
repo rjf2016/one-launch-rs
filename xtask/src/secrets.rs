@@ -156,8 +156,8 @@ impl Scanner {
                             .then(|| found[0].to_owned())
                     },
                 ),
-                whole_run("steamid64", r"76561(?:19|20)([0-9]{10})", |_, found, _| {
-                    (!no_generator_made(&found[1], 2)).then(|| found[0].to_owned())
+                whole_run("steamid64", r"76561(?:19|20)[0-9]{10}", |_, found, _| {
+                    Some(found[0].to_owned())
                 }),
                 whole_run(
                     "uuid",
@@ -231,7 +231,7 @@ fn unless_no_generator_made_it<const GROUP: usize>(
     _: &str,
 ) -> Option<String> {
     let value = &found[GROUP];
-    (!no_generator_made(value, 4)).then(|| value.to_owned())
+    (!no_generator_made(value)).then(|| value.to_owned())
 }
 
 // A secret a person chose can be anything, so no pattern or word in it shows that it is made up: only one character from end to end does.
@@ -246,8 +246,8 @@ fn unless_one_character<const GROUP: usize>(
     (!one_character).then(|| value.to_owned())
 }
 
-// An id or a token comes out of a generator, which all but never gives one character throughout but for a few, or a short unit repeated.
-fn no_generator_made(value: &str, odd: usize) -> bool {
+// A random id or token comes out of a generator, which all but never gives one character throughout but for a few, or a short unit repeated. A SteamID64 is a counter, so any of them may be an account: those pass by the allow list only.
+fn no_generator_made(value: &str) -> bool {
     let chars: Vec<char> = value
         .to_ascii_lowercase()
         .chars()
@@ -258,7 +258,7 @@ fn no_generator_made(value: &str, odd: usize) -> bool {
         *counts.entry(*c).or_default() += 1;
     }
     let most = counts.values().max().copied().unwrap_or_default();
-    let nearly_one_character = chars.len() - most <= odd;
+    let nearly_one_character = chars.len() - most <= 4;
     let a_unit_repeated = (1..=16.min(chars.len() / 2))
         .any(|period| chars[period..] == chars[..chars.len() - period]);
     nearly_one_character || a_unit_repeated
@@ -443,8 +443,6 @@ mod tests {
         for line in [
             "11111111-1111-4111-8111-111111111111".to_owned(),
             "0123456789abcdef".repeat(2),
-            "7656119".to_owned() + "0000000000",
-            "7656119".to_owned() + "8000000000",
             format!("gh{}_{}", "p", "x".repeat(36)),
             format!("ey{}{}.{}", "J", "x".repeat(20), "x".repeat(30)),
         ] {
@@ -465,10 +463,22 @@ mod tests {
             rules(&format!("ey{0}{1}.ey{0}{1}.{1}", "J", "PLACEHOLDER")),
             ["jwt"]
         );
-        assert_eq!(
-            rules(&format!("id {}{}", "7656119", "8000000123")),
-            ["steamid64"]
-        );
+        for digits in ["0000000000", "0000000001", "8000000000", "1212121212"] {
+            assert_eq!(
+                rules(&format!("id {}{digits}", "7656119")),
+                ["steamid64"],
+                "{digits}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_exact_value_on_the_allow_list_passes() {
+        let base = "7656119".to_owned() + "7960265728";
+        let scanner = Scanner::new(BTreeSet::from([base.clone()]));
+        assert!(scanner.scan(&format!("id {base}"), false).is_empty());
+        let next = "7656119".to_owned() + "7960265729";
+        assert_eq!(scanner.scan(&format!("id {next}"), false).len(), 1);
     }
 
     #[test]
