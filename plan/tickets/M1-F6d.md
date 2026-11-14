@@ -18,7 +18,7 @@ owner_step: "1. Push the waiting workflow commit of scratch pull request number 
 
 ## Outcome
 
-Scratch pull requests, opened by the app against `main`, each carrying one deliberate fault. Auto-merge is requested on every one, so a guardrail that fails to hold would show as a merge.
+Scratch pull requests, opened by the app against `main`, each carrying one deliberate fault. Auto-merge is requested on every one but number 5, so a guardrail that fails to hold would show as a merge. Number 5 never has auto-merge on: the owner's approval makes it mergeable as number 6, and with auto-merge on that approval would merge it.
 
 | # | The pull request | Must end as |
 | --- | --- | --- |
@@ -45,7 +45,7 @@ Fixing a guardrail that fails to hold: that is a `fix` ticket, and this one stay
 
 ## Traps
 
-- Number 6 must not merge. Close it as soon as its state is read; do not request auto-merge on it.
+- Numbers 5 and 6 are one pull request, and it must not merge. Before the owner is asked to approve, read back that auto-merge is off on it. Close it as soon as its mergeable state is read.
 - If any scratch pull request merges, stop the line: revert through a pull request and tell the owner.
 - Do not weaken a hook to commit a fault. If a fault cannot be committed with the hooks on, that is the finding.
 - Never test the tag rule by pushing a tag.

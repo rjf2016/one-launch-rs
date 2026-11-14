@@ -3,12 +3,13 @@ id: M1-F6e
 title: Test integrity and the computed ledger
 kind: feature
 risk: safety
-depends: [M1-F6c, M1-F2]
+depends: [M1-F6c]
 write_scope:
   - xtask/src/policy/integrity/**
   - xtask/src/policy/ledger/**
+  - xtask/src/policy/mod.rs           # to register the two modules
+  - xtask/src/main.rs                 # to add the two commands
   - xtask/tests/integrity/**
-  - crates/ol-testkit/src/parity.rs
   - crates/ol-testkit-macros/**
   - .github/workflows/ci.yml          # committed by the agent, pushed by the owner
 read:
@@ -16,7 +17,7 @@ read:
   source: []
 acceptance:
   checks:
-    - "fixture diffs in xtask's tests: a removed test, a renamed test, a test given `#[ignore]`, a test that loses one assertion, and a changed file under oracle/ each fail with their own message; adding a test passes"
+    - "fixture diffs in xtask's tests: a removed test, a renamed test, a test given `#[ignore]`, a test that loses one assertion, a test whose assertion is commented out, a test whose assertion is moved inside a string literal, and a changed file under oracle/ each fail with their own message; adding a test passes"
     - "a test tagged `#[parity(\"<catalogue id>\")]` that ran and passed makes its row covered; the same test failing, filtered out or ignored does not"
     - "a tag naming an id that is not in oracle/tests/catalogue.json, oracle/l1, oracle/l2 or oracle/ui fails"
     - "a head whose covered set lacks a row covered on the base fails"
@@ -37,7 +38,9 @@ Mutation testing in CI, verifier receipts and canaries (F7c and Milestone 2). Wa
 ## Traps
 
 - `#[parity]` is an attribute that returns its item unchanged. It needs the proc-macro crate F1 created empty (`ol-testkit-macros`) and nothing else: no `syn`, no `quote`.
-- Counting assertions needs no Rust parser: none is approved. Count the assertion macros inside each test function's braces as text, and treat a test whose body cannot be delimited as a failure, not as zero.
+- Counting assertions needs no Rust parser: none is approved. Raw text is not enough either: `// assert!(x);` and `"assert!(x)"` check nothing and must not count. Run a small lexer over the test body first that drops line comments, nested block comments, and string, raw string, byte string and char literals; count the assertion macros in what is left. Treat a test whose body cannot be delimited as a failure, not as zero.
+- A test can still be hollowed out in ways no count sees (`if false { assert!(..) }`). That is what the mutation receipts are for; do not grow the lexer to chase it.
+- `ol-testkit` re-exports the attribute in F2. This ticket does not touch `ol-testkit`, so it does not wait for F2.
 - The base inventory is read from the base commit's sources. Do not build the base.
 - A test that is compiled out by `cfg` on the CI platform did not run. It covers nothing there.
 - The row totals come from the bundle. If a count differs from the gate report of Milestone 0, stop and say so; do not adjust either.

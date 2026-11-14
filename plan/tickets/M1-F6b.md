@@ -34,4 +34,4 @@ The hooks (F6a). Proving the owners file works on real pull requests (F6d).
 - The owners file is not a workflow file, so the app can push it. Once it is on `main`, every later change under `.github/` and `.claude/` waits for the owner.
 - The pull request is opened by the app. One opened by the owner could not be approved by anyone.
 - Every subagent pays for `CLAUDE.md` on every run. No history, no rationale, no duplicate of a design file: point to it.
-- "Commit only when the owner asks" ends here; say what replaces it (commits happen inside a ticket, on its branch).
+- "Commit only when the owner asks, until the agent workflow of Milestone 1 is in place" stays word for word. The workflow is not in place when this ticket merges; F7c is the ticket that replaces the rule.

@@ -14,7 +14,8 @@ acceptance:
   checks:
     - "the hook's own test run passes: every command in the two tables below, plus each table row in every quoting and casing variant the test file lists, gets the stated verdict"
     - "a PreToolUse call answers in under 100 ms (median of 50 on this PC)"
-    - "an Edit or Write to spec/, oracle/, .github/, .claude/, deny.toml, scripts/agent/ or the policy code of xtask is refused; with a ticket set, so is any path outside its write_scope"
+    - "with no ticket set, an Edit or Write to spec/, oracle/, .github/, .claude/, deny.toml, scripts/agent/ or the policy code of xtask is refused"
+    - "with a ticket set, a path is allowed exactly when the ticket's write_scope names it, owner-approved paths included: under M1-F6b the hook allows .github/CODEOWNERS and refuses .github/workflows/ci.yml, and under M1-F6c the reverse"
     - "with the hook file missing or throwing, the tool call is refused, not allowed"
     - "a commit whose staged diff holds a planted fake token, email address or path inside a Windows user profile is refused"
 owner_step: none
@@ -25,7 +26,7 @@ owner_step: none
 `.claude/settings.json` is committed and wires hooks that hold in every agent session and subagent in this repo and in the slots:
 
 - **PreToolUse on Bash and PowerShell**: refuses the commands of `workflow.md` › "Hooks", and everything that would reach GitHub other than through `scripts/agent/git.ps1` and `scripts/agent/gh.ps1`.
-- **PreToolUse on Edit and Write**: refuses owner-approved paths, and paths outside the current ticket's `write_scope`. The current ticket is named by an ignored file in the checkout that the Workflow script writes (F7c); with none set, only the owner-approved paths are refused.
+- **PreToolUse on Edit and Write**: with a ticket set, allows the paths its `write_scope` names and refuses every other. With none set, refuses the owner-approved paths and allows the rest. A ticket may name an owner-approved path (F6b the owners file, F6c the workflow, this ticket its own hooks): the hook lets the agent write it, and the owner's review of the pull request decides whether it merges. The current ticket is named by `.claude/ticket.local.json`, which the repo's `*.local.*` ignore rule already covers. The Workflow script writes it (F7c); until then the session that starts a ticket does. No ticket's `write_scope` names that file, so an agent cannot change its own ticket through Edit or Write.
 - **PostToolUse on Edit and Write**: runs rustfmt on a changed `.rs` file.
 - **Before a commit**: the secret scan over the staged diff.
 - **SubagentStop**: `cargo xtask check --ticket <id>` must pass when a ticket is set.

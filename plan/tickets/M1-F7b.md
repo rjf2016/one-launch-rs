@@ -14,7 +14,7 @@ acceptance:
   checks:
     - "each skill file loads (front matter valid, under 150 lines) and names only commands and files that exist"
     - "the verifier agent type has no Edit, Write or NotebookEdit tool, and its skill refuses to start without a ticket id and a head commit"
-    - "a dry run on a merged Milestone 1 ticket: `verify-pr` produces a verdict that validates against the schema of F7c, bound to that commit"
+    - "a dry run on a merged Milestone 1 ticket: `verify-pr` produces a verdict that validates against the verdict schema of F7a, bound to that commit"
     - "`ship` on a scratch branch writes a pull request body with the three sections and an evidence block that `cargo xtask policy` accepts"
 owner_step: none
 ---

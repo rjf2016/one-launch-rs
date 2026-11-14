@@ -16,13 +16,14 @@ acceptance:
   checks:
     - "xtask's own tests pass: one fixture repository per rule below, each with a diff that must pass and one that must fail"
     - "`cargo xtask check --ticket M1-F1 --base <commit>` passes on the F1 merge and fails on the same diff plus one file outside its write_scope"
+    - "`cargo xtask check --ticket <id>` passes on a branch that has no pull request, and makes no network call"
     - "tier 0 runs `cargo xtask policy` on every pull request and `gate` fails when it fails"
 owner_step: "1. Push the workflow commit: `git push origin <branch>`."
 ---
 
 ## Outcome
 
-`cargo xtask policy --base <ref>` judges the diff of a pull request, and `cargo xtask check --ticket <id>` runs it locally with the ticket's limits. Tier 0 runs it; the hooks of F6a call the same code where they can. Rules, each with a named failure message:
+`cargo xtask policy --base <ref>` judges a pull request: its diff, its commits, its body and its reviews. Tier 0 runs it on every pull request. `cargo xtask check --ticket <id>` runs the rules that need no pull request, with the ticket's limits: rules 1 to 4, the commit-message half of rule 6, and rule 7. Rules 5 and 8 and the body half of rule 6 run only in `policy`, because an implementer's branch has no pull request yet when its agent stops. The hooks of F6a call the local rules only. Rules, each with a named failure message:
 
 1. **Ticket.** The branch names one ticket (`<milestone>/<ticket>-...`), and that ticket's file exists on the base.
 2. **Scope.** Every changed path matches the ticket's `write_scope`. Fifteen files at most, unless the ticket is `kind: interface`.
