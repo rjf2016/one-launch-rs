@@ -18,8 +18,14 @@ pub fn check(files: &[String]) -> Result<Vec<String>> {
         for finding in scanner.scan(file) {
             problems.push(format!("{file}: in the file name: {finding}"));
         }
-        let Ok(bytes) = std::fs::read(workspace::root().join(file)) else {
-            continue;
+        let path = workspace::root().join(file);
+        let bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(_) if !path.exists() => continue,
+            Err(error) => {
+                problems.push(format!("{file}: could not be read ({error})"));
+                continue;
+            }
         };
         if bytes.iter().take(8000).any(|byte| *byte == 0) {
             continue;

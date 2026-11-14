@@ -191,11 +191,15 @@ pub fn files() -> Result<Vec<String>> {
             "--exclude-standard",
         ],
     )?;
-    Ok(String::from_utf8_lossy(&listing)
+    let files: Vec<String> = String::from_utf8_lossy(&listing)
         .split('\0')
         .filter(|path| !path.is_empty())
         .map(str::to_owned)
-        .collect())
+        .collect();
+    if files.is_empty() {
+        bail!("git listed no files");
+    }
+    Ok(files)
 }
 
 #[derive(Deserialize)]
