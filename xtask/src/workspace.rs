@@ -191,7 +191,11 @@ pub fn files() -> Result<Vec<String>> {
             "--exclude-standard",
         ],
     )?;
-    let files: Vec<String> = String::from_utf8_lossy(&listing)
+    listed(&listing)
+}
+
+fn listed(listing: &[u8]) -> Result<Vec<String>> {
+    let files: Vec<String> = String::from_utf8_lossy(listing)
         .split('\0')
         .filter(|path| !path.is_empty())
         .map(str::to_owned)
@@ -243,4 +247,22 @@ struct Resolve {
 struct Node {
     id: String,
     dependencies: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_listing_is_split_at_the_nul_bytes() {
+        assert_eq!(
+            listed(b"Cargo.toml\0crates/ol-model/src/lib.rs\0").unwrap(),
+            ["Cargo.toml", "crates/ol-model/src/lib.rs"]
+        );
+    }
+
+    #[test]
+    fn an_empty_listing_is_an_error() {
+        assert!(listed(b"").is_err());
+    }
 }

@@ -252,6 +252,13 @@ mod tests {
     const HEX: &str = "0123456789abcdef";
 
     #[test]
+    fn a_path_that_cannot_be_read_is_a_finding() {
+        let problems = check(&["crates".to_owned(), "no-such-file".to_owned()]).unwrap();
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].starts_with("crates: could not be read"));
+    }
+
+    #[test]
     fn a_private_key_is_found() {
         let line = format!("-----BEGIN {} KEY-----", "RSA PRIVATE");
         assert_eq!(rules(&line), ["private-key"]);
