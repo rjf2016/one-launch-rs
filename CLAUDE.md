@@ -13,7 +13,7 @@ This file is the minimum that must hold from the first session. Milestone 1 repl
 - Riot Games: never touch a Riot game process or Vanguard (image names only; no `tasklist`, `taskkill`, WMI or `Get-Process` for anything Riot), never switch while a Riot game runs, never send anything to Riot's servers (the one local exception is the launch request to the client's own loopback server), never export a Riot session. The full rules are in the Electron repo at `docs/adapters/riot.md` and come before convenience.
 - Dependencies: only the approved list in `plan/PLAN.md`. Anything else needs the owner's OK.
 - Releases are the owner's. Never push a tag, create or publish a release, or handle signing keys.
-- Commit only when the owner asks, until the bot workflow of Milestone 1 is in place.
+- Commit only when the owner asks, until the agent workflow of Milestone 1 is in place.
 
 ## The oracle
 
