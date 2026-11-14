@@ -2,14 +2,18 @@
 
 A snapshot of web research, not verified locally. Every fact here is confirmed or replaced by a Milestone 1 spike before anything depends on it. Versions are as found on crates.io and GitHub when the plan was written.
 
+Checked against crates.io, the pinned source and a build by F1 (`../decisions/M1-gpui-pin.md`): "Which GPUI", the first two points of "GPUI Kit", the AccessKit re-export, and "Other crates". Everything else is still unverified.
+
 ## Which GPUI
 
 - The official `gpui` crate on crates.io is stale (0.2.2). Zed's own tree still carries that version number.
-- The practical dependency is `gpui-pre` (0.3.12 at research time), a weekly snapshot of a Zed commit, with `gpui-pre-platform`, `-macros`, `-http-client` and `-reqwest-client` at the same version. It is published by the GPUI Kit maintainer, not by Zed. Pin exactly and commit `Cargo.lock`.
-- Alternatives: a pinned git rev of zed-industries/zed, or forks (`gpui-ce` and others). Mixing lineages causes trait mismatches.
+- The dependency is `gpui-pre` 0.3.12, a weekly snapshot of a Zed commit (`d2a4fb6`), published by the GPUI Kit maintainer, not by Zed. Pinned exactly, with `Cargo.lock` committed. The package builds a library named `gpui`, and `gpui-pre-platform` one named `gpui_platform`; depend on them under those names.
+- With it, at the same version, come `gpui-pre-platform`, `-windows`, `-macros`, `-collections`, `-refineable`, `-derive-refineable`, `-scheduler`, `-shared-string`, `-sum-tree`, `-util`, `-http-client`, `-ztracing` and `-ztracing-macro`. `gpui-pre-reqwest-client` exists but nothing we take depends on it.
+- Alternatives: a pinned git rev of zed-industries/zed, or forks (`gpui-ce` and others). Mixing lineages causes trait mismatches, and GPUI Kit requires `gpui-pre` by exact version.
 - There is no GPUI 1.0 and no separate repo. The README says breaking changes are common.
-- Zed pins Rust 1.98.1. `windows-registry` 0.100 needs 1.95.
+- Zed pins Rust 1.98.1 at that commit. The `gpui-pre` crates and GPUI Kit declare no Rust version; the highest one declared in the Windows build is 1.89. `windows-registry` 0.100 needs 1.95, but the lockfile takes 0.6.1, which needs 1.82. The workspace pins 1.100.0.
 - Licence: `gpui` and the `gpui-pre-*` crates are Apache-2.0. Many other Zed crates are GPL-3.0; take only gpui and its platform crates.
+- `gpui-pre` depends on `chrono`, and its build script on `embed-resource`, which uses `winreg` to find the Windows SDK. Both are on our ban list; `deny.toml` allows them under those crates only. Its feature `screen-capture` brings `sysinfo` and stays off.
 
 ## Windows backend
 
@@ -21,6 +25,7 @@ A snapshot of web research, not verified locally. Every fact here is confirmed o
 ## GPUI Kit (formerly gpui-component)
 
 - Repo `longbridge/gpui-kit`; crates `gpui-kit` and `gpui-component` 0.9.1; Apache-2.0; pins `gpui-pre` exactly. Weekly releases, some breaking.
+- `gpui-kit` is a facade over layers. `gpui-base`, always on, is the unstyled one: the input with masking, the textarea, the scrollbar, the focus trap and the virtual list are there. `gpui-component` and `gpui-kit-assets` are the styled one, behind the default features `component` and `assets`: the title bar, the menu and the notification are there. The workspace takes `gpui-kit` with default features off.
 - Has TitleBar, Dialog, Notification, Select, Menu, Popover, Tooltip, Input (masked, with toggle), Textarea, Switch, Checkbox, Tabs, Scrollable, VirtualList, TextView, Image, Theme, Focus Trap.
 - Ships an AGENTS.md and agent skills. Claims AccessKit accessibility and headless UI integration tests.
 - This project uses it for text input only; see `architecture.md`.
@@ -45,7 +50,7 @@ Lacks:
 
 ## Other crates (versions at research time)
 
-`rusqlite` 0.41, `windows` 0.62, `ed25519-dalek` 3.0, `ureq` 3.5, `tracing` 0.1, `tray-icon` 0.26, `muda` 0.21, `winresource` 0.1. The SQLite file and WAL formats are stable, so a database written by better-sqlite3 should open; the vault spike checks it.
+Pinned by F1 in `Cargo.toml`: `rusqlite` 0.42.0, `windows` 0.62.2, `ed25519-dalek` 3.0.0, `ureq` 3.5.2, `winresource` 0.1.34; the rest of the approved list is in `../decisions/M1-gpui-pin.md`. Not pinned: `tray-icon` 0.26 and `muda` 0.21, which wait for the tray spike, and `tracing`, which is not on the approved list. The SQLite file and WAL formats are stable, so a database written by better-sqlite3 should open; the vault spike checks it.
 
 ## Packaging
 
