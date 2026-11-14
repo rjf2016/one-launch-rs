@@ -5,6 +5,9 @@ use regex::Regex;
 
 use crate::workspace::{self, CRATES_IO, Member, Workspace};
 
+const CARGO_CONFIG: &str = ".cargo/config.toml";
+const THE_ALIAS: &str = "[alias]\nxtask = \"run --locked --package xtask --\"\n";
+
 pub fn check(workspace: &Workspace) -> Result<Vec<String>> {
     let mut problems = workspace_dependencies(&workspace::read("Cargo.toml")?);
     for member in &workspace.members {
@@ -18,7 +21,43 @@ pub fn check(workspace: &Workspace) -> Result<Vec<String>> {
             "Cargo.lock: {package} does not come from crates.io"
         ));
     }
+    problems.extend(cargo_config(
+        &workspace::files()?,
+        &workspace::read(CARGO_CONFIG)?,
+    ));
     Ok(problems)
+}
+
+// A cargo config can swap the registry, cap the lints or point `cargo xtask` at another binary.
+fn cargo_config(files: &[String], config: &str) -> Vec<String> {
+    let mut problems: Vec<String> = files
+        .iter()
+        .filter(|file| file.ends_with(".cargo/config.toml") || file.ends_with(".cargo/config"))
+        .filter(|file| *file != CARGO_CONFIG)
+        .map(|file| format!("{file}: only {CARGO_CONFIG} may configure cargo"))
+        .collect();
+    if config.replace("\r\n", "\n") != THE_ALIAS {
+        problems.push(format!(
+            "{CARGO_CONFIG}: must hold the xtask alias and nothing else"
+        ));
+    }
+    problems
+}
+
+fn exact(requirement: &str) -> bool {
+    let Some(version) = requirement.strip_prefix('=') else {
+        return false;
+    };
+    let numbers: Vec<&str> = version
+        .split(['-', '+'])
+        .next()
+        .unwrap_or_default()
+        .split('.')
+        .collect();
+    numbers.len() == 3
+        && numbers
+            .iter()
+            .all(|number| !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
 // What cargo resolved, whatever way a manifest spells it: the text checks above read one spelling only.
@@ -30,7 +69,7 @@ fn resolved(members: &[Member]) -> Vec<String> {
         for edge in &member.edges {
             let (dependency, requirement) = (&edge.name, &edge.requirement);
             match edge.source.as_deref() {
-                Some(CRATES_IO) if requirement.starts_with('=') => {}
+                Some(CRATES_IO) if exact(requirement) => {}
                 Some(CRATES_IO) => problems.push(format!(
                     "{name}: asks for {dependency} {requirement}, which is not an exact `=` version"
                 )),
@@ -48,10 +87,11 @@ fn resolved(members: &[Member]) -> Vec<String> {
 }
 
 fn workspace_dependencies(manifest: &str) -> Vec<String> {
-    let exact =
-        Regex::new(r#"^[A-Za-z0-9_-]+ = (?:"=[0-9][^"]*"|\{.*\bversion = "=[0-9][^"]*".*\})$"#)
-            .expect("a fixed pattern");
+    let entry = Regex::new(r#"^[A-Za-z0-9_-]+ = (?:"(=[^"]*)"|\{.*\bversion = "(=[^"]*)".*\})$"#)
+        .expect("a fixed pattern");
     let git = Regex::new(r"\bgit\s*=").expect("a fixed pattern");
+    let elsewhere =
+        Regex::new(r"^(?:workspace\s*\.\s*)?dependencies\s*[.=]").expect("a fixed pattern");
     let mut problems = Vec::new();
     for (table, line) in entries(manifest) {
         if table.starts_with("workspace.dependencies.") {
@@ -61,13 +101,21 @@ fn workspace_dependencies(manifest: &str) -> Vec<String> {
                 ));
             }
         } else if table == "workspace.dependencies" && !line.is_empty() {
+            let pinned = entry
+                .captures(line)
+                .and_then(|found| found.get(1).or(found.get(2)))
+                .is_some_and(|version| exact(version.as_str()));
             if git.is_match(line) {
                 problems.push(format!("Cargo.toml: `{line}` is a git dependency"));
-            } else if !exact.is_match(line) {
+            } else if !pinned {
                 problems.push(format!(
-                    "Cargo.toml: `{line}` is not pinned to an exact `=` version"
+                    "Cargo.toml: `{line}` is not pinned to an exact `=x.y.z` version"
                 ));
             }
+        } else if matches!(table, "" | "workspace") && elsewhere.is_match(line) {
+            problems.push(format!(
+                "Cargo.toml: `{line}` must be one line under [workspace.dependencies]"
+            ));
         }
     }
     problems
@@ -78,6 +126,8 @@ fn member_dependencies(path: &str, manifest: &str) -> Vec<String> {
         Regex::new(r"^[A-Za-z0-9_-]+(?:\.workspace = true|\s*=\s*\{\s*workspace = true\b.*\})$")
             .expect("a fixed pattern");
     let nested = Regex::new(r"(?:^|\.)(?:dev-|build-)?dependencies\.").expect("a fixed pattern");
+    let elsewhere = Regex::new(r"^(?:target\b.*\.\s*)?(?:dev-|build-)?dependencies\s*[.=]")
+        .expect("a fixed pattern");
     let mut problems = Vec::new();
     for (table, line) in entries(manifest) {
         let last = table.rsplit('.').next().unwrap_or_default();
@@ -90,10 +140,14 @@ fn member_dependencies(path: &str, manifest: &str) -> Vec<String> {
         } else if matches!(
             last,
             "dependencies" | "dev-dependencies" | "build-dependencies"
-        ) && !line.is_empty()
-            && !inherited.is_match(line)
-        {
-            problems.push(format!("{path}: `{line}` does not say `workspace = true`"));
+        ) {
+            if !line.is_empty() && !inherited.is_match(line) {
+                problems.push(format!("{path}: `{line}` does not say `workspace = true`"));
+            }
+        } else if (table.is_empty() || table.starts_with("target")) && elsewhere.is_match(line) {
+            problems.push(format!(
+                "{path}: `{line}` must be one line under a [dependencies] header"
+            ));
         }
     }
     problems
@@ -114,11 +168,12 @@ fn entries(manifest: &str) -> Vec<(&str, &str)> {
         if line.starts_with('#') {
             continue;
         }
-        if let Some(header) = line
+        let before_comment = line.split('#').next().unwrap_or_default().trim();
+        if let Some(header) = before_comment
             .strip_prefix('[')
             .and_then(|rest| rest.strip_suffix(']'))
         {
-            table = header.trim_matches(['[', ']']);
+            table = header.trim_matches(['[', ']', ' ']);
             entries.push((table, ""));
         } else if !line.is_empty() {
             entries.push((table, line));
@@ -153,6 +208,8 @@ anyhow = "=1.0.104"
             r#"serde = { version = "1", features = ["derive"] }"#,
             r#"serde = { version = "^1.0.229" }"#,
             r#"serde = { version = ">=1.0.229" }"#,
+            r#"serde = { version = "=1" }"#,
+            r#"serde = "=1.0""#,
             r#"ol-model = { path = "crates/ol-model" }"#,
         ] {
             let manifest = format!("[workspace.dependencies]\n{line}\n");
@@ -261,6 +318,70 @@ version = "1.0.0"
 source = "registry+https://example.com/index"
 "#;
         assert_eq!(lock_sources(lock).len(), 2);
+    }
+
+    #[test]
+    fn only_a_full_version_is_exact() {
+        for requirement in ["=1.0.229", "=0.0.0", "=2.0.0-beta.1", "=0.6.0+11769913"] {
+            assert!(exact(requirement), "{requirement}");
+        }
+        for requirement in ["=1", "=1.2", "=1.2.x", "=1.2.", "1.2.3", "^1.2.3", "=", ""] {
+            assert!(!exact(requirement), "{requirement}");
+        }
+    }
+
+    #[test]
+    fn a_header_with_a_comment_or_spaces_is_still_a_header() {
+        for header in ["[dependencies] # runtime", "[ dependencies ]"] {
+            let manifest = format!("{header}\nserde = \"=1.0.229\"\n");
+            let problems = member_dependencies("x/Cargo.toml", &manifest);
+            assert_eq!(problems.len(), 1, "{header}");
+        }
+    }
+
+    #[test]
+    fn a_dependency_written_outside_a_header_fails() {
+        for manifest in [
+            "dependencies.serde = \"=1.0.229\"\n[package]\nname = \"x\"\n",
+            "build-dependencies = { semver = \"=1.0.28\" }\n[package]\nname = \"x\"\n",
+            "[target.'cfg(windows)']\ndependencies = { windows = \"=0.62.2\" }\n",
+            "target.'cfg(windows)'.dependencies.windows = \"=0.62.2\"\n",
+        ] {
+            let problems = member_dependencies("x/Cargo.toml", manifest);
+            assert_eq!(problems.len(), 1, "{manifest}");
+            assert!(problems[0].contains("under a [dependencies] header"));
+        }
+        for manifest in [
+            "workspace.dependencies.serde = \"=1.0.229\"\n",
+            "[workspace]\ndependencies = { serde = \"=1.0.229\" }\n",
+            "[workspace]\ndependencies.serde = \"=1.0.229\"\n",
+        ] {
+            assert_eq!(workspace_dependencies(manifest).len(), 1, "{manifest}");
+        }
+    }
+
+    #[test]
+    fn the_cargo_config_holds_the_alias_and_nothing_else() {
+        let root = [CARGO_CONFIG.to_owned(), "Cargo.toml".to_owned()];
+        assert_eq!(cargo_config(&root, THE_ALIAS), Vec::<String>::new());
+        assert_eq!(
+            cargo_config(&root, &THE_ALIAS.replace('\n', "\r\n")),
+            Vec::<String>::new()
+        );
+        for config in [
+            "[alias]\nxtask = \"run --locked --package s10 --\"\n".to_owned(),
+            format!("{THE_ALIAS}\n[build]\nrustflags = [\"--cap-lints\", \"allow\"]\n"),
+            format!("{THE_ALIAS}\n[source.crates-io]\nreplace-with = \"vendored\"\n"),
+            String::new(),
+        ] {
+            assert_eq!(cargo_config(&root, &config).len(), 1, "{config}");
+        }
+        let nested = [
+            CARGO_CONFIG.to_owned(),
+            "crates/ol-model/.cargo/config.toml".to_owned(),
+            "xtask/.cargo/config".to_owned(),
+        ];
+        assert_eq!(cargo_config(&nested, THE_ALIAS).len(), 2);
     }
 
     #[test]

@@ -17,6 +17,7 @@ pub fn check(files: &[String]) -> Result<Vec<String>> {
     let manifest: Manifest = serde_json::from_str(&workspace::read(MANIFEST)?)
         .with_context(|| format!("{MANIFEST} is not the manifest this check reads"))?;
     let mut present = BTreeMap::new();
+    let mut problems = Vec::new();
     for file in files {
         let Some(path) = file.strip_prefix("oracle/") else {
             continue;
@@ -24,11 +25,17 @@ pub fn check(files: &[String]) -> Result<Vec<String>> {
         if file == MANIFEST {
             continue;
         }
-        if let Ok(bytes) = std::fs::read(workspace::root().join(file)) {
-            present.insert(path.to_owned(), sha256(&bytes));
+        let on_disk = workspace::root().join(file);
+        match std::fs::read(&on_disk) {
+            Ok(bytes) => {
+                present.insert(path.to_owned(), sha256(&bytes));
+            }
+            Err(_) if !on_disk.exists() => {}
+            Err(error) => problems.push(format!("{file}: could not be read ({error})")),
         }
     }
-    Ok(differences(&manifest.files, &present))
+    problems.extend(differences(&manifest.files, &present));
+    Ok(problems)
 }
 
 fn sha256(bytes: &[u8]) -> String {

@@ -27,10 +27,7 @@ pub fn check(files: &[String]) -> Result<Vec<String>> {
                 continue;
             }
         };
-        if bytes.iter().take(8000).any(|byte| *byte == 0) {
-            continue;
-        }
-        for (index, line) in String::from_utf8_lossy(&bytes).lines().enumerate() {
+        for (index, line) in text(bytes).lines().enumerate() {
             for finding in scanner.scan(line) {
                 problems.push(format!("{file}:{}: {finding}", index + 1));
             }
@@ -42,6 +39,12 @@ pub fn check(files: &[String]) -> Result<Vec<String>> {
 // oracle/ is sealed by its manifest and was scanned when it was captured; Cargo.lock is all checksums.
 fn skipped(file: &str) -> bool {
     file.starts_with("oracle/") || file == "Cargo.lock"
+}
+
+// Without its NUL bytes UTF-16 text reads as ASCII, and so do the strings inside a binary file.
+fn text(bytes: Vec<u8>) -> String {
+    let bytes: Vec<u8> = bytes.into_iter().filter(|byte| *byte != 0).collect();
+    String::from_utf8_lossy(&bytes).into_owned()
 }
 
 fn allowed(list: &str) -> BTreeSet<String> {
@@ -58,6 +61,7 @@ struct Rule {
     id: &'static str,
     pattern: Regex,
     value: Value,
+    whole_run: bool,
 }
 
 fn rule(id: &'static str, pattern: &str, value: Value) -> Rule {
@@ -65,6 +69,15 @@ fn rule(id: &'static str, pattern: &str, value: Value) -> Rule {
         id,
         pattern: Regex::new(pattern).expect("a fixed pattern"),
         value,
+        whole_run: false,
+    }
+}
+
+// A match counts only when no letter or digit touches it, so part of a longer run is not taken for an id.
+fn whole_run(id: &'static str, pattern: &str, value: Value) -> Rule {
+    Rule {
+        whole_run: true,
+        ..rule(id, pattern, value)
     }
 }
 
@@ -84,14 +97,14 @@ impl Scanner {
                     r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----",
                     |_, found, _| Some(found[0].to_owned()),
                 ),
-                rule(
+                whole_run(
                     "github-token",
-                    r"\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})",
+                    r"(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})",
                     Scanner::unless_synthetic::<0>,
                 ),
-                rule(
+                whole_run(
                     "jwt",
-                    r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_-]*)?",
+                    r"(?:eyJ|eyAi)[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_-]*)?",
                     Scanner::unless_synthetic::<0>,
                 ),
                 rule(
@@ -109,37 +122,28 @@ impl Scanner {
                     r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})",
                     |_, found, line| {
                         let after = line[found.get(0)?.end()..].chars().next();
-                        let cut_short =
-                            after.is_some_and(|c| c.is_alphanumeric() || c == '_' || c == '-');
+                        let cut_short = after.is_some_and(char::is_alphanumeric);
                         (!cut_short && &found[0] != "git@github.com" && !safe_domain(&found[1]))
                             .then(|| found[0].to_owned())
                     },
                 ),
-                rule(
+                whole_run(
                     "steamid64",
-                    r"\b7656119([0-9]{10})\b",
+                    r"76561(?:19|20)([0-9]{10})",
                     |scanner, found, _| {
                         (!scanner.synthetic(&found[1])).then(|| found[0].to_owned())
                     },
                 ),
-                rule(
+                whole_run(
                     "uuid",
-                    r"\b[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\b",
+                    r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}",
                     Scanner::unless_synthetic::<0>,
                 ),
-                rule(
-                    "hex64",
-                    r"\b[0-9A-Fa-f]{64}\b",
-                    Scanner::unless_synthetic::<0>,
-                ),
-                rule(
-                    "hex32",
-                    r"\b[0-9A-Fa-f]{32}\b",
-                    Scanner::unless_synthetic::<0>,
-                ),
+                whole_run("hex64", r"[0-9A-Fa-f]{64}", Scanner::unless_synthetic::<0>),
+                whole_run("hex32", r"[0-9A-Fa-f]{32}", Scanner::unless_synthetic::<0>),
                 rule(
                     "user-folder",
-                    r#"(?i)(?:\b[a-z]:|(?:^|[^\w.])/[a-z])[\\/]{1,2}users[\\/]{1,2}([^\\/\s"'`*?|:;,)\]]+)"#,
+                    r#"(?i)(?:\b[a-z]:|(?:^|[^\w.])(?:/mnt)?/[a-z])[\\/]{1,4}users[\\/]{1,4}([^\\/\s"'`*?|:;,)\]]+)"#,
                     |_, found, _| {
                         let name = &found[1];
                         let named = name.starts_with(['<', '%', '$', '{', '['])
@@ -163,6 +167,13 @@ impl Scanner {
                 let whole = found.get(0).expect("group 0 always matches");
                 let (start, end) = (whole.start(), whole.end());
                 if taken.iter().any(|(from, to)| start < *to && end > *from) {
+                    continue;
+                }
+                let neighbours = [
+                    line[..start].chars().next_back(),
+                    line[end..].chars().next(),
+                ];
+                if rule.whole_run && neighbours.iter().flatten().any(char::is_ascii_alphanumeric) {
                     continue;
                 }
                 if let Some(value) = (rule.value)(self, &found, line) {
@@ -341,6 +352,34 @@ mod tests {
     #[test]
     fn a_commit_hash_is_not_an_account_id() {
         assert_eq!(rules(&random(HEX, 40)), Vec::<String>::new());
+        assert_eq!(
+            rules(&format!("0{}{}", "7656119", "8134509276")),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn an_id_between_underscores_is_found() {
+        let hex = random(HEX, 32);
+        assert_eq!(rules(&format!("acct_{hex}_grid.png")), ["hex32"]);
+        assert_eq!(
+            rules(&format!("steam_{}{}", "7656120", "1134509276")),
+            ["steamid64"]
+        );
+        let jwt = format!(
+            "token_ey{}{}.{}",
+            "Ai",
+            random(BASE62, 20),
+            random(BASE62, 30)
+        );
+        assert_eq!(rules(&jwt), ["jwt"]);
+    }
+
+    #[test]
+    fn utf16_text_is_read() {
+        let line = format!(r"C:\{}\{}\AppData", "Users", "jdoe");
+        let utf16: Vec<u8> = line.encode_utf16().flat_map(u16::to_le_bytes).collect();
+        assert_eq!(rules(&text(utf16)), ["user-folder"]);
     }
 
     #[test]
@@ -383,6 +422,10 @@ mod tests {
         assert_eq!(rules(&escaped), ["user-folder"]);
         let posix = format!("cd /c/{}/{}/project", "Users", "jdoe");
         assert_eq!(rules(&posix), ["user-folder"]);
+        let twice_escaped = format!(r"C:\\\\{}\\\\{}\\\\file.txt", "Users", "jdoe");
+        assert_eq!(rules(&twice_escaped), ["user-folder"]);
+        let wsl = format!("ls /mnt/c/{}/{}/project", "Users", "jdoe");
+        assert_eq!(rules(&wsl), ["user-folder"]);
     }
 
     #[test]
