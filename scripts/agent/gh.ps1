@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'AgentApp.psm1') -Force
 
 $identity = Get-AgentIdentity
-$forward = $args
+$forward = Get-ForwardedArguments $PSCommandPath $args
 $environment = @{
     GH_TOKEN                = (New-AgentToken).token
     GH_REPO                 = "$($identity.Owner)/$($identity.Repo)"

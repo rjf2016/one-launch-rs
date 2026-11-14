@@ -2,8 +2,8 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'AgentApp.psm1') -Force
 
 $identity = Get-AgentIdentity
-$forward = $args
-$helper = '!pwsh -NoProfile -File "{0}"' -f ((Join-Path $PSScriptRoot 'git-credential.ps1') -replace '\\', '/')
+$forward = Get-ForwardedArguments $PSCommandPath $args
+$helper ='!pwsh -NoProfile -File "{0}"' -f ((Join-Path $PSScriptRoot 'git-credential.ps1') -replace '\\', '/')
 
 $config = @(
     '-c', "user.name=$($identity.Name)"
@@ -23,7 +23,17 @@ $headerKeys = @(
     "http.$repoUrl.extraHeader"
     "http.$repoUrl.git.extraHeader"
 )
-$inFolder = if ($forward.Count -ge 2 -and $forward[0] -ceq '-C') { $forward[0..1] } else { @() }
+$inFolder = @()
+$next = 0
+while ($next + 1 -lt $forward.Count -and "$($forward[$next])" -ceq '-C') {
+    $inFolder += $forward[$next], $forward[$next + 1]
+    $next += 2
+}
+# Any other option here would either move the repo the scan below must read, or override the settings above.
+if ($next -ge $forward.Count -or "$($forward[$next])".StartsWith('-')) {
+    [Console]::Error.WriteLine("git.ps1: expected a git command, with only -C <folder> allowed before it; got '$($forward[$next])'")
+    exit 2
+}
 $headerKeys += @(& git @inFolder config --name-only --get-regexp '^http(\..*)?\.extraheader$')
 foreach ($key in $headerKeys | Select-Object -Unique) {
     $config += '-c', "$key="

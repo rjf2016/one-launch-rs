@@ -104,6 +104,23 @@ function New-AgentToken {
     Invoke-AgentApi -Method POST -Path "/app/installations/$($installation.id)/access_tokens" -Bearer $Jwt -Body $scope
 }
 
+function Get-ForwardedArguments {
+    param(
+        [Parameter(Mandatory)][string]$ScriptPath,
+        [object[]]$Parsed = @()
+    )
+    # Started as `pwsh -File script args`, PowerShell cuts `--opt=a:b` in two at the colon; the process's own argument list still has it whole.
+    $raw = [Environment]::GetCommandLineArgs()
+    for ($i = 1; $i -lt $raw.Count; $i++) {
+        try { $full = [IO.Path]::GetFullPath($raw[$i]) } catch { continue }
+        if ($full -ieq $ScriptPath) {
+            if ($i + 1 -ge $raw.Count) { return , @() }
+            return , @($raw[($i + 1)..($raw.Count - 1)])
+        }
+    }
+    , @($Parsed)
+}
+
 function Invoke-WithEnvironment {
     param(
         [Parameter(Mandatory)][hashtable]$Environment,
@@ -126,4 +143,4 @@ function Invoke-WithEnvironment {
     }
 }
 
-Export-ModuleMember -Function Get-AgentIdentity, New-AgentJwt, Invoke-AgentApi, New-AgentToken, Invoke-WithEnvironment
+Export-ModuleMember -Function Get-AgentIdentity, New-AgentJwt, Invoke-AgentApi, New-AgentToken, Get-ForwardedArguments, Invoke-WithEnvironment
