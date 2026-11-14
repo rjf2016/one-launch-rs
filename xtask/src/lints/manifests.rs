@@ -90,7 +90,12 @@ fn resolved(members: &[Member]) -> Vec<String> {
                     "{name}: asks for {dependency} {requirement}, which is not an exact `=` version"
                 )),
                 Some(other) => problems.push(format!(
-                    "{name}: takes {dependency} from {other}, not from crates.io"
+                    "{name}: takes {dependency} from {}, not from crates.io",
+                    if other.starts_with("git+") {
+                        "a git repository"
+                    } else {
+                        "another registry"
+                    }
                 )),
                 None if names.contains(dependency.as_str()) => {}
                 None => problems.push(format!(
@@ -109,11 +114,11 @@ fn workspace_dependencies(manifest: &str) -> Vec<String> {
     let elsewhere =
         Regex::new(r"^(?:workspace\s*\.\s*)?dependencies\s*[.=]").expect("a fixed pattern");
     let mut problems = Vec::new();
-    for (table, line) in entries(manifest) {
+    for (number, table, line) in entries(manifest) {
         if table.starts_with("workspace.dependencies.") {
             if line.is_empty() {
                 problems.push(format!(
-                    "Cargo.toml: [{table}] must be one line under [workspace.dependencies]"
+                    "Cargo.toml:{number}: a dependency must be one line under [workspace.dependencies], not a table of its own"
                 ));
             }
         } else if table == "workspace.dependencies" && !line.is_empty() {
@@ -122,15 +127,15 @@ fn workspace_dependencies(manifest: &str) -> Vec<String> {
                 .and_then(|found| found.get(1).or(found.get(2)))
                 .is_some_and(|version| exact(version.as_str()));
             if git.is_match(line) {
-                problems.push(format!("Cargo.toml: `{line}` is a git dependency"));
+                problems.push(format!("Cargo.toml:{number}: a git dependency"));
             } else if !pinned {
                 problems.push(format!(
-                    "Cargo.toml: `{line}` is not pinned to an exact `=x.y.z` version"
+                    "Cargo.toml:{number}: not pinned to an exact `=x.y.z` version"
                 ));
             }
         } else if matches!(table, "" | "workspace") && elsewhere.is_match(line) {
             problems.push(format!(
-                "Cargo.toml: `{line}` must be one line under [workspace.dependencies]"
+                "Cargo.toml:{number}: a dependency must be one line under [workspace.dependencies]"
             ));
         }
     }
@@ -145,12 +150,12 @@ fn member_dependencies(path: &str, manifest: &str) -> Vec<String> {
     let elsewhere = Regex::new(r"^(?:target\b.*\.\s*)?(?:dev-|build-)?dependencies\s*[.=]")
         .expect("a fixed pattern");
     let mut problems = Vec::new();
-    for (table, line) in entries(manifest) {
+    for (number, table, line) in entries(manifest) {
         let last = table.rsplit('.').next().unwrap_or_default();
         if nested.is_match(table) {
             if line.is_empty() {
                 problems.push(format!(
-                    "{path}: [{table}] must be one line, `name.workspace = true`"
+                    "{path}:{number}: a dependency must be one line, `name.workspace = true`, not a table of its own"
                 ));
             }
         } else if matches!(
@@ -158,11 +163,11 @@ fn member_dependencies(path: &str, manifest: &str) -> Vec<String> {
             "dependencies" | "dev-dependencies" | "build-dependencies"
         ) {
             if !line.is_empty() && !inherited.is_match(line) {
-                problems.push(format!("{path}: `{line}` does not say `workspace = true`"));
+                problems.push(format!("{path}:{number}: does not say `workspace = true`"));
             }
         } else if (table.is_empty() || table.starts_with("target")) && elsewhere.is_match(line) {
             problems.push(format!(
-                "{path}: `{line}` must be one line under a [dependencies] header"
+                "{path}:{number}: a dependency must be one line under a [dependencies] header"
             ));
         }
     }
@@ -172,8 +177,9 @@ fn member_dependencies(path: &str, manifest: &str) -> Vec<String> {
 fn lock_sources(lock: &str) -> Vec<String> {
     let crates_io = format!("source = \"{CRATES_IO}\"");
     lock.lines()
-        .filter(|line| line.starts_with("source = ") && *line != crates_io)
-        .map(|line| format!("Cargo.lock: `{line}` is not crates.io"))
+        .enumerate()
+        .filter(|(_, line)| line.starts_with("source = ") && *line != crates_io)
+        .map(|(index, _)| format!("Cargo.lock:{}: a source that is not crates.io", index + 1))
         .collect()
 }
 
@@ -181,18 +187,19 @@ fn header(line: &str) -> Option<&str> {
     Some(HEADER.captures(line)?.get(1)?.as_str())
 }
 
-fn entries(manifest: &str) -> Vec<(&str, &str)> {
+// A problem names its line by number and never quotes it: the line may hold what the secret scan would mask.
+fn entries(manifest: &str) -> Vec<(usize, &str, &str)> {
     let mut table = "";
     let mut entries = Vec::new();
-    for line in manifest.lines().map(str::trim) {
+    for (index, line) in manifest.lines().map(str::trim).enumerate() {
         if line.starts_with('#') {
             continue;
         }
         if let Some(name) = header(line) {
             table = name;
-            entries.push((table, ""));
+            entries.push((index + 1, table, ""));
         } else if !line.is_empty() {
-            entries.push((table, line));
+            entries.push((index + 1, table, line));
         }
     }
     entries
@@ -200,16 +207,12 @@ fn entries(manifest: &str) -> Vec<(&str, &str)> {
 
 // TOML spells one table many ways (quoted keys, spaces round the dots, a value over several lines) and cargo reads them all, so a line outside the one spelling read here fails.
 fn unreadable(path: &str, manifest: &str) -> Vec<String> {
-    manifest
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .filter(|line| header(line).is_none())
-        .filter(|line| !ENTRY.captures(line).is_some_and(|found| closed(&found[1])))
-        .map(|line| {
-            format!(
-                "{path}: `{line}` is neither a table name nor a one-line entry, with plain keys"
-            )
+    entries(manifest)
+        .into_iter()
+        .filter(|(_, _, line)| !line.is_empty())
+        .filter(|(_, _, line)| !ENTRY.captures(line).is_some_and(|found| closed(&found[1])))
+        .map(|(number, _, _)| {
+            format!("{path}:{number}: neither a table name nor a one-line entry with plain keys")
         })
         .collect()
 }
@@ -273,7 +276,7 @@ anyhow = "=1.0.104"
             let manifest = format!("[workspace.dependencies]\n{line}\n");
             let problems = workspace_dependencies(&manifest);
             assert_eq!(problems.len(), 1, "{line}");
-            assert!(problems[0].contains("is not pinned to an exact"), "{line}");
+            assert!(problems[0].contains("not pinned to an exact"), "{line}");
         }
     }
 
@@ -285,7 +288,7 @@ gpui = { git = "https://github.com/zed-industries/zed", rev = "d2a4fb6" }
 "#;
         let problems = workspace_dependencies(manifest);
         assert_eq!(problems.len(), 1);
-        assert!(problems[0].contains("is a git dependency"));
+        assert!(problems[0].contains("a git dependency"));
     }
 
     #[test]
@@ -495,6 +498,54 @@ windows.workspace = true
     }
 
     #[test]
+    fn a_problem_gives_the_line_number_and_never_the_line() {
+        let held = "held-in-the-line";
+        let unreadable_line = format!("[package]\nnote = \"\"\"{held}\n");
+        assert_eq!(
+            unreadable("x/Cargo.toml", &unreadable_line),
+            ["x/Cargo.toml:2: neither a table name nor a one-line entry with plain keys"]
+        );
+        let own = format!("[package]\nname = \"x\"\n\n[dependencies]\n{held} = \"1\"\n");
+        assert_eq!(
+            member_dependencies("x/Cargo.toml", &own),
+            ["x/Cargo.toml:5: does not say `workspace = true`"]
+        );
+        let root = format!(
+            "[workspace.dependencies]\nserde = \"=1.0.229\"\nx = {{ git = \"https://{held}@host.example/x\" }}\ny = \"{held}\"\n"
+        );
+        assert_eq!(
+            workspace_dependencies(&root),
+            [
+                "Cargo.toml:3: a git dependency",
+                "Cargo.toml:4: not pinned to an exact `=x.y.z` version"
+            ]
+        );
+        let lock = format!(
+            "[[package]]\nname = \"x\"\nsource = \"registry+https://{held}@host.example/index\"\n"
+        );
+        assert_eq!(
+            lock_sources(&lock),
+            ["Cargo.lock:3: a source that is not crates.io"]
+        );
+        let edge = Edge {
+            name: "x".to_owned(),
+            source: Some(format!("git+https://{held}@host.example/x")),
+            ..Edge::default()
+        };
+        let member = Member {
+            name: "ol-model".to_owned(),
+            dir: "crates/ol-model".to_owned(),
+            edges: vec![edge],
+            roots: Vec::new(),
+            reach: BTreeSet::new(),
+        };
+        assert_eq!(
+            resolved(&[member]),
+            ["ol-model: takes x from a git repository, not from crates.io"]
+        );
+    }
+
+    #[test]
     fn the_cargo_config_holds_the_alias_and_nothing_else() {
         let root = [CARGO_CONFIG.to_owned(), "Cargo.toml".to_owned()];
         assert_eq!(cargo_config(&root, THE_ALIAS), Vec::<String>::new());
@@ -550,7 +601,7 @@ windows.workspace = true
             resolved(&members),
             [
                 "ol-formats: asks for regex ^1.13, which is not an exact `=` version".to_owned(),
-                format!("ol-formats: takes gpui from {git}, not from crates.io"),
+                "ol-formats: takes gpui from a git repository, not from crates.io".to_owned(),
                 "ol-formats: vendored is a path dependency outside the workspace".to_owned(),
             ]
         );
