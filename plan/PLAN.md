@@ -22,7 +22,7 @@ Made by you in this session:
 | Existing installs | In-place takeover: same data folder, DB, vault format and installer identity; the current auto-updater delivers the Rust build |
 | Known bugs and dead code | Not carried over where leaving them out changes nothing for the user; see "What must match" (amended 2026-11-13; before that: match behaviour exactly) |
 | Review | Agents review and merge their own PRs; you review at milestone gates |
-| Agent login | A separate bot account, scoped to the new repo |
+| Agent login | A GitHub App installed on the new repo only (decided at the M0 gate; before that: a separate bot account) |
 | Installer runs | Agents may run installers on GitHub-hosted runners only, never on your PC |
 | New repo | Public and separate until cutover (working name `one-launch-rs`, at `D:\Coding\slop\one-launch-rs`) |
 | Electron app meanwhile | Critical fixes only; each one re-captures the affected reference data and amends the spec |
@@ -127,7 +127,7 @@ Copilot review stays on as a second model's opinion; the verifier triages its co
 
 1. **Prep.** A ticket file lands in `plan/tickets/` with: spec sections, Electron source files, acceptance ids (vectors, tests, replays, shots, probes), the files it may touch, a size budget (about 350 source lines) and a risk class. Its red tests land with it. The ticket is immutable afterwards.
 2. **Schedule.** `xtask plan next` offers tickets whose dependencies are merged and whose file scopes do not overlap anything running. Three run at once, one GPUI build at a time.
-3. **Implement.** The agent works in one of three long-lived checkouts with warm build caches, commits per acceptance id, and opens a PR as the bot with a machine-readable evidence block.
+3. **Implement.** The agent works in one of three long-lived checkouts with warm build caches, commits per acceptance id, and opens a PR as the app with a machine-readable evidence block.
 4. **CI recomputes the evidence** and fails on any mismatch.
 5. **Verify.** The verifier gets the ticket, the diff and CI artefacts, not the implementer's explanation. It must produce: an assert-by-assert comparison with the TS originals, at least 3 mutation receipts (break the code, name the test that goes red; 6 for safety tickets), 200 differential probes per listed function, and a list of every new call into registry, process, launcher-file or network APIs mapped to a spec clause. For UI tickets it drives the scenario itself. CI re-runs its receipts.
 6. **Merge.** On a pass, auto-merge is enabled and GitHub squash-merges once required checks are green. No agent merges directly. On a fail, the implementer gets a fix round, three at most.
@@ -209,8 +209,10 @@ Each ends in a short decision record: pass, or the named fallback.
 
 Yours, before M1:
 
-- Create the public repo and the bot account, with a token limited to that repo (contents and pull requests; no admin, no workflow edits, no releases).
-- Rulesets: PRs only, one required aggregate check, code-owner review on protected paths, no bypass.
+- Create the public repo and the GitHub App the agents act as, installed on that repo only (contents and pull requests; no admin, no workflow edits).
+- Rulesets: PRs only, one required aggregate check, code-owner review on protected paths, no bypass. Tags are yours alone, so the app cannot publish a release.
+
+Done at the M0 gate, apart from the required check, which is added once CI reports it; `design/workflow.md` has the detail.
 
 Tools, listed once per your usual rule: rustup, NSIS, `sccache`, `cargo-nextest`, `cargo-deny`, `cargo-mutants`, `cargo-about`. Approving this plan approves the list; I install the user-level ones at the start of M1, and anything that needs elevation is yours.
 
@@ -243,4 +245,4 @@ In this session, nothing is pushed and nothing is installed:
 2. Draft `plan/triage.toml` from spec §11 and §12 plus the rows above, each with a recommendation, for your decisions.
 3. Write the M0 tickets.
 
-Then it waits on you for the triage decisions, the repo and the bot account. M0 starts in a fresh session in the Electron repo.
+Then it waits on you for the triage decisions, the repo and the agents' login. M0 starts in a fresh session in the Electron repo.

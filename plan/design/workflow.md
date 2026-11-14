@@ -6,11 +6,13 @@ Principle: if a rule can be code, it is not a prompt.
 
 ## Identity and merging
 
-- Agents use a bot account with a fine-grained token scoped to this repo: contents and pull requests only. No admin, no workflow-file pushes, no releases.
+- Agents act as the GitHub App `one-launch-agents` (App ID 5752844), installed on this repo only: contents and pull requests, nothing else. No admin, no workflow-file pushes. Its tokens last one hour and are minted from a key the owner keeps outside every repo, in `D:\Coding\slop\one-launch-rs-bot`. Its commits carry `356454087+one-launch-agents[bot]@users.noreply.github.com`.
+- The app replaced the plan's bot account at the M0 gate: a bot account's token cannot be limited to one repo under a personal account, and an app needs no second account. If the token step cannot be made to work in Milestone 1, the fallback is a bot account in an organization that owns the repo.
+- Contents access would let the app create a release, so a tag ruleset only the owner bypasses blocks every tag creation, update and deletion.
 - GitHub merges, not an agent: auto-merge (squash) on required checks. `gh pr merge` without `--auto` is hook-blocked.
-- One aggregate required check (`gate`). Required checks are pinned to the Actions app.
+- One aggregate required check (`gate`). Required checks are pinned to the Actions app. The owner adds it to the `main` ruleset once CI reports it; until then the ruleset holds pull requests only, squash merges, code-owner review and no bypass.
 - No strict up-to-date rule. Main runs the full suite after each merge; a red main is auto-reverted and stops the line.
-- Existing installs update from the old repo's releases. The bot has no access there, so agents cannot ship to users.
+- Existing installs update from the old repo's releases. The app is not installed there, so agents cannot ship to users.
 
 ## Owner-approved paths
 
@@ -213,7 +215,7 @@ One page: ledger delta and parity by layer; oracle changes, spec amendments, tri
 
 | Gate | The owner does personally |
 | --- | --- |
-| M0 | Approve triage, waiver categories and the dependency list; about 12 manual captures; create the repo, bot account and rulesets |
+| M0 | Approve triage, waiver categories and the dependency list; about 12 manual captures; create the repo, the GitHub App and the rulesets |
 | M1 | GPUI go/no-go from the spike sheet; read a one-page architecture |
 | M2 | Run `doctor --data-dir=<copy>` on a copy of the real data folder; it prints counts only |
 | M3 | Ten minutes in the demo; one real Steam switch on a scratch data folder |
