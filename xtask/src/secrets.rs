@@ -129,22 +129,22 @@ impl Scanner {
                 whole_run(
                     "github-token",
                     r"(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})",
-                    Scanner::unless_synthetic::<0>,
+                    unless_no_generator_made_it::<0>,
                 ),
                 whole_run(
                     "jwt",
                     r"(?:eyJ|eyAi)[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_-]*)?",
-                    Scanner::unless_synthetic::<0>,
+                    unless_no_generator_made_it::<0>,
                 ),
                 rule(
                     "authorization",
                     r#"(?i)\bauthorization["']?\s*[:=]\s*["']?(?:bearer|basic)\s+([A-Za-z0-9._~+/=-]{20,})"#,
-                    Scanner::unless_synthetic::<1>,
+                    unless_one_character::<1>,
                 ),
                 rule(
                     "credential",
                     r#"(?i)\b(?:refresh_token|access_token|id_token|ssid|clid|web_token|client_secret|password)["']?\s*[:=]\s*["'`]([^"'`\s]{20,})["'`]"#,
-                    Scanner::unless_synthetic::<1>,
+                    unless_one_character::<1>,
                 ),
                 rule(
                     "email",
@@ -157,15 +157,23 @@ impl Scanner {
                     },
                 ),
                 whole_run("steamid64", r"76561(?:19|20)([0-9]{10})", |_, found, _| {
-                    (!filler(&found[1])).then(|| found[0].to_owned())
+                    (!no_generator_made(&found[1], 2)).then(|| found[0].to_owned())
                 }),
                 whole_run(
                     "uuid",
                     r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}",
-                    Scanner::unless_synthetic::<0>,
+                    unless_no_generator_made_it::<0>,
                 ),
-                whole_run("hex64", r"[0-9A-Fa-f]{64}", Scanner::unless_synthetic::<0>),
-                whole_run("hex32", r"[0-9A-Fa-f]{32}", Scanner::unless_synthetic::<0>),
+                whole_run(
+                    "hex64",
+                    r"[0-9A-Fa-f]{64}",
+                    unless_no_generator_made_it::<0>,
+                ),
+                whole_run(
+                    "hex32",
+                    r"[0-9A-Fa-f]{32}",
+                    unless_no_generator_made_it::<0>,
+                ),
                 rule(
                     "user-folder",
                     r#"(?i)(?:\b[a-z]:|(?:^|[^\w.])(?:/mnt)?/[a-z])[\\/]{1,4}users[\\/]{1,4}([^\\/\s"'`*?|:;,)\]]+)"#,
@@ -215,35 +223,45 @@ impl Scanner {
         }
         findings
     }
-
-    fn unless_synthetic<const GROUP: usize>(&self, found: &Captures, _: &str) -> Option<String> {
-        let value = &found[GROUP];
-        (!filler(value)).then(|| value.to_owned())
-    }
 }
 
-// A value is let off only when it is filler along its whole length, with no room in it for more than four characters of a secret; a word in it, such as "example", says nothing.
-fn filler(value: &str) -> bool {
-    let lower = value.to_ascii_lowercase();
-    let groups: Vec<Vec<char>> = lower
-        .split(|c: char| !c.is_ascii_alphanumeric())
-        .filter(|group| !group.is_empty())
-        .map(|group| group.chars().collect())
+fn unless_no_generator_made_it<const GROUP: usize>(
+    _: &Scanner,
+    found: &Captures,
+    _: &str,
+) -> Option<String> {
+    let value = &found[GROUP];
+    (!no_generator_made(value, 4)).then(|| value.to_owned())
+}
+
+// A secret a person chose can be anything, so no pattern or word in it shows that it is made up: only one character from end to end does.
+fn unless_one_character<const GROUP: usize>(
+    _: &Scanner,
+    found: &Captures,
+    _: &str,
+) -> Option<String> {
+    let value = &found[GROUP];
+    let mut chars = value.chars();
+    let one_character = chars.next().is_some_and(|first| chars.all(|c| c == first));
+    (!one_character).then(|| value.to_owned())
+}
+
+// An id or a token comes out of a generator, which all but never gives one character throughout but for a few, or a short unit repeated.
+fn no_generator_made(value: &str, odd: usize) -> bool {
+    let chars: Vec<char> = value
+        .to_ascii_lowercase()
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
         .collect();
-    let chars: Vec<char> = groups.concat();
     let mut counts: BTreeMap<char, usize> = BTreeMap::new();
     for c in &chars {
         *counts.entry(*c).or_default() += 1;
     }
     let most = counts.values().max().copied().unwrap_or_default();
-    let few_chars = counts.len() <= 3;
-    let nearly_one_char = chars.len() - most <= 4;
-    let one_char_groups = groups
-        .iter()
-        .all(|group| group.iter().all(|c| *c == group[0]));
-    let short_period =
-        (1..=4.min(chars.len() / 2)).any(|period| chars[period..] == chars[..chars.len() - period]);
-    few_chars || nearly_one_char || one_char_groups || short_period
+    let nearly_one_character = chars.len() - most <= odd;
+    let a_unit_repeated = (1..=16.min(chars.len() / 2))
+        .any(|period| chars[period..] == chars[..chars.len() - period]);
+    nearly_one_character || a_unit_repeated
 }
 
 fn safe_domain(domain: &str) -> bool {
@@ -421,22 +439,48 @@ mod tests {
     }
 
     #[test]
-    fn a_value_that_is_filler_along_its_whole_length_passes() {
+    fn an_id_or_a_token_no_generator_made_passes() {
         for line in [
             "11111111-1111-4111-8111-111111111111".to_owned(),
-            "11111111-2222-3333-4444-555555555555".to_owned(),
+            "0123456789abcdef".repeat(2),
             "7656119".to_owned() + "0000000000",
+            "7656119".to_owned() + "8000000000",
             format!("gh{}_{}", "p", "x".repeat(36)),
             format!("ey{}{}.{}", "J", "x".repeat(20), "x".repeat(30)),
-            format!("let password = \"{}\";", "a".repeat(24)),
-            format!("Authorization: Bearer {}", "abcd".repeat(6)),
         ] {
             assert_eq!(rules(&line), Vec::<String>::new(), "{line}");
         }
     }
 
     #[test]
-    fn a_word_or_a_long_pattern_in_a_value_does_not_excuse_it() {
+    fn an_id_or_a_token_a_generator_could_have_made_is_found() {
+        let one_character_a_group = [8, 4, 4, 4, 12]
+            .iter()
+            .zip(["1", "2", "3", "4", "5"])
+            .map(|(length, digit)| digit.repeat(*length))
+            .collect::<Vec<_>>()
+            .join("-");
+        assert_eq!(rules(&one_character_a_group), ["uuid"]);
+        assert_eq!(
+            rules(&format!("ey{0}{1}.ey{0}{1}.{1}", "J", "PLACEHOLDER")),
+            ["jwt"]
+        );
+        assert_eq!(
+            rules(&format!("id {}{}", "7656119", "8000000123")),
+            ["steamid64"]
+        );
+    }
+
+    #[test]
+    fn a_secret_someone_chose_passes_only_as_one_character() {
+        for line in [
+            format!("let password = \"{}\";", "a".repeat(24)),
+            format!("Authorization: Bearer {}", "x".repeat(24)),
+        ] {
+            assert_eq!(rules(&line), Vec::<String>::new(), "{line}");
+        }
+        let a_separator_after_each: String =
+            random(BASE62, 16).chars().flat_map(|c| [c, '-']).collect();
         for value in [
             ["fake", "password", "for", "the", "vault"].join("-"),
             format!("example-{}", random(BASE62, 16)),
@@ -444,22 +488,18 @@ mod tests {
             random(BASE62, 11) + &"a".repeat(11),
             random(BASE62, 16).repeat(2),
             random(BASE62, 5) + &"x".repeat(30),
+            a_separator_after_each,
+            "ab".repeat(12),
+            "a".repeat(23) + "b",
+            format!("{}aaaa", "!@#$%^&*()_+{}|:<>?~"),
         ] {
             let line = format!("let password = \"{value}\";");
             assert_eq!(rules(&line), ["credential"], "{value}");
         }
-        assert_eq!(rules(&"0123456789abcdef".repeat(2)), ["hex32"]);
-        assert_eq!(
-            rules(&format!("ey{0}{1}.ey{0}{1}.{1}", "J", "PLACEHOLDER")),
-            ["jwt"]
-        );
-        assert_eq!(
-            rules(&format!(
-                "Authorization: Bearer {}",
-                "example-token-".repeat(2)
-            )),
-            ["authorization"]
-        );
+        for value in ["abcd".repeat(6), "example-token-".repeat(2)] {
+            let line = format!("Authorization: Bearer {value}");
+            assert_eq!(rules(&line), ["authorization"], "{value}");
+        }
     }
 
     #[test]
