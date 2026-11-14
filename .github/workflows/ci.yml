@@ -13,10 +13,68 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  tier0:
+    name: tier 0
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the tool pins
+        id: tools
+        run: sed -n 's/^\([a-z-]*\) = "\([0-9.]*\)"$/\1=\2/p' tools.toml >> "$GITHUB_OUTPUT"
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: tier0
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21 # v2.90.4
+        with:
+          tool: cargo-deny@${{ steps.tools.outputs.cargo-deny }}
+          fallback: none
+      - name: Format, lints, secrets, oracle hashes, deny
+        run: cargo run --locked --package xtask -- check --tier 0
+
+  tier1:
+    name: tier 1
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the tool pins
+        id: tools
+        shell: bash
+        run: sed -n 's/^\([a-z-]*\) = "\([0-9.]*\)"$/\1=\2/p' tools.toml >> "$GITHUB_OUTPUT"
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: core
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21 # v2.90.4
+        with:
+          tool: cargo-nextest@${{ steps.tools.outputs.cargo-nextest }}
+          fallback: none
+      - name: Clippy, build and tests of the GPUI-free crates
+        run: cargo run --locked --package xtask -- check --tier 1
+
   gate:
     name: gate
+    if: always()
+    needs: [tier0, tier1]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Aggregate
-        run: echo "No tier jobs yet. Milestone 1 ticket F1 makes this job depend on them."
+      - name: Every tier passed
+        env:
+          TIER_0: ${{ needs.tier0.result }}
+          TIER_1: ${{ needs.tier1.result }}
+        run: |
+          echo "tier 0: $TIER_0"
+          echo "tier 1: $TIER_1"
+          test "$TIER_0" = success
+          test "$TIER_1" = success
