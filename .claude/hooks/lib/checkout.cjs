@@ -5,7 +5,7 @@ const path = require('node:path');
 const { Refusal } = require('./rules.cjs');
 
 const OWNER_APPROVED = ['spec/**', 'oracle/**', '.github/**', '.claude/**', 'deny.toml', 'scripts/agent/**', 'xtask/src/policy/**'];
-const NEVER = ['.claude/ticket.local.json', '.git', '.git/**'];
+const NEVER = ['.claude/ticket.local.json', '**/.git', '**/.git/**'];
 const TICKET_FILE = path.join('.claude', 'ticket.local.json');
 
 function canonical(file) {
@@ -43,12 +43,9 @@ function commonDir(root) {
     const pointer = /^gitdir:\s*(.+?)\s*$/m.exec(fs.readFileSync(dot, 'utf8'));
     if (!pointer) return null;
     const gitDir = path.resolve(root, pointer[1]);
-    let common = gitDir;
-    try {
-      common = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim());
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-    }
+    const back = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'gitdir'), 'utf8').trim());
+    if (fs.realpathSync.native(back).toLowerCase() !== fs.realpathSync.native(dot).toLowerCase()) return null;
+    const common = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim());
     return fs.realpathSync.native(common).toLowerCase();
   } catch {
     return null;
@@ -164,7 +161,8 @@ function glob(pattern) {
 const matches = (patterns, relative) => patterns.some((pattern) => glob(pattern).test(relative));
 
 function judgeWrite(file) {
-  if (typeof file !== 'string' || !path.isAbsolute(file)) throw new Refusal('scope', 'the call names no absolute file path');
+  const rooted = typeof file === 'string' && (process.platform === 'win32' ? /^([A-Za-z]:[\\/]|[\\/]{2})/.test(file) : path.isAbsolute(file));
+  if (!rooted) throw new Refusal('scope', 'the call names no absolute file path with a drive or a share in front');
   const full = canonical(file);
   for (const root of enclosing(full)) {
     const relative = path.relative(root, full).split(path.sep).join('/');

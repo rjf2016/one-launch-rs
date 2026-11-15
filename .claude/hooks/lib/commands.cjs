@@ -72,22 +72,33 @@ const COMMIT_PLAIN = set(
   '--amend --no-edit --edit --quiet --verbose --signoff --no-signoff --allow-empty --allow-empty-message --reset-author --gpg-sign --no-gpg-sign --dry-run --short --branch --porcelain --long --null --status --no-status --no-post-rewrite',
 );
 const COMMIT_VALUES = set('--message --file --author --date --cleanup --trailer --reuse-message --reedit-message --fixup --squash --template');
-const DATA_FOLDER = [/(?<!local)appdata[^a-z0-9]{0,12}(?:roaming[^a-z0-9]{0,12})?onelaunch/, /roaming[^a-z0-9]{0,12}onelaunch/];
+const DATA_FOLDER = [
+  /(?<!local)appdata[^a-z0-9]{0,12}(?:roaming[^a-z0-9]{0,12})?onelaunch/,
+  /roaming[^a-z0-9]{0,12}onelaunch/,
+  /(?<!local)appdata[^;|&\n]{0,40}onelaunch/,
+];
 const KEY_NAMES = [/one-launch-rs-bot/, /one_launch_agent_key_dir/, /\.pem(?![a-z0-9])/];
+const TOKEN_SHOWN = /git_(trace_redact|config)/;
+const QUIET = set('cat echo printf date type get-content gc get-date write-output');
+const STARTERS = set('env command builtin exec nohup nice time timeout');
+const STDIN = /^(-|\/dev\/(stdin|fd\/\d+)|\/proc\/self\/fd\/\d+)$/;
+const MERGE_SWITCHES = /^(--(auto|squash|merge|rebase|delete-branch)|-[dsmr]+)$/;
 const BUDGET = 4000;
 const DEPTH = 8;
 const NAME_LIMIT = 260;
 
 function flatten(text) {
   const lower = text.toLowerCase().replace(/["'`^\u2018-\u201E]/g, '');
-  const tidy = (flat) => {
-    let out = flat.replace(/\/+/g, '/').replace(/\/\.(?=\/)/g, '');
-    for (let before = ''; before !== out; ) {
-      before = out;
-      out = out.replace(/(?<![^/\s])(?!\.\.\/)[^/\s]+\/\.\.(\/|(?=\s|$))/g, '');
-    }
-    return out;
-  };
+  const tidy = (flat) =>
+    flat.replace(/\S+/g, (run) => {
+      const kept = [];
+      for (const part of run.split('/')) {
+        if ((part === '' || part === '.') && kept.length) continue;
+        if (part === '..' && kept.length && kept.at(-1) !== '..' && kept.at(-1) !== '') kept.pop();
+        else kept.push(part);
+      }
+      return kept.join('/');
+    });
   return [tidy(lower.replace(/\\/g, '/')), tidy(lower.replace(/\\/g, ''))];
 }
 
@@ -109,7 +120,7 @@ function identify(text) {
 function computed(word) {
   const leaf = word.text.replace(/\\/g, '/').split('/').pop();
   if (leaf.includes(MARK) || leaf.length > NAME_LIMIT || /[\0-\x1f]/.test(leaf)) return true;
-  return leaf.length > 1 && !/^\[+$/.test(leaf) && /[*?]|\[.+\]|\{.*,.*\}/.test(leaf);
+  return leaf.length > 1 && !/^\[+$/.test(leaf) && /[*?]|\[.+\]|\{.*(,|\.\.).*\}/.test(leaf);
 }
 
 function into(cwd, word, dialect) {
@@ -156,10 +167,11 @@ function head(words, dialect, mode, state) {
       if (assign && assign[1].startsWith('GIT_')) state.gitEnv = true;
       if (!assign && (word.quoted || !LEADING.has(word.text))) break;
       rest = rest.slice(1);
+      if (word.text === 'time') while (rest[0] && /^-/.test(rest[0].text)) rest = rest.slice(1);
     }
   }
-  if (dialect === 'cmd' && rest[0].text.startsWith('@')) {
-    const text = rest[0].text.replace(/^@+/, '');
+  if (dialect === 'cmd' && /^[@'`]/.test(rest[0].text)) {
+    const text = rest[0].text.replace(/^[@'`]+|['`]+$/g, '');
     rest = text ? [{ ...rest[0], text }, ...rest.slice(1)] : rest.slice(1);
   }
   if (!rest.length) return null;
@@ -181,11 +193,19 @@ function scoped(state, run) {
 
 function walk(text, dialect, state, depth) {
   if (depth > DEPTH) throw new Refusal('unreadable', 'commands are nested too deep for the hook to read');
-  for (const { words, level, piped, splits } of lex(text, dialect)) {
+  let commit = null;
+  for (const { words, level, piped, splits, wrote } of lex(text, dialect)) {
     if (dialect === 'powershell' && words.some((word) => word.text === '--%' && !word.quoted)) {
       throw new Refusal('unreadable', 'the stop-parsing token --% hides the rest of the line from the hook');
     }
+    if (commit !== null && level <= commit) commit = null;
+    const commits = state.commits;
     const moved = command(words, dialect, state, depth, 'normal', level === 0 && !piped);
+    const inner = commit === null ? null : head(words, dialect, 'normal', state);
+    if (commit !== null && (wrote || (inner && !QUIET.has(identify(inner[0].text).name)))) {
+      throw new Refusal('secrets', 'a command inside the words of the commit runs after the scan and before the commit; only cat, echo, printf, date and Get-Content may build a message there, and nothing may write a file');
+    }
+    if (state.commits > commits && commit === null) commit = level;
     if (dialect === 'cmd') for (let k = 1; k < words.length; k++) command(words.slice(k), dialect, state, depth, 'suffix', false);
     for (const k of splits) if (k < words.length) command(words.slice(k), dialect, state, depth, 'normal', false);
     if (!moved) state.before++;
@@ -208,7 +228,14 @@ function literal(words, what) {
   }
 }
 
-function suffixes(args, dialect, state, depth) {
+function behind(state, plain, run) {
+  const outer = state.behind;
+  state.behind = { plain: (outer === null || outer.plain) && plain };
+  run();
+  state.behind = outer;
+}
+
+function suffixes(args, dialect, state, depth, name = '') {
   literal(args, 'a word behind a command that starts another command');
   const flat = args.flatMap((word) =>
     /[\s,]/.test(word.text)
@@ -218,7 +245,10 @@ function suffixes(args, dialect, state, depth) {
           .map((text) => ({ ...word, text, alt: undefined }))
       : [word],
   );
-  for (let k = 0; k < flat.length; k++) command(flat.slice(k), dialect, state, depth + 1, 'suffix', false);
+  for (let k = 0; k < flat.length; k++) {
+    const plain = STARTERS.has(name) && flat.slice(0, k).every((word) => /^([A-Za-z_]\w*=|\d+(\.\d+)?[smhd]?$)/.test(word.text));
+    behind(state, plain, () => command(flat.slice(k), dialect, state, depth + 1, 'suffix', false));
+  }
 }
 
 function denied(id, args, lower) {
@@ -302,6 +332,7 @@ function push(texts, cwd, state, wrapper) {
   }
   for (const [index, ref] of refs.entries()) {
     if (ref.startsWith('+')) throw new Refusal('bypass', 'a refspec that starts with + is a force-push');
+    if (ref.includes('*')) throw new Refusal('tags', 'a refspec with a wildcard can push tags');
     if (/refs\/tags/i.test(ref) || (index > 0 && ref.toLowerCase() === 'tag')) throw new Refusal('tags', 'this pushes a tag');
   }
   const sides = refs.slice(1).flatMap((ref) => ref.split(':').filter((side) => side && !side.includes(MARK)));
@@ -341,6 +372,9 @@ function commit(texts, cwd, elsewhere, state) {
   if (state.before > 0) {
     throw new Refusal('secrets', 'other commands run before the commit in this call, so the scan cannot see what the commit will hold; stage in one call and commit alone in the next');
   }
+  if (state.behind && !state.behind.plain) {
+    throw new Refusal('secrets', 'the commit is started by another command that may run it in another folder than the one scanned; call git commit itself, or behind env, timeout, nohup, command or exec with no option of theirs');
+  }
   if (elsewhere || state.gitEnv) {
     throw new Refusal('secrets', 'the commit names its own git folder or index (--git-dir, --work-tree, GIT_*), which the scan cannot follow');
   }
@@ -350,9 +384,10 @@ function commit(texts, cwd, elsewhere, state) {
     const shown = findings.slice(0, 20).join('\n  ');
     throw new Refusal('secrets', `the commit would hold ${findings.length} finding(s) of the secret scan:\n  ${shown}\nUse a placeholder, or ask the owner to add an exact value to xtask/secrets.allow`);
   }
+  state.commits++;
 }
 
-function git(args, state, wrapper, dialect) {
+function git(args, state, wrapper, dialect, again = false) {
   let cwd = state.cwd;
   let elsewhere = false;
   let k = 0;
@@ -388,7 +423,7 @@ function git(args, state, wrapper, dialect) {
   if (!wrapper && reaches(sub, texts)) {
     throw new Refusal('github', `plain git ${sub} acts with the owner's login; use scripts/agent/git.ps1 ${sub}`);
   }
-  if (sub === 'commit') commit(texts, cwd, elsewhere, state);
+  if (sub === 'commit' && !again) commit(texts, cwd, elsewhere, state);
 }
 
 function gh(args, wrapper) {
@@ -402,14 +437,19 @@ function gh(args, wrapper) {
   const all = texts.join(' ');
   const merges = plain.some((word, at) => word === 'merge' && plain[at - 1] === 'pr');
   if (group === 'release') throw new Refusal('tags', 'gh release: releases are the owner\'s');
-  if (merges && (!texts.some((text) => text === '--auto' || text === '--auto=true') || texts.some((text) => text.startsWith('--admin')))) {
-    throw new Refusal('merge', 'gh pr merge needs --auto and no --admin, so that GitHub merges once the checks pass');
+  const auto = texts.some((text, at) => (text === '--auto' || text === '--auto=true') && at > 0 && (!texts[at - 1].startsWith('-') || MERGE_SWITCHES.test(texts[at - 1])));
+  if (merges && (!auto || texts.some((text) => text.startsWith('--admin')))) {
+    throw new Refusal('merge', 'gh pr merge needs --auto as an option of its own and no --admin, so that GitHub merges once the checks pass');
   }
-  if (group === 'api' && /pulls\/[^/\s]+\/merge|mergepullrequest|mergebranch/.test(all)) {
-    throw new Refusal('merge', 'this API call merges a pull request');
+  const sends = texts.some((text) => /^(-x|--method|-f|--field|--raw-field|--input)(=|$)|^-[xf]./.test(text));
+  if (group === 'api' && /pulls\/[^/\s]+\/merge|\/merges(?![a-z0-9_-])|mergepullrequest|mergebranch/.test(all)) {
+    throw new Refusal('merge', 'this API call merges a pull request or a branch');
   }
-  if (group === 'api' && /\/releases|git\/tags|refs\/tags|createrelease|createref/.test(all)) {
-    throw new Refusal('tags', 'this API call reaches tags or releases');
+  if (group === 'api' && (/\/releases|git\/tags|refs\/tags|createrelease|createref|updateref|deleteref/.test(all) || (sends && /git\/refs/.test(all)))) {
+    throw new Refusal('tags', 'this API call reaches tags or releases, or writes a ref the hook cannot read; push a branch with scripts/agent/git.ps1');
+  }
+  if (group === 'api' && plain[1] === 'graphql' && texts.some((text) => text.startsWith('--input') || /=@/.test(text))) {
+    throw new Refusal('unreadable', 'a GraphQL call whose text comes from a file or from standard input is one the hook cannot read');
   }
   if (group === 'auth') {
     throw wrapper ? new Refusal('key', 'gh auth through the wrapper would show or store the app\'s token') : new Refusal('github', 'gh auth works on the owner\'s login');
@@ -465,30 +505,35 @@ function cargo(args) {
 }
 
 function shell(name, args, state, depth) {
+  let inline = false;
   for (let k = 0; k < args.length; k++) {
     const text = args[k].text;
     if (text === '--version' || text === '--help') return;
-    if (/^-[A-Za-z]*c[A-Za-z]*$/.test(text)) {
-      const script = args.slice(k + 1).find((arg) => !/^[-+]/.test(arg.text));
-      if (!script) break;
-      literal([script], `the command text handed to ${name}`);
-      scoped(state, () => walk(script.text, 'bash', state, depth + 1));
+    if (/^(--rcfile|--init-file)$/.test(text)) k++;
+    else if (/^[-+][A-Za-z]+$/.test(text)) {
+      inline ||= text[0] === '-' && text.includes('c');
+      if (/[oO]/.test(text)) k++;
+    } else if (!/^[-+]/.test(text)) {
+      if (inline) {
+        literal([args[k]], `the command text handed to ${name}`);
+        scoped(state, () => walk(text, 'bash', state, depth + 1));
+        return;
+      }
+      if (STDIN.test(text)) break;
       return;
     }
-    if (/^([-+][oO]|--rcfile|--init-file)$/.test(text)) k++;
-    else if (!/^[-+]/.test(text)) return;
   }
   throw new Refusal('unreadable', `${name} with no command and no script file takes its commands from standard input`);
 }
 
 function powershell(name, args, state, depth, dialect) {
   let informational = false;
-  let positional = false;
+  let positional = -1;
   for (let k = 0; k < args.length; k++) {
     const arg = args[k];
-    const flag = !arg.block && /^[-/\u2013-\u2015]([A-Za-z]+:?|\?)$/.test(arg.text) ? arg.text.slice(1).toLowerCase().replace(/:$/, '') : null;
+    const flag = !arg.block && /^(--|[-/\u2013-\u2015])([A-Za-z]+:?|\?)$/.test(arg.text) ? arg.text.replace(/^(--|.)/, '').toLowerCase().replace(/:$/, '') : null;
     if (flag === null) {
-      positional ||= arg.text !== '-';
+      if (positional < 0 && arg.text !== '-') positional = k;
       continue;
     }
     const rest = args.slice(k + 1);
@@ -517,7 +562,14 @@ function powershell(name, args, state, depth, dialect) {
     }
   }
   suffixes(args, 'powershell', state, depth);
-  if (!informational && !positional) {
+  if (positional >= 0) {
+    const text = args
+      .slice(positional)
+      .filter((word) => !word.block)
+      .map((word) => word.text)
+      .join(' ');
+    walk(text, 'powershell', state, depth + 1);
+  } else if (!informational) {
     throw new Refusal('unreadable', `${name} with no command and no script file takes its commands from standard input`);
   }
 }
@@ -550,7 +602,9 @@ function command(all, dialect, state, depth, mode, sure) {
   const lower = texts.map((text) => text.toLowerCase());
   const plain = (candidate) => mode === 'suffix' && candidate.pathed && !candidate.ext;
   const argument = plain(id);
-  for (const candidate of first.alt ? [id, identify(first.alt)] : [id]) {
+  const candidates = first.alt ? [id, identify(first.alt)] : [id];
+  if (dialect === 'cmd' && first.text.includes('/')) candidates.push(identify(first.text.slice(0, first.text.indexOf('/'))));
+  for (const candidate of candidates) {
     if (!plain(candidate)) denied(candidate, args, lower);
   }
   if (name === 'git-credential.ps1') {
@@ -561,11 +615,18 @@ function command(all, dialect, state, depth, mode, sure) {
     if (!file || !state.io.wrapper(file, name)) {
       throw new Refusal('github', `this ${name} is not scripts/agent/${name} of this repo, or the hook cannot tell which folder it is in; call it by a path the hook can read`);
     }
-    if (name === 'git.ps1') git(args, state, true, dialect);
-    else gh(args, true);
+    const listed = dialect === 'powershell' && texts.some((text) => text.includes(','));
+    const spread = args.flatMap((arg) => arg.text.split(',').filter(Boolean).map((text) => ({ ...arg, text: text.trim() })));
+    for (const reading of listed ? [args, spread] : [args]) {
+      if (name === 'git.ps1') git(reading, state, true, dialect, reading === spread);
+      else gh(reading, true);
+    }
     return false;
   }
   if (argument) return false;
+  if ((first.text === '.' || name === 'source') && STDIN.test(texts[0] ?? '')) {
+    throw new Refusal('unreadable', `${name} reads its commands from standard input here`);
+  }
 
   if (REGISTRY_WRITERS.has(name)) state.registry = true;
   if (name === 'new-psdrive' && lower.some((text) => /registry|^hk(cu|lm|cr|u|cc)|^hkey_/.test(text))) {
@@ -595,16 +656,16 @@ function command(all, dialect, state, depth, mode, sure) {
       if (!/^-(exec|execdir|ok|okdir)$/.test(arg.text)) continue;
       const end = args.findIndex((later, k) => k > at && (later.text === ';' || later.text === '+'));
       const run = args.slice(at + 1, end < 0 ? args.length : end);
-      if (run.length) command(run, dialect, state, depth + 1, 'call', false);
+      if (run.length) behind(state, !arg.text.endsWith('dir'), () => command(run, dialect, state, depth + 1, 'call', false));
     }
-  } else if (WRAPPERS.has(name)) suffixes(args, dialect, state, depth);
+  } else if (WRAPPERS.has(name)) suffixes(args, dialect, state, depth, name);
   return false;
 }
 
 function judge({ tool, command: text, cwd, io }) {
   if (tool !== 'Bash' && tool !== 'PowerShell') throw new Error(`no rules for the tool ${tool}`);
   if (typeof text !== 'string') throw new Error('the call holds no command text');
-  const state = { cwd: cwd ? path.resolve(cwd) : null, before: 0, count: 0, registry: false, gitEnv: false, io };
+  const state = { cwd: cwd ? path.resolve(cwd) : null, before: 0, count: 0, commits: 0, behind: null, registry: false, gitEnv: false, io };
   try {
     const flat = flatten(text);
     if (flat.some((reading) => DATA_FOLDER.some((pattern) => pattern.test(reading)))) {
@@ -614,6 +675,9 @@ function judge({ tool, command: text, cwd, io }) {
       throw new Refusal('key', 'the command names the app\'s key folder or a .pem file');
     }
     walk(text, tool === 'PowerShell' ? 'powershell' : 'bash', state, 0);
+    if (flat.some((reading) => TOKEN_SHOWN.test(reading))) {
+      throw new Refusal('key', 'the command names GIT_TRACE_REDACT or a GIT_CONFIG variable, which can make git print the app\'s token or hand it to another helper');
+    }
     if (state.registry && REGISTRY_PATH.test(flat[0])) {
       throw new Refusal('registry', 'this call names a registry key and runs a command that can write one; read the registry in a call of its own');
     }

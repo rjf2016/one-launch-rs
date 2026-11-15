@@ -43,6 +43,9 @@ function lex(source, dialect, base = 0, body = false) {
   let piped = false;
   let glued = false;
   let redirect = false;
+  let pattern = false;
+  let wrote = false;
+  let after = -1;
   let splits = [];
   let words = [];
   let word = null;
@@ -58,10 +61,14 @@ function lex(source, dialect, base = 0, body = false) {
     add(MARK);
   };
   const keyword = () => {
-    if (!bash || !word || word.counted || word.quoted || !words.every((before) => !before.quoted && LEADING.has(before.text))) return;
-    if (word.text === 'case') cases++;
-    else if (word.text === 'esac' && cases) cases--;
-    else return;
+    if (!bash || !word || word.counted || word.quoted || word.alt !== word.text) return;
+    const named = words.length === 2 && words[0].text === 'function';
+    if (!named && !words.every((before) => !before.quoted && LEADING.has(before.text))) return;
+    if (word.text === 'case' && !pattern) cases++;
+    else if (word.text === 'esac' && cases) {
+      cases--;
+      pattern = false;
+    } else return;
     word.counted = true;
   };
   const endWord = () => {
@@ -72,6 +79,7 @@ function lex(source, dialect, base = 0, body = false) {
       return;
     }
     keyword();
+    if (bash && word.text === 'in' && !word.quoted && words.at(-2)?.counted && words.at(-2).text === 'case') pattern = true;
     if (word.alt === word.text) delete word.alt;
     words.push(word);
     if (ps && !(table && !assigned) && TAKES_STATEMENT.test(word.text)) assigned = words.length;
@@ -79,7 +87,7 @@ function lex(source, dialect, base = 0, body = false) {
   };
   const endCommand = (pipe = false) => {
     endWord();
-    if (words.length) commands.push({ words, at: words[0].at, level, piped: piped || pipe, splits });
+    if (words.length) commands.push({ words, at: words[0].at, level, piped: piped || pipe, splits, wrote });
     words = [];
     splits = [];
     piped = pipe;
@@ -87,9 +95,9 @@ function lex(source, dialect, base = 0, body = false) {
     redirect = false;
     assigned = 0;
   };
-  const nested = (closer, keyed = false) => {
+  const nested = (closer, keyed = false, patterns = false) => {
     if (level >= DEPTH) throw new Refusal('unreadable', 'brackets are nested too deep for the hook to read');
-    const outer = [words, word, piped, cases, table, assigned, redirect, splits];
+    const outer = [words, word, piped, cases, table, assigned, redirect, splits, pattern, wrote];
     const before = commands.length;
     words = [];
     splits = [];
@@ -99,11 +107,13 @@ function lex(source, dialect, base = 0, body = false) {
     table = keyed;
     assigned = 0;
     redirect = false;
+    pattern = patterns;
+    wrote = false;
     level++;
     run(closer);
     endCommand();
     level--;
-    [words, word, piped, cases, table, assigned, redirect, splits] = outer;
+    [words, word, piped, cases, table, assigned, redirect, splits, pattern, wrote] = outer;
     return commands.length > before;
   };
   const escaped = () => {
@@ -263,10 +273,12 @@ function lex(source, dialect, base = 0, body = false) {
 
   const hereString = () => {
     const quote = src[i + 1];
-    const opening = /^[ \t]*\r?\n/.exec(src.slice(i + 2, i + 130));
+    const opening = /^[ \t]*(\r\n|\n|\r)/.exec(src.slice(i + 2, i + 130));
     if (!opening) return false;
     const from = i + 2 + opening[0].length;
-    const end = src.indexOf(`\n${quote}@`, from - 1);
+    const closing = new RegExp(`[\\r\\n]${quote}@`, 'g');
+    closing.lastIndex = from - 1;
+    const end = closing.exec(src)?.index ?? -1;
     const text = src.slice(from, Math.max(from, end < 0 ? n : end)).replace(/\r$/, '');
     i = end < 0 ? n : end + 3;
     open().quoted = true;
@@ -353,6 +365,7 @@ function lex(source, dialect, base = 0, body = false) {
       if (c === escape) {
         if (next === '\n') i += 2;
         else if (next === '\r' && src[i + 2] === '\n') i += 3;
+        else if (ps && next === '\r') i += 2;
         else if (ps && next !== undefined) add(escaped());
         else {
           if (next !== undefined) add(next, bash ? c + next : next);
@@ -361,8 +374,7 @@ function lex(source, dialect, base = 0, body = false) {
         continue;
       }
       if (c === '#' && !word && !glued && !cmd) {
-        const end = src.indexOf('\n', i);
-        i = end < 0 ? n : end;
+        while (i < n && src[i] !== '\n' && !(ps && src[i] === '\r')) i++;
         continue;
       }
       if (ps && !word && !glued && c === '<' && next === '#') {
@@ -400,9 +412,12 @@ function lex(source, dialect, base = 0, body = false) {
         const last = ps && !word && words.at(-1);
         i++;
         if (arithmetic) math++;
-        const some = nested(')');
+        const some = nested(')', false, bash && pattern);
         if (arithmetic) math--;
-        if (bash && cases) endCommand();
+        if (bash && cases) {
+          endCommand();
+          pattern = false;
+        } else if (bash && !some && !subshell) endCommand();
         else if (some && !subshell && !cmd) mark();
         if (last && ENDS_STATEMENT.test(last.text)) split();
         continue;
@@ -410,6 +425,7 @@ function lex(source, dialect, base = 0, body = false) {
       if (c === ')' || (ps && c === '}')) {
         i++;
         endCommand();
+        pattern = false;
         continue;
       }
       if (ps && c === '{') {
@@ -427,8 +443,10 @@ function lex(source, dialect, base = 0, body = false) {
         continue;
       }
       if (c === ';') {
-        i++;
+        const clause = bash && cases > 0 && (next === ';' || next === '&');
+        i += clause ? 2 : 1;
         endCommand();
+        if (clause) pattern = true;
         continue;
       }
       if (c === '|') {
@@ -438,8 +456,7 @@ function lex(source, dialect, base = 0, body = false) {
         continue;
       }
       if (c === '&') {
-        const previous = src[i - 1];
-        if (previous === '>' || previous === '<' || (bash && next === '>')) {
+        if (after === i || (bash && next === '>')) {
           i++;
         } else if (next === '&') {
           i += 2;
@@ -466,7 +483,9 @@ function lex(source, dialect, base = 0, body = false) {
         else endWord();
         if (middle) glued = true;
         else redirect = true;
+        if (c === '>') wrote = true;
         i += here ? 3 : 1;
+        after = i;
         continue;
       }
       add(c);

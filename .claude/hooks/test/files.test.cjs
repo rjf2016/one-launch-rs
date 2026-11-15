@@ -239,6 +239,34 @@ test('a repository made inside a protected folder does not take the folder out o
   assert.equal(verdict(path.join(ticketed, 'crates', 'a.rs')), 'scope');
 });
 
+test('a file that only claims to be a worktree does not take a folder out of its checkout', () => {
+  const root = checkout(null);
+  assert.equal(verdict(path.join(root, 'scripts', '.git')), 'scope', 'a .git below the root is git\'s as well');
+  assert.equal(verdict(path.join(root, 'xtask', '.git', 'HEAD')), 'scope');
+  put(root, 'scripts/.git', 'gitdir: ../.git\n');
+  put(root, 'xtask/.git', 'gitdir: ../.git\n');
+  assert.equal(verdict(path.join(root, 'scripts', 'agent', 'gh.ps1')), 'owner');
+  assert.equal(verdict(path.join(root, 'xtask', 'src', 'policy', 'scope.rs')), 'owner');
+
+  const main = folder();
+  git(main, 'init', '-q');
+  put(main, 'scripts/agent/gh.ps1', 'exit 0\n');
+  git(main, 'add', '-A');
+  git(main, 'commit', '-q', '-m', 'fixture');
+  const tree = `${main}-tree`;
+  made.push(tree);
+  git(main, 'worktree', 'add', '-q', '-b', 'tree', tree);
+  const fake = folder();
+  put(fake, 'scripts/agent/gh.ps1', 'exit 0\n');
+  put(fake, '.git', `gitdir: ${path.join(main, '.git', 'worktrees', path.basename(tree))}\n`);
+  assert.equal(isWrapper(path.join(tree, 'scripts', 'agent', 'gh.ps1'), 'gh.ps1', main), true);
+  assert.equal(isWrapper(path.join(fake, 'scripts', 'agent', 'gh.ps1'), 'gh.ps1', main), false, 'git did not register this folder');
+  const bare = folder();
+  put(bare, 'scripts/agent/gh.ps1', 'exit 0\n');
+  put(bare, '.git', `gitdir: ${path.join(main, '.git')}\n`);
+  assert.equal(isWrapper(path.join(bare, 'scripts', 'agent', 'gh.ps1'), 'gh.ps1', main), false);
+});
+
 test('a worktree is its own checkout, nested inside the main one or beside it', () => {
   const main = folder();
   git(main, 'init', '-q');
@@ -298,7 +326,8 @@ test('a wrapper is scripts/agent/<name> of the session\'s repo and nothing else'
 });
 
 test('a call with no usable path is refused', () => {
-  for (const file of [undefined, null, '', 42, 'relative/path.rs']) assert.equal(verdict(file), 'scope', String(file));
+  const driveless = process.platform === 'win32' ? ['/c/work/repo/deny.toml', '\\work\\repo\\deny.toml', 'C:deny.toml'] : [];
+  for (const file of [undefined, null, '', 42, 'relative/path.rs', ...driveless]) assert.equal(verdict(file), 'scope', String(file));
 });
 
 test('write_scope globs match whole paths with forward slashes', () => {

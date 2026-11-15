@@ -360,6 +360,11 @@ const POWERSHELL = [
   '{}.b = Seen-A',
   '(1).b = Seen-A',
   '& `\nSeen-A',
+  'Get-X # note\rSeen-A',
+  "Get-X @'\nfoo\r'@; Seen-A; Get-X @'\nbar\n'@",
+  'Get-X; `\rSeen-A',
+  "Get-X @'\rit's\r'@; Seen-A",
+  'Get-X a`>& Seen-A',
   'Get-X "a`nHidden-A"',
   'Get-X a`;Hidden-A',
   '"Hidden-A"',
@@ -555,6 +560,18 @@ const BASH = [
   'cat <<<x\necho SEEN-A',
   'cat <<< "x"\necho SEEN-A',
   'cat <<<x true\necho SEEN-A\nx',
+  'echo "$(f() case x in x) echo SEEN-A;; esac; f)"',
+  'echo "$(\\case)"; echo SEEN-A; echo ""',
+  'echo "$(case x in a) :;; case) :;; esac)"; echo SEEN-A; echo ""',
+  'echo "$(case x in (case) :;; esac)"; echo SEEN-A; echo ""',
+  'echo "$(case x in a) :;; esac; case y in y) echo SEEN-A;; esac)"',
+  'time -p echo SEEN-A',
+  "bash -c -o pipefail 'echo SEEN-A'",
+  "bash -co pipefail 'echo SEEN-A'",
+  ". /dev/stdin <<'EOF'\necho SEEN-A\nEOF",
+  "bash /dev/stdin <<'EOF'\necho SEEN-A\nEOF",
+  'echo a \\>& echo SEEN-A',
+  'ech{o..o} SEEN-A',
 ];
 
 test('every command the real PowerShell parser finds in a text is one the hook refuses when it is a refused command', { skip: !pwsh }, () => {
@@ -582,7 +599,7 @@ test('every command the real PowerShell parser finds in a text is one the hook r
     }
   }
   assert.deepEqual(missed, []);
-  assert.deepEqual([ran, quiet], [303, 21],'texts where PowerShell runs a marked command, and texts where it leaves one alone');
+  assert.deepEqual([ran, quiet], [308, 21],'texts where PowerShell runs a marked command, and texts where it leaves one alone');
 });
 
 test('every command bash really runs in a text is one the hook refuses when it is a refused command', { skip: !bashWorks }, () => {
@@ -602,5 +619,5 @@ test('every command bash really runs in a text is one the hook refuses when it i
     }
   }
   assert.deepEqual(missed, []);
-  assert.deepEqual([ran, quiet], [184, 6], 'texts where bash runs a marked command, and texts where it leaves one alone');
+  assert.deepEqual([ran, quiet], [196, 6], 'texts where bash runs a marked command, and texts where it leaves one alone');
 });
