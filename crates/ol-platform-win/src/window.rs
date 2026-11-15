@@ -9,10 +9,11 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::Storage::Xps::{PRINT_WINDOW_FLAGS, PW_CLIENTONLY, PrintWindow};
 use windows::Win32::System::Threading::GetCurrentThreadId;
+use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumThreadWindows, GetClassNameW, GetClientRect, GetForegroundWindow, IsIconic,
     IsWindowVisible, IsZoomed, PW_RENDERFULLCONTENT, PostMessageW, SW_HIDE, SW_RESTORE, SW_SHOW,
-    SetForegroundWindow, ShowWindow, ShowWindowAsync, WM_CHAR,
+    SetForegroundWindow, ShowWindow, ShowWindowAsync, USER_DEFAULT_SCREEN_DPI, WM_CHAR,
 };
 use windows::core::BOOL;
 
@@ -65,6 +66,10 @@ impl AppWindow {
 
     pub fn is_maximized(self) -> bool {
         unsafe { IsZoomed(self.hwnd()).as_bool() }
+    }
+
+    pub fn scale(self) -> f32 {
+        unsafe { GetDpiForWindow(self.hwnd()) as f32 / USER_DEFAULT_SCREEN_DPI as f32 }
     }
 
     pub fn client_size(self) -> Option<(i32, i32)> {

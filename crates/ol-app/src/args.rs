@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+const MOST: usize = 20_000;
+
 #[derive(Debug, PartialEq)]
 pub struct Args {
     pub data_dir: PathBuf,
@@ -50,19 +52,29 @@ impl Args {
             let number = || {
                 value
                     .parse::<usize>()
-                    .map_err(|_| format!("{name}={value} is not a number"))
+                    .ok()
+                    .filter(|number| *number <= MOST)
+                    .ok_or_else(|| format!("{name}={value} is not a number up to {MOST}"))
+            };
+            // A folder written as "D:\x\" takes its closing quote, and every word after it, into the value.
+            let path = || {
+                if value.contains('"') {
+                    return Err(format!(
+                        "{name}= holds a quote; drop the last \\ of the path"
+                    ));
+                }
+                Ok(PathBuf::from(value))
             };
             match name {
-                "--data-dir" => data_dir = Some(PathBuf::from(value)),
-                "--capture" => file = Some(PathBuf::from(value)),
+                "--data-dir" => data_dir = Some(path()?),
+                "--capture" => file = Some(path()?),
                 "--capture-size" => {
-                    let size = value
+                    let side = |text: &str| text.parse::<u16>().ok().filter(|side| *side > 0);
+                    let (width, height) = value
                         .split_once('x')
-                        .and_then(|(width, height)| {
-                            Some((width.parse().ok()?, height.parse().ok()?))
-                        })
+                        .and_then(|(width, height)| Some((side(width)?, side(height)?)))
                         .ok_or_else(|| format!("{name}={value} is not <width>x<height>"))?;
-                    plan.size = Some(size);
+                    plan.size = Some((i32::from(width), i32::from(height)));
                 }
                 "--capture-sweep" => plan.sweep = Some(number()?),
                 "--capture-row" => plan.row = Some(number()?),
@@ -119,9 +131,31 @@ mod tests {
             &[r"/data-dir=D:\scratch\proof"],
             &["--data-dir=scratch"],
             &[r"--data-dir=\scratch"],
+            &[r#"--data-dir=D:\scratch" --probe"#],
         ] {
             assert!(parse(arguments).is_err(), "{arguments:?}");
         }
+    }
+
+    #[test]
+    fn a_number_out_of_range_is_refused() {
+        for step in [
+            "--capture-sweep=20001",
+            "--capture-sweep=-1",
+            "--capture-row=99999999999999999999",
+            "--capture-size=0x600",
+            "--capture-size=-960x600",
+            "--capture-size=70000x600",
+            "--capture-size=960",
+        ] {
+            let arguments = [r"--data-dir=D:\scratch", r"--capture=D:\a.png", step];
+            assert!(parse(&arguments).is_err(), "{step}");
+        }
+        let quoted = [
+            r"--data-dir=D:\scratch",
+            r#"--capture=D:\shots" --capture-row=3"#,
+        ];
+        assert!(parse(&quoted).is_err());
     }
 
     #[test]

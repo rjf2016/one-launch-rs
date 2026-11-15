@@ -54,6 +54,7 @@ pub enum TrayError {
 
 pub struct Tray {
     hwnd: isize,
+    shows_app_icon: bool,
     on_one_thread: PhantomData<*const ()>,
 }
 
@@ -91,13 +92,16 @@ impl Tray {
                 None,
             )?;
 
+            let app_icon = app_icon(instance);
             let mut icon = NOTIFYICONDATAW {
                 cbSize: size_of::<NOTIFYICONDATAW>() as u32,
                 hWnd: hwnd,
                 uID: ICON_ID,
                 uFlags: NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP,
                 uCallbackMessage: CALLBACK,
-                hIcon: small_icon(instance),
+                hIcon: app_icon
+                    .or_else(|| LoadIconW(None, IDI_APPLICATION).ok())
+                    .unwrap_or_default(),
                 ..Default::default()
             };
             let room = icon.szTip.len() - 1;
@@ -119,9 +123,14 @@ impl Tray {
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Rc::into_raw(state) as isize);
             Ok(Self {
                 hwnd: hwnd.0 as isize,
+                shows_app_icon: app_icon.is_some(),
                 on_one_thread: PhantomData,
             })
         }
+    }
+
+    pub fn shows_app_icon(&self) -> bool {
+        self.shows_app_icon
     }
 
     pub(crate) fn hwnd(&self) -> HWND {
@@ -185,7 +194,7 @@ impl MenuAnchor {
     }
 }
 
-fn small_icon(instance: HINSTANCE) -> HICON {
+fn app_icon(instance: HINSTANCE) -> Option<HICON> {
     unsafe {
         let (width, height) = (GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
         LoadImageW(
@@ -196,9 +205,8 @@ fn small_icon(instance: HINSTANCE) -> HICON {
             height,
             LR_SHARED,
         )
+        .ok()
         .map(|icon| HICON(icon.0))
-        .or_else(|_| LoadIconW(None, IDI_APPLICATION))
-        .unwrap_or_default()
     }
 }
 

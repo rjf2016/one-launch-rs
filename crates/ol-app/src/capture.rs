@@ -39,6 +39,8 @@ pub async fn run(
         in_library(window, cx, |library, window, cx| {
             library.start_sweep(frames, SWEEP_STEP, window, cx);
         })?;
+        // A window that is hidden or minimised gets no frames, and the sweep would wait for ever.
+        let mut polls_left = frames * 2 + 100;
         let report = loop {
             pause(Duration::from_millis(50), cx).await;
             if let Some(report) =
@@ -46,6 +48,9 @@ pub async fn run(
             {
                 break report;
             }
+            polls_left = polls_left
+                .checked_sub(1)
+                .context("the sweep stopped getting frames")?;
         };
         println!(
             "OneLaunch: sweep of {} frames at {SWEEP_STEP} px a frame: median {:.2} ms, 95th {:.2} ms, longest {:.2} ms, {} over 1.5 x median",

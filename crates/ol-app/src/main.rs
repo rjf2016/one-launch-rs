@@ -30,18 +30,25 @@ fn main() -> ExitCode {
         }
     };
     let failed = Rc::new(Cell::new(false));
+    let tray = TraySlot::default();
     gpui_platform::application()
         .with_assets(ol_ui::Assets)
         .run({
-            let failed = failed.clone();
+            let (failed, tray) = (failed.clone(), tray.clone());
             move |cx| {
-                if let Err(error) = start(args, failed.clone(), cx) {
+                if let Err(error) = start(args, failed.clone(), tray, cx) {
                     eprintln!("OneLaunch: {error:#}");
                     failed.set(true);
                     cx.quit();
                 }
             }
         });
+    // Here and nowhere else: whichever way the message loop ended, the icon goes with it.
+    let icon = tray.borrow_mut().take();
+    if icon.is_some() {
+        drop(icon);
+        println!("OneLaunch: tray icon removed");
+    }
     if failed.get() {
         ExitCode::FAILURE
     } else {
@@ -49,7 +56,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn start(args: Args, failed: Rc<Cell<bool>>, cx: &mut App) -> anyhow::Result<()> {
+fn start(args: Args, failed: Rc<Cell<bool>>, tray: TraySlot, cx: &mut App) -> anyhow::Result<()> {
     println!(
         "OneLaunch: data folder {} (the proof stores nothing)",
         args.data_dir.display()
@@ -62,22 +69,13 @@ fn start(args: Args, failed: Rc<Cell<bool>>, cx: &mut App) -> anyhow::Result<()>
     };
     let window = ol_ui::open_main_window(TITLE, presence, cx)?;
 
-    let tray = TraySlot::default();
-    let on_event = {
-        let (tray, cx) = (tray.clone(), cx.to_async());
-        move |event| on_tray_event(event, &cx, tray.clone())
-    };
-    match Tray::new(TITLE, on_event) {
-        Ok(icon) => {
-            println!("OneLaunch: tray icon added");
-            *tray.borrow_mut() = Some(icon);
-        }
-        Err(error) => {
-            eprintln!("OneLaunch: tray icon unavailable; closing the window quits: {error}");
-        }
-    }
+    // In a task and not here: adding the icon waits on the shell, Windows may hand the GPUI window a message meanwhile, and GPUI cannot take one while the app is being updated.
+    cx.spawn({
+        let tray = tray.clone();
+        async move |cx| add_tray_icon(&tray, cx)
+    })
+    .detach();
 
-    let close_to_tray = tray.borrow().is_some();
     window.update(cx, |_, window, cx| {
         // These callbacks run before their frame is drawn, so it is the second one that follows the first frame shown.
         window.on_next_frame(|window, _| {
@@ -90,8 +88,9 @@ fn start(args: Args, failed: Rc<Cell<bool>>, cx: &mut App) -> anyhow::Result<()>
                 }
             });
         });
+        let tray = tray.clone();
         window.on_window_should_close(cx, move |_, _| {
-            if !close_to_tray {
+            if tray.borrow().is_none() {
                 return true;
             }
             if let Some(window) = AppWindow::on_this_thread() {
@@ -118,14 +117,27 @@ fn start(args: Args, failed: Rc<Cell<bool>>, cx: &mut App) -> anyhow::Result<()>
                 failed.set(true);
             }
         }
-        quit(&tray, cx);
+        quit(cx);
     })
     .detach();
     Ok(())
 }
 
+fn add_tray_icon(tray: &TraySlot, cx: &AsyncApp) {
+    let cx = cx.clone();
+    match Tray::new(TITLE, move |event| on_tray_event(event, &cx)) {
+        Ok(icon) => {
+            println!("OneLaunch: tray icon added");
+            *tray.borrow_mut() = Some(icon);
+        }
+        Err(error) => {
+            eprintln!("OneLaunch: tray icon unavailable; closing the window quits: {error}");
+        }
+    }
+}
+
 // The tray calls this from its window procedure, between two GPUI updates. The menu waits here and not in a foreground task, where it would hold up every other task while it is open.
-fn on_tray_event(event: TrayEvent, cx: &AsyncApp, tray: TraySlot) {
+fn on_tray_event(event: TrayEvent, cx: &AsyncApp) {
     let chosen = match event {
         TrayEvent::Activate => Some(0),
         TrayEvent::Menu(anchor) => anchor.show(&[
@@ -136,7 +148,7 @@ fn on_tray_event(event: TrayEvent, cx: &AsyncApp, tray: TraySlot) {
     };
     match chosen {
         Some(0) => show_window(),
-        Some(2) => cx.spawn(async move |cx| quit(&tray, cx)).detach(),
+        Some(2) => cx.spawn(async |cx| quit(cx)).detach(),
         _ => {}
     }
 }
@@ -147,8 +159,6 @@ fn show_window() {
     }
 }
 
-fn quit(tray: &TraySlot, cx: &AsyncApp) {
-    let icon = tray.borrow_mut().take();
-    drop(icon);
+fn quit(cx: &AsyncApp) {
     cx.update(|cx| cx.quit());
 }

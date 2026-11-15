@@ -34,6 +34,10 @@ impl Report {
         }
     }
 
+    fn skip(&self, what: &str) {
+        println!("probe: skip  {what} (the step it follows failed)");
+    }
+
     fn area(&mut self, what: &str, pointer: Point, at: Point, expected: Area) {
         let seen = probe::area_at(self.window, pointer, at);
         self.check(what, seen == expected, seen);
@@ -91,10 +95,7 @@ pub async fn run(tray: &TraySlot, failed: &Cell<bool>, cx: &mut AsyncApp) -> any
     pause(SETTLE, cx).await;
     let mut report = Report { window, failed: 0 };
 
-    let (width, _) = window
-        .client_size()
-        .context("the window has no client area")?;
-    let scale = width as f32 / 1280.;
+    let scale = window.scale();
     let layout = Layout::of(window, scale)?;
     println!(
         "probe: client area {}x{}, scale {scale}",
@@ -176,29 +177,40 @@ pub async fn run(tray: &TraySlot, failed: &Cell<bool>, cx: &mut AsyncApp) -> any
     pause(BEAT, cx).await;
     let is = window.is_maximized();
     report.check("the maximise button maximises", is, is);
-    let caption = Layout::of(window, scale)?.caption();
-    report.area(
-        "maximised: the top edge is caption",
-        caption,
-        (caption.0, 1),
-        Area::Caption,
-    );
-    report.double_click(caption);
-    pause(BEAT, cx).await;
-    let is = window.is_maximized();
-    report.check("a double-click on the title bar restores", !is, is);
+    if is {
+        let caption = Layout::of(window, scale)?.caption();
+        report.area(
+            "maximised: the top edge is caption",
+            caption,
+            (caption.0, 1),
+            Area::Caption,
+        );
+        report.double_click(caption);
+        pause(BEAT, cx).await;
+        let is = window.is_maximized();
+        report.check("a double-click on the title bar restores", !is, is);
+    } else {
+        report.skip("maximised: the top edge is caption");
+        report.skip("a double-click on the title bar restores");
+    }
 
     report.click(minimize);
     pause(BEAT, cx).await;
     let is = window.is_minimized();
     report.check("the minimise button minimises", is, is);
-    window.show_and_focus();
-    pause(BEAT, cx).await;
-    let is = window.is_minimized();
-    report.check("showing the window restores it", !is, is);
+    if is {
+        window.show_and_focus();
+        pause(BEAT, cx).await;
+        let is = window.is_minimized();
+        report.check("showing the window restores it", !is, is);
+    } else {
+        report.skip("showing the window restores it");
+    }
 
     let held = with_tray(tray, probe::tray_is_shown) == Some(true);
     report.check("the shell holds the tray icon", held, held);
+    let own = with_tray(tray, Tray::shows_app_icon) == Some(true);
+    report.check("the tray icon is the app's own", own, own);
     report.click(close);
     pause(BEAT, cx).await;
     let state = (
@@ -210,11 +222,15 @@ pub async fn run(tray: &TraySlot, failed: &Cell<bool>, cx: &mut AsyncApp) -> any
         state == (true, false),
         state,
     );
-    print_cpu("hidden in the tray", cx).await;
-    with_tray(tray, probe::tray_click);
-    pause(BEAT, cx).await;
-    let is = window.is_visible();
-    report.check("a tray click shows the window", is, is);
+    if state == (true, false) {
+        print_cpu("hidden in the tray", cx).await;
+        with_tray(tray, probe::tray_click);
+        pause(BEAT, cx).await;
+        let is = window.is_visible();
+        report.check("a tray click shows the window", is, is);
+    } else {
+        report.skip("a tray click shows the window");
+    }
     println!(
         "probe: after the tray click the window {} the foreground window",
         if window.is_foreground() {
