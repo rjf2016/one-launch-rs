@@ -5,10 +5,10 @@ use std::time::{Duration, Instant, SystemTime};
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, BoxShadow, Context, Div, Entity, EventEmitter, FontWeight, Keystroke,
-    ObjectFit, Pixels, RenderImage, ScrollStrategy, SharedString, Stateful, Subscription, Task,
-    UniformListScrollHandle, Window, anchored, deferred, div, hsla, img, linear_color_stop,
-    linear_gradient, point, px, uniform_list,
+    AnyElement, App, BoxShadow, ClickEvent, Context, Div, Entity, EventEmitter, FontWeight,
+    Keystroke, ObjectFit, Pixels, RenderImage, ScrollStrategy, SharedString, Stateful,
+    Subscription, Task, UniformListScrollHandle, Window, anchored, deferred, div, hsla, img,
+    linear_color_stop, linear_gradient, point, px, uniform_list,
 };
 use ol_api::library::{LibraryGame, caption, monogram, relative, visible};
 use ol_api::{ApiError, Backend, Library};
@@ -871,7 +871,12 @@ impl LibraryView {
             .overflow_hidden()
             .cursor_pointer()
             .hover(|style| style.border_color(color(theme::BORDER_STRONG)))
-            .on_click(cx.listener(move |this, _, _, cx| this.open_card(game, cx)))
+            // The second click of a double-click is no second Play.
+            .on_click(cx.listener(move |this, click: &ClickEvent, _, cx| {
+                if click.click_count() == 1 {
+                    this.open_card(game, cx);
+                }
+            }))
             .child(art)
             .child(caption)
     }
@@ -1258,7 +1263,11 @@ impl LibraryView {
                     .bg(color(theme::SURFACE))
                     .cursor_pointer()
                     .hover(|style| style.border_color(color(theme::BORDER_STRONG)))
-                    .on_click(cx.listener(move |this, _, _, cx| this.open_recent(entry, cx)))
+                    .on_click(cx.listener(move |this, click: &ClickEvent, _, cx| {
+                        if click.click_count() == 1 {
+                            this.open_recent(entry, cx);
+                        }
+                    }))
                     .child(
                         div()
                             .flex()

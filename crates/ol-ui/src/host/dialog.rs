@@ -4,8 +4,8 @@ use std::time::SystemTime;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, BoxShadow, Context, Div, FontWeight, HighlightStyle, Hsla, SharedString, Stateful,
-    StyledText, div, hsla, px,
+    AnyElement, BoxShadow, ClickEvent, Context, Div, FontWeight, HighlightStyle, Hsla,
+    SharedString, Stateful, StyledText, div, hsla, px,
 };
 use ol_api::launch::{
     PhaseNames, failed_note, group_steps, phase_label, plan_phases, sentence, stopped_note,
@@ -1255,7 +1255,12 @@ impl LaunchHost {
                 .justify_center()
                 .p(px(24.))
                 .bg(alpha(theme::BG, 0.7))
-                .on_click(cx.listener(|this, _, _, cx| this.dismiss(cx)))
+                // The second click of the double-click that opened the dialog does not close it again.
+                .on_click(cx.listener(|this, click: &ClickEvent, _, cx| {
+                    if click.click_count() == 1 {
+                        this.dismiss(cx);
+                    }
+                }))
                 .child(card),
         )
     }
