@@ -470,7 +470,8 @@ impl Serving {
                 }),
             ),
             Command::RestoreBackup(launcher, id, reply) => {
-                let restored = store.and_then(|store| self.restore_backup(store, launcher, &id));
+                let restored =
+                    store.and_then(|store| self.restore_backup(store, launcher, &id, true));
                 if restored.is_ok() {
                     self.recovery
                         .restored_from_backups(&self.data_dir, launcher);
@@ -482,13 +483,16 @@ impl Serving {
             }
             Command::RestoreRecovery(reply) => {
                 let restored = store.and_then(|store| {
+                    if self.jobs.is_busy() {
+                        return Err(ServiceError::Busy.into());
+                    }
                     let entry = self
                         .recovery
                         .pending()
                         .ok_or(ServiceError::NothingToRecover)?;
                     let (launcher, id) =
                         (entry.launcher, entry.backup_id.clone().unwrap_or_default());
-                    self.restore_backup(store, launcher, &id)
+                    self.restore_backup(store, launcher, &id, false)
                 });
                 if restored.is_ok() {
                     self.recovery.settle(&self.data_dir);
@@ -620,16 +624,19 @@ impl Serving {
         store: &Store,
         launcher: LauncherId,
         id: &str,
+        must_be_listed: bool,
     ) -> Result<RestoreResult, ApiError> {
         if self.jobs.is_busy() {
             return Err(ServiceError::Busy.into());
         }
         let (launchers, config) = self.steam(store, launcher)?;
         let backups = self.backup_service(launchers, &config);
-        let listed = backups
-            .get(launcher, id)
-            .map_err(ServiceError::backup(launcher))?;
-        if listed.is_none() {
+        if must_be_listed
+            && backups
+                .get(launcher, id)
+                .map_err(ServiceError::backup(launcher))?
+                .is_none()
+        {
             return Err(ServiceError::SnapshotGone.into());
         }
         Ok(switch::restore_backup(

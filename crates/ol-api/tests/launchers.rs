@@ -58,6 +58,12 @@ impl Fakes {
         }
     }
 
+    // The app quits and starts again on the same two folders, with a fake machine built afresh.
+    fn restart(self) -> Self {
+        self.backend.shut_down();
+        start(self.scratch)
+    }
+
     fn seed_password(&self, login: &str) -> String {
         self.fake
             .seed
@@ -73,7 +79,6 @@ impl Fakes {
 fn fakes(knobs: Option<&Value>) -> Fakes {
     let scratch = Scratch::new("api-launchers");
     let launchers_dir = scratch.join("launchers");
-    let data_dir = scratch.join("data");
     ol_sim::lay_down(
         &oracle("fixtures/dev-only/fake-launchers/all-four"),
         &oracle("fixtures/launchers"),
@@ -83,6 +88,13 @@ fn fakes(knobs: Option<&Value>) -> Fakes {
     if let Some(knobs) = knobs {
         ol_sim::write_knobs(&launchers_dir, knobs).unwrap();
     }
+    start(scratch)
+}
+
+// The app started on a folder that is laid down: a first start, or the next one on what the last left.
+fn start(scratch: Scratch) -> Fakes {
+    let launchers_dir = scratch.join("launchers");
+    let data_dir = scratch.join("data");
     let fake = ol_sim::materialize(
         &launchers_dir,
         &data_dir,
@@ -104,8 +116,9 @@ fn fakes(knobs: Option<&Value>) -> Fakes {
             let _ = changed.lock().unwrap().send(job.clone());
         })),
     );
+    let fresh = block_on(backend.accounts()).unwrap().is_empty();
     for account in &fake.seed.accounts {
-        if account.launcher == LauncherId::Steam {
+        if fresh && account.launcher == LauncherId::Steam {
             block_on(backend.create_account(NewAccount {
                 launcher: account.launcher,
                 display_name: account.display_name.clone(),
@@ -450,4 +463,83 @@ fn a_stored_password_goes_to_steams_command_line_and_nowhere_else() {
             "{name} holds the password"
         );
     }
+}
+
+#[test]
+fn a_switch_the_last_run_did_not_finish_is_offered_and_put_back() {
+    let fakes = fakes(None);
+    block_on(fakes.backend.rescan()).unwrap();
+    let login_users = fakes
+        .launchers_dir()
+        .join("steam")
+        .join("config")
+        .join("loginusers.vdf");
+    let before = fs::read(&login_users).unwrap();
+    let account = fakes.account("user_3");
+    let switch = StartLaunch {
+        account_id: account.clone(),
+        game_id: None,
+        confirm_close: false,
+    };
+    block_on(fakes.backend.start_launch(switch)).unwrap();
+    let job = fakes.finished();
+    assert!(job.state == JobState::Done, "{:?}", job.error);
+    let backup_id = job.backup_id.expect("the switch took a snapshot");
+    assert_ne!(fs::read(&login_users).unwrap(), before);
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_none());
+    assert_eq!(
+        refusal(block_on(fakes.backend.restore_recovery())).0,
+        "NOT_FOUND"
+    );
+
+    // What a crash during the sign-in leaves: the journal of the fixtures, naming this run's account and snapshot.
+    let mut journal: Value = serde_json::from_str(
+        &fs::read_to_string(oracle("fixtures/journal/switch-signing-in.json")).unwrap(),
+    )
+    .unwrap();
+    journal["accountId"] = account.into();
+    journal["backupId"] = backup_id.clone().into();
+    let data_dir = fakes.scratch.join("data");
+    let journal_file = data_dir.join("switch.json");
+
+    let fakes = fakes.restart();
+    fakes.backend.shut_down();
+    fs::write(&journal_file, journal.to_string()).unwrap();
+    let fakes = start(fakes.scratch);
+
+    let pending = block_on(fakes.backend.recovery())
+        .unwrap()
+        .expect("a recovery");
+    assert!(pending.backup_id == backup_id && pending.snapshot_available);
+    assert_eq!(pending.phase, ol_model::RecoveryPhase::SigningIn);
+    assert_eq!(pending.launcher, LauncherId::Steam);
+    assert!(pending.account_name.is_some());
+
+    let restored = block_on(fakes.backend.restore_recovery()).unwrap();
+    assert!(restored.id == backup_id);
+    assert_eq!(restored.files.len(), 1);
+    assert!(
+        restored.registry
+            == [
+                "AutoLoginUser = user_1".to_owned(),
+                "RememberPassword (removed)".to_owned()
+            ]
+    );
+    assert_eq!(fs::read(&login_users).unwrap(), before);
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_none());
+    assert!(!journal_file.exists());
+    assert_eq!(
+        block_on(fakes.backend.backups(LauncherId::Steam))
+            .unwrap()
+            .len(),
+        2
+    );
+
+    fs::write(&journal_file, journal.to_string()).unwrap();
+    let fakes = fakes.restart();
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_some());
+    block_on(fakes.backend.dismiss_recovery()).unwrap();
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_none());
+    assert!(!journal_file.exists());
+    fakes.backend.shut_down();
 }
