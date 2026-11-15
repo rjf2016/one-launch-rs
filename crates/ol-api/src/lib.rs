@@ -1,5 +1,13 @@
 #![forbid(unsafe_code)]
 
+mod backend;
+
+pub use backend::{ApiError, Backend, Library};
+
+pub mod library {
+    pub use ol_services::library::{LibraryGame, caption, monogram, visible};
+}
+
 pub mod doctor {
     pub use ol_services::doctor::{Report, run};
 

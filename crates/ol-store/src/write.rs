@@ -1,13 +1,21 @@
-use ol_model::{Ciphertext, SecretKey, SettingKey};
+use ol_model::{Ciphertext, LibrarySort, SecretKey, SettingKey};
 use rusqlite::params;
 
 use crate::{Store, StoreError};
 
 impl Store {
     pub fn set_setting(&self, key: SettingKey, value: &str) -> Result<(), StoreError> {
+        self.store_value(key.as_str(), value)
+    }
+
+    pub fn set_library_sort(&self, sort: LibrarySort) -> Result<(), StoreError> {
+        self.store_value(LibrarySort::KEY, sort.as_str())
+    }
+
+    fn store_value(&self, key: &str, value: &str) -> Result<(), StoreError> {
         self.conn.execute(
             "INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            params![key.as_str(), value],
+            params![key, value],
         )?;
         Ok(())
     }

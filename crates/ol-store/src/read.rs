@@ -1,6 +1,6 @@
 use ol_model::{
-    Account, ArtworkSource, Ciphertext, Game, GameArtwork, LastLaunch, LauncherId, SecretKey,
-    SettingKey, Settings,
+    Account, ArtworkSource, Ciphertext, Game, GameArtwork, LastLaunch, LauncherId, LibrarySort,
+    SecretKey, SettingKey, Settings,
 };
 use rusqlite::{OptionalExtension, Row};
 
@@ -100,13 +100,25 @@ impl Store {
     }
 
     pub fn setting(&self, key: SettingKey) -> Result<Option<String>, StoreError> {
+        self.stored_value(key.as_str())
+    }
+
+    pub fn library_sort(&self) -> Result<LibrarySort, StoreError> {
+        let stored = self.stored_value(LibrarySort::KEY)?;
+        Ok(LibrarySort::from_stored(stored.as_deref()))
+    }
+
+    // The rows of the settings table that are this app's own and not among the Electron app's keys.
+    pub fn preferences_stored(&self) -> Result<usize, StoreError> {
+        Ok(usize::from(self.stored_value(LibrarySort::KEY)?.is_some()))
+    }
+
+    fn stored_value(&self, key: &str) -> Result<Option<String>, StoreError> {
         Ok(self
             .conn
-            .query_row(
-                "SELECT value FROM settings WHERE key = ?1",
-                [key.as_str()],
-                |row| row.get(0),
-            )
+            .query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
+                row.get(0)
+            })
             .optional()?)
     }
 

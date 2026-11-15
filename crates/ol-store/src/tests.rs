@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use ol_model::{ArtworkSource, Ciphertext, LauncherId, SecretKey, SettingKey};
+use ol_model::{ArtworkSource, Ciphertext, LauncherId, LibrarySort, SecretKey, SettingKey};
 use ol_testkit::{Scratch, oracle, snapshot};
 use rusqlite::types::Value;
 use rusqlite::{Connection, OpenFlags};
@@ -640,6 +640,33 @@ fn a_setting_and_a_secret_written_here_read_back_after_a_restart() {
         ),
         [[Value::Text("2026-01-02T03:04:05.678Z".to_owned())]]
     );
+}
+
+#[test]
+fn the_library_sort_is_a_row_the_electron_app_does_not_count_among_its_settings() {
+    let scratch = data_folder();
+    let file = database_path(scratch.path());
+    {
+        let (store, _) = Store::open(&file).unwrap();
+        assert_eq!(store.library_sort().unwrap(), LibrarySort::LastPlayed);
+        assert_eq!(store.preferences_stored().unwrap(), 0);
+        store.set_library_sort(LibrarySort::Name).unwrap();
+    }
+    let (store, _) = Store::open(&file).unwrap();
+    assert_eq!(store.library_sort().unwrap(), LibrarySort::Name);
+    assert_eq!(store.preferences_stored().unwrap(), 1);
+    assert_eq!(store.settings().unwrap().len(), 8);
+    assert_eq!(store.row_counts().unwrap().settings, 9);
+    assert_eq!(
+        rows(
+            &store.conn,
+            "SELECT value FROM settings WHERE key = 'library.sort'"
+        ),
+        [[Value::Text("name".to_owned())]]
+    );
+    store.set_library_sort(LibrarySort::LastPlayed).unwrap();
+    assert_eq!(store.library_sort().unwrap(), LibrarySort::LastPlayed);
+    assert_eq!(store.row_counts().unwrap().settings, 9);
 }
 
 #[test]

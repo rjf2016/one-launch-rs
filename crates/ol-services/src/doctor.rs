@@ -125,7 +125,7 @@ fn database(data_dir: &Path, vault: Option<&dyn Vault>) -> Result<Database, Stor
         games_installed: counts.games_installed,
         games_known: store.installed_games()?.len(),
         settings: counts.settings,
-        settings_known: store.settings()?.len(),
+        settings_known: store.settings()?.len() + store.preferences_stored()?,
         secrets: counts.secrets,
         sign_ins: counts.launcher_sessions,
         passwords: tally(&stored.passwords),
