@@ -261,6 +261,22 @@ pub fn materialize(
     data_dir: &Path,
     now: OffsetDateTime,
 ) -> Result<FakeLaunchers, ScenarioError> {
+    materialize_on(dir, data_dir, FakeClock::starting_at(now))
+}
+
+// As `materialize`, for a person to watch: the clock is the system's, so a switch takes the seconds its waits add up to.
+pub fn materialize_in_real_time(
+    dir: &Path,
+    data_dir: &Path,
+) -> Result<FakeLaunchers, ScenarioError> {
+    materialize_on(dir, data_dir, FakeClock::following_the_system())
+}
+
+fn materialize_on(
+    dir: &Path,
+    data_dir: &Path,
+    clock: FakeClock,
+) -> Result<FakeLaunchers, ScenarioError> {
     let scenario = read_json(&dir.join(SCENARIO_FILE), SCENARIO_FILE)?;
     if scenario["version"] != 1 {
         return Err(shape("version must be 1"));
@@ -307,7 +323,7 @@ pub fn materialize(
         log.clone(),
         process_knobs(&merged(&scenario, &overrides, &["processes"])),
     ));
-    let clock = Arc::new(FakeClock::starting_at(now));
+    let clock = Arc::new(clock);
     let steam = installed.contains(&LauncherId::Steam).then(|| {
         SteamSim::attach(
             &steam_dir,

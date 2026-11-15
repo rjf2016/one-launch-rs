@@ -124,6 +124,7 @@ pub struct Backend {
     thread: Thread,
     job_thread: Thread,
     jobs: JobBoard,
+    has_launchers: bool,
 }
 
 fn take(thread: &Thread) -> Option<JoinHandle<()>> {
@@ -159,6 +160,7 @@ impl Backend {
         let version = version.to_owned();
         let jobs = JobBoard::default();
         let job_thread: Thread = Arc::default();
+        let has_launchers = launchers.is_some();
         let serving = Serving {
             data_dir,
             launchers,
@@ -178,7 +180,13 @@ impl Backend {
             thread: Arc::new(Mutex::new(thread)),
             job_thread,
             jobs,
+            has_launchers,
         }
+    }
+
+    // Whether this build can scan, switch and start the launcher: it has an adapter for it and a machine to run it on.
+    pub fn can_reach(&self, launcher: LauncherId) -> bool {
+        self.has_launchers && Launchers::IMPLEMENTED.contains(&launcher)
     }
 
     pub async fn library(&self) -> Result<Library, ApiError> {

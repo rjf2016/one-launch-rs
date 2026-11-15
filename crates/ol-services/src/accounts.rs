@@ -237,6 +237,17 @@ pub fn set_launcher_uid(
     require(store, id)
 }
 
+// The order of a list to pick an account from: the one used last first, then those never used by name. Names compare by their lower-cased characters; the Electron app compares them by the rules of the system language.
+pub fn in_pick_order(mut accounts: Vec<Account>) -> Vec<Account> {
+    accounts.sort_by_cached_key(|account| {
+        match account.last_used_at.clone().filter(|at| !at.is_empty()) {
+            Some(used) => (false, Some(std::cmp::Reverse(used)), String::new()),
+            None => (true, None, account.display_name.to_lowercase()),
+        }
+    });
+    accounts
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

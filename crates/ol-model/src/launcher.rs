@@ -32,6 +32,16 @@ impl LauncherId {
             Self::Riot => "Riot Games",
         }
     }
+
+    // The program a switch closes and starts, as it reads in the middle of a sentence: Riot Games is the company, the client is what closes.
+    pub const fn client_name(self) -> &'static str {
+        match self {
+            Self::Steam => "Steam",
+            Self::Epic => "Epic Games Launcher",
+            Self::Battlenet => "Battle.net",
+            Self::Riot => "the Riot Client",
+        }
+    }
 }
 
 #[cfg(test)]
