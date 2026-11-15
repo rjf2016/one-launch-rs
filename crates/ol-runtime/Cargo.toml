@@ -15,6 +15,7 @@ ol-platform-api.workspace = true
 
 [dev-dependencies]
 ol-testkit.workspace = true
+time.workspace = true
 
 [lints]
 workspace = true

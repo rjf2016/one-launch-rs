@@ -4131,6 +4131,7 @@ dependencies = [
  "ol-testkit",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
  "thiserror 2.0.21",
  "time",
 ]
@@ -4177,6 +4178,7 @@ dependencies = [
  "ol-model",
  "ol-platform-api",
  "ol-testkit",
+ "time",
 ]
 
 [[package]]

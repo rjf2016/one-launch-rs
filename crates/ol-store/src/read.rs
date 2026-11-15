@@ -6,16 +6,16 @@ use rusqlite::{OptionalExtension, Row};
 
 use crate::{Store, StoreError};
 
-const ACCOUNTS: &str = "
+// Every read of an account takes these columns: the stored password is never one of them.
+pub(crate) const ACCOUNT: &str = "
   SELECT id, launcher, display_name, login,
          CASE WHEN secret_enc IS NULL THEN 0 ELSE 1 END AS has_secret,
          EXISTS (SELECT 1 FROM launcher_sessions s WHERE s.account_id = accounts.id) AS has_session,
          launcher_uid, tags, notes, last_used_at, created_at, updated_at
-  FROM accounts
-  ORDER BY launcher, display_name COLLATE NOCASE";
+  FROM accounts";
 
 // The account that goes with MAX(launched_at) is the one SQLite takes from the same row: the Electron app reads it this way, ties included.
-const INSTALLED_GAMES: &str = "
+pub(crate) const GAME: &str = "
   SELECT g.id, g.launcher, g.launcher_game_id, g.name, g.install_path, g.installed, g.last_seen_at,
          g.needs_update, g.last_played_at,
          a.source AS art_source, a.grid_path, a.hero_path, a.logo_path, a.fetched_at,
@@ -28,9 +28,7 @@ const INSTALLED_GAMES: &str = "
     SELECT game_id, account_id, MAX(launched_at) AS launched_at
     FROM launch_history WHERE result = 'ok' GROUP BY game_id
   ) ll ON ll.game_id = g.id
-  LEFT JOIN accounts acc ON acc.id = ll.account_id
-  WHERE g.installed = 1
-  ORDER BY g.name COLLATE NOCASE";
+  LEFT JOIN accounts acc ON acc.id = ll.account_id";
 
 const ROW_COUNTS: &str = "
   SELECT (SELECT COUNT(*) FROM accounts),
@@ -65,7 +63,9 @@ pub struct Ciphertexts {
 
 impl Store {
     pub fn accounts(&self) -> Result<Vec<Account>, StoreError> {
-        let mut statement = self.conn.prepare(ACCOUNTS)?;
+        let mut statement = self.conn.prepare(&format!(
+            "{ACCOUNT} ORDER BY launcher, display_name COLLATE NOCASE"
+        ))?;
         let rows = statement.query_map([], account)?;
         Ok(rows
             .collect::<Result<Vec<_>, _>>()?
@@ -75,7 +75,9 @@ impl Store {
     }
 
     pub fn installed_games(&self) -> Result<Vec<Game>, StoreError> {
-        let mut statement = self.conn.prepare(INSTALLED_GAMES)?;
+        let mut statement = self.conn.prepare(&format!(
+            "{GAME} WHERE g.installed = 1 ORDER BY g.name COLLATE NOCASE"
+        ))?;
         let rows = statement.query_map([], game)?;
         Ok(rows
             .collect::<Result<Vec<_>, _>>()?
@@ -182,7 +184,7 @@ impl Store {
     }
 }
 
-fn account(row: &Row<'_>) -> rusqlite::Result<Option<Account>> {
+pub(crate) fn account(row: &Row<'_>) -> rusqlite::Result<Option<Account>> {
     let Some(launcher) = LauncherId::parse(&row.get::<_, String>(1)?) else {
         return Ok(None);
     };
@@ -215,7 +217,7 @@ fn tags(stored: &str) -> Vec<String> {
     }
 }
 
-fn game(row: &Row<'_>) -> rusqlite::Result<Option<Game>> {
+pub(crate) fn game(row: &Row<'_>) -> rusqlite::Result<Option<Game>> {
     let Some(launcher) = LauncherId::parse(&row.get::<_, String>(1)?) else {
         return Ok(None);
     };

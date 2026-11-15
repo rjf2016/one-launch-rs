@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 use crate::workspace_root;
 
 // Stands where a recorded string holds half of a surrogate pair, which no Rust string can.
-const UNPAIRED: char = '\u{fdd0}';
+const MARKER: char = '\u{fdd0}';
 
 pub struct Vectors {
     pub function: String,
@@ -77,6 +77,71 @@ impl Case {
             Expected::Error(error) => Some(error),
         }
     }
+}
+
+// What the port answered for one case, or why the case cannot be put to it.
+pub enum Answer {
+    Out(Value),
+    Error(Value),
+    Skip(&'static str),
+}
+
+pub const UNPAIRED: &str = "half a surrogate pair, which no Rust string holds";
+
+// Puts every case of a vector file to `call` and fails with the cases that differ. The cases left out must be exactly `skipped`, each with its reason.
+pub fn run(file: &str, skipped: &[(&str, &str)], call: impl Fn(&Case) -> Answer) {
+    let vectors = Vectors::load(file);
+    let mut failures = Vec::new();
+    let mut left_out = Vec::new();
+    let mut passed = 0;
+    for case in &vectors.cases {
+        let answer = if case.has_unpaired_surrogate() {
+            Answer::Skip(UNPAIRED)
+        } else {
+            call(case)
+        };
+        let failure = match (&answer, case.out(), case.error()) {
+            (Answer::Skip(reason), _, _) => {
+                left_out.push((case.id.as_str(), *reason));
+                continue;
+            }
+            (Answer::Out(actual), Some(expected), _) => difference(actual, &expected),
+            (Answer::Error(actual), _, Some(expected)) => {
+                (actual != &Value::Object(expected.clone())).then(|| {
+                    format!(
+                        "error {actual}, expected {}",
+                        Value::Object(expected.clone())
+                    )
+                })
+            }
+            (Answer::Out(actual), None, Some(expected)) => Some(format!(
+                "returned {actual}, expected the error {}",
+                Value::Object(expected.clone())
+            )),
+            (Answer::Error(actual), Some(expected), _) => {
+                Some(format!("failed with {actual}, expected {expected}"))
+            }
+            _ => unreachable!("a case has an out or an error"),
+        };
+        match failure {
+            Some(failure) => failures.push(format!("{}: {failure}", case.id)),
+            None => passed += 1,
+        }
+    }
+    println!(
+        "{}: {} cases, {passed} passed, {} left out",
+        vectors.function,
+        vectors.cases.len(),
+        left_out.len()
+    );
+    assert!(
+        failures.is_empty(),
+        "{} of {} cases of {file} differ:\n{}",
+        failures.len(),
+        vectors.cases.len(),
+        failures.join("\n")
+    );
+    assert_eq!(left_out, skipped, "the cases of {file} left out");
 }
 
 pub fn bytes(arg: &Value) -> Vec<u8> {
@@ -154,7 +219,7 @@ pub fn plain(value: &Value) -> Value {
 
 fn unpaired(value: &Value) -> bool {
     match value {
-        Value::String(text) => text.contains(UNPAIRED),
+        Value::String(text) => text.contains(MARKER),
         Value::Array(items) => items.iter().any(unpaired),
         Value::Object(fields) => {
             if let Some(Value::Array(units)) = fields.get("$utf16") {
@@ -166,7 +231,7 @@ fn unpaired(value: &Value) -> bool {
             }
             fields
                 .iter()
-                .any(|(key, inner)| key.contains(UNPAIRED) || unpaired(inner))
+                .any(|(key, inner)| key.contains(MARKER) || unpaired(inner))
         }
         _ => false,
     }

@@ -15,73 +15,11 @@ use ol_formats::steam::manifests::{
 };
 use ol_formats::vdf::{self, VdfObject, VdfParseError, VdfValue};
 use ol_formats::winpath::{normalize_launcher_path, path_key};
-use ol_testkit::vectors::{Case, Vectors, difference, plain, text};
+use ol_testkit::vectors::{Answer, UNPAIRED, plain, run, text};
 use serde_json::{Value, json};
 
-const UNPAIRED: &str = "half a surrogate pair, which no Rust string holds";
 const NOT_TEXT: &str = "not text, which the Rust type rules out";
 const NOT_WHOLE: &str = "not a whole number, which the Rust type rules out";
-
-enum Answer {
-    Out(Value),
-    Error(Value),
-    Skip(&'static str),
-}
-
-fn run(file: &str, skipped: &[(&str, &str)], call: impl Fn(&Case) -> Answer) {
-    let vectors = Vectors::load(file);
-    let mut failures = Vec::new();
-    let mut left_out = Vec::new();
-    let mut passed = 0;
-    for case in &vectors.cases {
-        let answer = if case.has_unpaired_surrogate() {
-            Answer::Skip(UNPAIRED)
-        } else {
-            call(case)
-        };
-        let failure = match (&answer, case.out(), case.error()) {
-            (Answer::Skip(reason), _, _) => {
-                left_out.push((case.id.as_str(), *reason));
-                continue;
-            }
-            (Answer::Out(actual), Some(expected), _) => difference(actual, &expected),
-            (Answer::Error(actual), _, Some(expected)) => {
-                (actual != &Value::Object(expected.clone())).then(|| {
-                    format!(
-                        "error {actual}, expected {}",
-                        Value::Object(expected.clone())
-                    )
-                })
-            }
-            (Answer::Out(actual), None, Some(expected)) => Some(format!(
-                "returned {actual}, expected the error {}",
-                Value::Object(expected.clone())
-            )),
-            (Answer::Error(actual), Some(expected), _) => {
-                Some(format!("failed with {actual}, expected {expected}"))
-            }
-            _ => unreachable!("a case has an out or an error"),
-        };
-        match failure {
-            Some(failure) => failures.push(format!("{}: {failure}", case.id)),
-            None => passed += 1,
-        }
-    }
-    println!(
-        "{}: {} cases, {passed} passed, {} left out",
-        vectors.function,
-        vectors.cases.len(),
-        left_out.len()
-    );
-    assert!(
-        failures.is_empty(),
-        "{} of {} cases of {file} differ:\n{}",
-        failures.len(),
-        vectors.cases.len(),
-        failures.join("\n")
-    );
-    assert_eq!(left_out, skipped, "the cases of {file} left out");
-}
 
 fn vdf_error(error: &VdfParseError) -> Value {
     json!({ "name": "VdfParseError", "message": error.to_string(), "line": error.line, "code": VdfParseError::CODE })
