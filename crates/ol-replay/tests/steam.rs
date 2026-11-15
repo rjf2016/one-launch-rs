@@ -1,10 +1,6 @@
 #![forbid(unsafe_code)]
 
-// The Steam replay scripts of oracle/l2, run through the backend on fake launchers and held against what the Electron app did.
-//
-// Compared in full: every platform event, in order; the job events, the expectation's being a subsequence of the replay's; and of the final state the schema version, the accounts, the launch history, the settings, the journal, the backups, Steam's games, Steam's loginusers.vdf and Steam's registry values.
-//
-// Left out, because this build has no code for it yet: the other three launchers (their games, files and registry values, and their saved sign-ins), artwork, the vault probe and the log lines.
+// A recorded run is held to its Steam part only, because this build has no code yet for the rest: the other three launchers (their games, files, registry values and saved sign-ins), artwork, the vault probe and the log lines are left out of every comparison here.
 
 use std::fs;
 

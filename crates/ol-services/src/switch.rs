@@ -1,6 +1,4 @@
-// The switch pipeline for Steam: close, snapshot, write, start, confirm, and put the snapshot back when a step fails.
-//
-// This file is the only code in the app that writes a launcher-owned file or registry value. Every such write is one of the four functions under "The writes", and each goes through a port.
+// The only code in the app that writes a launcher-owned file or registry value: the four functions from write_login_users to apply_restore, each through a port. The rest of the file reads, waits and decides.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -29,10 +27,6 @@ use crate::launchers::ServiceError;
 const SNAPSHOT_RELATIVE: &str = "config/loginusers.vdf";
 const AUTO_LOGIN_USER: &str = "AutoLoginUser";
 const REMEMBER_PASSWORD: &str = "RememberPassword";
-
-// ---------------------------------------------------------------------------
-// The writes.
-// ---------------------------------------------------------------------------
 
 // loginusers.vdf with every AutoLogin or MostRecent line set for the target and nothing else changed.
 fn write_login_users(files: &dyn FileWriter, path: &str, text: &str) -> Result<(), Thrown> {
@@ -98,10 +92,6 @@ fn apply_restore(
         registry: lines,
     })
 }
-
-// ---------------------------------------------------------------------------
-// Everything below reads, waits and decides; it writes through the four functions above.
-// ---------------------------------------------------------------------------
 
 enum RestoreError {
     Adapter(AdapterError),

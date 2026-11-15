@@ -1,5 +1,4 @@
-// Steam's own sign-in state log, <SteamPath>\logs\steamui_login.txt: plain text from the client's window, with no token or password in it. A line of interest reads
-//     [2026-09-12 15:00:45] [ WaitingForServerResponse ] SetLoginState: WaitingForCredentials - Account Logon Denied
+// Steam's own sign-in state log, <SteamPath>\logs\steamui_login.txt: plain text from the client's window, with no token or password in it. A line of interest ends "SetLoginState: WaitingForCredentials - Account Logon Denied".
 
 use std::sync::LazyLock;
 
