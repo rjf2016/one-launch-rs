@@ -15,7 +15,7 @@ const io = {
   wrapper: (file, name) => checkout.isWrapper(file, name, HOME),
   isTag: (folder, name) => checkout.tagInFiles(folder, name) ?? require('./lib/secrets.cjs').isTag(folder, name),
   commit(folder, broad) {
-    const root = checkout.nearest(folder);
+    const root = checkout.nearest(checkout.canonical(folder));
     if (!root) throw new Refusal('secrets', 'the commit is not inside a checkout the hook can find');
     return require('./lib/secrets.cjs').commitFindings(root, broad);
   },

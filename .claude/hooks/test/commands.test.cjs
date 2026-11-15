@@ -1387,6 +1387,13 @@ test('a folder change is trusted only in the few forms that cannot fail or happe
     ['Bash', `cd "${crates}" 2>/dev/null;`],
     ['Bash', `pushd -n "${crates}";`],
     ['Bash', `pushd -P "${crates}";`],
+    ['Bash', `pushd -L "${crates}";`],
+    ['Bash', `coproc command cd "${crates}";`],
+    ['Bash', `x=1 builtin cd "${crates}";`],
+    ['Bash', `time command cd "${crates}";`],
+    ['Bash', `! builtin cd "${crates}";`],
+    ['Bash', `cd -P "${crates}";`],
+    ['Bash', `cd -L -P -- "${crates}";`],
     ['Bash', `cd "${crates}" || exit 1 > /nonexistent-dir/x;`],
     ['Bash', `cd "${crates}" || exit 1 2;`],
     ['Bash', `CDPATH=/somewhere; cd crates;`],
@@ -1430,10 +1437,38 @@ test('a folder change is trusted only in the few forms that cannot fail or happe
     if (verdict(tool, command) !== 'tags') open.push(command);
   }
   assert.deepEqual(open, [], 'after each of these the folder is unknown, so the pushed name cannot be looked up');
-  for (const name of ['-', '+1']) {
-    fs.mkdirSync(path.join(odd, name));
-    assert.equal(verdict('Bash', `cd ${name}; ${push}`, odd), 'tags', `cd ${name} goes by the shell's own list of folders, not into a folder of that name`);
+  for (const name of ['-', '+', '+1', '-x', '-0']) fs.mkdirSync(path.join(odd, name));
+  const before = [
+    ['Bash', 'cd -;'],
+    ['Bash', 'cd +1;'],
+    ['Bash', 'cd "-";'],
+    ['Bash', "cd '-';"],
+    ['Bash', 'cd -- "-";'],
+    ['Bash', 'cd "-x";'],
+    ['Bash', 'pushd "-0";'],
+    ['Bash', `cd "${odd}"; cd "-";`],
+    ['Bash', `cd "${odd}" && cd "-" &&`],
+    ['PowerShell', 'Set-Location "-";'],
+    ['PowerShell', "Set-Location '-';"],
+    ['PowerShell', "Set-Location -Path '-';"],
+    ['PowerShell', 'cd "-";'],
+    ['PowerShell', 'Push-Location "-";'],
+    ['PowerShell', 'Set-Location "+";'],
+    ['PowerShell', `Set-Location "${odd}"; Set-Location "-";`],
+    ['cmd', 'cd "-"'],
+  ];
+  for (const [tool, change] of before) {
+    const command = tool === 'cmd' ? `cmd //c "cd - & pwsh -NoProfile -File ${wrapper} push origin m1/x"` : `${change} ${push}`;
+    assert.equal(verdict(tool === 'cmd' ? 'Bash' : tool, command, odd), 'tags', `${change} goes by the shell's own list of folders, not into a folder of that name`);
+    if (tool !== 'cmd') assert.equal(verdict(tool, `${change} git commit -m x`, odd, recording), 'secrets', change);
   }
+  assert.deepEqual(seen, []);
+  for (const [tool, change, folder] of [['Bash', 'cd ./-;', path.join(odd, '-')], ['Bash', `git -C "${path.join(odd, '-')}"`, path.join(odd, '-')], ['PowerShell', 'Set-Location .\\-;', path.join(odd, '-')]]) {
+    seen.length = 0;
+    assert.equal(verdict(tool, change.startsWith('git') ? `${change} commit -m x` : `${change} git commit -m x`, odd, recording), 'allow', change);
+    assert.deepEqual(seen, [folder], change);
+  }
+  seen.length = 0;
   const after = [
     ['Bash', `{ echo x; }; cd "${crates}";`],
     ['Bash', `{ echo x; }& cd "${crates}";`],
@@ -1444,19 +1479,21 @@ test('a folder change is trusted only in the few forms that cannot fail or happe
     ['Bash', `cd "${crates}"; echo x &`],
     ['PowerShell', `Get-Date > $null; Set-Location "${crates}";`],
     ['PowerShell', `Set-Location "${crates}"; Get-Date &`],
+    ['Bash', `bash -r -c 'echo x'; cd "${crates}";`],
   ];
   for (const [tool, change] of after) assert.equal(verdict(tool, `${change} ${push}`), 'allow', change);
-  for (const [tool, change] of [changes[0], changes[5], changes[13], changes[14], changes[16], changes[32], changes[34], changes[35], changes[41]]) {
-    assert.equal(verdict(tool, `${change} git commit -m x`, ROOT, recording), 'secrets', change);
-  }
+  const picked = ['cd "${crates}" || exit 1 &', '{ cd "${crates}"; } &', 'cd "${crates}" extra;', 'cd -x "${crates}";', 'cd "${crates}" < /nonexistent-file;', 'coproc command cd "${crates}";', 'x=1 builtin cd "${crates}";', 'time command cd "${crates}";', 'Set-Location "${crates}" || exit 1 &', 'Set-Location "${crates}" extra;', 'Set-Location "${crates}" -Bogus;', 'Set-Location "${crates}" > C:\\no-such-dir\\x.txt;'].map((form) => form.replace('${crates}', crates));
+  const chosen = changes.filter(([, change]) => picked.includes(change));
+  assert.equal(chosen.length, picked.length);
+  for (const [tool, change] of chosen) assert.equal(verdict(tool, `${change} git commit -m x`, ROOT, recording), 'secrets', change);
   assert.deepEqual(seen, []);
   const trusted = [
     ['Bash', `cd "${crates}" &&`],
     ['Bash', `cd "${crates}";`],
     ['Bash', `cd "${crates}"\n`],
     ['Bash', `cd -- "${crates}";`],
-    ['Bash', `cd -P "${crates}";`],
-    ['Bash', `cd -L -P -- "${crates}";`],
+    ['Bash', `cd -L "${crates}";`],
+    ['Bash', `cd -L -- "${crates}";`],
     ['Bash', `cd "${crates}" || exit 1;`],
     ['Bash', `cd "${crates}" || exit;`],
     ['Bash', `command cd "${crates}" &&`],
@@ -1482,6 +1519,62 @@ test('a folder change is trusted only in the few forms that cannot fail or happe
     assert.equal(verdict(tool, `${change} ${push}`), 'allow', change);
   }
   fs.rmSync(odd, { recursive: true, force: true });
+});
+
+test('the folder a program ends up in is the one bash makes of the word, and a restricted shell stays where it is', () => {
+  const tw = fs.mkdtempSync(path.join(os.tmpdir(), 'ol-hook-'));
+  for (const name of ['x1', 'x[1]', '{a,b}', 'a', 'b']) fs.mkdirSync(path.join(tw, name));
+  const fwd = tw.replace(/\\/g, '/');
+  const crates = path.join(ROOT, 'crates');
+  const wrapper = path.join(ROOT, 'scripts', 'agent', 'git.ps1');
+  const seen = [];
+  const recording = { ...io, commit: (folder) => (seen.push(folder), []) };
+  fs.symlinkSync(path.join(ROOT, '.claude'), path.join(tw, 'jlink'), 'junction');
+  const expanded = [
+    ['Bash', `cd -P "${fwd}/jlink/.."; git commit -m x`],
+    ['Bash', `cd -P -- "${fwd}/jlink/.."; git commit -m x`],
+    ['Bash', `cd -P "${fwd}/jlink/../crates"; git commit -m x`],
+    ['Bash', `git -C ${fwd}/x[1] commit -m x`],
+    ['Bash', `cd ${fwd}/x[1] && git commit -m x`],
+    ['Bash', `cd ${fwd}/x[1]; git commit -m x`],
+    ['Bash', `cd ${fwd}/"x"[1]; git commit -m x`],
+    ['Bash', `cd "${fwd}/x"[1]; git commit -m x`],
+    ['Bash', `cd ${fwd}/{a,b}; git commit -m x`],
+    ['Bash', `git -C ${fwd}/{a,b} commit -m x`],
+    ['Bash', `pwsh -NoProfile -File "${wrapper}" -C ${fwd}/x[1] commit -m x`],
+    ['Bash', `cd -P "${crates}"; git commit -m x`],
+    ['Bash', `cd -P "${crates}"; cd ..; git commit -m x`],
+    ['Bash', `bash -r -c 'cd "${crates}"; git commit -m x'`],
+    ['Bash', `bash -rc 'cd "${crates}"; git commit -m x'`],
+    ['Bash', `bash --restricted -c 'cd "${crates}"; git commit -m x'`],
+    ['Bash', `rbash -c 'cd "${crates}"; git commit -m x'`],
+    ['PowerShell', `bash -r -c 'cd "${crates.replace(/\\/g, '/')}"; git commit -m x'`],
+  ];
+  for (const [tool, command] of expanded) assert.equal(verdict(tool, command, ROOT, recording), 'secrets', command);
+  assert.deepEqual(seen, [], 'none was scanned in a folder the commit might not run in');
+  assert.equal(verdict('Bash', `cd ${fwd}/x[1]; pwsh -NoProfile -File "${wrapper}" push origin m1/x`), 'tags');
+  assert.equal(verdict('Bash', `pwsh -NoProfile -File "${wrapper}" -C ${fwd}/x[1] push origin m1/x`), 'tags');
+  assert.equal(verdict('Bash', `cd -P "${crates}"; pwsh -NoProfile -File "${wrapper}" push origin m1/x`), 'tags');
+  assert.equal(verdict('Bash', `cd -P "${fwd}/jlink/.."; pwsh -NoProfile -File "${wrapper}" push origin m1/x`), 'tags');
+  assert.equal(verdict('Bash', "rbash -c 'tasklist'"), 'process', 'a restricted shell is read like any other');
+  const kept = [
+    ['Bash', `cd "${fwd}/x[1]" && git commit -m x`, path.join(tw, 'x[1]')],
+    ['Bash', `git -C "${fwd}/x[1]" commit -m x`, path.join(tw, 'x[1]')],
+    ['Bash', `git -C '${fwd}/{a,b}' commit -m x`, path.join(tw, '{a,b}')],
+    ['Bash', `git -C ${fwd}/x1 commit -m x`, path.join(tw, 'x1')],
+    ['PowerShell', `git -C ${tw}\\x[1] commit -m x`, path.join(tw, 'x[1]')],
+    ['PowerShell', `git -C "${tw}\\x[1]" commit -m x`, path.join(tw, 'x[1]')],
+    ['Bash', `bash -c 'cd "${crates}" && git commit -m x'`, crates],
+    ['Bash', `cd -L "${crates}"; git commit -m x`, crates],
+    ['Bash', `cd "${fwd}/jlink/.."; git commit -m x`, tw],
+    ['Bash', `cd -L "${fwd}/jlink/.."; git commit -m x`, tw],
+  ];
+  for (const [tool, command, folder] of kept) {
+    seen.length = 0;
+    assert.equal(verdict(tool, command, ROOT, recording), 'allow', command);
+    assert.deepEqual(seen.map((each) => each.toLowerCase()), [folder.toLowerCase()], command);
+  }
+  fs.rmSync(tw, { recursive: true, force: true });
 });
 
 test('a script named like the wrapper somewhere else is not the wrapper', () => {

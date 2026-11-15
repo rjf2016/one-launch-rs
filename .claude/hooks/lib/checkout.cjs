@@ -181,7 +181,7 @@ function judgeWrite(file) {
 }
 
 function tagInFiles(folder, name) {
-  const root = nearest(folder);
+  const root = nearest(canonical(folder));
   const common = root && commonDir(root);
   if (!common || !fs.existsSync(common) || fs.existsSync(path.join(common, 'reftable')) || !/^[\w.-]+(\/[\w.-]+)*$/.test(name) || name.includes('..')) return null;
   const loose = fs.statSync(path.join(common, 'refs', 'tags', ...name.split('/')), { throwIfNoEntry: false });

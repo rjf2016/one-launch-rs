@@ -66,7 +66,7 @@ const GITHUB_HOST = /github(usercontent)?\.com|ghcr\.io/i;
 const HTTP_TOOLS = set('curl wget http https invoke-restmethod irm invoke-webrequest iwr start-bitstransfer bitsadmin certutil aria2c');
 const SSH_TOOLS = set('ssh scp sftp plink pscp psftp');
 const CARGO_DEPS = set('add update install remove rm upgrade generate-lockfile binstall');
-const SHELLS = set('bash sh zsh dash ash ksh');
+const SHELLS = set('bash sh zsh dash ash ksh rbash rksh rzsh');
 const POWERSHELLS = set('pwsh powershell pwsh-preview');
 const POWERSHELL_VALUES = set('executionpolicy ex ep workingdirectory wd windowstyle w configurationname config settingsfile settings custompipename inputformat if outputformat of o psconsolefile');
 const WRAPPERS = set(
@@ -140,6 +140,7 @@ function into(cwd, word, dialect) {
   if (!word || word.dynamic || !word.text) return null;
   let target = word.text;
   if (/^[A-Za-z]:(?![\\/])/.test(target)) return null;
+  if (dialect === 'bash' && /[*?[\]{}]/.test(target) && !(word.string && word.cut === target.length)) return null;
   if (target === '~' || /^~[\\/]/.test(target)) target = path.join(os.homedir(), target.slice(1));
   else if (target.startsWith('~')) return null;
   if (dialect === 'bash') {
@@ -330,14 +331,14 @@ function destination(name, args, dialect) {
   } else if (dialect === 'cmd') {
     if (name !== 'pushd' && rest.length === 2 && /^\/d$/i.test(rest[0].text)) rest = rest.slice(1);
   } else if (name === 'cd') {
-    while (rest.length > 1 && !rest[0].quoted && /^(--|-P|-L)$/.test(rest[0].text)) {
+    while (rest.length > 1 && !rest[0].quoted && /^(--|-L)$/.test(rest[0].text)) {
       const last = rest[0].text === '--';
       rest = rest.slice(1);
       if (last) break;
     }
   }
   const [word] = rest;
-  if (rest.length !== 1 || word.block || (!word.quoted && /^[-+]/.test(word.text))) return null;
+  if (rest.length !== 1 || word.block || /^[-+]/.test(word.text)) return null;
   return literal || !/[*?[\]]/.test(word.text) ? word : null;
 }
 
@@ -624,17 +625,23 @@ function cargo(args) {
 
 function shell(name, args, state, depth) {
   let inline = false;
+  let restricted = name.startsWith('r');
   for (let k = 0; k < args.length; k++) {
     const text = args[k].text;
     if (text === '--version' || text === '--help') return;
+    restricted ||= text === '--restricted';
     if (/^(--rcfile|--init-file)$/.test(text)) k++;
     else if (/^[-+][A-Za-z]+$/.test(text)) {
       inline ||= text[0] === '-' && text.includes('c');
+      restricted ||= text[0] === '-' && text.includes('r');
       if (/[oO]/.test(text)) k++;
     } else if (!/^[-+]/.test(text)) {
       if (inline) {
         literal([args[k]], `the command text handed to ${name}`);
+        const before = state.redefined;
+        state.redefined ||= restricted;
         scoped(state, () => walk(text, 'bash', state, depth + 1));
+        state.redefined = before;
         return;
       }
       if (STDIN.test(text)) break;

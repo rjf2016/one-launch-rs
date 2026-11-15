@@ -146,7 +146,7 @@ function lex(source, dialect, base = 0, body = false) {
   };
   const string = (read) => {
     if (ps && word?.text === '.' && !word.quoted) endWord();
-    const fresh = ps && !word;
+    const fresh = !word;
     i++;
     read();
     if (fresh) Object.assign(word, { string: true, cut: word.text.length });

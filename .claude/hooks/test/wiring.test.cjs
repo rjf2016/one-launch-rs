@@ -365,6 +365,45 @@ test('a folder change that cannot have happened does not move the scan or the ta
   fs.rmSync(path.join(main, '.git', 'refs', 'tags', 'v9'));
 });
 
+test('the checkout of a commit and of a tag lookup is found from the folder as git resolves it', () => {
+  const outer = project();
+  const inside = path.join(outer, 'k4n');
+  fs.mkdirSync(inside);
+  git(inside, 'init', '-q');
+  put(inside, 'notes.md', `a planted ${token()}\n`);
+  put(inside, 'sub/keep.txt', 'x\n');
+  git(inside, 'add', '-A');
+  put(inside, '.git/refs/tags/v9', `${'0'.repeat(39)}1\n`);
+  fs.symlinkSync(path.join(inside, 'sub'), path.join(outer, 'k4link'), 'junction');
+  const wrapper = path.join(main, 'scripts', 'agent', 'git.ps1');
+  const commits = [
+    ['Bash', `git -C "${outer}/k4n " commit -m x`],
+    ['Bash', `git -C "${outer}/k4n." commit -m x`],
+    ['PowerShell', `git -C "${outer}\\k4n " commit -m x`],
+    ['PowerShell', `git -C "${outer}\\k4n." commit -m x`],
+    ['PowerShell', `& "${wrapper}" -C "${outer}\\k4n " commit -m x`],
+    ['Bash', `git -C "${outer}/k4link" commit -m x`],
+    ['Bash', `cd "${outer}/k4link" && git commit -m x`],
+    ['PowerShell', `git -C "${outer}\\k4link" commit -m x`],
+    ['PowerShell', `Set-Location "${outer}\\k4link"; git commit -m x`],
+    ['PowerShell', `& "${wrapper}" -C "${outer}\\k4link" commit -m x`],
+  ];
+  for (const [tool, command] of commits) {
+    const refused = shell(tool, command, outer);
+    assert.deepEqual([refused.blocked, refused.status], [true, [2]], command);
+    assert.match(refused.stderr, /notes\.md:1: github-token ghs_/, command);
+  }
+  assert.equal(shell('Bash', 'git commit -m x', outer).blocked, false, 'the control: the outer checkout is clean');
+  assert.equal(shell('PowerShell', `git -C "${outer}" commit -m x`, outer).blocked, false);
+  const pushes = [`& "${wrapper}" -C "${outer}\\k4link" push origin v9`, `& "${wrapper}" -C "${outer}\\k4n " push origin v9`, `Set-Location "${outer}\\k4link"; & "${wrapper}" push origin v9`];
+  for (const command of pushes) {
+    const refused = shell('PowerShell', command, outer);
+    assert.equal(refused.blocked, true, command);
+    assert.match(refused.stderr, /v9 is a tag in this checkout/, command);
+  }
+  assert.equal(shell('PowerShell', `& "${wrapper}" -C "${outer}" push origin v9`, outer).blocked, false, 'in the outer checkout v9 is no tag');
+});
+
 test('the first commit of a repository is scanned like any other, and so is a staged file whose working copy has moved on', () => {
   const fresh = folder();
   git(fresh, 'init', '-q');
