@@ -1,0 +1,28 @@
+[package]
+name = "ol-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-channel.workspace = true
+futures-lite.workspace = true
+ol-adapters.workspace = true
+ol-model.workspace = true
+ol-platform-api.workspace = true
+ol-runtime.workspace = true
+ol-services.workspace = true
+ol-store.workspace = true
+ol-vault.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+ol-platform-fake.workspace = true
+ol-sim.workspace = true
+ol-testkit.workspace = true
+
+[lints]
+workspace = true

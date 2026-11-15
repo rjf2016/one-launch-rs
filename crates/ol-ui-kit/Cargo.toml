@@ -1,0 +1,17 @@
+[package]
+name = "ol-ui-kit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+gpui.workspace = true
+gpui-kit.workspace = true
+image.workspace = true
+
+[dev-dependencies]
+ol-testkit.workspace = true
+
+[lints]
+workspace = true

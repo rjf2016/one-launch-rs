@@ -1,0 +1,62 @@
+[graph]
+targets = ["x86_64-pc-windows-msvc"]
+all-features = true
+
+[advisories]
+unmaintained = "workspace"
+
+[bans]
+multiple-versions = "allow"
+deny = [
+    { crate = "sysinfo", reason = "process listing lives in ol-platform-win and opens no foreign process" },
+    { crate = "heim", reason = "process listing lives in ol-platform-win and opens no foreign process" },
+    { crate = "wmi", reason = "no WMI, for the Riot rules" },
+    { crate = "tasklist", reason = "process listing lives in ol-platform-win and opens no foreign process" },
+    { crate = "winreg", wrappers = ["embed-resource"], reason = "registry access lives in ol-platform-win; gpui-pre's build script finds the Windows SDK through embed-resource" },
+    { crate = "tokio", reason = "the backend runs on its own single-threaded executor" },
+    { crate = "reqwest", reason = "HTTP goes through ol-net on ureq" },
+    { crate = "openssl", reason = "TLS is rustls" },
+    { crate = "native-tls", reason = "TLS is rustls" },
+    { crate = "chrono", wrappers = ["gpui-base", "gpui-pre", "gpui-pre-scheduler"], reason = "dates are the time crate; GPUI brings its own chrono" },
+    { crate = "fancy-regex", reason = "regexes stay linear time" },
+    { crate = "serde_yaml", reason = "the byte-preserving port in ol-formats replaces it" },
+    { crate = "serde_yml", reason = "the byte-preserving port in ol-formats replaces it" },
+    { crate = "keyvalues-parser", reason = "the byte-preserving port in ol-formats replaces it" },
+    { crate = "rust-ini", reason = "the byte-preserving port in ol-formats replaces it" },
+    { crate = "ini", reason = "the byte-preserving port in ol-formats replaces it" },
+    { crate = "configparser", reason = "the byte-preserving port in ol-formats replaces it" },
+    { crate = "serde_ini", reason = "the byte-preserving port in ol-formats replaces it" },
+    { crate = "prost", reason = "the product.db decoder in ol-formats replaces it" },
+    { crate = "arboard", reason = "the clipboard is implemented in ol-platform-win" },
+    { crate = "clipboard-win", reason = "the clipboard is implemented in ol-platform-win" },
+    { crate = "keyring", reason = "secrets live in the vault" },
+    { crate = "windows-dpapi", reason = "DPAPI is called from ol-platform-win" },
+    { crate = "single-instance", reason = "single instance is implemented in ol-platform-win" },
+    { crate = "auto-launch", reason = "the login item is implemented in ol-platform-win" },
+    { crate = "rfd", reason = "file dialogs come from GPUI" },
+    { crate = "self_update", reason = "updates keep the existing installer contract" },
+    { crate = "velopack", reason = "updates keep the existing installer contract" },
+    { crate = "cargo-packager-updater", reason = "updates keep the existing installer contract" },
+    { crate = "gpui", reason = "GPUI is gpui-pre; mixing lineages breaks traits" },
+]
+
+[licenses]
+allow = [
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "Unicode-3.0",
+    "Zlib",
+]
+
+[licenses.private]
+ignore = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

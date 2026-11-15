@@ -1,0 +1,21 @@
+[package]
+name = "ol-replay"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ol-api.workspace = true
+ol-model.workspace = true
+ol-platform-api.workspace = true
+ol-platform-fake.workspace = true
+ol-runtime.workspace = true
+ol-sim.workspace = true
+ol-testkit.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
