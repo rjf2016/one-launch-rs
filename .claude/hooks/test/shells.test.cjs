@@ -290,6 +290,79 @@ const POWERSHELL = [
   '[ordered]@{ a = Seen-A }',
   '[pscustomobject]@{ a = Seen-A }',
   'New-Object X -Property @{ a = Seen-A }',
+  'Seen-A{}',
+  'Seen-A{ 1 }{ 2 }',
+  'Seen-A(1)',
+  'Seen-A(1){2}',
+  '& Seen-A(1)',
+  'Get-X | Seen-A{}',
+  'if(1){} Seen-A',
+  'if(1){}Seen-A',
+  'if(1){}else{} Seen-A',
+  'if(1){} elseif(2){} Seen-A',
+  'while(0){} Seen-A',
+  ':l while(0){} Seen-A',
+  'foreach($i in 1){} Seen-A',
+  'for(;;){break} Seen-A',
+  'do{}while(0) Seen-A',
+  'do{}while(0)Seen-A',
+  'do{}until(1) Seen-A',
+  'switch(1){1{}} Seen-A',
+  'try{}catch{} Seen-A',
+  'try{}finally{} Seen-A',
+  'try{}catch [System.Exception] {} Seen-A',
+  'function f{} Seen-A',
+  'function f($a){}Seen-A',
+  'filter f{} Seen-A',
+  'class C{} Seen-A',
+  'enum E{a} Seen-A',
+  'trap{} Seen-A',
+  'trap [System.Exception] {} Seen-A',
+  'data{} Seen-A',
+  'param($x) Seen-A',
+  'param ($x) Seen-A',
+  'param()Seen-A',
+  'param(\n$x\n) Seen-A',
+  '[CmdletBinding()]param($x) Seen-A',
+  '[CmdletBinding()]\nparam($x) Seen-A',
+  'PARAM ($x) Seen-A',
+  '& { param($x) Seen-A }',
+  'exit Seen-A',
+  'exit $x = Seen-A',
+  'return $x = Seen-A',
+  '$x = if(1){2} Seen-A',
+  '$x = switch(1){1{2}} Seen-A',
+  'if(1){} $y = Seen-A',
+  'param($x) $y = Seen-A',
+  'param($x) [int]$y = Seen-A',
+  'if(1){}else{} $y += Seen-A',
+  'param($x) if(1){} $y = Seen-A',
+  'if(1){} . Seen-A',
+  'if(1){} & Seen-A',
+  'Get-X (1) Hidden-A',
+  'Get-X {} -a Hidden-A',
+  'param($p) "Hidden-A"',
+  'if(1){ "Hidden-A" } Seen-A',
+  'Write-Output exit Hidden-A',
+  'Seen-A""',
+  "Seen-A''",
+  '& "Seen-A"-a',
+  '& "Seen-A"/v',
+  "& 'Seen-A'x",
+  '& "Seen-A"(1)',
+  '& "Seen-A"{}',
+  '. "Seen-A"-a',
+  '."Seen-A"-a',
+  '"a".b = Seen-A',
+  "'a'.b = Seen-A",
+  '@($x)[0]=Seen-A',
+  '@{}.b=Seen-A',
+  '{}.b = Seen-A',
+  '(1).b = Seen-A',
+  '& `\nSeen-A',
+  'Get-X "a`nHidden-A"',
+  'Get-X a`;Hidden-A',
+  '"Hidden-A"',
 ];
 
 const BASH = [
@@ -479,6 +552,9 @@ const BASH = [
   'bash -c "echo SEEN-A"',
   "eval 'echo SEEN-A'",
   'echo a | { cat > /dev/null; echo SEEN-A; }',
+  'cat <<<x\necho SEEN-A',
+  'cat <<< "x"\necho SEEN-A',
+  'cat <<<x true\necho SEEN-A\nx',
 ];
 
 test('every command the real PowerShell parser finds in a text is one the hook refuses when it is a refused command', { skip: !pwsh }, () => {
@@ -506,7 +582,7 @@ test('every command the real PowerShell parser finds in a text is one the hook r
     }
   }
   assert.deepEqual(missed, []);
-  assert.deepEqual([ran, quiet], [237, 13], 'texts where PowerShell runs a marked command, and texts where it leaves one alone');
+  assert.deepEqual([ran, quiet], [303, 21],'texts where PowerShell runs a marked command, and texts where it leaves one alone');
 });
 
 test('every command bash really runs in a text is one the hook refuses when it is a refused command', { skip: !bashWorks }, () => {
@@ -526,5 +602,5 @@ test('every command bash really runs in a text is one the hook refuses when it i
     }
   }
   assert.deepEqual(missed, []);
-  assert.deepEqual([ran, quiet], [181, 6], 'texts where bash runs a marked command, and texts where it leaves one alone');
+  assert.deepEqual([ran, quiet], [184, 6], 'texts where bash runs a marked command, and texts where it leaves one alone');
 });

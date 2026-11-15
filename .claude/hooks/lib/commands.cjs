@@ -8,7 +8,7 @@ const { lex, MARK, LEADING } = require('./shell.cjs');
 const set = (names) => new Set(names.split(' '));
 
 const PROCESS = set(
-  'tasklist taskkill tskill wmic qprocess pslist pskill pssuspend get-process gps ps stop-process spps kill wait-process debug-process pkill pgrep killall pidof top htop gcim gwmi iwmi icim rwmi swmi rcim scim ncim',
+  'tasklist taskkill tskill wmic qprocess pslist pskill pssuspend get-process gps ps stop-process spps kill wait-process debug-process pkill pgrep killall pidof top htop gcim gwmi iwmi icim rwmi swmi rcim scim ncim taskmgr tlist procexp procexp64 procdump procdump64 handle handle64 listdlls ciminstance wmiobject cimclass cimassociatedinstance cimsession',
 );
 const CIM = /^(get|set|new|remove|invoke|register)-(cim|wmi)/;
 const LAUNCHERS = new Set([
@@ -32,6 +32,7 @@ const LAUNCHERS = new Set([
   '2xko',
   '2xko-win64-shipping',
   'vgc',
+  'vgk',
   'vgtray',
 ]);
 const PROTOCOLS = /^(steam|com\.epicgames\.launcher|battlenet|riotclient):/i;
@@ -54,6 +55,9 @@ const GIT_FLAGS = set(
 const GIT_VALUES = set('--namespace --super-prefix --attr-source --list-cmds');
 const CARGO_FLAGS = set('--locked --offline --frozen -q --quiet -v -vv --verbose -V --version --list -h --help');
 const CARGO_VALUES = set('--config -C -Z --color --explain');
+const CARGO_SETTINGS = /^(net\.[\w-]+|term\.[\w-]+|build\.(jobs|incremental)|profile\.[\w.-]+)$/;
+const GIT_SETTINGS =
+  /^(user\.(name|email)|(commit|tag)\.gpgsign|init\.defaultbranch|core\.(autocrlf|quotepath|longpaths|symlinks|filemode|ignorecase|abbrev|safecrlf|eol)|color\.[\w.]+|advice\.\w+|safe\.directory|gc\.auto|pull\.(rebase|ff)|merge\.ff|diff\.(renames|renamelimit)|log\.\w+|status\.\w+|column\.\w+)$/;
 const GITHUB_HOST = /github(usercontent)?\.com|ghcr\.io/i;
 const HTTP_TOOLS = set('curl wget http https invoke-restmethod irm invoke-webrequest iwr start-bitstransfer bitsadmin certutil aria2c');
 const SSH_TOOLS = set('ssh scp sftp plink pscp psftp');
@@ -62,7 +66,7 @@ const SHELLS = set('bash sh zsh dash ash ksh');
 const POWERSHELLS = set('pwsh powershell pwsh-preview');
 const POWERSHELL_VALUES = set('executionpolicy ex ep workingdirectory wd windowstyle w configurationname config settingsfile settings custompipename inputformat if outputformat of o psconsolefile');
 const WRAPPERS = set(
-  'env command builtin exec nohup nice time timeout stdbuf setsid winpty xargs watch sudo doas runas start start-process saps explorer rundll32 invoke-item ii cygstart conhost wt psexec schtasks forfiles call wsl busybox rustup set-alias new-alias sal nal parallel start-job sajb start-threadjob invoke-command icm',
+  'env command builtin exec nohup nice time timeout stdbuf setsid winpty xargs watch sudo doas runas start start-process saps explorer rundll32 invoke-item ii cygstart conhost wt psexec schtasks forfiles call wsl busybox rustup set-alias new-alias sal nal parallel start-job sajb start-threadjob invoke-command icm script sc net net1 get-service gsv start-service sasv stop-service spsv restart-service suspend-service resume-service set-service new-service remove-service service',
 );
 const COMMIT_PLAIN = set(
   '--amend --no-edit --edit --quiet --verbose --signoff --no-signoff --allow-empty --allow-empty-message --reset-author --gpg-sign --no-gpg-sign --dry-run --short --branch --porcelain --long --null --status --no-status --no-post-rewrite',
@@ -104,7 +108,7 @@ function identify(text) {
 
 function computed(word) {
   const leaf = word.text.replace(/\\/g, '/').split('/').pop();
-  if (leaf.includes(MARK) || leaf.length > NAME_LIMIT) return true;
+  if (leaf.includes(MARK) || leaf.length > NAME_LIMIT || /[\0-\x1f]/.test(leaf)) return true;
   return leaf.length > 1 && !/^\[+$/.test(leaf) && /[*?]|\[.+\]|\{.*,.*\}/.test(leaf);
 }
 
@@ -129,16 +133,20 @@ function head(words, dialect, mode, state) {
     if (first.op || (first.text === '.' && !first.quoted && !first.block && rest.length > 1)) {
       rest = rest.slice(1);
       if (!rest.length || (rest[0].block && !rest[0].text)) return null;
+      const called = rest[0];
+      if (called.string && called.cut < called.text.length) {
+        rest = [{ ...called, text: called.text.slice(0, called.cut) }, { ...called, text: called.text.slice(called.cut), string: false }, ...rest.slice(1)];
+      }
       if (computed(rest[0])) throw new Refusal('unreadable', 'the command after the call operator is computed at run time');
       return rest;
     }
     const text = first.text;
-    const expression = first.quoted || first.block || /^[$[@!+-]/.test(text) || text.startsWith(MARK) || /^\d+(\.\d+)?$/.test(text);
+    const expression = first.string || first.block || /^[$[@!+,-]/.test(text) || text.startsWith(MARK) || /^\d+(\.\d+)?$/.test(text);
     const assign = rest.findIndex((word, k) => k > 0 && (word.assign || (expression && !word.quoted && word.text.toLowerCase() === 'in')));
     if (expression || assign === 1) {
       return assign < 0 || assign + 1 >= rest.length ? null : head(rest.slice(assign + 1), dialect, mode, state);
     }
-    if (/^(return|throw)$/i.test(text)) return rest.length > 1 ? head(rest.slice(1), dialect, mode, state) : null;
+    if (/^(return|throw|exit)$/i.test(text)) return rest.length > 1 ? head(rest.slice(1), dialect, mode, state) : null;
   }
   if (dialect !== 'powershell') {
     for (;;) {
@@ -173,12 +181,13 @@ function scoped(state, run) {
 
 function walk(text, dialect, state, depth) {
   if (depth > DEPTH) throw new Refusal('unreadable', 'commands are nested too deep for the hook to read');
-  for (const { words, level, piped } of lex(text, dialect)) {
+  for (const { words, level, piped, splits } of lex(text, dialect)) {
     if (dialect === 'powershell' && words.some((word) => word.text === '--%' && !word.quoted)) {
       throw new Refusal('unreadable', 'the stop-parsing token --% hides the rest of the line from the hook');
     }
     const moved = command(words, dialect, state, depth, 'normal', level === 0 && !piped);
     if (dialect === 'cmd') for (let k = 1; k < words.length; k++) command(words.slice(k), dialect, state, depth, 'suffix', false);
+    for (const k of splits) if (k < words.length) command(words.slice(k), dialect, state, depth, 'normal', false);
     if (!moved) state.before++;
   }
 }
@@ -202,9 +211,9 @@ function literal(words, what) {
 function suffixes(args, dialect, state, depth) {
   literal(args, 'a word behind a command that starts another command');
   const flat = args.flatMap((word) =>
-    /\s/.test(word.text)
+    /[\s,]/.test(word.text)
       ? word.text
-          .split(/\s+/)
+          .split(/[\s,]+/)
           .filter(Boolean)
           .map((text) => ({ ...word, text, alt: undefined }))
       : [word],
@@ -214,11 +223,12 @@ function suffixes(args, dialect, state, depth) {
 
 function denied(id, args, lower) {
   const { name, leaf, ext } = id;
-  if (PROCESS.has(name) || CIM.test(name) || (name === 'query' && lower[0] === 'process')) {
+  const getProcess = name === 'process' && !(args[0]?.block && !args[0].text);
+  if (PROCESS.has(name) || CIM.test(name) || getProcess || (name === 'query' && lower[0] === 'process')) {
     throw new Refusal('process', `${name} lists or ends processes, and no form of a process tool is allowed`);
   }
   if (LAUNCHERS.has(name)) {
-    throw new Refusal('launcher', 'this would start a launcher or a Riot game; the owner performs every real launch');
+    throw new Refusal('launcher', `${name} is a launcher, a Riot game or Vanguard; the owner starts and stops them, never an agent`);
   }
   const named = (ext || !/\.[a-z0-9]{1,5}$/.test(name)) && name !== 'install' && INSTALLER_NAME.test(name);
   if (INSTALLERS.has(name) || PACKAGES.test(leaf) || named || (PACKAGE_MANAGERS.has(name) && lower.some((arg) => PACKAGE_VERBS.has(arg)))) {
@@ -251,9 +261,11 @@ function move(args, state, sure, dialect) {
 }
 
 function config(pair) {
-  const key = pair.split('=')[0].toLowerCase();
+  const key = pair.split('=')[0].trim().toLowerCase();
   if (key === 'core.hookspath') throw new Refusal('bypass', 'core.hooksPath moves the commit hooks away');
-  if (key.startsWith('alias.')) throw new Refusal('unreadable', 'a git alias given on the command line runs what the hook cannot read');
+  if (!GIT_SETTINGS.test(key)) {
+    throw new Refusal('unreadable', 'git -c sets a key the hook does not know to be harmless: an alias, a pager, an editor or a helper is a program git then runs');
+  }
 }
 
 function reaches(sub, texts) {
@@ -365,6 +377,13 @@ function git(args, state, wrapper, dialect) {
   if (texts.some((text) => text.length >= 9 && '--no-verify'.startsWith(text))) throw new Refusal('bypass', '--no-verify skips the hooks');
   if (sub === 'config' && texts.some((text) => /core\.hookspath/i.test(text))) throw new Refusal('bypass', 'core.hooksPath moves the commit hooks away');
   if (sub.startsWith('credential')) throw new Refusal('key', `git ${sub} hands out a stored login or the app's token`);
+  const programs =
+    texts.some((text) => /^--(upload-pack|receive-pack|exec|extcmd)(=|$)/.test(text)) ||
+    ((sub === 'rebase' || sub === 'difftool') && texts.includes('-x')) ||
+    (sub === 'bisect' && texts[0] === 'run') ||
+    (sub === 'submodule' && texts.includes('foreach')) ||
+    sub === 'filter-branch';
+  if (programs) throw new Refusal('unreadable', `git ${sub} is told to run a program of its own here, which the hook cannot read`);
   if (sub === 'push') push(texts, cwd, state, wrapper);
   if (!wrapper && reaches(sub, texts)) {
     throw new Refusal('github', `plain git ${sub} acts with the owner's login; use scripts/agent/git.ps1 ${sub}`);
@@ -396,10 +415,21 @@ function gh(args, wrapper) {
     throw wrapper ? new Refusal('key', 'gh auth through the wrapper would show or store the app\'s token') : new Refusal('github', 'gh auth works on the owner\'s login');
   }
   if (!wrapper) throw new Refusal('github', 'plain gh acts with the owner\'s login, reads included; use scripts/agent/gh.ps1');
+  if (/^(alias|extension|ext|config)$/.test(group ?? '')) {
+    throw new Refusal('unreadable', `gh ${group} can make gh run a program the hook cannot read`);
+  }
 }
 
 function cargo(args) {
   const texts = args.map((arg) => arg.text);
+  const cargoArgs = texts.includes('--') ? texts.slice(0, texts.indexOf('--')) : texts;
+  for (const [at, text] of cargoArgs.entries()) {
+    if (text !== '--config' && !text.startsWith('--config=')) continue;
+    const pair = text === '--config' ? (cargoArgs[at + 1] ?? '') : text.slice(9);
+    if (!CARGO_SETTINGS.test(pair.split('=')[0].trim().toLowerCase())) {
+      throw new Refusal('unreadable', 'cargo --config sets a key the hook does not know to be harmless: an alias, a runner or a wrapper is a program cargo then runs');
+    }
+  }
   let k = 0;
   for (; k < texts.length; k++) {
     const text = texts[k];
@@ -554,7 +584,7 @@ function command(all, dialect, state, depth, mode, sure) {
     const given = args.filter((arg) => arg.quoted || !arg.text.startsWith('-'));
     if (given.length !== 1 || given[0].dynamic || given[0].block) throw new Refusal('unreadable', 'Invoke-Expression runs text the hook cannot read');
     walk(given[0].text, 'powershell', state, depth + 1);
-  } else if (name === 'eval' || name === 'trap') {
+  } else if (name === 'eval' || (name === 'trap' && dialect !== 'powershell')) {
     const given = name === 'trap' ? args.filter((arg) => arg.quoted || !arg.text.startsWith('-')).slice(0, 1) : args;
     literal(given, `the text ${name} runs`);
     walk(given.map((arg) => arg.text).join(' '), 'bash', state, depth + 1);

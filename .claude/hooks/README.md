@@ -51,7 +51,7 @@ node --test ".claude/hooks/test/*.test.cjs"
 node .claude/hooks/bench.cjs
 ```
 
-The first runs every command of the two tables in `plan/tickets/M1-F6a.md` in each spelling `test/commands.test.cjs` lists, the path rules, the scan, and each hook through the exact command line of `settings.json`. `test/shells.test.cjs` holds some four hundred awkward texts: it asks the real PowerShell parser which commands each one holds, runs the bash ones (they only `echo`), and fails when a command the shell would run is one the hook does not see. The tests need `git`; `pwsh` and Git Bash for that comparison, which is skipped without them; `cargo` and `rustfmt` for the last two wiring tests. The second command times 50 runs of each kind of PreToolUse call and fails when a median reaches 100 ms. No CI job runs either yet.
+The first runs every command of the two tables in `plan/tickets/M1-F6a.md` in each spelling `test/commands.test.cjs` lists, the path rules, the scan, and each hook through the exact command line of `settings.json`. `test/shells.test.cjs` holds some five hundred awkward texts: it asks the real PowerShell parser which commands each one holds, runs the bash ones (they only `echo`), and fails when a command the shell would run is one the hook does not see. The tests need `git`; `pwsh` and Git Bash for that comparison, which is skipped without them; `cargo` and `rustfmt` for the last two wiring tests. The second command times 50 runs of each kind of PreToolUse call and fails when a median reaches 100 ms. No CI job runs either yet.
 
 ## Refused because it cannot be read
 
@@ -63,9 +63,11 @@ A command the hook cannot follow is refused, not let through:
 - `Invoke-Expression` or `eval` on anything but one plain string, an encoded PowerShell command, `--%`, and a shell that takes its commands from standard input;
 - a `${...}` with a quote or another expansion inside, and `<<` inside `(( ))`: each can be read two ways;
 - an option before a `git` or `cargo` command that the hook does not know;
+- a setting on the command line that can name a program: `git -c <key>=...` and `cargo --config <key>=...` pass only for the keys listed in `lib/commands.cjs` (`GIT_SETTINGS`, `CARGO_SETTINGS`), so `-c alias.x=...`, `-c core.pager=...` and `--config target.x.runner=...` are refused;
+- a git command that is told to run a program of its own: `--upload-pack`, `--receive-pack`, `--exec`, `--extcmd`, `rebase -x`, `difftool -x`, `bisect run`, `submodule foreach`, `filter-branch`; and `gh alias`, `gh extension` and `gh config` through the wrapper;
 - shells nested more than eight deep, brackets nested more than two hundred deep, and more than four thousand commands in one call.
 
-Three rules refuse more than they must, on purpose. A call that names a registry key and also runs a command that could write one (`Remove-Item`, `New-Item`, `cp` and the like) is refused whole. So is any call that names the real data folder, the key folder or a `.pem` file, even inside a message. And behind a command that starts another one (`env`, `xargs`, `timeout`, `Start-Process`, `cmd /c` and the like) every later word is read as if it could be the command, so `xargs grep kill` is refused.
+Four rules refuse more than they must, on purpose. A call that names a registry key and also runs a command that could write one (`Remove-Item`, `New-Item`, `cp` and the like) is refused whole. So is any call that names the real data folder, the key folder or a `.pem` file, even inside a message. Behind a command that starts another one (`env`, `xargs`, `timeout`, `Start-Process`, `cmd /c`, the service tools `sc`, `net` and `Stop-Service`, and the like) every later word is read as if it could be the command, so `xargs grep kill` is refused. And in PowerShell a new statement may follow a `}`, a `param(...)` or the `while (...)` of a `do` loop with nothing in between (`if ($x) { } tasklist` runs `tasklist`), so the words after each of those are also read as a command of their own: `Write-Output { } tasklist` is refused although `tasklist` is only a word there, and a `Set-Location` in that place makes the folder unknown.
 
 ## Not covered
 
@@ -77,6 +79,8 @@ The hook reads text. It does not see:
 - an argument that is computed at run time, such as a branch or a URL held in a variable;
 - text that reaches a command through a pipe (`echo ... | xargs -I{} sh -c {}`), and in cmd a command taken from a `for` variable;
 - aliases and settings kept in files: a git alias, a cargo alias (`cargo xtask` is one), `push.followTags`, an ssh host alias, a PowerShell profile;
+- a program named by an environment variable that another program reads: `GIT_PAGER`, `GIT_EDITOR`, `GIT_SSH_COMMAND`, `GIT_CONFIG_*`, `PAGER`, `RUSTC_WRAPPER`, `CARGO_TARGET_*_RUNNER`, `CARGO_ALIAS_*`. Only a commit is refused when a `GIT_*` variable is set in its call;
+- processes read without a process tool: `/proc` in Git Bash, a debugger, a performance counter;
 - the real data folder reached without naming it: a relative path after a `cd`, a wildcard, an 8.3 short name;
 - a renamed installer or launcher, a shortcut, or a program started by a path with no extension behind `Start-Process` and the like;
 - a `--data-dir` value that is not a scratch folder, apart from the real data folder by name;
