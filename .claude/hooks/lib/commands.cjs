@@ -49,6 +49,9 @@ const REGISTRY_WRITERS = set(
 );
 const REGISTRY_PATH = /(^|[^a-z0-9])hk(cu|lm|cr|u|cc):|registry::/;
 const MOVES = set('cd chdir pushd popd set-location sl push-location pop-location');
+const CHANGERS = { bash: set('cd pushd'), powershell: set('cd chdir sl set-location pushd push-location'), cmd: set('cd chdir pushd') };
+const REDEFINES =
+  /\b(function|filter)\s+(\w+:)?(cd|chdir|pushd|sl|set-location|push-location)\b|\b(cd|pushd)\s*\(\s*\)|\b(alias|sal|nal)\b[^;|&\n]*\b(cd|chdir|pushd|sl|set-location|push-location)\b|function:\/?(cd|chdir|pushd|sl|set-location|push-location)\b|\bcdpath\b/;
 const GIT_NETWORK = set('push fetch pull clone ls-remote send-pack fetch-pack http-fetch http-push request-pull svn lfs send-email imap-send');
 const GIT_FLAGS = set(
   '--version -v --help -h --html-path --man-path --info-path -p --paginate -P --no-pager --no-replace-objects --bare --literal-pathspecs --glob-pathspecs --noglob-pathspecs --icase-pathspecs --no-optional-locks --no-lazy-fetch --no-advice --exec-path',
@@ -209,7 +212,8 @@ function walk(text, dialect, state, depth) {
   let commit = null;
   let moves = false;
   let shaky = false;
-  for (const { words, level, piped, splits, wrote, joined, background } of lex(text, dialect)) {
+  for (const { words, level, piped, splits, wrote, joined, background, redirected, grouped } of lex(text, dialect)) {
+    const plain = level === 0 && !piped && !background && !redirected && !grouped;
     if (dialect === 'powershell' && words.some((word) => word.text === '--%' && !word.quoted)) {
       throw new Refusal('unreadable', 'the stop-parsing token --% hides the rest of the line from the hook');
     }
@@ -219,10 +223,11 @@ function walk(text, dialect, state, depth) {
       moves = false;
       shaky = false;
     }
-    const leaves = level === 0 && joined === 'or' && moves && words[0].text === 'exit';
+    const exits = (dialect === 'powershell' ? words[0].text.toLowerCase() : words[0].text) === 'exit' && (words.length === 1 || (words.length === 2 && /^\d+$/.test(words[1].text)));
+    const leaves = plain && joined === 'or' && moves && exits;
     if (level === 0 && joined === 'or' && moves && !leaves) state.cwd = null;
     const commits = state.commits;
-    const moved = command(words, dialect, state, depth, 'normal', level === 0 && !piped && !background && joined !== 'or');
+    const moved = command(words, dialect, state, depth, 'normal', plain && joined !== 'or');
     if (moved) {
       moves = true;
       shaky ||= joined === 'and';
@@ -315,15 +320,43 @@ function folder(target) {
   }
 }
 
+function destination(name, args, dialect) {
+  let rest = args;
+  let literal = dialect !== 'powershell';
+  if (dialect === 'powershell') {
+    const option = rest.length === 2 && !rest[0].quoted ? rest[0].text.toLowerCase() : '';
+    if (option === '-path' || option === '-literalpath') rest = rest.slice(1);
+    literal = option === '-literalpath';
+  } else if (dialect === 'cmd') {
+    if (name !== 'pushd' && rest.length === 2 && /^\/d$/i.test(rest[0].text)) rest = rest.slice(1);
+  } else if (name === 'cd') {
+    while (rest.length > 1 && !rest[0].quoted && /^(--|-P|-L)$/.test(rest[0].text)) {
+      const last = rest[0].text === '--';
+      rest = rest.slice(1);
+      if (last) break;
+    }
+  }
+  const [word] = rest;
+  if (rest.length !== 1 || word.block || (!word.quoted && /^[-+]/.test(word.text))) return null;
+  return literal || !/[*?[\]]/.test(word.text) ? word : null;
+}
+
 function move(name, args, state, sure, dialect) {
-  const target = args.find((arg) => arg.quoted || !(arg.text.startsWith('-') || /^\/d$/i.test(arg.text)));
-  const drive = (text) => /^[A-Za-z]:/.exec(text ?? '')?.[0].toLowerCase();
-  const stays = dialect === 'cmd' && /^(cd|chdir)$/.test(name) && !args.some((arg) => /^\/d$/i.test(arg.text)) && drive(target?.text) && drive(target.text) !== drive(state.cwd);
-  if (target && REGISTRY_PATH.test(target.text.toLowerCase())) {
+  const named = args.find((arg) => arg.quoted || !(arg.text.startsWith('-') || /^\/d$/i.test(arg.text)));
+  if (named && REGISTRY_PATH.test(named.text.toLowerCase())) {
     throw new Refusal('registry', 'a registry key as the working location hides which key a later command writes; name the key in full on a read');
   }
-  state.cwd = sure && !stays ? folder(into(state.cwd, target, dialect)) : null;
+  const target = sure && !state.redefined ? destination(name, args, dialect) : null;
+  const drive = (text) => /^[A-Za-z]:/.exec(text ?? '')?.[0].toLowerCase();
+  const stays = dialect === 'cmd' && name !== 'pushd' && args.length === 1 && drive(target?.text) && drive(target.text) !== drive(state.cwd);
+  state.cwd = target && !stays ? folder(into(state.cwd, target, dialect)) : null;
   return true;
+}
+
+function unknownIfMoved(state, run) {
+  const before = state.cwd;
+  run();
+  if (state.cwd !== before) state.cwd = null;
 }
 
 function config(pair) {
@@ -717,7 +750,11 @@ function command(all, dialect, state, depth, mode, sure) {
   if (name === 'new-psdrive' && lower.some((text) => /registry|^hk(cu|lm|cr|u|cc)|^hkey_/.test(text))) {
     throw new Refusal('registry', 'a new drive on the registry hides which key a later command writes');
   }
-  if (MOVES.has(name)) return move(name, args, state, sure, dialect);
+  const typed = dialect === 'bash' ? first.text : first.text.toLowerCase();
+  if (MOVES.has(name)) return move(name, args, state, sure && words === all && typed === name && CHANGERS[dialect].has(name), dialect);
+  if (dialect === 'bash' && (typed === 'command' || typed === 'builtin') && CHANGERS.bash.has(texts[0])) {
+    return move(texts[0], args.slice(1), state, sure && words === all, dialect);
+  }
   if (name === 'git') git(args, state, false, dialect);
   else if (name === 'gh') gh(args, false);
   else if (name === 'cargo') cargo(args);
@@ -729,13 +766,13 @@ function command(all, dialect, state, depth, mode, sure) {
   else if (name === 'invoke-expression' || name === 'iex') {
     const given = args.filter((arg) => arg.quoted || !arg.text.startsWith('-'));
     if (given.length !== 1 || given[0].dynamic || given[0].block) throw new Refusal('unreadable', 'Invoke-Expression runs text the hook cannot read');
-    walk(given[0].text, 'powershell', state, depth + 1);
+    unknownIfMoved(state, () => walk(given[0].text, 'powershell', state, depth + 1));
   } else if (name === 'eval' || (name === 'trap' && dialect !== 'powershell')) {
     const given = name === 'trap' ? args.filter((arg) => arg.quoted || !arg.text.startsWith('-')).slice(0, 1) : args;
     literal(given, `the text ${name} runs`);
-    walk(given.map((arg) => arg.text).join(' '), 'bash', state, depth + 1);
+    unknownIfMoved(state, () => walk(given.map((arg) => arg.text).join(' '), 'bash', state, depth + 1));
   } else if (name === 'alias' && dialect !== 'powershell') {
-    for (const text of texts) if (text.includes('=')) walk(text.slice(text.indexOf('=') + 1), 'bash', state, depth + 1);
+    for (const text of texts) if (text.includes('=')) unknownIfMoved(state, () => walk(text.slice(text.indexOf('=') + 1), 'bash', state, depth + 1));
   } else if (name === 'find') {
     for (const [at, arg] of args.entries()) {
       if (!/^-(exec|execdir|ok|okdir)$/.test(arg.text)) continue;
@@ -760,10 +797,11 @@ function named(text, what) {
 function judge({ tool, command: text, cwd, io }) {
   if (tool !== 'Bash' && tool !== 'PowerShell') throw new Error(`no rules for the tool ${tool}`);
   if (typeof text !== 'string') throw new Error('the call holds no command text');
-  const state = { cwd: cwd ? path.resolve(cwd) : null, before: 0, count: 0, commits: 0, behind: null, registry: false, gitEnv: false, io };
+  const state = { cwd: cwd ? path.resolve(cwd) : null, before: 0, count: 0, commits: 0, behind: null, registry: false, gitEnv: false, redefined: false, io };
   try {
     const flat = flatten(text);
     named(text, 'command');
+    state.redefined = REDEFINES.test(flat[0]);
     walk(text, tool === 'PowerShell' ? 'powershell' : 'bash', state, 0);
     if (flat.some((reading) => TOKEN_SHOWN.test(reading))) {
       throw new Refusal('key', 'the command names GIT_TRACE_REDACT or a GIT_CONFIG variable, which can make git print the app\'s token or hand it to another helper');

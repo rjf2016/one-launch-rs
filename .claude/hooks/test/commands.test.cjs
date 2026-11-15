@@ -820,6 +820,7 @@ const MORE_REFUSED = [
   ['bypass', 'Bash', 'git config --file .git/config core.hooksPath x'],
   ['process', 'Bash', 'command tasklist'],
   ['process', 'Bash', 'command -p tasklist'],
+  ['secrets', 'Bash', 'cd crates 2>&1 && git commit -m x'],
   ['unreadable', 'PowerShell', 'target\\debug\\OneLaunch.exe \u2013\u2013data-dir=C:\\scratch\\x'],
   ['unreadable', 'PowerShell', './target/debug/OneLaunch.exe \u2013-data-dir=C:/scratch/x'],
   ['app', 'PowerShell', './target/debug/OneLaunch.exe -\u2013data-dir=C:/scratch/x'],
@@ -992,7 +993,7 @@ const MORE_ALLOWED = [
   ['Bash', 'find "$dir" -name "*.rs" -exec grep -l foo {} +'],
   ['Bash', "bash -c 'echo $HOME'"],
   ['Bash', 'timeout 60 cargo test > "$log" 2>&1'],
-  ['Bash', 'cd crates 2>&1 && git commit -m x'],
+  ['Bash', 'cd crates && git commit -m x 2>&1'],
   ['PowerShell', "pwsh -NoProfile -Command 'Get-Content $path'"],
   ['PowerShell', 'Start-Process notepad notes.txt *> $null'],
   ['PowerShell', 'cmd /c "echo 100%"'],
@@ -1345,6 +1346,7 @@ test('a change of folder counts only when it is sure to have happened: the folde
     ['Bash', `cmd //c "cd ${crates} && git commit -m x"`, crates],
     ['Bash', `cd /${ROOT[0].toLowerCase()}${ROOT.slice(2).replace(/\\/g, '/')}/crates && git commit -m x`, crates],
     ['Bash', `cd /${ROOT[0].toLowerCase()} && git commit -m x`, `${ROOT.slice(0, 2)}\\`],
+    ...(fs.existsSync(`${elsewhere}:\\`) ? [['Bash', `cmd //c "cd /d ${elsewhere}:\\ && git commit -m x"`, `${elsewhere}:\\`]] : []),
   ];
   for (const [tool, command, folder] of kept) {
     seen.length = 0;
@@ -1353,6 +1355,133 @@ test('a change of folder counts only when it is sure to have happened: the folde
   }
   assert.equal(verdict('PowerShell', `Set-Location "${crates}"; pwsh -NoProfile -File "${wrapper}" push origin m1/x`), 'allow');
   assert.equal(verdict('Bash', `cd "${crates}" && pwsh -NoProfile -File "${wrapper}" push origin m1/x`), 'allow');
+});
+
+test('a folder change is trusted only in the few forms that cannot fail or happen somewhere else', () => {
+  const crates = path.join(ROOT, 'crates');
+  const wrapper = path.join(ROOT, 'scripts', 'agent', 'git.ps1');
+  const odd = fs.mkdtempSync(path.join(os.tmpdir(), 'ol-hook-'));
+  fs.mkdirSync(path.join(odd, 'x[1]'));
+  const seen = [];
+  const recording = { ...io, commit: (folder) => (seen.push(folder), []) };
+  const push = `pwsh -NoProfile -File "${wrapper}" push origin m1/x`;
+  const changes = [
+    ['Bash', `cd "${crates}" || exit 1 &`],
+    ['Bash', `cd "${crates}" || exit &`],
+    ['Bash', `cd "${crates}" || exit 1 &\n`],
+    ['Bash', `cd "${crates}" && true &`],
+    ['Bash', `cd "${crates}" && echo x &`],
+    ['Bash', `{ cd "${crates}"; } &`],
+    ['Bash', `{ cd "${crates}"; };`],
+    ['Bash', `if true; then cd "${crates}"; fi &`],
+    ['Bash', `if true; then\ncd "${crates}"\nfi &\n`],
+    ['Bash', `if true; then\ncd "${crates}"\nfi\n`],
+    ['Bash', `for d in 1; do\ncd "${crates}"\ndone &`],
+    ['Bash', `while true; do\ncd "${crates}"\nbreak\ndone\n`],
+    ['Bash', `case x in x) cd "${crates}";; esac;`],
+    ['Bash', `cd "${crates}" extra;`],
+    ['Bash', `cd -x "${crates}";`],
+    ['Bash', `cd -e "${crates}";`],
+    ['Bash', `cd "${crates}" < /nonexistent-file;`],
+    ['Bash', `cd "${crates}" > /nonexistent-dir/x;`],
+    ['Bash', `cd "${crates}" 2>/dev/null;`],
+    ['Bash', `pushd -n "${crates}";`],
+    ['Bash', `pushd -P "${crates}";`],
+    ['Bash', `cd "${crates}" || exit 1 > /nonexistent-dir/x;`],
+    ['Bash', `cd "${crates}" || exit 1 2;`],
+    ['Bash', `CDPATH=/somewhere; cd crates;`],
+    ['Bash', `chdir "${crates}";`],
+    ['Bash', `CD "${crates}";`],
+    ['Bash', `./cd "${crates}";`],
+    ['Bash', `cd.exe "${crates}";`],
+    ['Bash', `command -p cd "${crates}";`],
+    ['Bash', `env cd "${crates}";`],
+    ['Bash', `x=1 cd "${crates}";`],
+    ['Bash', `time cd "${crates}";`],
+    ['Bash', `eval 'cd "${crates}"';`],
+    ['Bash', `cd() { :; }; cd "${crates}";`],
+    ['Bash', `function cd { :; }; cd "${crates}";`],
+    ['Bash', `alias cd=true; cd "${crates}";`],
+    ['PowerShell', `Set-Location "${crates}" || exit 1 &`],
+    ['PowerShell', `Set-Location "${crates}" && Get-Date &`],
+    ['PowerShell', `Set-Location "${crates}" extra;`],
+    ['PowerShell', `Set-Location "${crates}" -Bogus;`],
+    ['PowerShell', `Set-Location "${crates}" -WhatIf;`],
+    ['PowerShell', `Set-Location -Path "${crates}" -ErrorAction Stopp;`],
+    ['PowerShell', `Set-Location -Path "${crates}" -LiteralPath "${crates}";`],
+    ['PowerShell', `Set-Location -ErrorAction SilentlyContinue "${crates}";`],
+    ['PowerShell', `Set-Location "${crates}" > C:\\no-such-dir\\x.txt;`],
+    ['PowerShell', `Set-Location "${path.join(odd, 'x[1]')}";`],
+    ['PowerShell', `Set-Location "${crates}*";`],
+    ['PowerShell', `Set-Location -Pa "${crates}";`],
+    ['PowerShell', `& Set-Location "${crates}";`],
+    ['PowerShell', `Set-Location "${crates}" | Out-Null;`],
+    ['PowerShell', `function Set-Location { }; Set-Location "${crates}";`],
+    ['PowerShell', `filter cd { }; cd "${crates}";`],
+    ['PowerShell', `Set-Alias cd Get-Date; cd "${crates}";`],
+    ['PowerShell', `Invoke-Expression 'Set-Location "${crates}"';`],
+    ['PowerShell', `if ($true) { Set-Location "${crates}" };`],
+    ['Bash', `cmd //c "pushd /d ${crates} & pwsh -NoProfile -File ${wrapper} push origin m1/x"`, true],
+    ['Bash', `cmd //c "cd ${crates} extra & pwsh -NoProfile -File ${wrapper} push origin m1/x"`, true],
+  ];
+  const open = [];
+  for (const [tool, change, whole] of changes) {
+    const command = whole ? change : `${change} ${push}`;
+    if (verdict(tool, command) !== 'tags') open.push(command);
+  }
+  assert.deepEqual(open, [], 'after each of these the folder is unknown, so the pushed name cannot be looked up');
+  for (const name of ['-', '+1']) {
+    fs.mkdirSync(path.join(odd, name));
+    assert.equal(verdict('Bash', `cd ${name}; ${push}`, odd), 'tags', `cd ${name} goes by the shell's own list of folders, not into a folder of that name`);
+  }
+  const after = [
+    ['Bash', `{ echo x; }; cd "${crates}";`],
+    ['Bash', `{ echo x; }& cd "${crates}";`],
+    ['Bash', `if true; then echo x; fi; cd "${crates}";`],
+    ['Bash', `for i in 1; do echo x; done; cd "${crates}";`],
+    ['Bash', `case x in x) echo x;; esac; cd "${crates}";`],
+    ['Bash', `echo x > /dev/null; cd "${crates}";`],
+    ['Bash', `cd "${crates}"; echo x &`],
+    ['PowerShell', `Get-Date > $null; Set-Location "${crates}";`],
+    ['PowerShell', `Set-Location "${crates}"; Get-Date &`],
+  ];
+  for (const [tool, change] of after) assert.equal(verdict(tool, `${change} ${push}`), 'allow', change);
+  for (const [tool, change] of [changes[0], changes[5], changes[13], changes[14], changes[16], changes[32], changes[34], changes[35], changes[41]]) {
+    assert.equal(verdict(tool, `${change} git commit -m x`, ROOT, recording), 'secrets', change);
+  }
+  assert.deepEqual(seen, []);
+  const trusted = [
+    ['Bash', `cd "${crates}" &&`],
+    ['Bash', `cd "${crates}";`],
+    ['Bash', `cd "${crates}"\n`],
+    ['Bash', `cd -- "${crates}";`],
+    ['Bash', `cd -P "${crates}";`],
+    ['Bash', `cd -L -P -- "${crates}";`],
+    ['Bash', `cd "${crates}" || exit 1;`],
+    ['Bash', `cd "${crates}" || exit;`],
+    ['Bash', `command cd "${crates}" &&`],
+    ['Bash', `builtin cd "${crates}";`],
+    ['Bash', `pushd "${crates}";`],
+    ['Bash', 'cd crates &&'],
+    ['Bash', `cd "${path.join(odd, 'x[1]')}";`, path.join(odd, 'x[1]')],
+    ['PowerShell', `Set-Location "${crates}";`],
+    ['PowerShell', `Set-Location -Path "${crates}";`],
+    ['PowerShell', `Set-Location -LiteralPath "${crates}";`],
+    ['PowerShell', `set-location -path "${crates}";`],
+    ['PowerShell', `sl "${crates}";`],
+    ['PowerShell', `chdir "${crates}";`],
+    ['PowerShell', `Push-Location "${crates}";`],
+    ['PowerShell', `Set-Location -LiteralPath "${path.join(odd, 'x[1]')}";`, path.join(odd, 'x[1]')],
+    ['PowerShell', 'cd crates;'],
+    ['PowerShell', `Set-Location "${crates}" || exit 1;`],
+  ];
+  for (const [tool, change, folder = crates] of trusted) {
+    seen.length = 0;
+    assert.equal(verdict(tool, `${change} git commit -m x`, ROOT, recording), 'allow', change);
+    assert.deepEqual(seen.map((each) => each.toLowerCase()), [folder.toLowerCase()], change);
+    assert.equal(verdict(tool, `${change} ${push}`), 'allow', change);
+  }
+  fs.rmSync(odd, { recursive: true, force: true });
 });
 
 test('a script named like the wrapper somewhere else is not the wrapper', () => {

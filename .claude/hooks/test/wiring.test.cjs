@@ -323,10 +323,27 @@ test('a folder change that cannot have happened does not move the scan or the ta
     ['PowerShell', `Push-Location "${missing}"; git commit -m x`],
     ['PowerShell', `cd "${missing}" || git commit -m x`],
   ];
+  const untrusted = [
+    ['Bash', `cd "${clean}" || exit 1 & git commit -m x`],
+    ['Bash', `{ cd "${clean}"; } & git commit -m x`],
+    ['Bash', `cd "${clean}" extra; git commit -m x`],
+    ['Bash', `cd -x "${clean}"; git commit -m x`],
+    ['Bash', `cd "${clean}" < /nonexistent-file; git commit -m x`],
+    ['PowerShell', `Set-Location "${clean}" || exit 1 & git commit -m x`],
+    ['PowerShell', `Set-Location "${clean}" extra; git commit -m x`],
+    ['PowerShell', `Set-Location "${clean}" -Bogus; git commit -m x`],
+    ['PowerShell', `Set-Location -Path "${clean}" -LiteralPath "${clean}"; git commit -m x`],
+    ['PowerShell', `Set-Location "${clean}" > C:\\no-such-dir\\x.txt; git commit -m x`],
+  ];
   for (const [tool, command] of commits) {
     const refused = shell(tool, command, tree);
     assert.deepEqual([refused.blocked, refused.status], [true, [2]], command);
     assert.match(refused.stderr, /name it with -C <folder>/, command);
+  }
+  for (const [tool, command] of untrusted) {
+    const refused = shell(tool, command, tree);
+    assert.deepEqual([refused.blocked, refused.status], [true, [2]], command);
+    assert.match(refused.stderr, /Rule: the secret scan before a commit/, command);
   }
   assert.equal(shell('Bash', 'git commit -m x', tree).blocked, true, 'the control: the token is staged where the call runs');
   assert.equal(shell('Bash', `cd "${clean}" && git commit -m x`, tree).blocked, false, 'a folder that is there, entered for sure');
@@ -340,6 +357,10 @@ test('a folder change that cannot have happened does not move the scan or the ta
   assert.equal(shell('PowerShell', `Set-Location "${missing}"; pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, true);
   assert.equal(shell('PowerShell', `Set-Location "${clean}" || pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, true);
   assert.equal(shell('Bash', `cd "${missing}"; pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, true);
+  assert.equal(shell('Bash', `cd "${clean}" && true & pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, true);
+  assert.equal(shell('Bash', `cd "${clean}" || exit 1 & pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, true);
+  assert.equal(shell('PowerShell', `Set-Location "${clean}" && Get-Date & pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, true);
+  assert.equal(shell('PowerShell', `Set-Location -LiteralPath "${clean}"; pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, false);
   assert.equal(shell('PowerShell', `Set-Location "${clean}"; pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, false, 'in the other checkout v9 is no tag');
   fs.rmSync(path.join(main, '.git', 'refs', 'tags', 'v9'));
 });

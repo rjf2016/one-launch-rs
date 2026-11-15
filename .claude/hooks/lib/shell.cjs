@@ -4,6 +4,8 @@ const { Refusal } = require('./rules.cjs');
 
 const MARK = '\uE000';
 const LEADING = new Set(['if', 'then', 'else', 'elif', 'while', 'until', 'do', '!', 'time', 'coproc']);
+const OPENERS = new Set(['if', 'while', 'until', 'for', 'select']);
+const CLOSERS = new Set(['fi', 'done']);
 const DEPTH = 200;
 const ENDS_STATEMENT = /^(while|until)$|(^|\])param$/i;
 const TAKES_STATEMENT = /^(return|throw|exit)$/i;
@@ -46,7 +48,11 @@ function lex(source, dialect, base = 0, body = false) {
   let wrote = false;
   let after = -1;
   let joined = '';
-  let background = false;
+  let redirected = false;
+  let braces = 0;
+  let compound = 0;
+  let list = 0;
+  let lists = 0;
   let splits = [];
   let words = [];
   let word = null;
@@ -69,7 +75,9 @@ function lex(source, dialect, base = 0, body = false) {
     else if (word.text === 'esac' && cases) {
       cases--;
       pattern = false;
-    } else return;
+    } else if (OPENERS.has(word.text) && !pattern) compound++;
+    else if (CLOSERS.has(word.text) && compound) compound--;
+    else return;
     word.counted = true;
   };
   const endWord = () => {
@@ -92,10 +100,12 @@ function lex(source, dialect, base = 0, body = false) {
   const endCommand = (pipe = false) => {
     endWord();
     if (words.length) {
-      commands.push({ words, at: words[0].at, level, piped: piped || pipe, splits, wrote, joined, background });
+      if (!joined) list = ++lists;
+      const grouped = braces > 0 || compound > 0 || cases > 0;
+      commands.push({ words, at: words[0].at, level, piped: piped || pipe, splits, wrote, joined, background: false, redirected, grouped, list });
       joined = '';
     }
-    background = false;
+    redirected = false;
     words = [];
     splits = [];
     piped = pipe;
@@ -105,7 +115,7 @@ function lex(source, dialect, base = 0, body = false) {
   };
   const nested = (closer, keyed = false, patterns = false) => {
     if (level >= DEPTH) throw new Refusal('unreadable', 'brackets are nested too deep for the hook to read');
-    const outer = [words, word, piped, cases, table, assigned, redirect, splits, pattern, wrote, joined, background];
+    const outer = [words, word, piped, cases, table, assigned, redirect, splits, pattern, wrote, joined, redirected, braces, compound, list];
     const before = commands.length;
     words = [];
     splits = [];
@@ -121,7 +131,7 @@ function lex(source, dialect, base = 0, body = false) {
     run(closer);
     endCommand();
     level--;
-    [words, word, piped, cases, table, assigned, redirect, splits, pattern, wrote, joined, background] = outer;
+    [words, word, piped, cases, table, assigned, redirect, splits, pattern, wrote, joined, redirected, braces, compound, list] = outer;
     return commands.length > before;
   };
   const escaped = () => {
@@ -447,9 +457,10 @@ function lex(source, dialect, base = 0, body = false) {
         if (!keyed) split();
         continue;
       }
-      if (bash && (c === '{' || c === '}') && !word && (next === undefined || /[\s;]/.test(next))) {
+      if (bash && (c === '{' || c === '}') && !word && (next === undefined || (c === '{' ? /\s/ : /[\s;&|)]/).test(next))) {
         i++;
         endCommand();
+        braces = Math.max(0, braces + (c === '{' ? 1 : -1));
         continue;
       }
       if (c === ';') {
@@ -478,12 +489,13 @@ function lex(source, dialect, base = 0, body = false) {
           i++;
         } else {
           i++;
-          background = !cmd;
           endCommand();
+          if (!cmd) for (const each of commands) if (each.level === level && each.list === list) each.background = true;
         }
         continue;
       }
       if (c === '<' || c === '>') {
+        redirected = true;
         const here = bash && c === '<' && next === '<';
         if (here && src[i + 2] !== '<') {
           if (math) throw new Refusal('unreadable', 'a << inside (( )) is a shift to one reading and a here-document to another');
