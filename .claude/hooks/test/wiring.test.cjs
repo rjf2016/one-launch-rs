@@ -213,6 +213,19 @@ test('a commit whose staged files hold a planted token, address or profile path 
   put(tree, 'notes/clean.md', 'nothing to see\n');
 });
 
+test('a push through the wrapper of a name that is a tag in that checkout is refused', () => {
+  const wrapper = path.join(main, 'scripts', 'agent', 'git.ps1');
+  const head = spawnSync('git', ['-C', main, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+  put(main, '.git/refs/tags/v9', `${head}\n`);
+  const tagged = shell('PowerShell', `& "${wrapper}" -C "${tree}" push origin v9`, main);
+  assert.deepEqual([tagged.blocked, tagged.status], [true, [2]]);
+  assert.match(tagged.stderr, /v9 is a tag in this checkout\.\nRule: tags and releases/);
+  assert.equal(shell('PowerShell', `& "${wrapper}" -C "${tree}" push origin HEAD:v9`, main).blocked, true);
+  assert.equal(shell('PowerShell', `& "${wrapper}" -C "${tree}" push origin tree`, main).blocked, false);
+  assert.equal(shell('PowerShell', `& "${wrapper}" -C "${tree}" push origin v8`, main).blocked, false);
+  fs.rmSync(path.join(main, '.git', 'refs', 'tags', 'v9'));
+});
+
 test('a commit outside every checkout is refused, since nothing can be scanned', () => {
   const nowhere = folder();
   const refused = shell('Bash', 'git commit -m x', nowhere);
@@ -282,6 +295,13 @@ test('a call the hook cannot read refuses: bad JSON, no input, no command, no pa
 
 test('a hook path that is not filled in refuses, and so does a failure to start under onFailure', () => {
   const hook = SETTINGS.hooks.PreToolUse[0].hooks[0];
+  const fill = (text) => text.replaceAll('${CLAUDE_PROJECT_DIR}', main);
+  for (const mode of ['nope', '', 'Shell']) {
+    const args = [...hook.args.slice(0, 3).map(fill), mode];
+    const odd = spawnSync(hook.command, args, { input: JSON.stringify({ tool_name: 'Bash', cwd: main, tool_input: { command: 'git status' } }), cwd: main, encoding: 'utf8' });
+    assert.equal(odd.status, 2, `mode ${JSON.stringify(mode)}`);
+    assert.match(odd.stderr, /unknown mode/);
+  }
   const unfilled = spawnSync(hook.command, hook.args, { input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git status' } }), cwd: main, encoding: 'utf8' });
   assert.equal(unfilled.status, 2);
   assert.match(unfilled.stderr, /could not be loaded \(MODULE_NOT_FOUND\)/);
@@ -296,14 +316,17 @@ test('after an edit a Rust file is formatted, and nothing else is touched', () =
   const text = put(tree, 'crates/a/notes.md', ugly);
   const brokenRust = put(tree, 'crates/a/src/broken.rs', 'fn main( {\n');
   const outside = put(folder(), 'a.rs', ugly);
-  for (const file of [rust, sealed, text, brokenRust, outside]) {
+  const bare = folder();
+  fs.mkdirSync(path.join(bare, '.git'));
+  const unconfigured = put(bare, 'src/a.rs', ugly);
+  for (const file of [rust, sealed, text, brokenRust, outside, unconfigured]) {
     for (const tool of ['Edit', 'Write']) {
       const run = fire('PostToolUse', tool, { cwd: main, tool_input: { file_path: file }, tool_response: {} });
       assert.deepEqual([run.ran, run.status, run.stdout, run.stderr], [1, [0], '', ''], file);
     }
   }
   assert.equal(fs.readFileSync(rust, 'utf8'), 'fn main() {\n    let x = 1;\n    println!("{}", x);\n}\n');
-  for (const file of [sealed, text, outside]) assert.equal(fs.readFileSync(file, 'utf8'), ugly, file);
+  for (const file of [sealed, text, outside, unconfigured]) assert.equal(fs.readFileSync(file, 'utf8'), ugly, file);
   assert.equal(fs.readFileSync(brokenRust, 'utf8'), 'fn main( {\n');
   assert.equal(fire('PostToolUse', 'Write', { cwd: main, tool_input: { file_path: path.join(tree, 'gone.rs') } }).status[0], 0);
 });

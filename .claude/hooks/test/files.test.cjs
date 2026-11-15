@@ -7,7 +7,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { after, test } = require('node:test');
 const { Refusal } = require('../lib/rules.cjs');
-const { judgeWrite, glob, writeScope, OWNER_APPROVED } = require('../lib/checkout.cjs');
+const { judgeWrite, glob, isWrapper, writeScope, OWNER_APPROVED } = require('../lib/checkout.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const made = [];
@@ -195,6 +195,7 @@ test('a ticket file that cannot be read refuses every write in its checkout', ()
   };
   for (const [name, content] of Object.entries(cases)) {
     const root = checkout(null);
+    put(root, 'x.md', '---\nwrite_scope: ["**"]\n---\n');
     put(root, '.claude/ticket.local.json', content);
     assert.equal(verdict(path.join(root, 'CLAUDE.md')), 'scope', name);
     assert.equal(verdict(path.join(root, 'crates', 'a.rs')), 'scope', name);
@@ -263,6 +264,37 @@ test('a worktree is its own checkout, nested inside the main one or beside it', 
   assert.equal(verdict(path.join(beside, '.github', 'workflows', 'ci.yml')), 'owner');
   assert.equal(verdict(path.join(beside, 'crates', 'a.rs')), 'allow');
   assert.equal(verdict(path.join(main, '.git', 'worktrees', 'inside', 'HEAD')), 'scope');
+});
+
+test('a wrapper is scripts/agent/<name> of the session\'s repo and nothing else', () => {
+  const main = folder();
+  git(main, 'init', '-q');
+  put(main, 'scripts/agent/gh.ps1', 'exit 0\n');
+  put(main, 'plan/tickets/gh.ps1', 'exit 0\n');
+  put(main, 'scripts/agent/deeper/gh.ps1', 'exit 0\n');
+  git(main, 'add', '-A');
+  git(main, 'commit', '-q', '-m', 'fixture');
+  const tree = `${main}-tree`;
+  made.push(tree);
+  git(main, 'worktree', 'add', '-q', '-b', 'tree', tree);
+  const other = folder();
+  git(other, 'init', '-q');
+  put(other, 'scripts/agent/gh.ps1', 'exit 0\n');
+  const plain = folder();
+  put(plain, 'scripts/agent/gh.ps1', 'exit 0\n');
+
+  const wrapper = (root, ...parts) => isWrapper(path.join(root, ...parts), 'gh.ps1', main);
+  assert.equal(wrapper(main, 'scripts', 'agent', 'gh.ps1'), true);
+  assert.equal(wrapper(tree, 'scripts', 'agent', 'gh.ps1'), true);
+  assert.equal(wrapper(main, 'SCRIPTS', 'Agent', 'GH.PS1'), true);
+  assert.equal(wrapper(main, 'scripts', 'agent', '..', 'agent', 'gh.ps1.'), true);
+  assert.equal(isWrapper(path.join(main, 'scripts', 'agent', 'gh.ps1'), 'gh.ps1', tree), true, 'seen from a worktree, the main checkout holds the wrapper too');
+  assert.equal(wrapper(main, 'plan', 'tickets', 'gh.ps1'), false);
+  assert.equal(wrapper(main, 'scripts', 'agent', 'deeper', 'gh.ps1'), false);
+  assert.equal(wrapper(main, 'scripts', 'agent', 'git.ps1'), false);
+  assert.equal(wrapper(other, 'scripts', 'agent', 'gh.ps1'), false);
+  assert.equal(wrapper(plain, 'scripts', 'agent', 'gh.ps1'), false);
+  assert.equal(isWrapper(path.join(main, 'scripts', 'agent', 'gh.ps1'), 'gh.ps1', plain), false);
 });
 
 test('a call with no usable path is refused', () => {

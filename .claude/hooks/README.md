@@ -55,9 +55,17 @@ The first runs every command of the two tables in `plan/tickets/M1-F6a.md` in ea
 
 ## Refused because it cannot be read
 
-A command the hook cannot follow is refused, not let through: a command name that is computed (`& $x`, `$(...)` or a glob in command position), `Invoke-Expression` or `eval` on anything but one plain string, an encoded PowerShell command, `--%`, a shell that takes its commands from standard input, a `${...}` with a quote or another expansion inside, `<<` inside `(( ))`, an option before a `git` or `cargo` command that the hook does not know, shells nested more than eight deep, brackets nested more than two hundred deep, and more than four thousand commands in one call.
+A command the hook cannot follow is refused, not let through:
 
-Three rules refuse more than they must, on purpose. A call that names a registry key and also runs a command that could write one (`Remove-Item`, `New-Item`, `cp` and the like) is refused whole. So is any call that names the real data folder, the key folder or a `.pem` file, even inside a message. And behind a command that starts another one (`env`, `xargs`, `find -exec`, `Start-Process`, `cmd /c` and the like) every later word is read as if it could be the command, so `xargs grep kill` is refused.
+- a command name that is computed: `& $x`, `$(...)` or a glob in command position;
+- command text for another shell that the calling shell puts together, since a value can carry a second command: `bash -c "echo $x"`, `pwsh -Command "Get-Date $x"`, `cmd /c echo $x`, and `cmd /c` with a `%NAME%` in it. In single quotes the inner shell reads the variable itself, and that is allowed;
+- a computed word behind a command that starts another one: `Start-Process $x`, `env $x`, `xargs $x`;
+- `Invoke-Expression` or `eval` on anything but one plain string, an encoded PowerShell command, `--%`, and a shell that takes its commands from standard input;
+- a `${...}` with a quote or another expansion inside, and `<<` inside `(( ))`: each can be read two ways;
+- an option before a `git` or `cargo` command that the hook does not know;
+- shells nested more than eight deep, brackets nested more than two hundred deep, and more than four thousand commands in one call.
+
+Three rules refuse more than they must, on purpose. A call that names a registry key and also runs a command that could write one (`Remove-Item`, `New-Item`, `cp` and the like) is refused whole. So is any call that names the real data folder, the key folder or a `.pem` file, even inside a message. And behind a command that starts another one (`env`, `xargs`, `timeout`, `Start-Process`, `cmd /c` and the like) every later word is read as if it could be the command, so `xargs grep kill` is refused.
 
 ## Not covered
 
@@ -67,6 +75,7 @@ The hook reads text. It does not see:
 - a file written by a shell command (`Set-Content`, `>`, `sed -i`): only Edit and Write are checked against `write_scope`, so a shell can also rewrite a wrapper, a ticket file or these hooks;
 - .NET, COM and WMI reached from a PowerShell expression (`[Diagnostics.Process]::Start`, `[Microsoft.Win32.Registry]::SetValue`, `[wmiclass]`), and text run through a method (`[scriptblock]::Create(...).Invoke()`);
 - an argument that is computed at run time, such as a branch or a URL held in a variable;
+- text that reaches a command through a pipe (`echo ... | xargs -I{} sh -c {}`), and in cmd a command taken from a `for` variable;
 - aliases and settings kept in files: a git alias, a cargo alias (`cargo xtask` is one), `push.followTags`, an ssh host alias, a PowerShell profile;
 - the real data folder reached without naming it: a relative path after a `cd`, a wildcard, an 8.3 short name;
 - a renamed installer or launcher, a shortcut, or a program started by a path with no extension behind `Start-Process` and the like;

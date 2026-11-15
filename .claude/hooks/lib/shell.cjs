@@ -29,6 +29,7 @@ function lex(source, dialect, base = 0, body = false) {
   let assigned = 0;
   let piped = false;
   let glued = false;
+  let redirect = false;
   let words = [];
   let word = null;
 
@@ -51,6 +52,11 @@ function lex(source, dialect, base = 0, body = false) {
   };
   const endWord = () => {
     if (!word) return;
+    if (redirect) {
+      redirect = false;
+      word = null;
+      return;
+    }
     keyword();
     if (word.alt === word.text) delete word.alt;
     words.push(word);
@@ -62,11 +68,12 @@ function lex(source, dialect, base = 0, body = false) {
     words = [];
     piped = pipe;
     glued = false;
+    redirect = false;
     assigned = 0;
   };
   const nested = (closer, keyed = false) => {
     if (level >= DEPTH) throw new Refusal('unreadable', 'brackets are nested too deep for the hook to read');
-    const outer = [words, word, piped, cases, table, assigned];
+    const outer = [words, word, piped, cases, table, assigned, redirect];
     const before = commands.length;
     words = [];
     word = null;
@@ -74,11 +81,12 @@ function lex(source, dialect, base = 0, body = false) {
     cases = 0;
     table = keyed;
     assigned = 0;
+    redirect = false;
     level++;
     run(closer);
     endCommand();
     level--;
-    [words, word, piped, cases, table, assigned] = outer;
+    [words, word, piped, cases, table, assigned, redirect] = outer;
     return commands.length > before;
   };
   const assignment = () => {
@@ -124,14 +132,6 @@ function lex(source, dialect, base = 0, body = false) {
       return true;
     }
     const name = (ps ? /^\$[\w:?^$]+/ : /^\$(?:\w+|[?!#@*$-])/).exec(src.slice(i, i + 256));
-    if (!name) return false;
-    i += name[0].length;
-    mark();
-    return true;
-  };
-
-  const percent = () => {
-    const name = /^%[^%\s]+%/.exec(src.slice(i, i + 256));
     if (!name) return false;
     i += name[0].length;
     mark();
@@ -213,7 +213,6 @@ function lex(source, dialect, base = 0, body = false) {
         backtick();
         continue;
       }
-      if (c === '%' && cmd && percent()) continue;
       add(c);
       i++;
     }
@@ -350,7 +349,6 @@ function lex(source, dialect, base = 0, body = false) {
         backtick();
         continue;
       }
-      if (c === '%' && cmd && percent()) continue;
       if (c === '(') {
         const subshell = bash && !word && !words.length;
         const arithmetic = bash && next === '(';
@@ -359,7 +357,7 @@ function lex(source, dialect, base = 0, body = false) {
         const some = nested(')');
         if (arithmetic) math--;
         if (bash && cases) endCommand();
-        else if (some && !subshell) mark();
+        else if (some && !subshell && !cmd) mark();
         continue;
       }
       if (c === ')' || (ps && c === '}')) {
@@ -411,9 +409,13 @@ function lex(source, dialect, base = 0, body = false) {
           heredoc();
           continue;
         }
-        if (ps && word) glued = true;
+        const stream = word !== null && !word.quoted && /^[\d*]$/.test(word.text);
+        const middle = ps && word !== null && !stream;
+        if (stream) word = null;
+        else endWord();
+        if (middle) glued = true;
+        else redirect = true;
         i++;
-        endWord();
         continue;
       }
       add(c);

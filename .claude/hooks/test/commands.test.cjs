@@ -299,6 +299,20 @@ const MORE_REFUSED = [
   ['unreadable', 'Bash', "echo $((cat <<'EOF'\nit's\nEOF\n)); tasklist"],
   ['unreadable', 'Bash', 'git --some-new-option x tag v1'],
   ['unreadable', 'Bash', 'cargo --some-new-option x add serde'],
+  ['unreadable', 'Bash', 'eval "echo $x"'],
+  ['unreadable', 'Bash', 'x=\'; tasklist\'; bash -c "echo $x"'],
+  ['unreadable', 'Bash', 'x=tasklist; env $x'],
+  ['unreadable', 'Bash', 'x=tasklist; timeout 5 $x'],
+  ['unreadable', 'Bash', 'x=tasklist; echo a | xargs $x'],
+  ['unreadable', 'Bash', 'find . -exec $x {} \\;'],
+  ['unreadable', 'Bash', 'x="a & tasklist"; cmd //c "echo $x"'],
+  ['unreadable', 'PowerShell', "$x = 'a & tasklist'; cmd /c echo $x"],
+  ['unreadable', 'PowerShell', "$env:X = 'a & tasklist'; cmd /c \"echo %X%\""],
+  ['unreadable', 'PowerShell', "$x = '; tasklist'; pwsh -NoProfile -Command \"Get-Date $x\""],
+  ['unreadable', 'PowerShell', "$x = '; tasklist'; bash -c \"echo $x\""],
+  ['unreadable', 'PowerShell', "$x = 'tasklist'; Start-Process $x"],
+  ['unreadable', 'PowerShell', 'Start-Process (Get-Command tasklist).Source'],
+  ['unreadable', 'PowerShell', "$x = 'tasklist'; Set-Alias go $x; go"],
   ['unreadable', 'Bash', 'echo tasklist | cmd //k'],
   ['unreadable', 'PowerShell', '& $x'],
   ['unreadable', 'PowerShell', '& (Get-Command tasklist)'],
@@ -531,6 +545,19 @@ const MORE_REFUSED = [
   ['data', 'PowerShell', 'ls %APPDATA%\\\\OneLaunch'],
   ['data', 'PowerShell', 'ls %APPDATA%\\.\\OneLaunch'],
   ['data', 'PowerShell', 'ls %AppData%\\ONELAUNCH.'],
+  ['data', 'PowerShell', 'ls %APPDATA%\\x\\\\..\\OneLaunch'],
+  ['data', 'PowerShell', 'ls %APPDATA%\\x\\.\\..\\OneLaunch'],
+  ['tags', 'PowerShell', 'scripts/agent/gh.ps1 -R o/r release create v1'],
+  ['key', 'PowerShell', 'scripts/agent/gh.ps1 --repo o/r auth token'],
+  ['app', 'Bash', 'cargo run -p xtask --bin OneLaunch'],
+  ['process', 'PowerShell', 'cmd /c "for %i in (1 2) do tasklist"'],
+  ['process', 'PowerShell', 'cmd /c if exist x tasklist'],
+  ['process', 'PowerShell', 'cmd /c "if 1==1 (echo a) else taskkill /IM x.exe"'],
+  ['process', 'PowerShell', "Write-Output a@'\nit' ; tasklist ; 'x'"],
+  ['process', 'PowerShell', `tasklist${String.fromCharCode(0x2028)}/v`],
+  ['process', 'Bash', 'find . -maxdepth 0 -exec tasklist \\;'],
+  ['process', 'Bash', "find . -name x -execdir sh -c 'tasklist' \\;"],
+  ['secrets', 'Bash', 'cd /tmp && git commit -m x'],
   ['data', 'PowerShell', 'ls %APPDATA%\\"One"Launch'],
   ['data', 'PowerShell', 'git commit -m "never touch %APPDATA%\\OneLaunch"'],
   ['data', 'PowerShell', `ls ${HOME_DATA}`],
@@ -664,6 +691,17 @@ const MORE_ALLOWED = [
   ['PowerShell', 'Import-Module scripts/agent/AgentApp.psm1'],
   ['PowerShell', 'Get-Content scripts/agent/git-credential.ps1'],
   ['Bash', 'case "$x" in (a) echo 1;; (b) echo 2;; esac'],
+  ['Bash', './setup.sh --prefix x'],
+  ['PowerShell', '.\\Setup-Env.ps1 -Fast'],
+  ['PowerShell', "& 'tas''klist'"],
+  ['Bash', 'find . -name kill -type f'],
+  ['Bash', 'find "$dir" -name "*.rs" -exec grep -l foo {} +'],
+  ['Bash', "bash -c 'echo $HOME'"],
+  ['Bash', 'timeout 60 cargo test > "$log" 2>&1'],
+  ['Bash', 'cd crates 2>&1 && git commit -m x'],
+  ['PowerShell', "pwsh -NoProfile -Command 'Get-Content $path'"],
+  ['PowerShell', 'Start-Process notepad notes.txt *> $null'],
+  ['PowerShell', 'cmd /c "echo 100%"'],
 ];
 
 test('more ways to spell a refused command are refused', () => {
@@ -674,6 +712,29 @@ test('more ways to spell a refused command are refused', () => {
 test('the nearest allowed commands stay allowed', () => {
   const wrong = MORE_ALLOWED.filter(([tool, command]) => verdict(tool, command) !== 'allow');
   assert.deepEqual(wrong.map(([tool, command]) => `${tool}: ${JSON.stringify(command)} gave ${verdict(tool, command)}`), []);
+});
+
+test('a change of folder is followed only where the shell keeps it', () => {
+  const crates = path.join(ROOT, 'crates');
+  const view = 'scripts/agent/gh.ps1 pr view 5';
+  const expected = [
+    ['Bash', `cd ..; ${view}`, 'allow'],
+    ['Bash', `cd .. && ${view}`, 'allow'],
+    ['Bash', `(cd ..); ${view}`, 'github'],
+    ['Bash', `cd .. | cat; ${view}`, 'github'],
+    ['Bash', `bash -c "cd .."; ${view}`, 'github'],
+    ['Bash', `cmd //c "cd .."; ${view}`, 'github'],
+    ['Bash', `cd "$elsewhere"; ${view}`, 'github'],
+    ['Bash', `cd -; ${view}`, 'github'],
+    ['Bash', `pushd ..; popd; ${view}`, 'github'],
+    ['PowerShell', `Set-Location ..; ${view}`, 'allow'],
+    ['PowerShell', `pwsh -NoProfile -Command "Set-Location .."; ${view}`, 'github'],
+    ['PowerShell', `cmd /c "cd .."; ${view}`, 'github'],
+    ['PowerShell', `pwsh -NoProfile -WorkingDirectory .. -File ${view}`, 'allow'],
+    ['PowerShell', `pwsh -NoProfile -WorkingDirectory .. -File ${view}; ${view}`, 'github'],
+    ['PowerShell', `pwsh -NoProfile -File ${view}`, 'github'],
+  ];
+  for (const [tool, command, rule] of expected) assert.equal(verdict(tool, command, crates), rule, command);
 });
 
 test('a script named like the wrapper somewhere else is not the wrapper', () => {

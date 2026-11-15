@@ -143,6 +143,9 @@ test('what the Rust scan still finds is found here too', () => {
   }
   assert.deepEqual(rules(`placeholder account ${hex}`), ['hex32']);
   assert.deepEqual(rules(`account ${random(HEX, 26)}000000`), ['hex32']);
+  assert.deepEqual(rules(`account ${'0'.repeat(27)}12345`), ['hex32']);
+  assert.deepEqual(rules(`account ${'0'.repeat(28)}1234`), []);
+  assert.deepEqual(rules(`account ${'0'.repeat(20)}123456789abc`), ['hex32']);
   assert.deepEqual(rules(`ey${'J'}${random(HEX, 32)}.${random(HEX, 32)}.${random(HEX, 32)}`), ['jwt']);
 });
 

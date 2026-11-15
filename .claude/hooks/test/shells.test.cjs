@@ -167,6 +167,10 @@ const POWERSHELL = [
   'Get-X -a=b ; Seen-A',
   'Get-X a=b ; Seen-A',
   'Get-X --data-dir=C:\\x ; Seen-A',
+  'Write-Output a@\'\nit\' ; Seen-A ; \'x\'',
+  'Write-Output a@"\nit" ; Seen-A ; "x"',
+  'Seen-A\u2028/v',
+  'Get-X \'a\'\' ; Hidden-A ; \' ; Seen-A',
   'Seen-A>#b ; Seen-B',
   'Get-X a>#b ; Seen-B',
   'Get-X a>>#b ; Seen-B',
@@ -458,6 +462,23 @@ const BASH = [
   'echo if then else fi; echo SEEN-A',
   'function case_x { echo SEEN-A; }; case_x',
   'esac_x() { echo SEEN-A; }; esac_x',
+  'find . -maxdepth 0 -exec echo SEEN-A \\;',
+  'echo x | xargs echo SEEN-A',
+  'echo a > /dev/null 2>&1; echo SEEN-A',
+  'echo a 2>/dev/null >&2; echo SEEN-A',
+  '2> /dev/null echo SEEN-A',
+  '2>&1 echo SEEN-A',
+  'echo SEEN-A 2>/dev/null | cat',
+  'cat < /dev/null; echo SEEN-A',
+  'cat <(echo SEEN-A >&2) > /dev/null',
+  'env FOO=1 echo SEEN-A',
+  'command echo SEEN-A',
+  'time echo SEEN-A',
+  'exec echo SEEN-A',
+  "sh -c 'echo SEEN-A'",
+  'bash -c "echo SEEN-A"',
+  "eval 'echo SEEN-A'",
+  'echo a | { cat > /dev/null; echo SEEN-A; }',
 ];
 
 test('every command the real PowerShell parser finds in a text is one the hook refuses when it is a refused command', { skip: !pwsh }, () => {
@@ -485,7 +506,7 @@ test('every command the real PowerShell parser finds in a text is one the hook r
     }
   }
   assert.deepEqual(missed, []);
-  assert.deepEqual([ran, quiet], [233, 12], 'texts where PowerShell runs a marked command, and texts where it leaves one alone');
+  assert.deepEqual([ran, quiet], [237, 13], 'texts where PowerShell runs a marked command, and texts where it leaves one alone');
 });
 
 test('every command bash really runs in a text is one the hook refuses when it is a refused command', { skip: !bashWorks }, () => {
@@ -505,5 +526,5 @@ test('every command bash really runs in a text is one the hook refuses when it i
     }
   }
   assert.deepEqual(missed, []);
-  assert.deepEqual([ran, quiet], [164, 6], 'texts where bash runs a marked command, and texts where it leaves one alone');
+  assert.deepEqual([ran, quiet], [181, 6], 'texts where bash runs a marked command, and texts where it leaves one alone');
 });

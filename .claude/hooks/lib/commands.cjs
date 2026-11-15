@@ -62,7 +62,7 @@ const SHELLS = set('bash sh zsh dash ash ksh');
 const POWERSHELLS = set('pwsh powershell pwsh-preview');
 const POWERSHELL_VALUES = set('executionpolicy ex ep workingdirectory wd windowstyle w configurationname config settingsfile settings custompipename inputformat if outputformat of o psconsolefile');
 const WRAPPERS = set(
-  'env command builtin exec nohup nice time timeout stdbuf setsid winpty xargs watch sudo doas runas start start-process saps explorer rundll32 invoke-item ii cygstart conhost wt psexec schtasks forfiles call wsl busybox rustup set-alias new-alias sal nal find parallel start-job sajb start-threadjob invoke-command icm',
+  'env command builtin exec nohup nice time timeout stdbuf setsid winpty xargs watch sudo doas runas start start-process saps explorer rundll32 invoke-item ii cygstart conhost wt psexec schtasks forfiles call wsl busybox rustup set-alias new-alias sal nal parallel start-job sajb start-threadjob invoke-command icm',
 );
 const COMMIT_PLAIN = set(
   '--amend --no-edit --edit --quiet --verbose --signoff --no-signoff --allow-empty --allow-empty-message --reset-author --gpg-sign --no-gpg-sign --dry-run --short --branch --porcelain --long --null --status --no-status --no-post-rewrite',
@@ -135,7 +135,7 @@ function head(words, dialect, mode, state) {
     const text = first.text;
     const expression = first.quoted || first.block || /^[$[@!+-]/.test(text) || text.startsWith(MARK) || /^\d+(\.\d+)?$/.test(text);
     const assign = rest.findIndex((word, k) => k > 0 && (word.assign || (expression && !word.quoted && word.text.toLowerCase() === 'in')));
-    if (expression || assign > 0) {
+    if (expression || assign === 1) {
       return assign < 0 || assign + 1 >= rest.length ? null : head(rest.slice(assign + 1), dialect, mode, state);
     }
     if (/^(return|throw)$/i.test(text)) return rest.length > 1 ? head(rest.slice(1), dialect, mode, state) : null;
@@ -193,7 +193,14 @@ function readings(text, state, depth) {
   state.before = Math.max(after, state.before);
 }
 
+function literal(words, what) {
+  if (words.some((word) => word.dynamic)) {
+    throw new Refusal('unreadable', `${what} is put together at run time, so the hook cannot read what will run`);
+  }
+}
+
 function suffixes(args, dialect, state, depth) {
+  literal(args, 'a word behind a command that starts another command');
   const flat = args.flatMap((word) =>
     /\s/.test(word.text)
       ? word.text
@@ -434,6 +441,7 @@ function shell(name, args, state, depth) {
     if (/^-[A-Za-z]*c[A-Za-z]*$/.test(text)) {
       const script = args.slice(k + 1).find((arg) => !/^[-+]/.test(arg.text));
       if (!script) break;
+      literal([script], `the command text handed to ${name}`);
       scoped(state, () => walk(script.text, 'bash', state, depth + 1));
       return;
     }
@@ -459,6 +467,7 @@ function powershell(name, args, state, depth, dialect) {
     }
     if ('command'.startsWith(flag) || flag === 'cwa' || (flag.length > 7 && 'commandwithargs'.startsWith(flag))) {
       if (!rest.length || rest[0].text === '-') break;
+      literal(rest, `the command text handed to ${name}`);
       const text = rest
         .filter((word) => !word.block)
         .map((word) => word.text)
@@ -490,6 +499,10 @@ function cmdShell(args, state, depth) {
     throw new Refusal('unreadable', 'cmd without /c stays open and takes its commands from standard input');
   }
   const text = [args[at].text.replace(/^\/{1,2}[cr]/i, ''), ...args.slice(at + 1).map((arg) => arg.text)].filter(Boolean).join(' ');
+  literal(args.slice(at), 'the command text handed to cmd');
+  if (/%[^%\s]+%/.test(text)) {
+    throw new Refusal('unreadable', 'cmd puts the value of %NAME% into the line before it reads it, so the hook cannot read what will run');
+  }
   scoped(state, () => readings(text, state, depth + 1));
 }
 
@@ -543,10 +556,17 @@ function command(all, dialect, state, depth, mode, sure) {
     walk(given[0].text, 'powershell', state, depth + 1);
   } else if (name === 'eval' || name === 'trap') {
     const given = name === 'trap' ? args.filter((arg) => arg.quoted || !arg.text.startsWith('-')).slice(0, 1) : args;
-    if (given.some((arg) => arg.dynamic)) throw new Refusal('unreadable', `${name} runs text the hook cannot read`);
+    literal(given, `the text ${name} runs`);
     walk(given.map((arg) => arg.text).join(' '), 'bash', state, depth + 1);
   } else if (name === 'alias' && dialect !== 'powershell') {
     for (const text of texts) if (text.includes('=')) walk(text.slice(text.indexOf('=') + 1), 'bash', state, depth + 1);
+  } else if (name === 'find') {
+    for (const [at, arg] of args.entries()) {
+      if (!/^-(exec|execdir|ok|okdir)$/.test(arg.text)) continue;
+      const end = args.findIndex((later, k) => k > at && (later.text === ';' || later.text === '+'));
+      const run = args.slice(at + 1, end < 0 ? args.length : end);
+      if (run.length) command(run, dialect, state, depth + 1, 'call', false);
+    }
   } else if (WRAPPERS.has(name)) suffixes(args, dialect, state, depth);
   return false;
 }
