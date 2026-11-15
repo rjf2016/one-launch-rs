@@ -6,16 +6,19 @@ mod capture;
 mod probe;
 
 use std::cell::{Cell, RefCell};
+use std::path::Path;
 use std::process::ExitCode;
 use std::rc::Rc;
 
 use gpui::{App, AsyncApp};
+use ol_platform_win::data_folder::refuse_real_data_folder;
+use ol_platform_win::dpapi::Dpapi;
 use ol_platform_win::own_process;
 use ol_platform_win::tray::{MenuEntry, Tray, TrayEvent};
 use ol_platform_win::window::AppWindow;
 use ol_ui::Presence;
 
-use crate::args::{Args, Check};
+use crate::args::{Args, Check, DoctorVault};
 
 const TITLE: &str = "One Launch (GPUI proof)";
 
@@ -29,6 +32,23 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    // Before anything is opened, made or read: the installed app's own folder is not for this build, and a capture is the other path it writes to.
+    let capture = match &args.check {
+        Some(Check::Capture(plan)) => Some(("--capture", plan.file.as_path())),
+        _ => None,
+    };
+    for (argument, path) in [Some(("--data-dir", args.data_dir.as_path())), capture]
+        .into_iter()
+        .flatten()
+    {
+        if let Err(refusal) = refuse_real_data_folder(argument, path) {
+            eprintln!("OneLaunch: {refusal}");
+            return ExitCode::from(2);
+        }
+    }
+    if let Some(vault) = args.doctor {
+        return doctor(&args.data_dir, vault);
+    }
     let failed = Rc::new(Cell::new(false));
     let tray = TraySlot::default();
     gpui_platform::application()
@@ -56,11 +76,27 @@ fn main() -> ExitCode {
     }
 }
 
-fn start(args: Args, failed: Rc<Cell<bool>>, tray: TraySlot, cx: &mut App) -> anyhow::Result<()> {
-    println!(
-        "OneLaunch: data folder {} (the proof stores nothing)",
-        args.data_dir.display()
+// Counts and ok or failed, never a value: the report can be shown to anyone.
+fn doctor(data_dir: &Path, vault: DoctorVault) -> ExitCode {
+    let report = match vault {
+        DoctorVault::OfThisUser => ol_api::doctor::run(data_dir, &Dpapi),
+        #[cfg(feature = "fake")]
+        DoctorVault::OfTheFixtures => ol_api::doctor::run_on_fixtures(data_dir),
+    };
+    print!(
+        "OneLaunch doctor
+{report}"
     );
+    if report.passed() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
+}
+
+fn start(args: Args, failed: Rc<Cell<bool>>, tray: TraySlot, cx: &mut App) -> anyhow::Result<()> {
+    // The folder itself is not printed: a copy of real data tends to sit under the user's profile.
+    println!("OneLaunch: the window stores nothing in the data folder yet");
     ol_ui::init(cx);
     let presence = match &args.check {
         Some(Check::Capture(plan)) if !plan.focus => Presence::Background,

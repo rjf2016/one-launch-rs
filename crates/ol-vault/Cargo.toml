@@ -6,7 +6,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-aes-gcm.workspace = true
+aes-gcm = { workspace = true, features = ["zeroize"] }
 base64.workspace = true
 getrandom.workspace = true
 ol-model.workspace = true
@@ -17,6 +17,7 @@ thiserror.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]
+ol-platform-win.workspace = true
 ol-testkit.workspace = true
 
 [lints]

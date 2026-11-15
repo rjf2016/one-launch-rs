@@ -6,6 +6,14 @@ const MOST: usize = 20_000;
 pub struct Args {
     pub data_dir: PathBuf,
     pub check: Option<Check>,
+    pub doctor: Option<DoctorVault>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DoctorVault {
+    OfThisUser,
+    #[cfg(feature = "fake")]
+    OfTheFixtures,
 }
 
 #[derive(Debug, PartialEq)]
@@ -28,6 +36,7 @@ pub struct CapturePlan {
 impl Args {
     pub fn parse(arguments: impl Iterator<Item = String>) -> Result<Self, String> {
         let (mut data_dir, mut file, mut probe) = (None, None, false);
+        let (mut doctor, mut fake_vault) = (false, false);
         let mut plan = CapturePlan::default();
         let mut steps = false;
         for argument in arguments {
@@ -37,6 +46,14 @@ impl Args {
             }
             if argument == "--capture-focus" {
                 (plan.focus, steps) = (true, true);
+                continue;
+            }
+            if argument == "--doctor" {
+                doctor = true;
+                continue;
+            }
+            if cfg!(feature = "fake") && argument == "--fake-vault" {
+                fake_vault = true;
                 continue;
             }
             let Some((name, value)) = argument.split_once('=') else {
@@ -88,6 +105,13 @@ impl Args {
         if !data_dir.is_absolute() {
             return Err("--data-dir=<folder> must be an absolute path".to_owned());
         }
+        if fake_vault && !doctor {
+            return Err("--fake-vault needs --doctor".to_owned());
+        }
+        if doctor && (file.is_some() || probe || steps) {
+            return Err("--doctor does not go with --capture or --probe".to_owned());
+        }
+        let doctor = doctor.then_some(vault(fake_vault));
         let check = match (file, probe) {
             (Some(_), true) => return Err("--capture and --probe do not go together".to_owned()),
             (Some(file), false) => Some(Check::Capture(CapturePlan { file, ..plan })),
@@ -97,8 +121,26 @@ impl Args {
             (None, true) => Some(Check::Probe),
             (None, false) => None,
         };
-        Ok(Self { data_dir, check })
+        Ok(Self {
+            data_dir,
+            check,
+            doctor,
+        })
     }
+}
+
+#[cfg(feature = "fake")]
+fn vault(of_the_fixtures: bool) -> DoctorVault {
+    if of_the_fixtures {
+        DoctorVault::OfTheFixtures
+    } else {
+        DoctorVault::OfThisUser
+    }
+}
+
+#[cfg(not(feature = "fake"))]
+fn vault(_: bool) -> DoctorVault {
+    DoctorVault::OfThisUser
 }
 
 #[cfg(test)]
@@ -166,6 +208,41 @@ mod tests {
                 "{extra}"
             );
         }
+    }
+
+    #[test]
+    fn the_doctor_runs_alone() {
+        let args = parse(&[r"--data-dir=D:\scratch", "--doctor"]).unwrap();
+        assert_eq!(args.doctor, Some(DoctorVault::OfThisUser));
+        assert_eq!(args.check, None);
+        assert_eq!(parse(&[r"--data-dir=D:\scratch"]).unwrap().doctor, None);
+        for extra in [
+            &["--probe"][..],
+            &[r"--capture=D:.png"],
+            &["--capture-focus"],
+            &[r"--capture=D:.png", "--capture-row=3"],
+        ] {
+            let mut arguments = vec![r"--data-dir=D:\scratch", "--doctor"];
+            arguments.extend(extra);
+            assert!(parse(&arguments).is_err(), "{extra:?}");
+        }
+        assert!(parse(&["--doctor"]).is_err());
+        assert!(parse(&[r"--data-dir=D:\scratch", "--doctor=1"]).is_err());
+    }
+
+    #[cfg(not(feature = "fake"))]
+    #[test]
+    fn the_stand_in_vault_cannot_be_asked_for() {
+        assert!(parse(&[r"--data-dir=D:\scratch", "--doctor", "--fake-vault"]).is_err());
+    }
+
+    #[cfg(feature = "fake")]
+    #[test]
+    fn the_stand_in_vault_is_for_the_doctor_only() {
+        let args = parse(&[r"--data-dir=D:\scratch", "--doctor", "--fake-vault"]).unwrap();
+        assert_eq!(args.doctor, Some(DoctorVault::OfTheFixtures));
+        assert!(parse(&[r"--data-dir=D:\scratch", "--fake-vault"]).is_err());
+        assert!(parse(&[r"--data-dir=D:\scratch", "--probe", "--fake-vault"]).is_err());
     }
 
     #[test]

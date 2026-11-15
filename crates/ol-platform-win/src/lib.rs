@@ -1,3 +1,5 @@
+pub mod data_folder;
+pub mod dpapi;
 pub mod own_process;
 pub mod probe;
 pub mod tray;

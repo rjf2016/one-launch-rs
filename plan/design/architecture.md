@@ -49,7 +49,7 @@ The diagram above gives the layers. This table is the record: `cargo xtask check
 | `ol-platform-api` | `ol-model` | `ol-testkit` |
 | `ol-runtime` | `ol-model`, `ol-platform-api` | `ol-testkit` |
 | `ol-store` | `ol-model` | `ol-testkit` |
-| `ol-vault` | `ol-model`, `ol-platform-api` | `ol-testkit` |
+| `ol-vault` | `ol-model`, `ol-platform-api` | `ol-platform-win`, `ol-testkit` |
 | `ol-adapters` | `ol-formats`, `ol-model`, `ol-platform-api`, `ol-runtime`, `ol-store`, `ol-vault` | `ol-platform-fake`, `ol-sim`, `ol-testkit` |
 | `ol-services` | `ol-adapters`, `ol-formats`, `ol-model`, `ol-platform-api`, `ol-runtime`, `ol-store`, `ol-vault` | `ol-platform-fake`, `ol-sim`, `ol-testkit` |
 | `ol-api` | `ol-adapters`, `ol-model`, `ol-platform-api`, `ol-runtime`, `ol-services`, `ol-store`, `ol-vault` | `ol-platform-fake`, `ol-sim`, `ol-testkit` |

@@ -5,6 +5,9 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+fake = []
+
 [dependencies]
 async-channel.workspace = true
 futures-lite.workspace = true
