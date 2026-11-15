@@ -11,7 +11,7 @@ path = "src/main.rs"
 
 [features]
 automation = ["dep:ol-automation"]
-fake = ["dep:ol-platform-fake", "dep:ol-replay", "dep:ol-sim"]
+fake = ["dep:ol-platform-fake", "dep:ol-replay", "dep:ol-sim", "ol-api/fake"]
 
 [dependencies]
 anyhow.workspace = true
