@@ -32,10 +32,19 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    // Before anything is opened, made or read: the installed app's own folder is not for this build.
-    if let Err(refusal) = refuse_real_data_folder(&args.data_dir) {
-        eprintln!("OneLaunch: {refusal}");
-        return ExitCode::from(2);
+    // Before anything is opened, made or read: the installed app's own folder is not for this build, and a capture is the other path it writes to.
+    let capture = match &args.check {
+        Some(Check::Capture(plan)) => Some(("--capture", plan.file.as_path())),
+        _ => None,
+    };
+    for (argument, path) in [Some(("--data-dir", args.data_dir.as_path())), capture]
+        .into_iter()
+        .flatten()
+    {
+        if let Err(refusal) = refuse_real_data_folder(argument, path) {
+            eprintln!("OneLaunch: {refusal}");
+            return ExitCode::from(2);
+        }
     }
     if let Some(vault) = args.doctor {
         return doctor(&args.data_dir, vault);
@@ -86,10 +95,8 @@ fn doctor(data_dir: &Path, vault: DoctorVault) -> ExitCode {
 }
 
 fn start(args: Args, failed: Rc<Cell<bool>>, tray: TraySlot, cx: &mut App) -> anyhow::Result<()> {
-    println!(
-        "OneLaunch: data folder {} (the proof stores nothing)",
-        args.data_dir.display()
-    );
+    // The folder itself is not printed: a copy of real data tends to sit under the user's profile.
+    println!("OneLaunch: the window stores nothing in the data folder yet");
     ol_ui::init(cx);
     let presence = match &args.check {
         Some(Check::Capture(plan)) if !plan.focus => Presence::Background,

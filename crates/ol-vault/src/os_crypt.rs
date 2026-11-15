@@ -38,7 +38,8 @@ pub enum KeyError {
 
 // The vault of the Electron app: Chromium's os_crypt. One AES-256 key, wrapped by DPAPI in chromium\Local State, seals every value as "v10", a nonce, the ciphertext and the tag.
 pub struct OsCryptVault {
-    cipher: Aes256Gcm,
+    // In a box: moving the vault then moves a pointer, and does not leave a copy of the key behind at every stop. The cipher wipes its own when it is dropped.
+    cipher: Box<Aes256Gcm>,
 }
 
 impl OsCryptVault {
@@ -72,7 +73,9 @@ impl OsCryptVault {
 
     fn with_key(key: &[u8]) -> Result<Self, KeyError> {
         Aes256Gcm::new_from_slice(key)
-            .map(|cipher| Self { cipher })
+            .map(|cipher| Self {
+                cipher: Box::new(cipher),
+            })
             .map_err(|_| KeyError::WrongLength)
     }
 }
@@ -419,5 +422,45 @@ mod tests {
             .as_str()
             .unwrap();
         assert_eq!(VaultError::Unreadable.to_string(), recorded);
+    }
+
+    #[test]
+    fn the_cipher_wipes_its_key_when_it_is_dropped() {
+        fn wipes_on_drop<T: zeroize::ZeroizeOnDrop>() {}
+        wipes_on_drop::<Aes256Gcm>();
+    }
+
+    #[test]
+    fn a_key_file_that_cannot_be_read_or_written_is_reported_without_the_folder() {
+        let scratch = Scratch::new("vault");
+        fs::create_dir_all(local_state_path(scratch.path())).unwrap();
+        let before = snapshot(scratch.path());
+        let folder = scratch.path().to_str().unwrap();
+        for opened in [
+            OsCryptVault::open(scratch.path(), &Reversible),
+            OsCryptVault::open_or_create(scratch.path(), &Reversible),
+        ] {
+            let error = opened.err().unwrap();
+            assert!(matches!(error, KeyError::Read(_)), "{error:?}");
+            let shown = format!("{error} {error:?}");
+            assert!(shown.starts_with("chromium\\Local State could not be read: "));
+            assert!(!shown.contains(folder), "the folder is in the error");
+        }
+        assert!(before == snapshot(scratch.path()), "the folder changed");
+
+        let blocked = Scratch::new("vault");
+        fs::write(blocked.join("chromium"), b"a file where the folder goes").unwrap();
+        let error = OsCryptVault::open_or_create(blocked.path(), &Reversible)
+            .err()
+            .unwrap();
+        assert!(matches!(error, KeyError::Write(_)), "{error:?}");
+        let shown = format!("{error} {error:?}");
+        assert!(shown.starts_with("chromium\\Local State could not be written: "));
+        assert!(!shown.contains(blocked.path().to_str().unwrap()));
+        assert_eq!(
+            snapshot(blocked.path()).len(),
+            1,
+            "something was left behind"
+        );
     }
 }

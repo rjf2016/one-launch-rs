@@ -23,11 +23,21 @@ impl Store {
             "{PREFIX}{}{SUFFIX}",
             iso_timestamp(now).replace(':', "-")
         ));
-        let mut target = Connection::open(&copy).map_err(StoreError::opening_file)?;
-        if Backup::new(&self.conn, &mut target)?.step(-1)? != StepResult::Done {
-            return Err(StoreError::Locked("the copy did not finish".to_owned()));
+        let was_there = copy.exists();
+        let copied = (|| {
+            let mut target = Connection::open(&copy).map_err(StoreError::opening_file)?;
+            match Backup::new(&self.conn, &mut target)?.step(-1)? {
+                StepResult::Done => Ok(()),
+                _ => Err(StoreError::Locked("the copy did not finish".to_owned())),
+            }
+        })();
+        if let Err(error) = copied {
+            // Left behind, the empty file would count among the newest and push a whole copy out.
+            if !was_there {
+                let _ = fs::remove_file(&copy);
+            }
+            return Err(error);
         }
-        drop(target);
 
         let mut copies = Vec::new();
         for entry in fs::read_dir(folder).map_err(failed("listed"))? {

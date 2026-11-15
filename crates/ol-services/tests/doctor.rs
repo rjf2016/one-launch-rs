@@ -410,6 +410,78 @@ result: FAILED
 }
 
 #[test]
+fn a_report_of_a_failure_holds_no_folder_and_no_text_of_the_fixture() {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    let telling = telling_texts(fixture().path());
+    let check = |folder: &Path, report: Report, reason: &str| {
+        let shown = format!("{report}\n{report:?}\n{report:#?}");
+        assert!(
+            shown.starts_with(&format!("database: failed ({reason}")),
+            "{reason}"
+        );
+        assert!(!report.passed(), "{reason}");
+        assert!(
+            !shown.contains(folder.to_str().unwrap()),
+            "{reason}: the folder is in the report"
+        );
+        for text in &telling {
+            assert!(
+                !shown.contains(text.as_str()),
+                "{reason}: a text of the fixture"
+            );
+        }
+    };
+
+    let missing = Scratch::new("doctor");
+    check(
+        missing.path(),
+        stand_in(&missing.join("no such folder")),
+        "There is no One Launch database in this folder.",
+    );
+
+    let running = fixture();
+    fs::write(running.join("onelaunch.db-journal"), [0; 32]).unwrap();
+    check(
+        running.path(),
+        stand_in(running.path()),
+        "The database has changes that are not in the file yet (onelaunch.db-journal is not empty).",
+    );
+
+    let cut_short = fixture();
+    let file = database_path(cut_short.path());
+    let whole = fs::read(&file).unwrap();
+    fs::write(&file, &whole[..whole.len() / 2]).unwrap();
+    check(
+        cut_short.path(),
+        stand_in(cut_short.path()),
+        "The One Launch database is damaged (",
+    );
+
+    let held = fixture();
+    let file = database_path(held.path());
+    let handle = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(&file)
+        .unwrap();
+    check(
+        held.path(),
+        stand_in(held.path()),
+        "The One Launch database could not be opened (unable to open database file).",
+    );
+    drop(handle);
+
+    let key_is_a_folder = fixture();
+    fs::create_dir(key_is_a_folder.join("chromium").join("Local State")).unwrap();
+    let report = run(key_is_a_folder.path(), &Reversible);
+    let shown = format!("{report}\n{report:?}");
+    assert!(shown.contains("vault key: failed (chromium\\Local State could not be read: "));
+    assert!(!shown.contains(key_is_a_folder.path().to_str().unwrap()));
+    assert!(!report.passed());
+}
+
+#[test]
 fn rows_this_version_does_not_know_are_counted_apart() {
     let database = Database {
         schema_on_disk: 5,

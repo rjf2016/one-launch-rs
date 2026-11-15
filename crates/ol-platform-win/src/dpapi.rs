@@ -6,7 +6,7 @@ use windows::Win32::Security::Cryptography::{
 use windows::core::w;
 use zeroize::{Zeroize, Zeroizing};
 
-// The calls Chromium makes for its os_crypt key: the signed-in user, no entropy, no description, and never a prompt.
+// For the signed-in user, without entropy and never with a prompt: what unwraps the os_crypt key Chromium wrapped.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Dpapi;
 

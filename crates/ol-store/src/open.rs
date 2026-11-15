@@ -46,11 +46,15 @@ impl Store {
         if !file.is_file() {
             return Err(StoreError::NotFound);
         }
-        // An immutable open does not look at a journal, so what it holds would be left out without a word.
+        // An immutable open does not look at a journal, so what it holds would be left out without a word. One that cannot be looked at counts as holding something.
         for suffix in UNFINISHED {
             let mut beside = file.as_os_str().to_owned();
             beside.push(suffix);
-            if std::fs::metadata(&beside).is_ok_and(|journal| journal.len() > 0) {
+            let empty = match std::fs::metadata(&beside) {
+                Ok(journal) => journal.len() == 0,
+                Err(error) => error.kind() == std::io::ErrorKind::NotFound,
+            };
+            if !empty {
                 return Err(StoreError::UnfinishedWrite(suffix));
             }
         }
@@ -59,6 +63,7 @@ impl Store {
             | OpenFlags::SQLITE_OPEN_NO_MUTEX;
         let conn = Connection::open_with_flags(immutable_uri(file)?, flags)
             .map_err(StoreError::opening_file)?;
+        keep_out_of_temp(&conn)?;
         quick_check(&conn)?;
         let schema_on_disk = schema_version(&conn).map_err(opening)?;
         if schema_on_disk > SCHEMA_VERSION {
@@ -79,6 +84,7 @@ impl Store {
                     "the copy in memory did not finish".to_owned(),
                 ));
             }
+            keep_out_of_temp(&copy)?;
             copy.pragma_update(None, "foreign_keys", "ON")?;
             migrate(&mut copy, &MIGRATIONS)?;
             copy
@@ -120,6 +126,7 @@ fn prepare(conn: &Connection, busy_timeout: Duration) -> Result<(), StoreError> 
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
+        keep_out_of_temp(conn)?;
         quick_check(conn)?;
         // A page write that is rolled back shows the file is ours to use: a lock held elsewhere fails as busy, a read-only file as read-only.
         let version = schema_version(conn)?;
@@ -129,6 +136,11 @@ fn prepare(conn: &Connection, busy_timeout: Duration) -> Result<(), StoreError> 
         Ok(written?)
     })();
     prepared.map_err(opening)
+}
+
+// A sort or a statement journal that outgrows its memory would otherwise spill into a file in %TEMP%, rows and all. The Electron app leaves this at SQLite's default.
+fn keep_out_of_temp(conn: &Connection) -> Result<(), StoreError> {
+    Ok(conn.pragma_update(None, "temp_store", "MEMORY")?)
 }
 
 fn quick_check(conn: &Connection) -> Result<(), StoreError> {

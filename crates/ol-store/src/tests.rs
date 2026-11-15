@@ -137,6 +137,7 @@ fn a_new_file_gets_the_whole_schema_and_the_pragmas() {
     assert_eq!(pragma("synchronous"), Value::Integer(1));
     assert_eq!(pragma("foreign_keys"), Value::Integer(1));
     assert_eq!(pragma("busy_timeout"), Value::Integer(5_000));
+    assert_eq!(pragma("temp_store"), Value::Integer(2));
     assert_eq!(store.row_counts().unwrap(), Default::default());
     drop(store);
 
@@ -266,17 +267,20 @@ fn a_rebuild_keeps_the_rows_that_point_at_the_rebuilt_table() {
 }
 
 #[test]
-fn a_database_from_a_newer_version_is_refused_and_left_alone() {
+fn a_database_from_a_newer_version_is_refused_and_keeps_its_version() {
     let scratch = Scratch::new("store");
     let file = copy_of(&scratch, "fixtures/db/onelaunch-empty-v5.db");
     Connection::open(&file)
         .unwrap()
         .pragma_update(None, "user_version", 6)
         .unwrap();
-    for error in [
-        Store::open(&file).err().unwrap(),
-        Store::open_read_only(&file).err().unwrap(),
-    ] {
+    let before = snapshot(scratch.path());
+    let unread = Store::open_read_only(&file).err().unwrap();
+    assert!(
+        before == snapshot(scratch.path()),
+        "the read-only open changed the file"
+    );
+    for error in [unread, Store::open(&file).err().unwrap()] {
         assert!(
             matches!(
                 error,
@@ -371,6 +375,33 @@ fn a_folder_that_is_not_there_cannot_be_opened() {
         StoreError::NotFound
     ));
     assert!(!scratch.join("missing").exists());
+}
+
+#[test]
+fn a_file_another_program_holds_cannot_be_opened_and_the_error_names_no_folder() {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    let scratch = Scratch::new("store");
+    let file = copy_of(&scratch, "fixtures/db/onelaunch-empty-v5.db");
+    let before = snapshot(scratch.path());
+    let held = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(&file)
+        .unwrap();
+    for error in [
+        Store::open_read_only(&file).err().unwrap(),
+        Store::open(&file).err().unwrap(),
+    ] {
+        assert!(matches!(error, StoreError::CannotOpen(_)), "{error}");
+        assert_eq!(
+            error.to_string(),
+            "The One Launch database could not be opened (unable to open database file). Check that the data folder exists and is writable."
+        );
+        assert!(!format!("{error:?}").contains(scratch.path().to_str().unwrap()));
+    }
+    drop(held);
+    assert!(before == snapshot(scratch.path()), "the folder changed");
 }
 
 #[test]
@@ -631,11 +662,19 @@ fn a_read_only_open_changes_nothing_in_the_folder() {
     {
         let opened = Store::open_read_only(&database_path(scratch.path())).unwrap();
         assert_eq!(opened.schema_on_disk, 5);
+        assert_eq!(
+            rows(&opened.store.conn, "PRAGMA temp_store"),
+            [[Value::Integer(2)]]
+        );
         assert_eq!(opened.store.accounts().unwrap().len(), 9);
         assert_eq!(opened.store.installed_games().unwrap().len(), 8);
         assert_eq!(opened.store.ciphertexts().unwrap().secrets.len(), 3);
         let refused = opened.store.set_setting(SettingKey::DryRun, "true");
         assert!(refused.is_err());
+        assert!(
+            before == snapshot(scratch.path()),
+            "the folder changed while the database was open"
+        );
     }
     assert!(before == snapshot(scratch.path()), "the folder changed");
 }
@@ -648,15 +687,63 @@ fn an_old_database_is_read_through_a_copy_in_memory() {
     {
         let opened = Store::open_read_only(&file).unwrap();
         assert_eq!(opened.schema_on_disk, 1);
+        assert_eq!(
+            rows(&opened.store.conn, "PRAGMA temp_store"),
+            [[Value::Integer(2)]]
+        );
         assert_eq!(opened.store.schema_version().unwrap(), 5);
         assert_eq!(master(&opened.store.conn), recorded("v5.json").1);
         assert_eq!(opened.store.accounts().unwrap().len(), 3);
         assert_eq!(opened.store.installed_games().unwrap().len(), 1);
         assert_eq!(opened.store.ciphertexts().unwrap().passwords.len(), 1);
         assert_eq!(opened.store.row_counts().unwrap().launcher_sessions, 0);
+        assert!(
+            before == snapshot(scratch.path()),
+            "the folder changed while the database was open"
+        );
     }
     assert!(before == snapshot(scratch.path()), "the folder changed");
     assert_eq!(version(&read_only(&file)), 1);
+}
+
+#[test]
+fn a_folder_with_an_odd_name_opens_both_ways() {
+    let scratch = Scratch::new("store");
+    for name in [
+        "a b",
+        "50%25 off",
+        "tag #1",
+        "what%3fnow",
+        "ünïcødé 日本語",
+        "file:x",
+        "a&b=c",
+    ] {
+        let name = name.replace(':', ";");
+        let folder = scratch.join(&name);
+        fs::create_dir(&folder).unwrap();
+        let file = database_path(&folder);
+        fs::copy(oracle("fixtures/data-folder/onelaunch.db"), &file).unwrap();
+        let before = snapshot(&folder);
+        {
+            let opened = Store::open_read_only(&file).unwrap();
+            assert_eq!(opened.store.accounts().unwrap().len(), 9, "{name}");
+        }
+        assert!(before == snapshot(&folder), "{name}: the folder changed");
+        assert_eq!(snapshot(scratch.path()).len(), before.len() + 1, "{name}");
+        let (store, _) = Store::open(&file).unwrap();
+        assert_eq!(store.accounts().unwrap().len(), 9, "{name}");
+        drop(store);
+        fs::remove_dir_all(&folder).unwrap();
+    }
+
+    let verbatim = PathBuf::from(format!(r"\\?\{}", scratch.path().display()));
+    let file = database_path(&verbatim);
+    fs::copy(oracle("fixtures/data-folder/onelaunch.db"), &file).unwrap();
+    let opened = Store::open_read_only(&file).unwrap();
+    assert_eq!(opened.store.accounts().unwrap().len(), 9);
+    let slashes = scratch.path().to_str().unwrap().replace('\\', "/");
+    let opened = Store::open_read_only(&database_path(Path::new(&slashes))).unwrap();
+    assert_eq!(opened.store.accounts().unwrap().len(), 9);
 }
 
 #[test]
@@ -687,6 +774,10 @@ fn a_database_in_wal_mode_is_read_without_a_journal_being_made() {
             let opened = Store::open_read_only(&file).unwrap();
             assert_eq!(i64::from(opened.schema_on_disk), on_disk);
             assert!(!opened.store.accounts().unwrap().is_empty());
+            assert!(
+                before == snapshot(scratch.path()),
+                "a journal was made while the database was open"
+            );
         }
         assert!(before == snapshot(scratch.path()), "the folder changed");
     }
@@ -795,5 +886,42 @@ fn a_copy_is_taken_and_the_newest_five_are_kept() {
         folder
             .join("onelaunch-2026-12-01T10-24-00.000Z.db")
             .exists()
+    );
+}
+
+#[test]
+fn a_copy_that_fails_leaves_no_file_and_takes_none_away() {
+    let scratch = Scratch::new("store");
+    let folder = database_backups_dir(scratch.path());
+    fs::create_dir_all(&folder).unwrap();
+    for minute in 1..=5 {
+        let name = format!("onelaunch-2026-12-01T10-0{minute}-00.000Z.db");
+        fs::write(folder.join(name), b"an earlier copy").unwrap();
+    }
+    let before = snapshot(&folder);
+
+    let damaged = scratch.join("damaged.db");
+    fs::write(&damaged, [0x5a; 8192]).unwrap();
+    let store = Store {
+        conn: Connection::open(&damaged).unwrap(),
+    };
+    let failed = store.backup(&folder, BACKUPS_TO_KEEP, datetime!(2026-12-01 11:00:00 UTC));
+    assert!(failed.is_err());
+    assert!(
+        before == snapshot(&folder),
+        "a failed copy changed the folder"
+    );
+
+    let (store, _) = Store::open(&database_path(scratch.path())).unwrap();
+    let taken = folder.join("onelaunch-2026-12-01T10-05-00.000Z.db");
+    let failed = store.backup(&folder, BACKUPS_TO_KEEP, datetime!(2026-12-01 10:05:00 UTC));
+    assert!(
+        failed.is_err(),
+        "a file that is no database was copied over"
+    );
+    assert_eq!(fs::read(&taken).unwrap(), b"an earlier copy");
+    assert!(
+        before == snapshot(&folder),
+        "a failed copy changed the folder"
     );
 }
