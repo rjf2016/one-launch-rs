@@ -75,14 +75,22 @@ const COMMIT_VALUES = set('--message --file --author --date --cleanup --trailer 
 const DATA_FOLDER = [
   /(?<!local)appdata[^a-z0-9]{0,12}(?:roaming[^a-z0-9]{0,12})?onelaunch/,
   /roaming[^a-z0-9]{0,12}onelaunch/,
-  /(?<!local)appdata[^;|&\n]{0,40}onelaunch/,
+  /(?<!local)appdata(?![^a-z0-9]{0,3}local)[^;|&\n]{0,40}onelaunch/,
 ];
 const KEY_NAMES = [/one-launch-rs-bot/, /one_launch_agent_key_dir/, /\.pem(?![a-z0-9])/];
 const TOKEN_SHOWN = /git_(trace_redact|config)/;
+const REACHES = [
+  ['process', /diagnostics\.process|\[\s*wmi(class|searcher)?\s*\]|management(object|class)/, 'a .NET or WMI type that lists, starts or ends processes; no form of a process tool is allowed'],
+  ['registry', /microsoft\.win32\.registry/, 'the .NET registry classes can write a key; read one with reg query or Get-ItemProperty'],
+  ['unreadable', /\[\s*scriptblock\s*\]\s*::\s*create|\.\s*(invokescript|newscriptblock)\s*\(/, 'text that is made into a script at run time is text the hook cannot read'],
+];
 const QUIET = set('cat echo printf date type get-content gc get-date write-output');
 const STARTERS = set('env command builtin exec nohup nice time timeout');
 const STDIN = /^(-|\/dev\/(stdin|fd\/\d+)|\/proc\/self\/fd\/\d+)$/;
-const MERGE_SWITCHES = /^(--(auto|squash|merge|rebase|delete-branch)|-[dsmr]+)$/;
+const MERGE_VALUES = set('author-email body body-file match-head-commit subject repo');
+const MERGE_SWITCHES = set('admin auto delete-branch disable-auto merge rebase squash help');
+const MERGE_SHORT = new Map(Object.entries({ A: 'author-email', b: 'body', F: 'body-file', t: 'subject', R: 'repo', d: 'delete-branch', m: 'merge', r: 'rebase', s: 'squash', h: 'help' }));
+const AS_VALUE = '; a word that is only the value of an option goes in as --option=value';
 const BUDGET = 4000;
 const DEPTH = 8;
 const NAME_LIMIT = 260;
@@ -193,6 +201,8 @@ function scoped(state, run) {
 
 function walk(text, dialect, state, depth) {
   if (depth > DEPTH) throw new Refusal('unreadable', 'commands are nested too deep for the hook to read');
+  const reach = dialect === 'powershell' && REACHES.find(([, pattern]) => pattern.test(text.toLowerCase().replace(/["'`]/g, '')));
+  if (reach) throw new Refusal(reach[0], `this PowerShell text names ${reach[2]}`);
   let commit = null;
   for (const { words, level, piped, splits, wrote } of lex(text, dialect)) {
     if (dialect === 'powershell' && words.some((word) => word.text === '--%' && !word.quoted)) {
@@ -298,6 +308,17 @@ function config(pair) {
   }
 }
 
+function configWrites(texts) {
+  const plain = [];
+  for (let k = 0; k < texts.length; k++) {
+    if (/^(-f|--file|--blob|-t|--type|--default)$/.test(texts[k])) k++;
+    else if (!texts[k].startsWith('-')) plain.push(texts[k].toLowerCase());
+  }
+  if (texts.some((text) => /^(--(unset|unset-all|add|replace-all|edit|rename-section|remove-section)|-e)$/.test(text))) return true;
+  if (texts.some((text) => /^(--(get|get-all|get-regexp|get-urlmatch|list)|-l)$/.test(text)) || /^(get|list)$/.test(plain[0])) return false;
+  return plain.length > 1;
+}
+
 function reaches(sub, texts) {
   if (GIT_NETWORK.has(sub)) return true;
   const plain = texts.filter((text) => !text.startsWith('-')).map((text) => text.toLowerCase());
@@ -317,7 +338,7 @@ function push(texts, cwd, state, wrapper) {
       refs.push(...texts.slice(k + 1));
       break;
     }
-    if (/^--for/.test(text) || text === '--mirror') throw new Refusal('bypass', 'a force-push rewrites what is on GitHub');
+    if (/^--(for|m)/.test(text)) throw new Refusal('bypass', 'a force-push rewrites what is on GitHub');
     if (/^--(ta|fol)/.test(text)) throw new Refusal('tags', 'this pushes tags');
     if (/^-[A-Za-z]+$/.test(text)) {
       const letters = text.slice(1);
@@ -410,7 +431,7 @@ function git(args, state, wrapper, dialect, again = false) {
   if (sub === 'tag') throw new Refusal('tags', 'git tag: tags are the owner\'s; read them with git for-each-ref refs/tags');
   if (/^(update|symbolic)-ref$/.test(sub) && texts.some((text) => /refs\/tags/i.test(text))) throw new Refusal('tags', 'this writes a tag ref');
   if (texts.some((text) => text.length >= 9 && '--no-verify'.startsWith(text))) throw new Refusal('bypass', '--no-verify skips the hooks');
-  if (sub === 'config' && texts.some((text) => /core\.hookspath/i.test(text))) throw new Refusal('bypass', 'core.hooksPath moves the commit hooks away');
+  if (sub === 'config' && texts.some((text) => /core\.hookspath/i.test(text)) && configWrites(texts)) throw new Refusal('bypass', 'core.hooksPath moves the commit hooks away');
   if (sub.startsWith('credential')) throw new Refusal('key', `git ${sub} hands out a stored login or the app's token`);
   const programs =
     texts.some((text) => /^--(upload-pack|receive-pack|exec|extcmd)(=|$)/.test(text)) ||
@@ -426,38 +447,72 @@ function git(args, state, wrapper, dialect, again = false) {
   if (sub === 'commit' && !again) commit(texts, cwd, elsewhere, state);
 }
 
+function mergeFlags(words) {
+  const plain = new Set();
+  const valued = new Set();
+  const unknown = (word) => new Refusal('merge', `gh pr merge is given ${word}, which is no option of it that the hook knows, so it cannot tell whether --auto is set${AS_VALUE}`);
+  for (let k = 0; k < words.length && words[k] !== '--'; k++) {
+    const word = words[k];
+    if (word.startsWith('--')) {
+      const cut = word.indexOf('=');
+      const name = cut < 0 ? word.slice(2) : word.slice(2, cut);
+      if (MERGE_VALUES.has(name)) k += cut < 0 ? 1 : 0;
+      else if (!MERGE_SWITCHES.has(name)) throw unknown(word);
+      else (cut < 0 ? plain : valued).add(name);
+    } else if (word.length > 1 && word[0] === '-') {
+      for (let c = 1; c < word.length; c++) {
+        const name = MERGE_SHORT.get(word[c]);
+        if (!name) throw unknown(word);
+        if (MERGE_VALUES.has(name)) {
+          k += c + 1 === word.length ? 1 : 0;
+          break;
+        }
+        if (word[c + 1] === '=') {
+          valued.add(name);
+          break;
+        }
+        plain.add(name);
+      }
+    }
+  }
+  return { plain, valued };
+}
+
 function gh(args, wrapper) {
-  const texts = args.map((arg) => arg.text.toLowerCase());
-  const plain = [];
-  for (let k = 0; k < texts.length; k++) {
-    if (/^(-r|--repo|--hostname)$/.test(texts[k])) k++;
-    else if (!texts[k].startsWith('-')) plain.push(texts[k]);
-  }
-  const [group] = plain;
+  const words = args.map((arg) => arg.text);
+  const texts = words.map((word) => word.toLowerCase());
+  const bare = texts.filter((text) => !text.startsWith('-'));
   const all = texts.join(' ');
-  const merges = plain.some((word, at) => word === 'merge' && plain[at - 1] === 'pr');
-  if (group === 'release') throw new Refusal('tags', 'gh release: releases are the owner\'s');
-  const auto = texts.some((text, at) => (text === '--auto' || text === '--auto=true') && at > 0 && (!texts[at - 1].startsWith('-') || MERGE_SWITCHES.test(texts[at - 1])));
-  if (merges && (!auto || texts.some((text) => text.startsWith('--admin')))) {
-    throw new Refusal('merge', 'gh pr merge needs --auto as an option of its own and no --admin, so that GitHub merges once the checks pass');
+  if (bare.includes('release')) throw new Refusal('tags', `gh release: releases are the owner's${AS_VALUE}`);
+  if (bare.includes('pr') && bare.includes('merge')) {
+    const places = (name) => texts.flatMap((text, k) => (text === name ? [k] : []));
+    for (const pr of places('pr')) {
+      for (const merge of places('merge')) {
+        const { plain, valued } = mergeFlags(words.filter((word, k) => k !== pr && k !== merge));
+        const switched = ['auto', 'admin', 'disable-auto'].some((name) => valued.has(name));
+        if (switched || plain.has('admin') || plain.has('auto') === plain.has('disable-auto')) {
+          throw new Refusal('merge', 'gh pr merge needs a plain --auto as an option of its own (or a plain --disable-auto instead), no --auto=<value> and no --admin, so that GitHub merges once the checks pass');
+        }
+      }
+    }
   }
+  const api = bare.includes('api');
   const sends = texts.some((text) => /^(-x|--method|-f|--field|--raw-field|--input)(=|$)|^-[xf]./.test(text));
-  if (group === 'api' && /pulls\/[^/\s]+\/merge|\/merges(?![a-z0-9_-])|mergepullrequest|mergebranch/.test(all)) {
+  if (api && /pulls\/[^/\s]+\/merge|\/merges(?![a-z0-9_-])|mergepullrequest|mergebranch/.test(all)) {
     throw new Refusal('merge', 'this API call merges a pull request or a branch');
   }
-  if (group === 'api' && (/\/releases|git\/tags|refs\/tags|createrelease|createref|updateref|deleteref/.test(all) || (sends && /git\/refs/.test(all)))) {
+  if (api && (/\/releases|git\/tags|refs\/tags|createrelease|createref|updateref|deleteref/.test(all) || (sends && /git\/refs/.test(all)))) {
     throw new Refusal('tags', 'this API call reaches tags or releases, or writes a ref the hook cannot read; push a branch with scripts/agent/git.ps1');
   }
-  if (group === 'api' && plain[1] === 'graphql' && texts.some((text) => text.startsWith('--input') || /=@/.test(text))) {
+  if (api && bare.includes('graphql') && texts.some((text) => text.startsWith('--input') || /=@/.test(text))) {
     throw new Refusal('unreadable', 'a GraphQL call whose text comes from a file or from standard input is one the hook cannot read');
   }
-  if (group === 'auth') {
-    throw wrapper ? new Refusal('key', 'gh auth through the wrapper would show or store the app\'s token') : new Refusal('github', 'gh auth works on the owner\'s login');
+  if (bare.includes('auth')) {
+    throw wrapper ? new Refusal('key', `gh auth through the wrapper would show or store the app's token${AS_VALUE}`) : new Refusal('github', "gh auth works on the owner's login");
   }
-  if (!wrapper) throw new Refusal('github', 'plain gh acts with the owner\'s login, reads included; use scripts/agent/gh.ps1');
-  if (/^(alias|extension|ext|config)$/.test(group ?? '')) {
-    throw new Refusal('unreadable', `gh ${group} can make gh run a program the hook cannot read`);
-  }
+  if (!wrapper) throw new Refusal('github', "plain gh acts with the owner's login, reads included; use scripts/agent/gh.ps1");
+  const runs = ['alias', 'extension', 'ext', 'config'].find((name) => bare.includes(name));
+  if (runs) throw new Refusal('unreadable', `gh ${runs} can make gh run a program the hook cannot read${AS_VALUE}`);
 }
 
 function cargo(args) {
@@ -658,8 +713,18 @@ function command(all, dialect, state, depth, mode, sure) {
       const run = args.slice(at + 1, end < 0 ? args.length : end);
       if (run.length) behind(state, !arg.text.endsWith('dir'), () => command(run, dialect, state, depth + 1, 'call', false));
     }
-  } else if (WRAPPERS.has(name)) suffixes(args, dialect, state, depth, name);
+  } else if (WRAPPERS.has(name) && !(name === 'command' && /^-[vV]$/.test(texts[0] ?? ''))) suffixes(args, dialect, state, depth, name);
   return false;
+}
+
+function named(text, what) {
+  const flat = flatten(text);
+  if (flat.some((reading) => DATA_FOLDER.some((pattern) => pattern.test(reading)))) {
+    throw new Refusal('data', `the ${what} names %APPDATA%\\OneLaunch, the real data folder; use a scratch folder`);
+  }
+  if (flat.some((reading) => KEY_NAMES.some((pattern) => pattern.test(reading)))) {
+    throw new Refusal('key', `the ${what} names the app's key folder or a .pem file`);
+  }
 }
 
 function judge({ tool, command: text, cwd, io }) {
@@ -668,12 +733,7 @@ function judge({ tool, command: text, cwd, io }) {
   const state = { cwd: cwd ? path.resolve(cwd) : null, before: 0, count: 0, commits: 0, behind: null, registry: false, gitEnv: false, io };
   try {
     const flat = flatten(text);
-    if (flat.some((reading) => DATA_FOLDER.some((pattern) => pattern.test(reading)))) {
-      throw new Refusal('data', 'the command names %APPDATA%\\OneLaunch, the real data folder; use a scratch folder');
-    }
-    if (flat.some((reading) => KEY_NAMES.some((pattern) => pattern.test(reading)))) {
-      throw new Refusal('key', 'the command names the app\'s key folder or a .pem file');
-    }
+    named(text, 'command');
     walk(text, tool === 'PowerShell' ? 'powershell' : 'bash', state, 0);
     if (flat.some((reading) => TOKEN_SHOWN.test(reading))) {
       throw new Refusal('key', 'the command names GIT_TRACE_REDACT or a GIT_CONFIG variable, which can make git print the app\'s token or hand it to another helper');
@@ -688,4 +748,4 @@ function judge({ tool, command: text, cwd, io }) {
   }
 }
 
-module.exports = { judge };
+module.exports = { judge, named };

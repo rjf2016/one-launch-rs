@@ -13,7 +13,7 @@ const CHECK = ['run', '--locked', '--package', 'xtask', '--', 'check', '--ticket
 
 const io = {
   wrapper: (file, name) => checkout.isWrapper(file, name, HOME),
-  isTag: (folder, name) => require('./lib/secrets.cjs').isTag(folder, name),
+  isTag: (folder, name) => checkout.tagInFiles(folder, name) ?? require('./lib/secrets.cjs').isTag(folder, name),
   commit(folder, broad) {
     const root = checkout.nearest(folder);
     if (!root) throw new Refusal('secrets', 'the commit is not inside a checkout the hook can find');
@@ -28,7 +28,21 @@ function shell(input) {
 }
 
 function write(input) {
-  checkout.judgeWrite(input.tool_input?.file_path ?? input.tool_input?.notebook_path);
+  const file = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
+  checkout.judgeWrite(file);
+  checkout.judgePlace(file);
+}
+
+function read(input) {
+  const given = input.tool_input ?? {};
+  const cwd = input.cwd ?? '.';
+  if (input.tool_name === 'Read') {
+    if (typeof given.file_path !== 'string' || !given.file_path) throw new Refusal('scope', 'the call names no file to read');
+    checkout.judgePlace(given.file_path, { cwd });
+  } else if (input.tool_name === 'Grep' || input.tool_name === 'Glob') {
+    const second = input.tool_name === 'Grep' ? given.glob : given.pattern;
+    for (const field of [given.path ?? cwd, second]) checkout.judgePlace(field, { cwd, search: true });
+  } else throw new Error(`no rules for reading with the tool ${input.tool_name}`);
 }
 
 function format(input) {
@@ -57,6 +71,7 @@ function main() {
   const input = JSON.parse(fs.readFileSync(0, 'utf8'));
   if (mode === 'shell') shell(input);
   else if (mode === 'write') write(input);
+  else if (mode === 'read') read(input);
   else if (mode === 'format') format(input);
   else if (mode === 'stop') {
     const reason = stop(input);

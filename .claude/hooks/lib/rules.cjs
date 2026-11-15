@@ -34,4 +34,9 @@ function explain(error) {
   return `Refused by the safety hook: ${detail}.\nRule: ${title} (${where}).\n`;
 }
 
-module.exports = { RULES, Refusal, explain };
+function unloaded(error) {
+  const why = (error && (error.code || error.message)) || 'it gave no verdict';
+  require('node:fs').writeSync(2, explain(new Refusal('failed', `the hook could not be loaded (${why})`)));
+}
+
+module.exports = { RULES, Refusal, explain, unloaded };

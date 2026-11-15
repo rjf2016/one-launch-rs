@@ -95,11 +95,11 @@ const profile = () => `C:\\${'Users'}\\${'jdoe'}\\AppData\\Roaming`;
 
 test('settings.json wires each hook as node with no shell in between, and a failed tool-call hook blocks', () => {
   const { PreToolUse, PostToolUse, SubagentStop } = SETTINGS.hooks;
-  assert.deepEqual(PreToolUse.map((group) => group.matcher), ['Bash|PowerShell', 'Edit|Write|NotebookEdit|MultiEdit']);
+  assert.deepEqual(PreToolUse.map((group) => group.matcher), ['Bash|PowerShell', 'Edit|Write|NotebookEdit|MultiEdit', 'Read|Grep|Glob']);
   assert.deepEqual(PostToolUse.map((group) => group.matcher), ['Edit|Write|MultiEdit']);
   assert.deepEqual(SubagentStop.map((group) => group.matcher), [undefined]);
   const hooks = [...PreToolUse, ...PostToolUse, ...SubagentStop].flatMap((group) => group.hooks);
-  assert.deepEqual(hooks.map((hook) => hook.args[3]), ['shell', 'write', 'format', 'stop']);
+  assert.deepEqual(hooks.map((hook) => hook.args[3]), ['shell', 'write', 'read', 'format', 'stop']);
   for (const hook of hooks) {
     assert.equal(hook.type, 'command');
     assert.equal(hook.command, 'node');
@@ -111,6 +111,72 @@ test('settings.json wires each hook as node with no shell in between, and a fail
   }
   for (const group of PreToolUse) for (const hook of group.hooks) assert.equal(hook.onFailure, 'block');
   assert.equal(SETTINGS.disableAllHooks, false, 'a user-level switch must not turn these hooks off');
+});
+
+test('what an agent reads of a refusal starts with the hook\'s own line, and nothing in that line reads like a refusal', () => {
+  for (const group of SETTINGS.hooks.PreToolUse) {
+    const [hook] = group.hooks;
+    const echoed = `${hook.command} ${hook.args.join(' ')}`;
+    assert.ok(echoed.length < 320, `Claude Code prints these ${echoed.length} characters before the reason`);
+    assert.deepEqual(echoed.match(/[A-Za-z]+ [A-Za-z]+ [A-Za-z]+/g), null, 'no run of three plain words, so no sentence');
+    assert.ok(!/refus|could not|denied|blocked|not allowed/i.test(echoed));
+  }
+  const refused = shell('PowerShell', 'gh --version');
+  assert.equal(refused.stderr, "Refused by the safety hook: plain gh acts with the owner's login, reads included; use scripts/agent/gh.ps1.\nRule: GitHub other than as the app (plan/design/workflow.md \"Acting as the app\").\n");
+});
+
+test('Read, Grep and Glob: the real data folder, the key folder and a .pem file are refused wherever they are', () => {
+  const roaming = path.join(folder(), 'AppData', 'Roaming');
+  fs.mkdirSync(path.join(roaming, 'Other'), { recursive: true });
+  const env = { APPDATA: roaming };
+  const read = (tool, input, cwd = main) => fire('PreToolUse', tool, { cwd, tool_input: input }, { env });
+  const data = path.join(roaming, 'OneLaunch');
+  const refused = [
+    ['Read', { file_path: path.join(data, 'config.json') }],
+    ['Read', { file_path: path.join(roaming, 'Other', '..', 'ONELAUNCH.', 'vault.bin') }],
+    ['Read', { file_path: `\\\\?\\${path.join(data, 'config.json')}` }],
+    ['Read', { file_path: path.join(main, 'keys', 'app.private-key.pem') }],
+    ['Read', { file_path: path.join(os.tmpdir(), 'one-launch-rs-bot', 'notes.txt') }],
+    ['Grep', { pattern: 'x', path: data }],
+    ['Grep', { pattern: 'x', path: roaming }],
+    ['Grep', { pattern: 'x', path: path.parse(roaming).root }],
+    ['Grep', { pattern: 'x', path: main, glob: '**/*.pem' }],
+    ['Glob', { pattern: path.join(data, '**', '*.json') }],
+    ['Glob', { pattern: `${roaming}\\*\\*.json` }],
+    ['Glob', { pattern: '*.json', path: data }],
+    ['Glob', { pattern: '**/*.pem' }],
+    ['Read', {}],
+  ];
+  for (const [tool, input] of refused) {
+    const result = read(tool, input);
+    assert.deepEqual([result.ran, result.blocked, result.status], [1, true, [2]], `${tool} ${JSON.stringify(input)}`);
+    assert.match(result.stderr, /^Refused by the safety hook: /);
+  }
+  assert.match(read('Read', { file_path: path.join(data, 'config.json') }).stderr, /Rule: the real data folder/);
+  assert.match(read('Read', { file_path: path.join(main, 'keys', 'app.private-key.pem') }).stderr, /Rule: the app's key and tokens/);
+  const allowed = [
+    ['Read', { file_path: path.join(main, 'docs', 'tasklist-notes.md') }],
+    ...['spec/a.md', 'oracle/PIN', '.claude/settings.json', '.claude/hooks/guard.cjs', 'scripts/agent/gh.ps1', '.github/CODEOWNERS', '.git/config'].map((file) => ['Read', { file_path: path.join(tree, file) }]),
+    ['Read', { file_path: path.join(path.parse(main).root, 'somewhere', 'else', 'src', 'main.ts') }],
+    ['Read', { file_path: path.join(os.tmpdir(), 'OneLaunch-scratch', 'config.json') }],
+    ['Read', { file_path: path.join(roaming, 'Other', 'settings.json') }],
+    ['Read', { file_path: path.join(os.homedir(), '.claude', 'projects', 'x', 'memory', 'MEMORY.md') }],
+    ['Grep', { pattern: 'OneLaunch|\\.pem', path: main }],
+    ['Grep', { pattern: 'x', path: path.join(roaming, 'Other'), glob: '*.json' }],
+    ['Grep', { pattern: 'x' }],
+    ['Glob', { pattern: 'crates/**/*.rs' }],
+    ['Glob', { pattern: '**/*.md', path: tree }],
+  ];
+  for (const [tool, input] of allowed) {
+    assert.deepEqual(read(tool, input), { ran: 1, blocked: false, status: [0], stderr: '', stdout: '' }, `${tool} ${JSON.stringify(input)}`);
+  }
+  assert.equal(read('Grep', { pattern: 'x' }, roaming).blocked, true, 'a search with no path runs in the folder the call is made from');
+  for (const tool of ['Edit', 'Write', 'NotebookEdit', 'MultiEdit']) {
+    assert.equal(edit(tool, path.join(data, 'config.json'), main, { env }).blocked, true, tool);
+    assert.equal(edit(tool, path.join(folder(), 'app.private-key.pem'), main, { env }).blocked, true, tool);
+    assert.equal(edit(tool, path.join(roaming, 'Other', 'settings.json'), main, { env }).blocked, false, tool);
+  }
+  assert.equal(fire('PreToolUse', 'Glob', { tool_name: 'WebFetch', tool_input: { url: 'x' } }, { env }).blocked, true, 'another tool on this hook is an error, not a pass');
 });
 
 test('Bash and PowerShell calls: a refusal exits 2 and names the rule, an allowed call exits 0 in silence', () => {
@@ -223,7 +289,58 @@ test('a push through the wrapper of a name that is a tag in that checkout is ref
   assert.equal(shell('PowerShell', `& "${wrapper}" -C "${tree}" push origin HEAD:v9`, main).blocked, true);
   assert.equal(shell('PowerShell', `& "${wrapper}" -C "${tree}" push origin tree`, main).blocked, false);
   assert.equal(shell('PowerShell', `& "${wrapper}" -C "${tree}" push origin v8`, main).blocked, false);
+  fs.mkdirSync(path.join(main, '.git', 'reftable'));
+  assert.equal(shell('PowerShell', `& "${wrapper}" -C "${tree}" push origin v9`, main).blocked, true, 'where the files cannot tell, git is asked');
+  assert.equal(shell('PowerShell', `& "${wrapper}" -C "${tree}" push origin v8`, main).blocked, false);
+  fs.rmdirSync(path.join(main, '.git', 'reftable'));
   fs.rmSync(path.join(main, '.git', 'refs', 'tags', 'v9'));
+});
+
+test('the first commit of a repository is scanned like any other, and so is a staged file whose working copy has moved on', () => {
+  const fresh = folder();
+  git(fresh, 'init', '-q');
+  put(fresh, 'notes.md', `a planted ${token()}\n`);
+  put(fresh, 'sub/clean.md', 'nothing to see\n');
+  git(fresh, 'add', '-A');
+  const refused = shell('Bash', 'git commit -m "first"', fresh);
+  assert.deepEqual([refused.blocked, refused.status], [true, [2]]);
+  assert.match(refused.stderr, /notes\.md:1: github-token ghs_…/);
+  put(fresh, 'notes.md', 'the working copy is clean, the staged one is not\n');
+  assert.equal(shell('Bash', 'git commit -m "first"', fresh).blocked, true);
+  git(fresh, 'add', '-A');
+  assert.equal(shell('Bash', 'git commit -m "first"', fresh).blocked, false);
+  put(fresh, 'notes.md', `the staged copy is clean, the working one holds ${token()}\n`);
+  assert.equal(shell('Bash', 'git commit -m "first"', fresh).blocked, false);
+  git(fresh, 'rm', '-q', '--cached', 'sub/clean.md');
+  assert.equal(shell('Bash', 'git commit -m "first"', fresh).blocked, false, 'a file taken out of the commit is not read');
+  git(fresh, 'commit', '-q', '-m', 'first');
+  const head = spawnSync('git', ['-C', fresh, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+  git(fresh, 'update-index', '--add', '--cacheinfo', `160000,${head},vendor/sub`);
+  assert.equal(shell('Bash', 'git commit -m "second"', fresh).blocked, false, 'a submodule entry is a commit id, not a file');
+  const blob = spawnSync('git', ['-C', fresh, 'rev-parse', 'HEAD:notes.md'], { encoding: 'utf8' }).stdout.trim();
+  const stages = [1, 2, 3].map((stage) => `100644 ${blob} ${stage}\tclash.md\n`).join('');
+  assert.equal(spawnSync('git', ['-C', fresh, 'update-index', '--index-info'], { input: stages }).status, 0);
+  assert.equal(shell('Bash', 'git commit -m "second"', fresh).blocked, false, 'an unmerged path is not staged content; git itself refuses that commit');
+  git(fresh, 'rm', '-q', '--cached', 'clash.md');
+
+  put(fresh, 'notes.md', `a planted ${token()}\n`);
+  git(fresh, 'add', 'notes.md');
+  put(fresh, 'notes.md', 'clean again in the working copy\n');
+  const staged = spawnSync('git', ['-C', fresh, 'rev-parse', ':notes.md'], { encoding: 'utf8' }).stdout.trim();
+  const object = path.join(fresh, '.git', 'objects', staged.slice(0, 2), staged.slice(2));
+  assert.ok(fs.existsSync(object), 'a file staged a moment ago is a loose object');
+  assert.equal(shell('Bash', 'git commit -m "second"', fresh).blocked, true);
+  const kept = fs.readFileSync(object);
+  fs.chmodSync(object, 0o644);
+  fs.writeFileSync(object, 'not an object');
+  assert.equal(shell('Bash', 'git commit -m "second"', fresh).blocked, true, 'a staged file that cannot be read is not passed over');
+  fs.writeFileSync(object, kept);
+  git(fresh, 'repack', '-a', '-d', '-q');
+  git(fresh, 'prune-packed', '-q');
+  assert.ok(!fs.existsSync(object), 'the staged file now lives in a pack');
+  const packed = shell('Bash', 'git commit -m "second"', fresh);
+  assert.equal(packed.blocked, true);
+  assert.match(packed.stderr, /notes\.md:1: github-token ghs_…/);
 });
 
 test('a commit outside every checkout is refused, since nothing can be scanned', () => {
@@ -259,11 +376,18 @@ test('a hook that is missing, empty, cut short or throwing refuses the call', ()
   };
   for (const [name, change] of Object.entries(cases)) {
     const home = broken(change);
-    for (const call of [() => shell('Bash', 'git status', home, { home }), () => shell('PowerShell', 'Get-ChildItem', home, { home }), () => edit('Edit', path.join(home, 'crates', 'a.rs'), home, { home })]) {
+    const bare = name === 'the hooks folder gone' || name === 'a rule file missing';
+    const calls = [
+      () => shell('Bash', 'git status', home, { home }),
+      () => shell('PowerShell', 'Get-ChildItem', home, { home }),
+      () => edit('Edit', path.join(home, 'crates', 'a.rs'), home, { home }),
+      () => fire('PreToolUse', 'Read', { cwd: home, tool_input: { file_path: path.join(home, 'crates', 'a.rs') } }, { home }),
+    ];
+    for (const call of calls) {
       const result = call();
       assert.deepEqual([result.ran, result.blocked, result.status], [1, true, [2]], name);
-      assert.match(result.stderr, /^Refused by the safety hook: /, name);
-      assert.match(result.stderr, /Rule: fail closed/, name);
+      if (bare) assert.equal(result.stderr, 'fail closed MODULE_NOT_FOUND', name);
+      else assert.match(result.stderr, /^Refused by the safety hook: the hook (could not be loaded|failed while reading this call) \(.+\)\.\nRule: fail closed/, name);
     }
   }
   const whole = broken(() => {});
@@ -304,7 +428,7 @@ test('a hook path that is not filled in refuses, and so does a failure to start 
   }
   const unfilled = spawnSync(hook.command, hook.args, { input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git status' } }), cwd: main, encoding: 'utf8' });
   assert.equal(unfilled.status, 2);
-  assert.match(unfilled.stderr, /could not be loaded \(MODULE_NOT_FOUND\)/);
+  assert.equal(unfilled.stderr, 'fail closed MODULE_NOT_FOUND');
   const noNode = fire('PreToolUse', 'Bash', { tool_input: { command: 'git status' } }, { env: { PATH: '', Path: '' } });
   assert.equal(noNode.blocked, true);
 });

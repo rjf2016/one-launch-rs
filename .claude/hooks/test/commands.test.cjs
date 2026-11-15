@@ -727,7 +727,6 @@ const MORE_REFUSED = [
   ['data', 'PowerShell', 'Get-ChildItem (Join-Path $env:APPDATA -ChildPath OneLaunch)'],
   ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --body --auto'],
   ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash -t --auto'],
-  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 --auto pr merge 5'],
   ['merge', 'PowerShell', 'scripts/agent/gh.ps1 api repos/o/r/merges -f base=main -f head=m1/x'],
   ['tags', 'PowerShell', "scripts/agent/git.ps1 push origin 'refs/*:refs/*'"],
   ['tags', 'Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 api repos/o/r/git/refs --input -'],
@@ -750,6 +749,77 @@ const MORE_REFUSED = [
   ['process', 'Bash', "bash --rcfile x -c 'tasklist'"],
   ['process', 'Bash', 'case x in "$(case y in y) echo \'a"b\';; esac)") :;; esac; tasklist'],
   ['process', 'PowerShell', "Get-X @'\rit's\r'@; tasklist"],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --subject --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --subject "--auto"'],
+  ['merge', 'PowerShell', "scripts/agent/gh.ps1 pr merge 5 --squash --subject '--auto'"],
+  ['merge', 'Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 pr merge 5 --squash --subject "--auto"'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --body "--auto"'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --body-file --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --match-head-commit --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --author-email --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --repo --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash -b --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash -F --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash -A --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash -R --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 -st --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 -sdt --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 -sb --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash -- --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge --squash -- --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --subject x --body --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --auto=false'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --auto=0'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --auto=true'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --auto --auto=0'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --auto --disable-auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --disable-auto=false --squash'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 -st pr merge --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr -sb merge --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge --body=--auto -s=false --auto -A --rebase --auto=0 --squash'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge -d -s --body --AUTO x --merge'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge -dt --auto -t--auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge --subject --auto -A --squash'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --auto --frobnicate'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --auto -x'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --auto --admin'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --auto --admin=true'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr -b x merge 5 --squash'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr --body x merge 5 --squash'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 -t x pr merge 5 --squash'],
+  ['tags', 'PowerShell', 'scripts/agent/gh.ps1 -n notes release create v1'],
+  ['key', 'PowerShell', 'scripts/agent/gh.ps1 -h github.com auth token'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 -f base=main api repos/o/r/merges -f head=x'],
+  ['unreadable', 'PowerShell', 'scripts/agent/gh.ps1 -x y alias set m "pr merge"'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push --mirro'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push --mirr origin'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push --mi'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push --m'],
+  ['process', 'PowerShell', '[System.Diagnostics.Process]::GetProcesses()'],
+  ['process', 'PowerShell', "[Diagnostics.Process]::GetProcessesByName('x')"],
+  ['process', 'PowerShell', "[Diagnostics.Process]::Start('steam.exe')"],
+  ['process', 'PowerShell', "[System.Diagnostics.Process]::Start('steam://open/main')"],
+  ['process', 'PowerShell', 'New-Object System.Diagnostics.ProcessStartInfo'],
+  ['process', 'PowerShell', '([wmiclass]"Win32_Process").Create("x")'],
+  ['process', 'PowerShell', '([wmisearcher]"select * from Win32_Process").Get()'],
+  ['process', 'PowerShell', '(New-Object System.Management.ManagementObjectSearcher "select * from Win32_Process").Get()'],
+  ['process', 'Bash', 'pwsh -NoProfile -Command "[Diagnostics.Process]::GetProcesses()"'],
+  ['registry', 'PowerShell', "[Microsoft.Win32.Registry]::SetValue('HKEY_CURRENT_USER\\Software\\X', 'a', 'b')"],
+  ['registry', 'PowerShell', "[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\\X', $true).SetValue('a', 'b')"],
+  ['registry', 'PowerShell', '[Microsoft.Win32.RegistryKey]::OpenBaseKey(1, 0)'],
+  ['unreadable', 'PowerShell', "[scriptblock]::Create('Get-Date').Invoke()"],
+  ['unreadable', 'PowerShell', "[ScriptBlock] :: Create('Get-Date')"],
+  ['unreadable', 'PowerShell', "$ExecutionContext.InvokeCommand.InvokeScript('Get-Date')"],
+  ['unreadable', 'PowerShell', "$ExecutionContext.InvokeCommand.NewScriptBlock('Get-Date')"],
+  ['bypass', 'Bash', 'git config core.hooksPath .githooks'],
+  ['bypass', 'Bash', 'git config --local core.hooksPath .githooks'],
+  ['bypass', 'Bash', 'git config --unset core.hooksPath'],
+  ['bypass', 'Bash', 'git config set core.hooksPath .githooks'],
+  ['bypass', 'Bash', 'git config unset core.hooksPath'],
+  ['bypass', 'Bash', 'git config --get core.hooksPath --unset'],
+  ['bypass', 'Bash', 'git config --file .git/config core.hooksPath x'],
+  ['process', 'Bash', 'command tasklist'],
+  ['process', 'Bash', 'command -p tasklist'],
 ];
 
 const MORE_ALLOWED = [
@@ -944,7 +1014,149 @@ const MORE_ALLOWED = [
   ['Bash', 'echo hello &> out.txt tasklist'],
   ['Bash', 'git commit -m "$(cat < msg.txt)"'],
   ['Bash', 'cmd //c "git commit -m \\"x y\\" & xargs echo done"'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --auto --squash --match-head-commit abc123 --subject "M1-F6a: x (#5)" --body-file squash.md'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --subject "--auto" --auto'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr merge 5 -s --auto -t x -F squash.md'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --auto -sd'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --auto --squash --repo=o/r'],
+  ['PowerShell', 'scripts/agent/gh.ps1 -R o/r pr merge 5 --auto -tsubject'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --disable-auto'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr list --label=release --search=merge'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr view 5 --json mergeable'],
+  ['Bash', 'command -v gh'],
+  ['Bash', 'command -v pwsh'],
+  ['Bash', 'command -V tasklist'],
+  ['Bash', 'git config --get core.hooksPath'],
+  ['Bash', 'git config core.hooksPath'],
+  ['Bash', 'git config get core.hooksPath'],
+  ['Bash', 'git config --get-regexp hookspath'],
+  ['Bash', 'git config --file .git/config --get core.hooksPath'],
+  ['Bash', 'git config --file .git/config core.hooksPath'],
+  ['Bash', 'git config --get-all core.hooksPath githooks'],
+  ['Bash', 'git config -l core.hooksPath x'],
+  ['PowerShell', 'Get-ItemProperty HKCU:\\Software\\Valve\\Steam -Name SteamPath'],
+  ['Bash', 'rg -n "Diagnostics.Process" docs'],
+  ['PowerShell', `cargo run -p ol-app -- --data-dir "${path.join(os.tmpdir(), 'OneLaunch-scratch')}"`],
+  ['PowerShell', `.\\target\\debug\\OneLaunch.exe --data-dir="${path.join(os.tmpdir(), 'ol', 'OneLaunch')}"`],
+  ['PowerShell', 'Get-ChildItem $env:LOCALAPPDATA\\Temp\\OneLaunch-scratch'],
 ];
+
+test('gh pr merge: no list of options that gh would read as a merge at once gets past', () => {
+  const VALUE_LONG = ['author-email', 'body', 'body-file', 'match-head-commit', 'subject', 'repo'];
+  const BOOL_LONG = ['admin', 'auto', 'delete-branch', 'disable-auto', 'merge', 'rebase', 'squash', 'help'];
+  const SHORT = { A: 'author-email', b: 'body', F: 'body-file', t: 'subject', R: 'repo', d: 'delete-branch', m: 'merge', r: 'rebase', s: 'squash', h: 'help' };
+  const TRUTH = { 1: true, t: true, T: true, TRUE: true, true: true, True: true, 0: false, f: false, F: false, FALSE: false, false: false, False: false };
+  const pflag = (words) => {
+    const flags = {};
+    const bool = (name, text) => {
+      if (text !== undefined && !(text in TRUTH)) throw new Error('not a truth value');
+      flags[name] = text === undefined ? true : TRUTH[text];
+    };
+    for (let k = 0; k < words.length; k++) {
+      const word = words[k];
+      if (word === '--') break;
+      if (word.startsWith('--')) {
+        const cut = word.indexOf('=');
+        const name = cut < 0 ? word.slice(2) : word.slice(2, cut);
+        if (VALUE_LONG.includes(name)) {
+          if (cut < 0 && ++k >= words.length) throw new Error('no value');
+        } else if (BOOL_LONG.includes(name)) bool(name, cut < 0 ? undefined : word.slice(cut + 1));
+        else throw new Error('unknown flag');
+      } else if (word.length > 1 && word.startsWith('-')) {
+        let rest = word.slice(1);
+        while (rest) {
+          const name = SHORT[rest[0]];
+          if (!name) throw new Error('unknown shorthand');
+          if (VALUE_LONG.includes(name)) {
+            if (rest.length === 1 && ++k >= words.length) throw new Error('no value');
+            rest = '';
+          } else if (rest.length > 2 && rest[1] === '=') {
+            bool(name, rest.slice(2));
+            rest = '';
+          } else {
+            bool(name);
+            rest = rest.slice(1);
+          }
+        }
+      }
+    }
+    return flags;
+  };
+  const valueless = (word, known) => known.includes(word) || word.includes('=') || !(word.startsWith('--') || word.length === 2);
+  const commandWords = (words, known) => {
+    const found = [];
+    for (let k = 0; k < words.length && words[k] !== '--'; k++) {
+      if (!words[k].startsWith('-')) found.push(words[k]);
+      else if (!valueless(words[k], known)) {
+        if (words.length - k - 1 <= 1) break;
+        k++;
+      }
+    }
+    return found;
+  };
+  const without = (words, name, known) => {
+    for (let k = 0; k < words.length && words[k] !== '--'; k++) {
+      if (words[k] === name) return [...words.slice(0, k), ...words.slice(k + 1)];
+      if (words[k].startsWith('-') && !valueless(words[k], known)) k++;
+    }
+    return words;
+  };
+  const cobra = (words) => {
+    let rest = words;
+    for (const [name, known] of [['pr', ['--help', '--version', '-h']], ['merge', ['--help', '-h']]]) {
+      if (commandWords(rest, known)[0] !== name) return null;
+      rest = without(rest, name, known);
+    }
+    return rest;
+  };
+  const mergesAtOnce = (words) => {
+    const read = cobra(words);
+    if (!read) return false;
+    let flags;
+    try {
+      flags = pflag(read);
+    } catch {
+      return false;
+    }
+    const chosen = [flags.auto, flags['disable-auto'], flags.admin].filter(Boolean).length;
+    return !flags.help && chosen <= 1 && !flags.auto && !flags['disable-auto'];
+  };
+  const PIECES = [
+    ...['--auto', '--auto', '--auto', '--auto=true', '--auto=false', '--auto=0', '--auto=1', '--auto=F', '--auto=x', '--AUTO', '--admin', '--admin=false', '--admin=1'],
+    ...['--disable-auto', '--disable-auto=false', '--squash', '--merge', '--rebase', '--delete-branch', '--squash=false', '-s', '-d', '-m', '-r', '-sd', '-s=false', '-d=true', '-ds=0'],
+    ...['--body', '--body=--auto', '--subject', '--subject=x', '--body-file', '--match-head-commit', '--author-email', '--repo', '--repo=o/r', '-t', '-b', '-F', '-A', '-R'],
+    ...['-t--auto', '-tx', '-t=x', '-st', '-dt', '-sb', '-sdt', '--', 'x', '5', 'true', 'false', '--frob', '--auto-merge', '-x', '-sx', '--help', '-h', '-'],
+  ];
+  let seed = 20261115;
+  const random = (below) => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return Math.floor((seed / 2 ** 32) * below);
+  };
+  const missed = [];
+  const counts = { atOnce: 0, allowed: 0 };
+  for (let run = 0; run < 6000; run++) {
+    const words = Array.from({ length: random(9) }, () => PIECES[random(PIECES.length)]);
+    const cut = random(4) === 0 ? random(words.length + 1) : 0;
+    const between = random(6) === 0 ? [PIECES[random(PIECES.length)]] : [];
+    for (const number of [['5'], []]) {
+      const list = [...words.slice(0, cut), 'pr', ...between, 'merge', ...number, ...words.slice(cut)];
+      const atOnce = mergesAtOnce(list);
+      const got = verdict('PowerShell', `scripts/agent/gh.ps1 ${list.join(' ')}`);
+      counts.atOnce += atOnce ? 1 : 0;
+      counts.allowed += got === 'allow' ? 1 : 0;
+      if (atOnce && got !== 'merge') missed.push(list.join(' '));
+      if (got !== 'allow' && got !== 'merge') missed.push(`${got}: ${list.join(' ')}`);
+    }
+  }
+  assert.deepEqual(missed.slice(0, 10), []);
+  assert.ok(counts.atOnce > 1000 && counts.allowed > 300, JSON.stringify(counts));
+  assert.equal(mergesAtOnce(['-st', 'pr', 'merge', '--auto']), true, 'the option in front takes --auto as its value once gh has taken the two command words out');
+  assert.equal(mergesAtOnce(['pr', 'merge', '5', '--squash', '--auto']), false);
+  assert.equal(mergesAtOnce(['pr', 'merge', '5', '--squash']), true);
+  for (const once of ['--auto', '--squash --auto', '--auto -sd', '--subject --auto --auto', '-t x --auto -F f.md', '--disable-auto']) {
+    assert.equal(verdict('PowerShell', `scripts/agent/gh.ps1 pr merge 5 ${once}`), 'allow', once);
+  }
+});
 
 test('more ways to spell a refused command are refused', () => {
   const wrong = MORE_REFUSED.filter(([rule, tool, command]) => verdict(tool, command) !== rule);

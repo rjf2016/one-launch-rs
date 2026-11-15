@@ -10,7 +10,7 @@
             "command": "node",
             "args": [
               "-e",
-              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 'it gave no verdict'}catch(e){process.exitCode=2;require('fs').writeSync(2,'Refused by the safety hook: it could not be loaded ('+(e&&e.code||e)+'). Rule: fail closed (plan/design/workflow.md, Hooks).')}",
+              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 0}catch(e){process.exitCode=2;try{require(process.argv[1]+'/../lib/rules.cjs').unloaded(e)}catch{require('fs').writeSync(2,'fail closed '+(e&&e.code))}}",
               "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard.cjs",
               "shell"
             ],
@@ -27,9 +27,26 @@
             "command": "node",
             "args": [
               "-e",
-              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 'it gave no verdict'}catch(e){process.exitCode=2;require('fs').writeSync(2,'Refused by the safety hook: it could not be loaded ('+(e&&e.code||e)+'). Rule: fail closed (plan/design/workflow.md, Hooks).')}",
+              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 0}catch(e){process.exitCode=2;try{require(process.argv[1]+'/../lib/rules.cjs').unloaded(e)}catch{require('fs').writeSync(2,'fail closed '+(e&&e.code))}}",
               "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard.cjs",
               "write"
+            ],
+            "onFailure": "block",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "-e",
+              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 0}catch(e){process.exitCode=2;try{require(process.argv[1]+'/../lib/rules.cjs').unloaded(e)}catch{require('fs').writeSync(2,'fail closed '+(e&&e.code))}}",
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard.cjs",
+              "read"
             ],
             "onFailure": "block",
             "timeout": 30
@@ -46,7 +63,7 @@
             "command": "node",
             "args": [
               "-e",
-              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 'it gave no verdict'}catch(e){process.exitCode=2;require('fs').writeSync(2,'Refused by the safety hook: it could not be loaded ('+(e&&e.code||e)+'). Rule: fail closed (plan/design/workflow.md, Hooks).')}",
+              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 0}catch(e){process.exitCode=2;try{require(process.argv[1]+'/../lib/rules.cjs').unloaded(e)}catch{require('fs').writeSync(2,'fail closed '+(e&&e.code))}}",
               "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard.cjs",
               "format"
             ],
@@ -63,7 +80,7 @@
             "command": "node",
             "args": [
               "-e",
-              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 'it gave no verdict'}catch(e){process.exitCode=2;require('fs').writeSync(2,'Refused by the safety hook: it could not be loaded ('+(e&&e.code||e)+'). Rule: fail closed (plan/design/workflow.md, Hooks).')}",
+              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 0}catch(e){process.exitCode=2;try{require(process.argv[1]+'/../lib/rules.cjs').unloaded(e)}catch{require('fs').writeSync(2,'fail closed '+(e&&e.code))}}",
               "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard.cjs",
               "stop"
             ],

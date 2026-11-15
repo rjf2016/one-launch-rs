@@ -208,6 +208,16 @@ function isTag(folder, name) {
   return git(folder, ['for-each-ref', '--count=1', '--format=%(refname)', `refs/tags/${name}`]).toString('utf8').trim() !== '';
 }
 
+function stagedOnly(root) {
+  const records = git(root, ['--no-optional-locks', 'diff', '--cached', '--raw', '-z', '--no-abbrev', '--no-renames', '--no-ext-diff']).toString('utf8').split('\0');
+  const list = [];
+  for (let k = 0; k + 1 < records.length; k += 2) {
+    const [, mode, , oid, staged] = records[k].split(' ');
+    if (mode !== '160000' && staged !== 'U') list.push({ staged, unstaged: '.', oid, name: records[k + 1] });
+  }
+  return list;
+}
+
 function changes(root) {
   const records = git(root, ['--no-optional-locks', 'status', '--porcelain=v2', '-z', '--untracked-files=no', '--no-renames']).toString('utf8').split('\0');
   const list = [];
@@ -247,9 +257,19 @@ function blobName(bytes, like) {
     .digest('hex');
 }
 
+function looseBlob(root, oid) {
+  try {
+    const common = require('./checkout.cjs').commonDir(root);
+    const whole = require('node:zlib').inflateSync(fs.readFileSync(path.join(common, 'objects', oid.slice(0, 2), oid.slice(2))));
+    return whole.subarray(whole.indexOf(0) + 1);
+  } catch {
+    return null;
+  }
+}
+
 function commitFindings(root, broad) {
   const scanner = new Scanner(allowed(root));
-  const list = changes(root);
+  const list = broad ? changes(root) : stagedOnly(root);
   const onDisk = new Map();
   const disk = (name) => {
     if (!onDisk.has(name)) onDisk.set(name, fs.readFileSync(path.join(root, name)));
@@ -258,14 +278,15 @@ function commitFindings(root, broad) {
   const staged = list.filter((entry) => entry.staged !== '.' && entry.staged !== 'D');
   const same = (entry) => {
     try {
-      return entry.unstaged === '.' && blobName(disk(entry.name), entry.oid) === entry.oid;
+      return blobName(disk(entry.name), entry.oid) === entry.oid;
     } catch {
       return false;
     }
   };
-  const fetched = blobs(root, staged.filter((entry) => !same(entry)).map((entry) => entry.oid));
-  const problems = staged.flatMap((entry) => fileFindings(scanner, entry.name, fetched.get(entry.oid) ?? disk(entry.name)));
-  if (!broad) return problems;
+  const loose = new Map();
+  for (const entry of staged.filter((each) => !same(each))) loose.set(entry.oid, looseBlob(root, entry.oid));
+  const fetched = blobs(root, [...loose].filter(([, bytes]) => bytes === null).map(([oid]) => oid));
+  const problems = staged.flatMap((entry) => fileFindings(scanner, entry.name, loose.get(entry.oid) ?? fetched.get(entry.oid) ?? disk(entry.name)));
   for (const entry of list.filter((each) => each.unstaged !== '.' && each.unstaged !== 'D')) {
     for (const problem of fileFindings(scanner, entry.name, disk(entry.name))) {
       if (!problems.includes(problem)) problems.push(problem);

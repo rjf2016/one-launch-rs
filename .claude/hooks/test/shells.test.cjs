@@ -36,9 +36,16 @@ function gitBash() {
   return beside && fs.existsSync(beside) ? beside : 'bash';
 }
 
+function bashEnv(shell) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.toUpperCase() !== 'PATH'));
+  const own = path.isAbsolute(shell) ? [path.dirname(shell), path.resolve(path.dirname(shell), '..', '..', 'mingw64', 'bin')] : [];
+  return { ...env, PATH: [...own, process.env.PATH ?? ''].join(path.delimiter) };
+}
+
 const pwsh = spawnSync('pwsh', ['-NoProfile', '-Command', 'exit 0']).status === 0;
 const bash = gitBash();
-const bashWorks = spawnSync(bash, ['-c', 'echo ok'], { encoding: 'utf8' }).stdout === 'ok\n';
+const env = bashEnv(bash);
+const bashWorks = spawnSync(bash, ['-c', 'echo ok | cat'], { encoding: 'utf8', env }).stdout === 'ok\n';
 
 const POWERSHELL = [
   'Write-Output a@\'\nit\'s\n\'@; Seen-A; \'x\'',
@@ -607,7 +614,7 @@ test('every command bash really runs in a text is one the hook refuses when it i
   let ran = 0;
   let quiet = 0;
   for (const text of BASH) {
-    const run = spawnSync(bash, ['-c', text], { cwd: scratch, encoding: 'utf8', timeout: 20000, input: '' });
+    const run = spawnSync(bash, ['-c', text], { cwd: scratch, encoding: 'utf8', timeout: 20000, input: '', env });
     const said = `${run.stdout}\n${run.stderr.split(/\r?\n/).filter((line) => !/bash: -c: /.test(line)).join('\n')}`;
     if (/SEEN-[ABC]/.test(said)) {
       ran++;

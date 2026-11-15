@@ -7,7 +7,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { after, test } = require('node:test');
 const { Refusal } = require('../lib/rules.cjs');
-const { judgeWrite, glob, isWrapper, writeScope, OWNER_APPROVED } = require('../lib/checkout.cjs');
+const { judgeWrite, judgePlace, tagInFiles, glob, isWrapper, writeScope, OWNER_APPROVED } = require('../lib/checkout.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const made = [];
@@ -323,6 +323,88 @@ test('a wrapper is scripts/agent/<name> of the session\'s repo and nothing else'
   assert.equal(wrapper(other, 'scripts', 'agent', 'gh.ps1'), false);
   assert.equal(wrapper(plain, 'scripts', 'agent', 'gh.ps1'), false);
   assert.equal(isWrapper(path.join(main, 'scripts', 'agent', 'gh.ps1'), 'gh.ps1', plain), false);
+});
+
+test('a path in the real data folder, in the key folder or to a .pem file is refused for every file tool', () => {
+  const roaming = path.join(folder(), 'AppData', 'Roaming');
+  fs.mkdirSync(path.join(roaming, 'Other'), { recursive: true });
+  const data = path.join(roaming, 'OneLaunch');
+  const place = (text, options = {}) => {
+    try {
+      judgePlace(text, { roaming, ...options });
+      return 'allow';
+    } catch (error) {
+      if (error instanceof Refusal) return error.rule;
+      throw error;
+    }
+  };
+  const elsewhere = folder();
+  fs.symlinkSync(roaming, path.join(elsewhere, 'link'), 'junction');
+  const refused = {
+    [path.join(data, 'config.json')]: 'data',
+    [data]: 'data',
+    [path.join(roaming, 'Other', '..', 'onelaunch', 'x')]: 'data',
+    [`${data}.`]: 'data',
+    [`${data}-scratch`]: 'data',
+    [path.join(elsewhere, 'link', 'OneLaunch', 'vault.bin')]: 'data',
+    [path.join(elsewhere, 'AppData', 'Roaming', 'OneLaunch', 'x')]: 'data',
+    [path.join(elsewhere, 'one-launch-rs-bot', 'x')]: 'key',
+    [path.join(elsewhere, 'app.private-key.pem')]: 'key',
+    [path.join(elsewhere, 'x.PEM')]: 'key',
+  };
+  for (const [text, rule] of Object.entries(refused)) assert.equal(place(text), rule, text);
+  for (const text of [path.join(roaming, 'Other', 'x.json'), path.join(elsewhere, 'OneLaunch', 'x'), path.join(elsewhere, 'pem', 'x.pemfile'), roaming]) {
+    assert.equal(place(text), 'allow', text);
+  }
+  const search = { search: true };
+  assert.equal(place(roaming, search), 'data');
+  assert.equal(place(path.parse(roaming).root, search), 'data');
+  assert.equal(place(path.join(elsewhere, 'link'), search), 'data');
+  assert.equal(place(`${roaming}\\*\\*.json`, search), 'data');
+  assert.equal(place(`${path.parse(roaming).root}*`, search), 'data');
+  assert.equal(place('**/*.json', { search: true, cwd: roaming }), 'data');
+  assert.equal(place('**/*.json', { search: true, cwd: path.join(roaming, 'Other') }), 'allow');
+  assert.equal(place(path.join(roaming, 'Other'), search), 'allow');
+  assert.equal(place(`${path.join(roaming, 'Other')}\\**\\*.json`, search), 'allow');
+  assert.equal(place('*.pem', search), 'key');
+  assert.equal(place(path.join(data, 'x'), { roaming: '' }), 'data', 'the name is enough when the folder is not known');
+  assert.equal(place(path.join(elsewhere, 'link', 'OneLaunch', 'x'), { roaming: '' }), 'data', 'the name the path really has counts too');
+  assert.equal(place(path.join(elsewhere, 'link', 'Other', 'x'), { roaming: '' }), 'allow');
+  const plain = path.join(folder(), 'R');
+  fs.mkdirSync(plain);
+  const held = { roaming: plain };
+  assert.equal(place(path.join(plain, 'OneLaunch', 'config.json'), held), 'data', 'where the file is counts, whatever the folders above are called');
+  assert.equal(place(path.join(plain, 'OneLaunch'), held), 'data');
+  assert.equal(place(path.join(plain, 'OneLaunch-scratch', 'config.json'), held), 'allow');
+  assert.equal(place(plain, { ...held, search: true }), 'data');
+  assert.equal(place(path.join(plain, 'OneLaunch-scratch'), { ...held, search: true }), 'allow');
+  for (const nothing of [undefined, null, '', 42]) assert.equal(place(nothing), 'allow');
+});
+
+test('a tag is found in the files of the repository, loose or packed, and git is asked only when they cannot tell', () => {
+  const main = folder();
+  git(main, 'init', '-q');
+  put(main, 'a.txt', 'a\n');
+  git(main, 'add', '-A');
+  git(main, 'commit', '-q', '-m', 'fixture');
+  git(main, 'tag', 'v1');
+  git(main, 'tag', 'nested/v2');
+  git(main, 'tag', 'v3');
+  git(main, 'pack-refs', '--all');
+  git(main, 'tag', 'v4');
+  git(main, 'tag', 'deeper/v6');
+  assert.equal(tagInFiles(main, 'deeper'), false, 'a folder of tags is not a tag');
+  assert.equal(tagInFiles(main, 'deeper/v6'), true);
+  const tree = `${main}-tree`;
+  made.push(tree);
+  git(main, 'worktree', 'add', '-q', '-b', 'tree', tree);
+  for (const root of [main, tree, path.join(main, '.git', '..')]) {
+    assert.deepEqual(['v1', 'nested/v2', 'v3', 'v4', 'v5', 'main', 'tree', 'nested', 'v', 'v1x'].map((name) => tagInFiles(root, name)), [true, true, true, true, false, false, false, false, false, false], root);
+  }
+  for (const odd of ['v1~1', 'a..b', 'v1^{}', 'refs/tags/../tags/v1', '@', '']) assert.equal(tagInFiles(main, odd), null, odd);
+  assert.equal(tagInFiles(folder(), 'v1'), null, 'no checkout, so git must say');
+  fs.mkdirSync(path.join(main, '.git', 'reftable'));
+  assert.equal(tagInFiles(main, 'v1'), null, 'another way of keeping refs, so git must say');
 });
 
 test('a call with no usable path is refused', () => {

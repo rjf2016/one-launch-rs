@@ -180,4 +180,35 @@ function judgeWrite(file) {
   }
 }
 
-module.exports = { canonical, commonDir, isWrapper, nearest, ticket, writeScope, glob, judgeWrite, OWNER_APPROVED };
+function tagInFiles(folder, name) {
+  const root = nearest(folder);
+  const common = root && commonDir(root);
+  if (!common || !fs.existsSync(common) || fs.existsSync(path.join(common, 'reftable')) || !/^[\w.-]+(\/[\w.-]+)*$/.test(name) || name.includes('..')) return null;
+  const loose = fs.statSync(path.join(common, 'refs', 'tags', ...name.split('/')), { throwIfNoEntry: false });
+  if (loose) return loose.isFile();
+  let packed = '';
+  try {
+    packed = fs.readFileSync(path.join(common, 'packed-refs'), 'utf8');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  return packed.split(/\r?\n/).some((line) => line.endsWith(` refs/tags/${name}`));
+}
+
+function judgePlace(text, { cwd = '.', search = false, roaming = process.env.APPDATA } = {}) {
+  if (typeof text !== 'string' || text === '') return;
+  const parts = text.split(/[\\/]/);
+  const wild = search ? parts.findIndex((part) => /[*?[{]/.test(part)) : -1;
+  const fixed = wild < 0 ? text : parts.slice(0, wild).map((part) => part + path.sep).join('');
+  const real = canonical(path.resolve(cwd, fixed)).toLowerCase();
+  const { named } = require('./commands.cjs');
+  named(text, 'path');
+  named(real, 'path');
+  if (!roaming) return;
+  const data = path.join(canonical(roaming), 'OneLaunch').toLowerCase();
+  const inside = (inner, outer) => inner === outer || inner.startsWith(outer.endsWith(path.sep) ? outer : outer + path.sep);
+  if (inside(real, data)) throw new Refusal('data', 'the path is in the real data folder; use a scratch folder');
+  if (search && inside(data, real)) throw new Refusal('data', 'a search from this folder would go through the real data folder; search a folder that does not hold it');
+}
+
+module.exports = { canonical, commonDir, isWrapper, nearest, ticket, writeScope, glob, judgeWrite, judgePlace, tagInFiles, OWNER_APPROVED };

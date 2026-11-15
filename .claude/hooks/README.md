@@ -1,19 +1,38 @@
 # Safety hooks
 
-`../settings.json` runs `guard.cjs` in four places. The rules themselves are in `CLAUDE.md` › "Standing rules" and `plan/design/workflow.md` › "Hooks"; this folder only enforces them. A hook is a seatbelt: CI repeats every check.
+`../settings.json` runs `guard.cjs` in five places. The rules themselves are in `CLAUDE.md` › "Standing rules" and `plan/design/workflow.md` › "Hooks"; this folder only enforces them. A hook is a seatbelt: CI repeats every check.
 
 | Event | Tools | Mode | What it does |
 | --- | --- | --- | --- |
 | PreToolUse | Bash, PowerShell (and Monitor, which Claude Code hands over as Bash) | `shell` | Reads the command as text and refuses what the rules forbid. Before a `git commit` it scans what the commit would hold |
-| PreToolUse | Edit, Write, NotebookEdit, MultiEdit | `write` | Refuses a path the ticket's `write_scope` does not name, or an owner-approved path when no ticket is set |
+| PreToolUse | Edit, Write, NotebookEdit, MultiEdit | `write` | Refuses a path the ticket's `write_scope` does not name, or an owner-approved path when no ticket is set; and, wherever the file is, a path in the real data folder, in the key folder or to a `.pem` file |
+| PreToolUse | Read, Grep, Glob | `read` | Refuses the same three places: Read's `file_path`, Grep's `path` and `glob`, Glob's `pattern` and `path`. Everything else may be read |
 | PostToolUse | Edit, Write, MultiEdit | `format` | Runs `rustfmt` on a changed `.rs` file. Never blocks |
 | SubagentStop | every agent type | `stop` | Runs `cargo run --locked --package xtask -- check --ticket <id>` when a ticket is set, and keeps the agent going while it fails |
 
 Nothing in here runs any part of a command it reads.
 
+## How everyday calls are written
+
+The hook reads the text of a call, not what a variable will hold, so:
+
+- **The wrappers by a path written out.** `pwsh -NoProfile -File "D:\work\repo\scripts\agent\git.ps1" -C "D:\work\repo" push -u origin m1/x`, or `scripts/agent/gh.ps1 pr view 5` from inside the checkout. `& "$repo\scripts\agent\git.ps1"` is refused, and so is a commit or a push with `-C "$repo"`: the hook cannot tell which script or which folder that is.
+- **GitHub only through them.** `scripts/agent/git.ps1 fetch`, `pull`, `clone`, `push` and `ls-remote`, also for a local folder; `scripts/agent/gh.ps1` for everything `gh` does. Plain `gh` is refused whole, reads included.
+- **Stage in one call, commit in the next.** `git add ...` and then, alone, `git commit -m "..."`. Only a `cd` may stand before the commit; a message may come from `cat <<'EOF'` or `Get-Content` inside `-m "$(...)"`.
+- **`pr merge` with a plain `--auto`.** `scripts/agent/gh.ps1 pr merge 5 --auto --squash --match-head-commit <sha> --subject "..." --body-file squash.md`.
+- **A message or a pull request body that must name the real data folder, the key folder or a `.pem` file goes in a file** (`-F`, `--body-file`), written with Write.
+- **The app only with a data folder:** `cargo run -p ol-app -- --data-dir <scratch>` or `OneLaunch.exe --data-dir=<scratch>`.
+- **No process tool has an allowed form,** and no launcher, installer or registry write either. A refusal says which rule it was.
+
+A call takes about 40 ms more than without the hooks (node starts, reads, exits); a `git commit` about 75 ms, because git is asked what is staged. Measured on the PC the hooks were written on, median of 50, by `bench.cjs`: Read, Grep, Glob 38 ms; Bash and PowerShell 39 to 41 ms; Edit and Write 36 to 40 ms; a push through the wrapper 43 ms; a commit with nothing staged 71 ms; a commit of five staged files, one of them changed again since, 80 ms. On a slower PC the commit comes close to the 100 ms the ticket allows.
+
 ## Fail closed
 
-Each hook is `node -e <loader> <guard.cjs> <mode>` with no shell in between. The loader refuses (exit code 2) when `guard.cjs` is missing, does not parse, throws, or ends without a verdict. `guard.cjs` refuses when a rule file is missing, the input is not the JSON it expects, or anything throws. `"onFailure": "block"` on the two PreToolUse hooks covers what a script cannot: `node` not starting, and a timeout. `"disableAllHooks": false` keeps a switch in the user's own settings from turning the hooks off; `.claude/settings.local.json` and `--settings` still can.
+Each hook is `node -e <loader> <guard.cjs> <mode>` with no shell in between. The loader refuses (exit code 2) when `guard.cjs` is missing, does not parse, throws, or ends without a verdict. `guard.cjs` refuses when a rule file is missing, the input is not the JSON it expects, or anything throws. `"onFailure": "block"` on the three PreToolUse hooks covers what a script cannot: `node` not starting, and a timeout. `"disableAllHooks": false` keeps a switch in the user's own settings from turning the hooks off; `.claude/settings.local.json` and `--settings` still can.
+
+Claude Code shows an agent the hook's own command line and then what the hook wrote, so the loader is kept short and holds no sentence: the words of a refusal come from `lib/rules.cjs`, and when even that file is gone the loader writes `fail closed` and the error code.
+
+SubagentStop blocks again when the check still fails, also when `stop_hook_active` is set. Claude Code ends the turn after eight blocks in a row, and each block runs the whole check first. Until `check --ticket` exists in `xtask` (M1-F6c), every stop in a checkout with a ticket file fails that way.
 
 ## The ticket file
 
@@ -32,6 +51,7 @@ No Edit or Write may change that file, or a `.git` folder or `.git` file at any 
 The session's project folder is where the hooks are loaded from. It is not always where the work happens, so the checkout is found from the call:
 
 - **Edit and Write**: the nearest folder above the file that holds `.git`. The path must start with a drive letter or a share. A path outside every checkout is not judged: the user's own `.claude` folder is not the repo's. A repository made inside another checkout does not hide the outer one, unless it is a worktree of it. A folder is a worktree only when git registered it: its `.git` file names a folder under `.git/worktrees` that names the `.git` file back.
+- **Read, Grep and Glob**: no checkout is looked for. The path is made canonical the same way (`..`, case, `\\?\`, a trailing dot, a junction) and then held against the three places by name, and against `%APPDATA%\OneLaunch` by where it is. A search is also refused when it starts in a folder that holds the real data folder, such as the user's profile or the root of that drive. Grep's `pattern` is the text searched for, not a place, and is not judged.
 - **A commit**: the folder named by `-C`, or by a `cd` or `Set-Location` on its own before the commit, or else the folder the call runs in. This holds for `scripts/agent/git.ps1 -C <folder> commit` too. Behind `env`, `timeout`, `nohup`, `nice`, `time`, `command`, `builtin` or `exec` the commit is still read, as long as only `NAME=value` words or a number stand between; behind anything else that starts a command (`env -C`, `xargs`, `Start-Process`, `find -execdir`) it is refused, since it may run in another folder.
 - **The wrappers**: `scripts/agent/git.ps1` and `scripts/agent/gh.ps1` are the wrappers only in the checkout the hooks were loaded from and in its registered worktrees. A script of the same name anywhere else is refused.
 - **SubagentStop**: the checkout that holds the folder the event names as `cwd`. An agent that worked in another checkout by absolute paths is not checked there.
@@ -69,15 +89,16 @@ A command the hook cannot follow is refused, not let through:
 - a git command that is told to run a program of its own: `--upload-pack`, `--receive-pack`, `--exec`, `--extcmd`, `rebase -x`, `difftool -x`, `bisect run`, `submodule foreach`, `filter-branch`; and `gh alias`, `gh extension` and `gh config` through the wrapper;
 - shells nested more than eight deep, brackets nested more than two hundred deep, and more than four thousand commands in one call.
 
-Some rules refuse more than they must, on purpose. A call that names a registry key and also runs a command that could write one (`Remove-Item`, `New-Item`, `cp` and the like) is refused whole. So is any call that names the real data folder, the key folder, a `.pem` file, `GIT_TRACE_REDACT` or a `GIT_CONFIG` variable, even inside a message. A pattern of a bash `case` is read as a command, so `case "$1" in kill) ...` is refused. An API call through the wrapper that sends anything to `git/refs` is refused, branch or tag. Behind a command that starts another one (`env`, `xargs`, `timeout`, `Start-Process`, `cmd /c`, the service tools `sc`, `net` and `Stop-Service`, and the like) every later word is read as if it could be the command, so `xargs grep kill` is refused. And in PowerShell a new statement may follow a `}`, a `param(...)` or the `while (...)` of a `do` loop with nothing in between (`if ($x) { } tasklist` runs `tasklist`), so the words after each of those are also read as a command of their own: `Write-Output { } tasklist` is refused although `tasklist` is only a word there, and a `Set-Location` in that place makes the folder unknown.
+Some rules refuse more than they must, on purpose. A call that names a registry key and also runs a command that could write one (`Remove-Item`, `New-Item`, `cp` and the like) is refused whole. So is any call that names the real data folder, the key folder, a `.pem` file, `GIT_TRACE_REDACT` or a `GIT_CONFIG` variable, even inside a message. So is PowerShell text that names `Diagnostics.Process`, `[wmi]`, `[wmiclass]`, `[wmisearcher]`, a `System.Management` object class, `Microsoft.Win32.Registry`, `[scriptblock]::Create`, `.InvokeScript(` or `.NewScriptBlock(`: the registry is read with `reg query` or `Get-ItemProperty`. A `gh` call through the wrapper is judged by every bare word in it, because gh finds its command behind options the hook cannot tell from values: `release`, `auth`, `alias`, `extension`, `config`, and `pr` with `merge`, are refused or read as that command wherever they stand, and a word that is only a value goes in as `--option=value`. `pr merge` is read with gh's own table of options; one the table does not know is refused, and so is `--auto=true`. A pattern of a bash `case` is read as a command, so `case "$1" in kill) ...` is refused. An API call through the wrapper that sends anything to `git/refs` is refused, branch or tag. Behind a command that starts another one (`env`, `xargs`, `timeout`, `Start-Process`, `cmd /c`, the service tools `sc`, `net` and `Stop-Service`, and the like) every later word is read as if it could be the command, so `xargs grep kill` is refused. And in PowerShell a new statement may follow a `}`, a `param(...)` or the `while (...)` of a `do` loop with nothing in between (`if ($x) { } tasklist` runs `tasklist`), so the words after each of those are also read as a command of their own: `Write-Output { } tasklist` is refused although `tasklist` is only a word there, and a `Set-Location` in that place makes the folder unknown.
 
 ## Not covered
 
 The hook reads text. It does not see:
 
 - what a script file, a build script or a test does, or an inline program for another interpreter (`node -e`, `python -c`);
-- a file written by a shell command (`Set-Content`, `>`, `sed -i`): only Edit and Write are checked against `write_scope`, so a shell can also rewrite a wrapper, a ticket file or these hooks;
-- .NET, COM and WMI reached from a PowerShell expression (`[Diagnostics.Process]::Start`, `[Microsoft.Win32.Registry]::SetValue`, `[wmiclass]`), and text run through a method (`[scriptblock]::Create(...).Invoke()`);
+- a file written by a shell command (`Set-Content`, `>`, `sed -i`): only Edit and Write are checked against `write_scope`, so a shell can also rewrite a wrapper, a ticket file, these hooks, or a file a launcher owns (`loginusers.vdf`, `RiotGamesPrivateSettings.yaml`);
+- a file read by a shell command or by another tool than Read, Grep and Glob, unless the call names one of the three places;
+- .NET, COM and WMI reached from a PowerShell expression in another way than by the names above: through `using namespace`, a type held in a variable, reflection, `Add-Type` with its own code, or a COM object;
 - an argument that is computed at run time, such as a branch or a URL held in a variable;
 - text that reaches a command through a pipe (`echo ... | xargs -I{} sh -c {}`), and in cmd a command taken from a `for` variable;
 - aliases and settings kept in files: a git alias, a cargo alias (`cargo xtask` is one), `push.followTags`, an ssh host alias, a PowerShell profile;
