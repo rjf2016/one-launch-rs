@@ -15,8 +15,8 @@ implementations of ol-platform-api: ol-platform-win, ol-net (real) | ol-platform
 | Crate | Responsibility | Ports |
 | --- | --- | --- |
 | `ol-model` | Enums, entities, serde DTOs, limits, error codes, typed accessors over the string settings table, What's New data | `E\src\shared\*` |
-| `ol-formats` | Byte-preserving VDF, INI, Battle.net config, Riot YAML subset, product.db decoder, log parsers; pure functions | `E\src\main\launchers\*\{vdf,loginusers,manifests,ini,config,products,session,*-log}.ts` |
-| `ol-platform-api` | Traits, plain types, shared validation (image-name and registry-path rules), `winpath` | interfaces in `E\src\main\platform\*.ts`, `fs-path.ts` |
+| `ol-formats` | Byte-preserving VDF, INI, Battle.net config, Riot YAML subset, product.db decoder, log parsers, `winpath`; pure functions | `E\src\main\launchers\*\{vdf,loginusers,manifests,ini,config,products,session,*-log}.ts`, `fs-path.ts` |
+| `ol-platform-api` | Traits, plain types, shared validation (image-name and registry-path rules) | interfaces in `E\src\main\platform\*.ts` |
 | `ol-runtime` | `CancelToken`, `sleep`, `wait_until`, timing merge, watch channel, virtual-clock executor | `E\src\main\launchers\wait.ts` |
 | `ol-store` | rusqlite open, pragmas, migrations 1 to 5 verbatim, DB copies, repositories | `E\src\main\db\*` |
 | `ol-vault` | os_crypt `v10` codec, `Local State` read and create (unknown keys preserved), health | `E\src\main\services\{vault,vault-health,secrets}.ts` |
@@ -59,7 +59,7 @@ The diagram above gives the layers. This table is the record: `cargo xtask check
 | `ol-sim` | `ol-formats`, `ol-model`, `ol-platform-api`, `ol-platform-fake`, `ol-runtime` | `ol-testkit` |
 | `ol-testkit-macros` | none | none |
 | `ol-testkit` | `ol-testkit-macros` | none |
-| `ol-replay` | `ol-api`, `ol-model`, `ol-platform-api`, `ol-platform-fake`, `ol-runtime`, `ol-sim`, `ol-testkit` | none |
+| `ol-replay` | `ol-api`, `ol-formats`, `ol-model`, `ol-platform-api`, `ol-platform-fake`, `ol-runtime`, `ol-sim`, `ol-testkit`, `ol-vault` | none |
 | `ol-ui-kit` | none | `ol-testkit` |
 | `ol-ui` | `ol-api`, `ol-model`, `ol-runtime`, `ol-ui-kit` | `ol-platform-fake`, `ol-sim`, `ol-testkit` |
 | `ol-automation` | `ol-api`, `ol-model`, `ol-platform-fake`, `ol-ui-kit` | `ol-testkit` |
@@ -78,9 +78,9 @@ In `ol-app`, `ol-automation` is behind the feature `automation`, and `ol-platfor
 - `HttpClient`, `LoopbackTls`, `LoginItem`, `InstallProbe`, `Roots`.
 - `Clock` (`now_utc`, `instant`, `sleep`) and `IdSource`.
 
-There is no filesystem trait. The Electron fake platform already uses the real disk under redirected roots (`E\src\main\platform\wiring.ts`), adapters depend on real mtimes and atomic renames, and replay compares the real final folder. A capped-read and atomic-write helper module is enough.
+As built in slice 3, launcher files go through a port as well: `FileReader` and `FileWriter` (`write_atomic`). The fake behind them, `ScratchFiles`, is the real disk under the scenario folder and the data folder and refuses every other path, so a test cannot reach a real launcher's files even by mistake. A snapshot's manifest is written through the same port, as the Electron app writes it through its atomic writer.
 
-Launcher-owned writes take a `LauncherWrite` token that only the switch pipeline can construct, so the standing rule is a compile error rather than a convention.
+Launcher-owned writes are the four functions at the top of `crates/ol-services/src/switch.rs`, each through `FileWriter` or `RegistryWriter`; no adapter is handed a writer. The `LauncherWrite` token that would make this a compile error is not built.
 
 ## Adapter trait
 
@@ -114,7 +114,7 @@ pub trait LauncherAdapter {
 
 ## Async model
 
-Runtime-agnostic `async fn`, driven by a single-threaded executor on one dedicated backend thread.
+Target: runtime-agnostic `async fn`, driven by a single-threaded executor on one dedicated backend thread. As built in slice 3, there is no executor: the adapter and the switch pipeline are plain blocking code over the ports, a launch job runs on a thread of its own (`switch`) that never touches the database and hands its result to the backend thread, and every wait goes through `Clock::sleep` with a `CancelToken`. The fake clock moves time only when something sleeps, which gives the same determinism the virtual-clock executor was for. The points below describe the target.
 
 - The TS code is cooperative and single-threaded: the job, the IPC handlers and the simulator timers interleave only at `await`, and nothing is locked. A single-threaded executor reproduces that exactly, so `Backend` owns the DB, services and adapters without `Arc<Mutex>`.
 - Commands arrive on an `async-channel` with oneshot replies; events leave on a watch channel.

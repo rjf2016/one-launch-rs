@@ -25,7 +25,7 @@ use time::OffsetDateTime;
 use crate::AdapterError;
 use crate::files::{MAX_TAIL_BYTES, MAX_VDF_BYTES, log_mark, read_launcher_text, read_log_since};
 
-pub use plan::{PlanContext, STEP, SwitchPreflight};
+pub use plan::{PlanContext, STEP, SwitchPreflight, close_message};
 
 pub const HKCU_KEY: &str = r"Software\Valve\Steam";
 pub const HKLM_KEY: &str = r"SOFTWARE\WOW6432Node\Valve\Steam";
@@ -157,6 +157,10 @@ impl<'a> SteamAdapter<'a> {
 
     pub fn timing(&self) -> &Timing {
         &self.config.timing
+    }
+
+    pub fn auto_login(&self) -> bool {
+        self.config.auto_login
     }
 
     pub fn login_users_path(install: &LauncherInstall) -> String {

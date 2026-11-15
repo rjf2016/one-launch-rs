@@ -4155,16 +4155,21 @@ dependencies = [
 name = "ol-replay"
 version = "0.0.0"
 dependencies = [
+ "futures-lite",
  "ol-api",
+ "ol-formats",
  "ol-model",
  "ol-platform-api",
  "ol-platform-fake",
  "ol-runtime",
  "ol-sim",
  "ol-testkit",
+ "ol-vault",
+ "rusqlite",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
+ "time",
 ]
 
 [[package]]
