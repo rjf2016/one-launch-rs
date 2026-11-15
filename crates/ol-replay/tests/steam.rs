@@ -198,3 +198,65 @@ fn preview() {
 fn import() {
     check_with("import", Accounts::SteamOnly);
 }
+
+// The script goes on to Epic, which this build has no adapter for. Its Steam half is replayed: a session that has expired, the hand-over to the user, a stop, and a wait that runs out. Left out with the rest of the script: the final state. Left out of the platform events: the two copies to the clipboard, which this build does not have yet.
+#[test]
+fn handover_up_to_the_first_epic_step() {
+    let name = "handover";
+    let script = recorded("scripts", name);
+    let steam_steps = script["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|step| step.to_string().contains(":epic:"))
+        .expect("the script turns to Epic");
+    let rules = recorded("normalisation", name);
+    let clock = OffsetDateTime::parse(rules["clock"].as_str().unwrap(), &Rfc3339).unwrap();
+    let scratch = Scratch::new("replay");
+    let version = pinned_version();
+    let setup = Setup {
+        scenarios: &oracle("fixtures/dev-only/fake-launchers"),
+        fixtures: &oracle("fixtures/launchers"),
+        scratch: scratch.path(),
+        version: &version,
+        clock,
+    };
+    let actual = Replay::run_first(&setup, &script, &rules, steam_steps).unwrap();
+    let expected = recorded("expected", name);
+
+    let all = expected["events"].as_array().unwrap();
+    let steam_jobs = ["@job:1", "@job:2"];
+    let epic_from = all
+        .iter()
+        .position(|event| {
+            event["k"] == "job" && !steam_jobs.contains(&event["job"].as_str().unwrap())
+        })
+        .expect("the expectation turns to Epic");
+    let before_epic = json!({ "events": all[..epic_from] });
+    let wanted: Vec<Value> = events(&before_epic, "plat")
+        .into_iter()
+        .filter(|event| !event["op"].as_str().unwrap().starts_with("clip."))
+        .collect();
+    assert_eq!(
+        difference(&events(&actual, "plat").into(), &wanted.into()),
+        None,
+        "{name}: the platform events"
+    );
+    let did = events(&actual, "job");
+    let wanted = events(&before_epic, "job");
+    assert!(
+        wanted.len() > 20,
+        "{name}: the expectation has the two Steam jobs"
+    );
+    let mut from = 0;
+    for (index, wanted) in wanted.iter().enumerate() {
+        let Some(found) = did[from..].iter().position(|event| event == wanted) else {
+            let nearest = did.get(from).cloned().unwrap_or(Value::Null);
+            panic!(
+                "{name}: job event {index} of the expectation is not in the replay after its event {from}: {:?}",
+                difference(&nearest, wanted)
+            );
+        };
+        from += found + 1;
+    }
+}

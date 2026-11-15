@@ -404,7 +404,8 @@ impl<'a> Replay<'a> {
         let backend = self.backend()?.clone();
         match channel {
             "accounts:list" => drop(block_on(backend.accounts())),
-            "settings:get" | "settings:getAll" => {}
+            // Reads the replay has nothing to check, and the copy to the clipboard, which this build does not have yet.
+            "settings:get" | "settings:getAll" | "accounts:copy" => {}
             "settings:set" => {
                 let key = text("key")
                     .and_then(SettingKey::parse)
@@ -518,11 +519,24 @@ impl<'a> Replay<'a> {
 
     // Runs every step and answers with what the app did: `events` and `final`, with ids as aliases, the two folders as {launchers} and {data}, and times as the normalisation rules of the script say.
     pub fn run(setup: &'a Setup<'a>, script: &Value, rules: &Value) -> Result<Value, ReplayError> {
+        Self::run_first(setup, script, rules, usize::MAX)
+    }
+
+    // As `run`, for the first `count` steps only: the part of a script that comes before a launcher this build has no adapter for. The app quits after them, as it does at a snapshot.
+    pub fn run_first(
+        setup: &'a Setup<'a>,
+        script: &Value,
+        rules: &Value,
+        count: usize,
+    ) -> Result<Value, ReplayError> {
         let mut replay = Self::begin(setup, script)?;
         let steps = script["steps"]
             .as_array()
             .ok_or_else(|| script_error("no steps"))?;
-        let ran = steps.iter().try_for_each(|step| replay.step(step));
+        let ran = steps
+            .iter()
+            .take(count)
+            .try_for_each(|step| replay.step(step));
         replay.shut_down();
         ran?;
         replay.report(rules)
