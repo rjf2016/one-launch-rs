@@ -1,5 +1,7 @@
 # One Launch: Rust + GPUI rewrite plan
 
+**Superseded on 2026-11-15 by `LEAN.md`.** The milestones, the workflow and the gates below are no longer followed. This file is kept for what it records: the decisions, what must match, the architecture and the approved dependencies.
+
 ## Context
 
 One Launch is a Windows Electron app (about 28k lines of TypeScript, 1031 tests) at `1.0.0-beta.3`. The decision is made to rewrite it in Rust with GPUI as the same app for the user, lighter and faster, with all the work done by AI agents. This plan says what the agents check their work against, how the work is cut up, who does what, and where you step in.
