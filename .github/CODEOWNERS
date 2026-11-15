@@ -1,0 +1,8 @@
+# No default owner, on purpose: a pull request that touches none of these paths merges without review.
+/spec/ @rjf2016
+/oracle/ @rjf2016
+/.github/ @rjf2016
+/.claude/ @rjf2016
+/deny.toml @rjf2016
+/scripts/agent/ @rjf2016
+/xtask/src/policy/ @rjf2016
