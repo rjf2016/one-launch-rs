@@ -2,7 +2,7 @@
 
 The rewrite of One Launch (Electron) in Rust + GPUI: the same app for the user, lighter and faster. Windows only. `README.md` says what each folder holds.
 
-With a ticket, read it and only what its `read` field cites. Without one, start at `plan/PLAN.md` and read only the design or milestone file the task needs.
+With a ticket, read it and the code it has you change or call. Of the plan, the spec and the Electron source, read only what its `read` field cites. Without one, start at `plan/PLAN.md` and read only the design or milestone file the task needs.
 
 ## Standing rules
 
@@ -33,7 +33,7 @@ The owner's rule: the goal is the same working app in Rust, with the same featur
 
 ## Tickets
 
-- One ticket per agent. The ticket is a file in `plan/tickets/` and is immutable: never edit one.
+- One ticket per agent. The ticket is a file in `plan/tickets/`, and once it is on `main` it is immutable: no pull request changes it.
 - Its `write_scope` is the complete list of paths you may create or change. If the ticket cannot be met inside it, stop and report.
 - A pull request that touches a path in `.github/CODEOWNERS` merges only with the owner's approval. A ticket may name such a path; its pull request then waits for the owner.
 - Never merge a pull request. GitHub merges it, through auto-merge; `plan/design/workflow.md` › "Identity and merging" says when that may be requested.
