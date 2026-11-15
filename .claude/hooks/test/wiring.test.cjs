@@ -177,6 +177,18 @@ test('Read, Grep and Glob: the real data folder, the key folder and a .pem file 
     assert.equal(edit(tool, path.join(roaming, 'Other', 'settings.json'), main, { env }).blocked, false, tool);
   }
   assert.equal(fire('PreToolUse', 'Glob', { tool_name: 'WebFetch', tool_input: { url: 'x' } }, { env }).blocked, true, 'another tool on this hook is an error, not a pass');
+  assert.match(edit('Write', `${path.join(data, 'x')}:y`, main, { env }).stderr, /the path names %APPDATA%\\OneLaunch/, 'the name is read before the path is looked up');
+
+  const plain = path.join(folder(), 'R');
+  fs.mkdirSync(path.join(plain, 'Other'), { recursive: true });
+  const held = (tool, input) => fire('PreToolUse', tool, { cwd: main, tool_input: input }, { env: { APPDATA: plain } });
+  const beside = path.join(plain, 'Other');
+  assert.equal(held('Grep', { pattern: 'x', path: beside, glob: '../OneLaunch/**' }).blocked, true, 'the glob starts at the path of the search');
+  assert.equal(held('Glob', { path: beside, pattern: '../OneLaunch/*' }).blocked, true);
+  assert.equal(held('Glob', { path: beside, pattern: '..\\*\\*.json' }).blocked, true);
+  assert.equal(held('Grep', { pattern: 'x', path: beside, glob: '*.json' }).blocked, false);
+  assert.equal(held('Glob', { path: beside, pattern: '../Other/*.json' }).blocked, false);
+  assert.equal(held('Glob', { path: 'crates', pattern: '../docs/*.md' }).blocked, false);
 });
 
 test('Bash and PowerShell calls: a refusal exits 2 and names the rule, an allowed call exits 0 in silence', () => {

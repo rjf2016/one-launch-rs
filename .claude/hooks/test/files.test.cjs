@@ -367,6 +367,9 @@ test('a path in the real data folder, in the key folder or to a .pem file is ref
   assert.equal(place(path.join(roaming, 'Other'), search), 'allow');
   assert.equal(place(`${path.join(roaming, 'Other')}\\**\\*.json`, search), 'allow');
   assert.equal(place('*.pem', search), 'key');
+  assert.equal(place(`${path.join(data, 'x')}:stream`), 'data', 'a path that names the folder is refused before anything is looked up on disk');
+  assert.equal(place(`${path.join(roaming, 'Other', 'x')}:stream`), 'scope');
+  assert.equal(place('../OneLaunch/**', { search: true, cwd: path.join(roaming, 'Other') }), 'data');
   assert.equal(place(path.join(data, 'x'), { roaming: '' }), 'data', 'the name is enough when the folder is not known');
   assert.equal(place(path.join(elsewhere, 'link', 'OneLaunch', 'x'), { roaming: '' }), 'data', 'the name the path really has counts too');
   assert.equal(place(path.join(elsewhere, 'link', 'Other', 'x'), { roaming: '' }), 'allow');

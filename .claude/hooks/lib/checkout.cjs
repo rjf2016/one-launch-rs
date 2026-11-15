@@ -200,9 +200,9 @@ function judgePlace(text, { cwd = '.', search = false, roaming = process.env.APP
   const parts = text.split(/[\\/]/);
   const wild = search ? parts.findIndex((part) => /[*?[{]/.test(part)) : -1;
   const fixed = wild < 0 ? text : parts.slice(0, wild).map((part) => part + path.sep).join('');
-  const real = canonical(path.resolve(cwd, fixed)).toLowerCase();
   const { named } = require('./commands.cjs');
   named(text, 'path');
+  const real = canonical(path.resolve(cwd, fixed)).toLowerCase();
   named(real, 'path');
   if (!roaming) return;
   const data = path.join(canonical(roaming), 'OneLaunch').toLowerCase();

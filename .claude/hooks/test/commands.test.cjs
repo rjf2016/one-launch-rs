@@ -820,6 +820,49 @@ const MORE_REFUSED = [
   ['bypass', 'Bash', 'git config --file .git/config core.hooksPath x'],
   ['process', 'Bash', 'command tasklist'],
   ['process', 'Bash', 'command -p tasklist'],
+  ['unreadable', 'PowerShell', 'target\\debug\\OneLaunch.exe \u2013\u2013data-dir=C:\\scratch\\x'],
+  ['unreadable', 'PowerShell', './target/debug/OneLaunch.exe \u2013-data-dir=C:/scratch/x'],
+  ['app', 'PowerShell', './target/debug/OneLaunch.exe -\u2013data-dir=C:/scratch/x'],
+  ['app', 'PowerShell', './target/debug/OneLaunch.exe --data\u2013dir=C:/scratch/x'],
+  ['unreadable', 'PowerShell', 'cargo run -p ol-app -- \u2013\u2013data-dir=C:/scratch/x'],
+  ['unreadable', 'PowerShell', 'cargo run -p ol-app -- \u2014data-dir=C:/scratch/x'],
+  ['unreadable', 'PowerShell', 'cargo run -p ol-app -- \u2015\u2015data-dir C:/scratch/x'],
+  ['unreadable', 'PowerShell', 'cargo run -p ol-app \u2013\u2013 --data-dir=C:/scratch/x'],
+  ['app', 'PowerShell', 'cargo run -p ol-app -\u2013 --data-dir=C:/scratch/x'],
+  ['app', 'PowerShell', 'cargo run -p ol-app -- --data\u2014dir=C:/scratch/x'],
+  ['app', 'PowerShell', 'cargo run -p ol-app -- -\u2013data-dir C:/scratch/x'],
+  ['unreadable', 'PowerShell', 'scripts/agent/gh.ps1 pr merge --squash \u2013\u2013auto'],
+  ['unreadable', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 -s \u2013\u2013auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 -s -\u2013auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 -s --au\u2013to'],
+  ['unreadable', 'PowerShell', 'git config \u2013\u2013get core.hooksPath x'],
+  ['bypass', 'PowerShell', 'git config -\u2013get core.hooksPath x'],
+  ['unreadable', 'PowerShell', 'Get-ChildItem \u2013Recurse'],
+  ['unreadable', 'PowerShell', 'pwsh -NoProfile -Command "cargo run -p ol-app -- \u2013\u2013data-dir=C:/scratch/x"'],
+  ['unreadable', 'PowerShell', 'scripts/agent/git.ps1 push origin main \u2013\u2013dry-run'],
+  ['app', 'Bash', './target/debug/OneLaunch.exe \u2013\u2013data-dir=/c/scratch/x'],
+  ['app', 'Bash', 'cargo run -p ol-app -- \u2013\u2013data-dir=/c/scratch/x'],
+  ['merge', 'Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 pr merge 5 -s \u2013\u2013auto'],
+  ['app', 'PowerShell', 'target\\debug\\OneLaunch.exe --DATA-DIR=C:\\scratch\\x'],
+  ['app', 'PowerShell', 'target\\debug\\OneLaunch.exe --data-dir='],
+  ['app', 'PowerShell', 'target\\debug\\OneLaunch.exe --data-dir C:\\scratch\\x'],
+  ['app', 'Bash', 'cargo run -p ol-app -- --data-dir'],
+  ['app', 'Bash', 'cargo run -p ol-app -- --data-dir --start-hidden'],
+  ['app', 'Bash', './target/release/OneLaunch.exe --start-hidden --Data-Dir=C:/scratch/x'],
+  ['app', 'Bash', 'cargo run -p ol-app -- --DATA-DIR=C:/scratch/x'],
+  ['app', 'Bash', 'cargo run -p ol-app -- --Data-Dir C:/scratch/x'],
+  ['app', 'PowerShell', 'cargo run -p ol-app -- --DATA-DIR C:/scratch/x'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --subject $subject --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --subject ${subject} --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --subject $(Get-Content s.txt) --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --subject @() --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --subject @(Get-Content s.txt) --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --subject $pr.Title --auto'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --squash --auto --body-file $body'],
+  ['merge', 'Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 pr merge 5 --squash --subject $subject --auto'],
+  ['merge', 'Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 pr merge 5 --squash --subject ${subject} --auto'],
+  ['merge', 'Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 pr merge 5 --squash --subject $(cat s.txt) --auto'],
+  ['merge', 'Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 pr merge 5 --squash --subject `cat s.txt` --auto'],
 ];
 
 const MORE_ALLOWED = [
@@ -1039,7 +1082,28 @@ const MORE_ALLOWED = [
   ['PowerShell', `cargo run -p ol-app -- --data-dir "${path.join(os.tmpdir(), 'OneLaunch-scratch')}"`],
   ['PowerShell', `.\\target\\debug\\OneLaunch.exe --data-dir="${path.join(os.tmpdir(), 'ol', 'OneLaunch')}"`],
   ['PowerShell', 'Get-ChildItem $env:LOCALAPPDATA\\Temp\\OneLaunch-scratch'],
+  ['PowerShell', 'git commit -m "M1-F6a \u2013 the hooks"'],
+  ['PowerShell', "Write-Output 'a \u2014 b' \"c \u2015 d\""],
+  ['PowerShell', 'Write-Output "x" # a \u2013 b'],
+  ['PowerShell', "git commit -m @'\na \u2013 b\n\u2013 c\n'@"],
+  ['PowerShell', 'Write-Output a\u2013b'],
+  ['PowerShell', 'Write-Output "\u2013 a" \'\u2014b\''],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --auto --squash --subject "$subject"'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --auto --squash --subject=$subject'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr merge "$number" --auto --squash --body-file "$($body)"'],
+  ['Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 pr merge 5 --auto --squash --subject "$subject" --body-file "$body"'],
+  ['Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 pr merge 5 --auto --squash --subject="$(cat s.txt)"'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr view $number'],
 ];
+
+test('a refusal that names a .NET type reads as one sentence', () => {
+  const said = (command) => judge({ tool: 'PowerShell', command, cwd: ROOT, io }).message;
+  assert.equal(said('[Diagnostics.Process]::GetProcesses()'), 'this PowerShell text names a .NET or WMI type that lists, starts or ends processes, and no form of a process tool is allowed');
+  assert.equal(said("[Microsoft.Win32.Registry]::SetValue('a', 'b', 'c')"), 'this PowerShell text names the .NET registry classes, which can write a key; read a key with reg query or Get-ItemProperty');
+  assert.equal(said("[scriptblock]::Create('Get-Date')"), 'this PowerShell text makes a script out of a string at run time, and the hook cannot read that string');
+  assert.match(said('scripts/agent/gh.ps1 pr merge 5 --squash --subject $subject --auto'), /quote it \("\$subject"\) or join it to its option \(--subject=\$subject\)/);
+  assert.match(said('cargo run -p ol-app -- \u2013\u2013data-dir=C:/scratch/x'), /typographic dash/);
+});
 
 test('gh pr merge: no list of options that gh would read as a merge at once gets past', () => {
   const VALUE_LONG = ['author-email', 'body', 'body-file', 'match-head-commit', 'subject', 'repo'];

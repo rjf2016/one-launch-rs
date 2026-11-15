@@ -27,7 +27,6 @@ function lex(source, dialect, base = 0, body = false) {
     ? source
         .replace(/[\u2018-\u201B]/g, "'")
         .replace(/[\u201C-\u201E]/g, '"')
-        .replace(/[\u2013-\u2015]/g, '-')
         .replace(/[\u00A0\u0085\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\f\v]/g, ' ')
     : source;
   const n = src.length;
@@ -77,6 +76,9 @@ function lex(source, dialect, base = 0, body = false) {
       redirect = false;
       word = null;
       return;
+    }
+    if (ps && !word.string && /^[\u2013-\u2015]/.test(word.text)) {
+      throw new Refusal('unreadable', 'a word starts with a typographic dash (U+2013 to U+2015): PowerShell reads it as - for its own parameters and hands it to a program as typed, so type a plain -');
     }
     keyword();
     if (bash && word.text === 'in' && !word.quoted && words.at(-2)?.counted && words.at(-2).text === 'case') pattern = true;

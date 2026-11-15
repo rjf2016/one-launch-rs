@@ -79,10 +79,11 @@ const DATA_FOLDER = [
 ];
 const KEY_NAMES = [/one-launch-rs-bot/, /one_launch_agent_key_dir/, /\.pem(?![a-z0-9])/];
 const TOKEN_SHOWN = /git_(trace_redact|config)/;
+const DATA_DIR = /^--data-dir=./;
 const REACHES = [
-  ['process', /diagnostics\.process|\[\s*wmi(class|searcher)?\s*\]|management(object|class)/, 'a .NET or WMI type that lists, starts or ends processes; no form of a process tool is allowed'],
-  ['registry', /microsoft\.win32\.registry/, 'the .NET registry classes can write a key; read one with reg query or Get-ItemProperty'],
-  ['unreadable', /\[\s*scriptblock\s*\]\s*::\s*create|\.\s*(invokescript|newscriptblock)\s*\(/, 'text that is made into a script at run time is text the hook cannot read'],
+  ['process', /diagnostics\.process|\[\s*wmi(class|searcher)?\s*\]|management(object|class)/, 'this PowerShell text names a .NET or WMI type that lists, starts or ends processes, and no form of a process tool is allowed'],
+  ['registry', /microsoft\.win32\.registry/, 'this PowerShell text names the .NET registry classes, which can write a key; read a key with reg query or Get-ItemProperty'],
+  ['unreadable', /\[\s*scriptblock\s*\]\s*::\s*create|\.\s*(invokescript|newscriptblock)\s*\(/, 'this PowerShell text makes a script out of a string at run time, and the hook cannot read that string'],
 ];
 const QUIET = set('cat echo printf date type get-content gc get-date write-output');
 const STARTERS = set('env command builtin exec nohup nice time timeout');
@@ -202,7 +203,7 @@ function scoped(state, run) {
 function walk(text, dialect, state, depth) {
   if (depth > DEPTH) throw new Refusal('unreadable', 'commands are nested too deep for the hook to read');
   const reach = dialect === 'powershell' && REACHES.find(([, pattern]) => pattern.test(text.toLowerCase().replace(/["'`]/g, '')));
-  if (reach) throw new Refusal(reach[0], `this PowerShell text names ${reach[2]}`);
+  if (reach) throw new Refusal(reach[0], reach[2]);
   let commit = null;
   for (const { words, level, piped, splits, wrote } of lex(text, dialect)) {
     if (dialect === 'powershell' && words.some((word) => word.text === '--%' && !word.quoted)) {
@@ -274,7 +275,7 @@ function denied(id, args, lower) {
   if (INSTALLERS.has(name) || PACKAGES.test(leaf) || named || (PACKAGE_MANAGERS.has(name) && lower.some((arg) => PACKAGE_VERBS.has(arg)))) {
     throw new Refusal('installer', 'this would start an installer; installers run on GitHub-hosted runners only');
   }
-  if (name === 'onelaunch' && !args.some((arg) => /^--data-dir=./i.test(arg.text))) {
+  if (name === 'onelaunch' && !args.some((arg) => DATA_DIR.test(arg.text))) {
     throw new Refusal('app', 'the app binary needs --data-dir=<scratch folder> in that exact form, which the Electron build and the Rust build both read');
   }
   if (name === 'reg' && lower[0] && !lower[0].startsWith('/') && !REG_READS.has(lower[0])) {
@@ -485,6 +486,9 @@ function gh(args, wrapper) {
   const all = texts.join(' ');
   if (bare.includes('release')) throw new Refusal('tags', `gh release: releases are the owner's${AS_VALUE}`);
   if (bare.includes('pr') && bare.includes('merge')) {
+    if (args.some((arg) => !arg.quoted && /^(@?\uE000|@$)/.test(arg.text))) {
+      throw new Refusal('merge', 'in gh pr merge a variable that stands as a word of its own vanishes when it is empty, and the next word then becomes the value of the option before it; quote it ("$subject") or join it to its option (--subject=$subject)');
+    }
     const places = (name) => texts.flatMap((text, k) => (text === name ? [k] : []));
     for (const pr of places('pr')) {
       for (const merge of places('merge')) {
@@ -541,8 +545,9 @@ function cargo(args) {
   const split = rest.findIndex((arg) => arg.text === '--');
   const own = (split < 0 ? rest : rest.slice(0, split)).map((arg) => arg.text.toLowerCase());
   const app = split < 0 ? [] : rest.slice(split + 1);
-  const folder = app.some((arg, at) => /^--data-dir=./i.test(arg.text) || (/^--data-dir$/i.test(arg.text) && app[at + 1]?.text && !app[at + 1].text.startsWith('-')));
-  if (folder) return;
+  const joined = app.some((arg) => DATA_DIR.test(arg.text));
+  const spaced = app.some((arg, at) => arg.text === '--data-dir' && app[at + 1]?.text && !app[at + 1].text.startsWith('-'));
+  if (joined || spaced) return;
   const value = (long, short) => {
     for (const [at, text] of own.entries()) {
       if (text === long || text === short) return own[at + 1] ?? '';

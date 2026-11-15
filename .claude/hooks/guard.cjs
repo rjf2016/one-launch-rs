@@ -29,8 +29,8 @@ function shell(input) {
 
 function write(input) {
   const file = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
-  checkout.judgeWrite(file);
   checkout.judgePlace(file);
+  checkout.judgeWrite(file);
 }
 
 function read(input) {
@@ -40,8 +40,9 @@ function read(input) {
     if (typeof given.file_path !== 'string' || !given.file_path) throw new Refusal('scope', 'the call names no file to read');
     checkout.judgePlace(given.file_path, { cwd });
   } else if (input.tool_name === 'Grep' || input.tool_name === 'Glob') {
-    const second = input.tool_name === 'Grep' ? given.glob : given.pattern;
-    for (const field of [given.path ?? cwd, second]) checkout.judgePlace(field, { cwd, search: true });
+    const from = path.resolve(cwd, typeof given.path === 'string' ? given.path : '.');
+    checkout.judgePlace(from, { search: true });
+    checkout.judgePlace(input.tool_name === 'Grep' ? given.glob : given.pattern, { cwd: from, search: true });
   } else throw new Error(`no rules for reading with the tool ${input.tool_name}`);
 }
 
