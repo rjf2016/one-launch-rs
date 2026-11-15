@@ -56,6 +56,10 @@ pub(crate) fn write_key(file: &Path, wrapped: &[u8]) -> Result<(), KeyError> {
         Value::String(STANDARD.encode(key)),
     );
     let text = serde_json::to_vec(&state).map_err(|_| KeyError::Malformed)?;
+    // A file this size would not be read back, and the key in it would be lost with everything it sealed.
+    if text.len() as u64 > LARGEST {
+        return Err(KeyError::Malformed);
+    }
 
     let folder = file.parent().ok_or(KeyError::Malformed)?;
     fs::create_dir_all(folder).map_err(KeyError::Write)?;
@@ -112,6 +116,23 @@ mod tests {
             matches!(&refused, Err(KeyError::Write(error)) if error.kind() == io::ErrorKind::AlreadyExists),
             "{refused:?}"
         );
+        assert!(before == snapshot(scratch.path()), "the folder changed");
+    }
+
+    #[test]
+    fn a_key_that_would_make_the_file_too_large_to_read_back_is_not_written() {
+        let scratch = Scratch::new("vault");
+        let file = local_state_path(scratch.path());
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        let (start, end) = (r#"{"pad":""#, r#""}"#);
+        let padding = "a".repeat(LARGEST as usize - start.len() - end.len());
+        fs::write(&file, format!("{start}{padding}{end}")).unwrap();
+        assert_eq!(fs::metadata(&file).unwrap().len(), LARGEST);
+        assert_eq!(read_key(&file).unwrap(), None);
+        let before = snapshot(scratch.path());
+
+        let refused = write_key(&file, &[1; 40]);
+        assert!(matches!(refused, Err(KeyError::Malformed)), "{refused:?}");
         assert!(before == snapshot(scratch.path()), "the folder changed");
     }
 }

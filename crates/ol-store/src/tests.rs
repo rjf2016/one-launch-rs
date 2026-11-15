@@ -589,8 +589,10 @@ fn a_row_of_a_launcher_this_version_does_not_know_is_left_out() {
                VALUES ('game-x', 'gog', 'app', 'Placeholder Game', 't');",
         )
         .unwrap();
-    assert_eq!(store.row_counts().unwrap().accounts, 10);
+    let counts = store.row_counts().unwrap();
+    assert_eq!(counts.accounts, 10);
     assert_eq!(store.accounts().unwrap().len(), 9);
+    assert_eq!(counts.games_installed, 9);
     assert_eq!(store.installed_games().unwrap().len(), 8);
 }
 
@@ -871,21 +873,38 @@ fn a_copy_is_taken_and_the_newest_five_are_kept() {
         ]
     );
 
-    store
-        .backup(&folder, 0, datetime!(2026-12-01 09:00:00 UTC))
+    let copies = || {
+        let mut names: Vec<_> = fs::read_dir(&folder)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .filter(|name| name.ends_with(".db"))
+            .collect();
+        names.sort();
+        names
+    };
+    let set_back = store
+        .backup(&folder, BACKUPS_TO_KEEP, datetime!(2026-12-01 09:00:00 UTC))
         .unwrap();
-    let left = fs::read_dir(&folder)
-        .unwrap()
-        .filter(|entry| {
-            let name = entry.as_ref().unwrap().file_name();
-            name.to_string_lossy().ends_with(".db")
-        })
-        .count();
-    assert_eq!(left, 1, "at least one copy stays");
-    assert!(
-        folder
-            .join("onelaunch-2026-12-01T10-24-00.000Z.db")
-            .exists()
+    assert!(set_back.exists(), "the copy just made was pruned");
+    assert_eq!(
+        copies(),
+        [
+            "onelaunch-2026-12-01T09-00-00.000Z.db",
+            "onelaunch-2026-12-01T10-21-00.000Z.db",
+            "onelaunch-2026-12-01T10-22-00.000Z.db",
+            "onelaunch-2026-12-01T10-23-00.000Z.db",
+            "onelaunch-2026-12-01T10-24-00.000Z.db",
+        ]
+    );
+
+    let last = store
+        .backup(&folder, 0, datetime!(2026-12-01 08:00:00 UTC))
+        .unwrap();
+    assert!(last.exists());
+    assert_eq!(
+        copies(),
+        ["onelaunch-2026-12-01T08-00-00.000Z.db"],
+        "at least one copy stays, and it is the newest made"
     );
 }
 

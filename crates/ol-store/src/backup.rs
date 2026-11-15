@@ -39,16 +39,18 @@ impl Store {
             return Err(error);
         }
 
-        let mut copies = Vec::new();
+        // The copy just made stays whatever its name says: after the clock is set back it sorts as the oldest, and would be pruned at once.
+        let made = copy.file_name();
+        let mut earlier = Vec::new();
         for entry in fs::read_dir(folder).map_err(failed("listed"))? {
             let name = entry.map_err(failed("listed"))?.file_name();
-            if is_a_copy(&name.to_string_lossy()) {
-                copies.push(name);
+            if is_a_copy(&name.to_string_lossy()) && Some(name.as_os_str()) != made {
+                earlier.push(name);
             }
         }
-        copies.sort();
-        copies.reverse();
-        for name in copies.into_iter().skip(keep.max(1)) {
+        earlier.sort();
+        earlier.reverse();
+        for name in earlier.into_iter().skip(keep.max(1) - 1) {
             fs::remove_file(folder.join(name)).map_err(failed("pruned"))?;
         }
         Ok(copy)

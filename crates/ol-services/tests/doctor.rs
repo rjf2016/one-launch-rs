@@ -489,6 +489,7 @@ fn rows_this_version_does_not_know_are_counted_apart() {
         accounts_by_launcher: [1, 2, 0, 1],
         games: 4,
         games_installed: 3,
+        games_known: 2,
         settings: 6,
         settings_known: 4,
         secrets: 0,
@@ -506,6 +507,7 @@ fn rows_this_version_does_not_know_are_counted_apart() {
     assert!(
         shown.contains("accounts: 7 (steam 1, epic 2, battlenet 0, riot 1, other launchers 3)\n")
     );
+    assert!(shown.contains("games: 4 (3 installed, 1 of launchers this version does not know)\n"));
     assert!(shown.contains("settings: 6 (2 this version does not know)\n"));
     assert!(report.passed());
 }

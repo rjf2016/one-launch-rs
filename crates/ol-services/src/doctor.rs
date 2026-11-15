@@ -42,7 +42,8 @@ pub struct Database {
     pub accounts: u64,
     pub accounts_by_launcher: [usize; 4],
     pub games: u64,
-    pub games_installed: usize,
+    pub games_installed: u64,
+    pub games_known: usize,
     pub settings: u64,
     pub settings_known: usize,
     pub secrets: u64,
@@ -121,7 +122,8 @@ fn database(data_dir: &Path, vault: Option<&dyn Vault>) -> Result<Database, Stor
                 .count()
         }),
         games: counts.games,
-        games_installed: store.installed_games()?.len(),
+        games_installed: counts.games_installed,
+        games_known: store.installed_games()?.len(),
         settings: counts.settings,
         settings_known: store.settings()?.len(),
         secrets: counts.secrets,
@@ -232,11 +234,20 @@ impl fmt::Display for Database {
             write!(f, ", other launchers {unknown}")?;
         }
         writeln!(f, ")")?;
-        writeln!(
-            f,
-            "games: {} ({} installed)",
-            self.games, self.games_installed
-        )?;
+        let unknown = self.games_installed.saturating_sub(self.games_known as u64);
+        if unknown > 0 {
+            writeln!(
+                f,
+                "games: {} ({} installed, {unknown} of launchers this version does not know)",
+                self.games, self.games_installed
+            )?;
+        } else {
+            writeln!(
+                f,
+                "games: {} ({} installed)",
+                self.games, self.games_installed
+            )?;
+        }
         let unknown = self.settings.saturating_sub(self.settings_known as u64);
         if unknown > 0 {
             writeln!(

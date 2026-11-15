@@ -40,7 +40,8 @@ const ROW_COUNTS: &str = "
          (SELECT COUNT(*) FROM launch_history),
          (SELECT COUNT(*) FROM launcher_sessions),
          (SELECT COUNT(*) FROM settings),
-         (SELECT COUNT(*) FROM secrets)";
+         (SELECT COUNT(*) FROM secrets),
+         (SELECT COUNT(*) FROM games WHERE installed = 1)";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RowCounts {
@@ -52,6 +53,7 @@ pub struct RowCounts {
     pub launcher_sessions: u64,
     pub settings: u64,
     pub secrets: u64,
+    pub games_installed: u64,
 }
 
 #[derive(Debug, Default)]
@@ -154,6 +156,7 @@ impl Store {
                 launcher_sessions: count(5)?,
                 settings: count(6)?,
                 secrets: count(7)?,
+                games_installed: count(8)?,
             })
         })?)
     }

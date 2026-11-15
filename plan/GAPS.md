@@ -33,6 +33,7 @@ None is visible on data the app wrote itself.
 - A non-text value in a text column fails the read and names the column.
 - Artwork comes back as the stored relative path, not as an `onelaunch-art://` URL.
 - `PRAGMA temp_store = MEMORY` on every open, so rows cannot spill into `%TEMP%`.
+- The backup copy just made is never pruned. The Electron app prunes by name alone, so after the clock is set back it deletes the copy it has just taken.
 
 ## Tray (slice 5)
 
