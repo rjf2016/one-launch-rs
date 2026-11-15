@@ -1,8 +1,8 @@
 # One Launch (Rust)
 
-The rewrite of One Launch (Electron) in Rust + GPUI: the same app for the user, lighter and faster. Windows only. No Rust exists yet: the repo holds the plan, the spec and the oracle seed. Start at `plan/PLAN.md` and read only the design or milestone file the task needs.
+The rewrite of One Launch (Electron) in Rust + GPUI: the same app for the user, lighter and faster. Windows only. `README.md` says what each folder holds.
 
-This file is the minimum that must hold from the first session. Milestone 1 replaces it with the full version outlined in `plan/design/workflow.md`.
+With a ticket, read it and the code it has you change or call. Of the plan, the spec and the Electron source, read only what its `read` field cites. Without one, start at `plan/PLAN.md` and read only the design or milestone file the task needs.
 
 ## Standing rules
 
@@ -18,6 +18,7 @@ This file is the minimum that must hold from the first session. Milestone 1 repl
 ## The oracle
 
 - The Electron source at `D:\Coding\slop\one-launch`, at the commit in `oracle/PIN`, is the reference for what the app does. It is read-only; never write Rust there.
+- Expectations come from `oracle/`, captured from that source. The implementer never writes or changes one.
 - Never edit `spec/`, `oracle/`, a test, a triage row or a waiver to make a check pass. Spec amendments and differences from Electron follow `plan/design/workflow.md`.
 
 ## What must match
@@ -29,3 +30,43 @@ The owner's rule: the goal is the same working app in Rust, with the same featur
 - Where an oracle artefact or a catalogued test would differ, the difference is recorded as `plan/design/workflow.md` › "Differences from Electron" says. An unrecorded difference is a defect.
 - These stay exact whatever the Electron code looks like: the data folder, DB schema, vault format, installer identity and update feed (existing installs are taken over in place); the keys and values a switch writes to launcher-owned files and registry keys, with every other byte left alone; the standing rules above.
 - Performance is the point of the rewrite. Where doing something Electron's way costs startup time, memory or idle CPU, take the lighter way if the user sees the same result.
+
+## Tickets
+
+- One ticket per agent. The ticket is a file in `plan/tickets/`, and once it is on `main` it is immutable: no pull request changes it.
+- Its `write_scope` is the complete list of paths you may create or change. If the ticket cannot be met inside it, stop and report.
+- A pull request that touches a path in `.github/CODEOWNERS` merges only with the owner's approval. A ticket may name such a path; its pull request then waits for the owner.
+- Never merge a pull request. GitHub merges it, through auto-merge; `plan/design/workflow.md` › "Identity and merging" says when that may be requested.
+- Stop and ask the owner in the cases `plan/design/workflow.md` lists under "Stop and ask the owner when".
+
+## GitHub
+
+- Act on GitHub only as the app, through `pwsh -NoProfile -File scripts/agent/git.ps1 <git arguments>` and `pwsh -NoProfile -File scripts/agent/gh.ps1 <gh arguments>`. Commit through the first as well, so the commit carries the app's name.
+- On the owner's PC a plain `gh` and a plain `git push` act as the owner, with admin rights. Never use them: a plain `gh` not even to read.
+- The app cannot push a change under `.github/workflows/`. Commit it and stop: `plan/design/workflow.md` › "Acting as the app".
+
+## Rust
+
+- `unsafe` only in `ol-platform-win`. Every other crate root starts with `#![forbid(unsafe_code)]`; the spikes are exempt.
+- Errors are typed, with `thiserror`. `anyhow` only in binaries.
+- No comments by default. The exception: one line above code whose intent is not obvious, saying why.
+- Take a dependency from `[workspace.dependencies]` in `Cargo.toml`. Never run `cargo add`, `cargo update` or `cargo install`; builds and tests take `--locked`.
+- The crate graph is the table in `plan/design/architecture.md`. Only `ol-ui-kit`, `ol-ui`, `ol-automation` and `ol-app` reach GPUI.
+
+## GPUI
+
+- Never write GPUI from memory. Copy from an entry in `docs/cookbook/`, or read the pinned source in the cargo registry and cite the file. `Cargo.toml` and `plan/decisions/M1-gpui-pin.md` hold the pins.
+- `plan/design/gpui-notes.md` is unverified, apart from what it says a decision record confirmed.
+- One GPUI build at a time on the owner's PC.
+
+## Commands
+
+- `cargo xtask check`: everything a pull request must pass. `--tier 0` runs formatting, the lints, the secret scan, the oracle's hashes and `cargo deny`; `--tier 1` runs clippy, build and tests of the GPUI-free crates.
+- One crate's tests: `cargo nextest run --locked -p <crate>`.
+- The app is `crates/ol-app`: `cargo run --locked -p ol-app --features fake -- --data-dir <scratch folder>`. The feature `fake` holds the fake launchers. Today its `main` is empty: it reads no argument and exits at once.
+
+## Docs and commits
+
+- Change a doc only when a change makes it wrong or adds a rule or decision a later agent needs.
+- A commit message is `<ticket id>: <what> - <why, in plain words>`, in the voice of `git log`.
+- No AI attribution anywhere: no `Co-authored-by` trailer, no "generated with" line, no session link, in a commit, a pull request or a file.
