@@ -52,7 +52,9 @@ function format(input) {
   const root = checkout.nearest(path.dirname(file));
   if (!root || !fs.existsSync(path.join(root, 'rustfmt.toml'))) return;
   if (/^(oracle|spec)\//i.test(path.relative(root, file).split(path.sep).join('/'))) return;
-  spawnSync('rustfmt', [file], { cwd: root, timeout: 20000, windowsHide: true });
+  const before = fs.readFileSync(file);
+  const run = spawnSync('rustfmt', [], { cwd: root, input: before, timeout: 20000, windowsHide: true, maxBuffer: 1 << 28 });
+  if (!run.error && run.status === 0 && !run.stdout.equals(before)) fs.writeFileSync(file, run.stdout);
 }
 
 function stop(input) {

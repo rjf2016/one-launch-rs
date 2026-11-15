@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { Refusal } = require('./rules.cjs');
@@ -135,10 +136,11 @@ function computed(word) {
 function into(cwd, word, dialect) {
   if (!word || word.dynamic || !word.text) return null;
   let target = word.text;
+  if (/^[A-Za-z]:(?![\\/])/.test(target)) return null;
   if (target === '~' || /^~[\\/]/.test(target)) target = path.join(os.homedir(), target.slice(1));
   else if (target.startsWith('~')) return null;
   if (dialect === 'bash') {
-    target = target.replace(/^\/([A-Za-z])(?=\/|$)/, '$1:');
+    target = target.replace(/^\/([A-Za-z])(?=\/|$)/, '$1:').replace(/^([A-Za-z]:)$/, '$1/');
     if (target.startsWith('/')) return null;
   }
   const rooted = /^[\\/](?![\\/])/.test(target);
@@ -205,13 +207,26 @@ function walk(text, dialect, state, depth) {
   const reach = dialect === 'powershell' && REACHES.find(([, pattern]) => pattern.test(text.toLowerCase().replace(/["'`]/g, '')));
   if (reach) throw new Refusal(reach[0], reach[2]);
   let commit = null;
-  for (const { words, level, piped, splits, wrote } of lex(text, dialect)) {
+  let moves = false;
+  let shaky = false;
+  for (const { words, level, piped, splits, wrote, joined, background } of lex(text, dialect)) {
     if (dialect === 'powershell' && words.some((word) => word.text === '--%' && !word.quoted)) {
       throw new Refusal('unreadable', 'the stop-parsing token --% hides the rest of the line from the hook');
     }
     if (commit !== null && level <= commit) commit = null;
+    if (level === 0 && !joined) {
+      if (shaky) state.cwd = null;
+      moves = false;
+      shaky = false;
+    }
+    const leaves = level === 0 && joined === 'or' && moves && words[0].text === 'exit';
+    if (level === 0 && joined === 'or' && moves && !leaves) state.cwd = null;
     const commits = state.commits;
-    const moved = command(words, dialect, state, depth, 'normal', level === 0 && !piped);
+    const moved = command(words, dialect, state, depth, 'normal', level === 0 && !piped && !background && joined !== 'or');
+    if (moved) {
+      moves = true;
+      shaky ||= joined === 'and';
+    }
     const inner = commit === null ? null : head(words, dialect, 'normal', state);
     if (commit !== null && (wrote || (inner && !QUIET.has(identify(inner[0].text).name)))) {
       throw new Refusal('secrets', 'a command inside the words of the commit runs after the scan and before the commit; only cat, echo, printf, date and Get-Content may build a message there, and nothing may write a file');
@@ -219,7 +234,7 @@ function walk(text, dialect, state, depth) {
     if (state.commits > commits && commit === null) commit = level;
     if (dialect === 'cmd') for (let k = 1; k < words.length; k++) command(words.slice(k), dialect, state, depth, 'suffix', false);
     for (const k of splits) if (k < words.length) command(words.slice(k), dialect, state, depth, 'normal', false);
-    if (!moved) state.before++;
+    if (!moved && !leaves) state.before++;
   }
 }
 
@@ -292,12 +307,22 @@ function denied(id, args, lower) {
   }
 }
 
-function move(args, state, sure, dialect) {
+function folder(target) {
+  try {
+    return fs.statSync(target).isDirectory() ? target : null;
+  } catch {
+    return null;
+  }
+}
+
+function move(name, args, state, sure, dialect) {
   const target = args.find((arg) => arg.quoted || !(arg.text.startsWith('-') || /^\/d$/i.test(arg.text)));
+  const drive = (text) => /^[A-Za-z]:/.exec(text ?? '')?.[0].toLowerCase();
+  const stays = dialect === 'cmd' && /^(cd|chdir)$/.test(name) && !args.some((arg) => /^\/d$/i.test(arg.text)) && drive(target?.text) && drive(target.text) !== drive(state.cwd);
   if (target && REGISTRY_PATH.test(target.text.toLowerCase())) {
     throw new Refusal('registry', 'a registry key as the working location hides which key a later command writes; name the key in full on a read');
   }
-  state.cwd = sure ? into(state.cwd, target, dialect) : null;
+  state.cwd = sure && !stays ? folder(into(state.cwd, target, dialect)) : null;
   return true;
 }
 
@@ -617,7 +642,7 @@ function powershell(name, args, state, depth, dialect) {
     }
     if (/^(version|v|help|h|\?)$/.test(flag)) informational = true;
     if (POWERSHELL_VALUES.has(flag) || (flag.length > 2 && [...POWERSHELL_VALUES].some((full) => full.startsWith(flag)))) {
-      if (flag === 'wd' || (flag.length > 1 && 'workingdirectory'.startsWith(flag))) state.cwd = into(state.cwd, rest[0], dialect);
+      if (flag === 'wd' || (flag.length > 1 && 'workingdirectory'.startsWith(flag))) state.cwd = folder(into(state.cwd, rest[0], dialect));
       k++;
     }
   }
@@ -692,7 +717,7 @@ function command(all, dialect, state, depth, mode, sure) {
   if (name === 'new-psdrive' && lower.some((text) => /registry|^hk(cu|lm|cr|u|cc)|^hkey_/.test(text))) {
     throw new Refusal('registry', 'a new drive on the registry hides which key a later command writes');
   }
-  if (MOVES.has(name)) return move(args, state, sure, dialect);
+  if (MOVES.has(name)) return move(name, args, state, sure, dialect);
   if (name === 'git') git(args, state, false, dialect);
   else if (name === 'gh') gh(args, false);
   else if (name === 'cargo') cargo(args);

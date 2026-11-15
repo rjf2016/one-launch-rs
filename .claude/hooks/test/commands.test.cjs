@@ -1257,6 +1257,104 @@ test('a change of folder is followed only where the shell keeps it', () => {
   for (const [tool, command, rule] of expected) assert.equal(verdict(tool, command, crates), rule, command);
 });
 
+test('a change of folder counts only when it is sure to have happened: the folder exists, and nothing makes the change conditional', () => {
+  const missing = path.join(ROOT, 'no-such-folder');
+  const file = path.join(ROOT, 'Cargo.toml');
+  const crates = path.join(ROOT, 'crates');
+  const wrapper = path.join(ROOT, 'scripts', 'agent', 'git.ps1');
+  const seen = [];
+  const recording = { ...io, commit: (folder, broad) => (seen.push(folder), []) };
+  const elsewhere = ROOT[0].toLowerCase() === 'c' ? 'D' : 'C';
+  const commits = [
+    ['Bash', `cd "${missing}" || git commit -m x`],
+    ['Bash', `cd "${missing}"; git commit -m x`],
+    ['Bash', `cd "${missing}"\ngit commit -m x`],
+    ['Bash', `cd "${missing}" 2>/dev/null; git commit -m x`],
+    ['Bash', `pushd "${missing}"; git commit -m x`],
+    ['Bash', `cd "${file}"; git commit -m x`],
+    ['Bash', 'cd /Users; git commit -m x'],
+    ['Bash', 'cd; git commit -m x'],
+    ['Bash', `cd "${crates}" || git commit -m x`],
+    ['Bash', `cd "${crates}" && true || git commit -m x`],
+    ['Bash', `true && cd "${crates}"; git commit -m x`],
+    ['Bash', `false || cd "${crates}"; git commit -m x`],
+    ['Bash', `cd "${crates}" || cd "${ROOT}"; git commit -m x`],
+    ['Bash', `cd "${crates}" && cd "${missing}"; git commit -m x`],
+    ['Bash', `cd "${crates}" & git commit -m x`],
+    ['Bash', `cd "${crates}" &&\ncd "${missing}"\ngit commit -m x`],
+    ['PowerShell', `Set-Location "${missing}"; git commit -m x`],
+    ['PowerShell', `cd "${missing}"; git commit -m x`],
+    ['PowerShell', `Push-Location "${missing}"; git commit -m x`],
+    ['PowerShell', `Set-Location -Path "${missing}" -ErrorAction SilentlyContinue; git commit -m x`],
+    ['PowerShell', `Set-Location "${missing}"\ngit commit -m x`],
+    ['PowerShell', `cd "${missing}" || git commit -m x`],
+    ['PowerShell', `Set-Location "${crates}" || git commit -m x`],
+    ['PowerShell', `Set-Location "${file}"; git commit -m x`],
+    ['PowerShell', `Get-Date && Set-Location "${crates}"; git commit -m x`],
+    ['PowerShell', `Set-Location "${crates}" &\ngit commit -m x`],
+    ['Bash', `cmd //c "cd ${elsewhere}:\\ && git commit -m x"`],
+    ['PowerShell', `cmd /c "cd ${elsewhere}:\\ && git commit -m x"`],
+    ['PowerShell', `Set-Location ${elsewhere}:; git commit -m x`],
+    ['PowerShell', `Set-Location ${ROOT.slice(0, 2)}crates; git commit -m x`],
+  ];
+  for (const [tool, command] of commits) assert.equal(verdict(tool, command, ROOT, recording), 'secrets', command);
+  assert.deepEqual(seen, [], 'none of them was scanned in a folder the commit might not run in');
+  const pushes = [
+    ['PowerShell', `Set-Location "${missing}"; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['PowerShell', `Set-Location "${crates}" || pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `cd "${missing}"; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `cd "${crates}" || pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['PowerShell', `pwsh -NoProfile -WorkingDirectory "${missing}" -File "${wrapper}" push origin m1/x`],
+    ['Bash', `false && cd "${crates}"; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['PowerShell', `Get-Date && Set-Location "${crates}"; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `true && cd "${crates}" && (echo x)\npwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `cd "${crates}" &\npwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `cd "${crates}" || true; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `cd "${crates}" | cat; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `(cd "${crates}"); pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+  ];
+  for (const [tool, command] of pushes) assert.equal(verdict(tool, command), 'tags', command);
+  const pushed = [
+    ['Bash', `true && cd "${ROOT}"; cd "${crates}"; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `false || true\ncd "${crates}"\npwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `echo hi & cd "${crates}"; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `cd "${crates}" || exit 1; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `true && cd "${crates}" && pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `true || false; cd "${crates}"; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `false || true; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['Bash', `cd "${crates}"; false || true; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+    ['PowerShell', `Set-Location "${crates}" || exit 1; pwsh -NoProfile -File "${wrapper}" push origin m1/x`],
+  ];
+  for (const [tool, command] of pushed) assert.equal(verdict(tool, command), 'allow', command);
+  const kept = [
+    ['Bash', `cd "${crates}" && git commit -m x`, crates],
+    ['Bash', `cd "${crates}"; git commit -m x`, crates],
+    ['Bash', `cd "${crates}"\ngit commit -m x`, crates],
+    ['Bash', `cd "${ROOT}" && cd crates && git commit -m x`, crates],
+    ['Bash', `cd "${ROOT}"; cd crates; git commit -m x`, crates],
+    ['Bash', `pushd "${crates}" && git commit -m x`, crates],
+    ['PowerShell', `Set-Location "${crates}"; git commit -m x`, crates],
+    ['PowerShell', `Set-Location -Path "${crates}"; git commit -m x`, crates],
+    ['PowerShell', `cd "${crates}" && git commit -m x`, crates],
+    ['PowerShell', `Push-Location "${ROOT}"; Set-Location crates; git commit -m x`, crates],
+    ['Bash', `git -C "${crates}" commit -m x`, crates],
+    ['Bash', 'git commit -m x', ROOT],
+    ['Bash', `cd "${crates}" || exit 1; git commit -m x`, crates],
+    ['PowerShell', `Set-Location "${crates}" || exit 1; git commit -m x`, crates],
+    ['Bash', `cmd //c "cd /d ${crates} & git commit -m x"`, crates],
+    ['Bash', `cmd //c "cd ${crates} && git commit -m x"`, crates],
+    ['Bash', `cd /${ROOT[0].toLowerCase()}${ROOT.slice(2).replace(/\\/g, '/')}/crates && git commit -m x`, crates],
+    ['Bash', `cd /${ROOT[0].toLowerCase()} && git commit -m x`, `${ROOT.slice(0, 2)}\\`],
+  ];
+  for (const [tool, command, folder] of kept) {
+    seen.length = 0;
+    assert.equal(verdict(tool, command, ROOT, recording), 'allow', command);
+    assert.deepEqual(seen.map((each) => each.toLowerCase()), [folder.toLowerCase()], command);
+  }
+  assert.equal(verdict('PowerShell', `Set-Location "${crates}"; pwsh -NoProfile -File "${wrapper}" push origin m1/x`), 'allow');
+  assert.equal(verdict('Bash', `cd "${crates}" && pwsh -NoProfile -File "${wrapper}" push origin m1/x`), 'allow');
+});
+
 test('a script named like the wrapper somewhere else is not the wrapper', () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'ol-hook-'));
   try {

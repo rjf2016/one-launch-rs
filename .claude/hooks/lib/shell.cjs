@@ -45,6 +45,8 @@ function lex(source, dialect, base = 0, body = false) {
   let pattern = false;
   let wrote = false;
   let after = -1;
+  let joined = '';
+  let background = false;
   let splits = [];
   let words = [];
   let word = null;
@@ -89,7 +91,11 @@ function lex(source, dialect, base = 0, body = false) {
   };
   const endCommand = (pipe = false) => {
     endWord();
-    if (words.length) commands.push({ words, at: words[0].at, level, piped: piped || pipe, splits, wrote });
+    if (words.length) {
+      commands.push({ words, at: words[0].at, level, piped: piped || pipe, splits, wrote, joined, background });
+      joined = '';
+    }
+    background = false;
     words = [];
     splits = [];
     piped = pipe;
@@ -99,7 +105,7 @@ function lex(source, dialect, base = 0, body = false) {
   };
   const nested = (closer, keyed = false, patterns = false) => {
     if (level >= DEPTH) throw new Refusal('unreadable', 'brackets are nested too deep for the hook to read');
-    const outer = [words, word, piped, cases, table, assigned, redirect, splits, pattern, wrote];
+    const outer = [words, word, piped, cases, table, assigned, redirect, splits, pattern, wrote, joined, background];
     const before = commands.length;
     words = [];
     splits = [];
@@ -115,7 +121,7 @@ function lex(source, dialect, base = 0, body = false) {
     run(closer);
     endCommand();
     level--;
-    [words, word, piped, cases, table, assigned, redirect, splits, pattern, wrote] = outer;
+    [words, word, piped, cases, table, assigned, redirect, splits, pattern, wrote, joined, background] = outer;
     return commands.length > before;
   };
   const escaped = () => {
@@ -412,6 +418,7 @@ function lex(source, dialect, base = 0, body = false) {
         const arithmetic = bash && next === '(';
         if (ps && !word?.text.endsWith('@')) endWord();
         const last = ps && !word && words.at(-1);
+        const alone = !word && !words.length;
         i++;
         if (arithmetic) math++;
         const some = nested(')', false, bash && pattern);
@@ -422,6 +429,7 @@ function lex(source, dialect, base = 0, body = false) {
         } else if (bash && !some && !subshell) endCommand();
         else if (some && !subshell && !cmd) mark();
         if (last && ENDS_STATEMENT.test(last.text)) split();
+        if (alone && !word) joined = '';
         continue;
       }
       if (c === ')' || (ps && c === '}')) {
@@ -455,6 +463,7 @@ function lex(source, dialect, base = 0, body = false) {
         const or = next === '|';
         i += or || (bash && next === '&') ? 2 : 1;
         endCommand(!or);
+        if (or) joined = 'or';
         continue;
       }
       if (c === '&') {
@@ -463,11 +472,13 @@ function lex(source, dialect, base = 0, body = false) {
         } else if (next === '&') {
           i += 2;
           endCommand();
+          joined = 'and';
         } else if (ps && !word && !words.length) {
           words.push({ text: '&', quoted: false, dynamic: false, op: true, at: base + i });
           i++;
         } else {
           i++;
+          background = !cmd;
           endCommand();
         }
         continue;

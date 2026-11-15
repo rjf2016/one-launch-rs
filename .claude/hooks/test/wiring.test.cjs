@@ -308,6 +308,42 @@ test('a push through the wrapper of a name that is a tag in that checkout is ref
   fs.rmSync(path.join(main, '.git', 'refs', 'tags', 'v9'));
 });
 
+test('a folder change that cannot have happened does not move the scan or the tag lookup to another checkout', () => {
+  const clean = project();
+  const missing = path.join(clean, 'missing');
+  put(tree, 'notes/planted.md', `first line\nsecond ${token()}\n`);
+  git(tree, 'add', '-A');
+  const commits = [
+    ['Bash', `cd "${missing}"; git commit -m x`],
+    ['Bash', `cd "${missing}" || git commit -m x`],
+    ['Bash', `cd "${missing}"\ngit commit -m x`],
+    ['Bash', `cd "${path.join(clean, '.gitignore')}"; git commit -m x`],
+    ['Bash', `cd "${clean}" || git commit -m x`],
+    ['PowerShell', `Set-Location "${missing}"; git commit -m x`],
+    ['PowerShell', `Push-Location "${missing}"; git commit -m x`],
+    ['PowerShell', `cd "${missing}" || git commit -m x`],
+  ];
+  for (const [tool, command] of commits) {
+    const refused = shell(tool, command, tree);
+    assert.deepEqual([refused.blocked, refused.status], [true, [2]], command);
+    assert.match(refused.stderr, /name it with -C <folder>/, command);
+  }
+  assert.equal(shell('Bash', 'git commit -m x', tree).blocked, true, 'the control: the token is staged where the call runs');
+  assert.equal(shell('Bash', `cd "${clean}" && git commit -m x`, tree).blocked, false, 'a folder that is there, entered for sure');
+  assert.equal(shell('PowerShell', `Set-Location "${clean}"; git commit -m x`, tree).blocked, false);
+  put(tree, 'notes/planted.md', 'first line\nsecond line\n');
+  git(tree, 'add', '-A');
+
+  const wrapper = path.join(main, 'scripts', 'agent', 'git.ps1');
+  const head = spawnSync('git', ['-C', main, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+  put(main, '.git/refs/tags/v9', `${head}\n`);
+  assert.equal(shell('PowerShell', `Set-Location "${missing}"; pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, true);
+  assert.equal(shell('PowerShell', `Set-Location "${clean}" || pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, true);
+  assert.equal(shell('Bash', `cd "${missing}"; pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, true);
+  assert.equal(shell('PowerShell', `Set-Location "${clean}"; pwsh -NoProfile -File "${wrapper}" push origin v9`, main).blocked, false, 'in the other checkout v9 is no tag');
+  fs.rmSync(path.join(main, '.git', 'refs', 'tags', 'v9'));
+});
+
 test('the first commit of a repository is scanned like any other, and so is a staged file whose working copy has moved on', () => {
   const fresh = folder();
   git(fresh, 'init', '-q');
@@ -465,6 +501,25 @@ test('after an edit a Rust file is formatted, and nothing else is touched', () =
   for (const file of [sealed, text, outside, unconfigured]) assert.equal(fs.readFileSync(file, 'utf8'), ugly, file);
   assert.equal(fs.readFileSync(brokenRust, 'utf8'), 'fn main( {\n');
   assert.equal(fire('PostToolUse', 'Write', { cwd: main, tool_input: { file_path: path.join(tree, 'gone.rs') } }).status[0], 0);
+
+  const parent = put(tree, 'crates/b/src/parent.rs', 'mod inner;\nmod child;\npub  fn  top( ){}\n');
+  const child = put(tree, 'crates/b/src/child.rs', ugly);
+  const inner = put(tree, 'crates/b/src/parent/inner.rs', ugly);
+  assert.deepEqual(fire('PostToolUse', 'Edit', { cwd: main, tool_input: { file_path: parent }, tool_response: {} }).status, [0]);
+  for (const file of [child, inner]) assert.equal(fs.readFileSync(file, 'utf8'), ugly, 'a module the edited file declares is another file, and stays as it was');
+  assert.equal(fs.readFileSync(parent, 'utf8'), 'mod child;\nmod inner;\npub fn top() {}\n');
+  const lonely = put(tree, 'crates/b/src/lonely.rs', 'mod absent;\npub  fn  top( ){}\n');
+  fire('PostToolUse', 'Write', { cwd: main, tool_input: { file_path: lonely }, tool_response: {} });
+  assert.equal(fs.readFileSync(lonely, 'utf8'), 'mod absent;\npub fn top() {}\n', 'a declared module that is not there does not stop the formatting');
+
+  const windows = put(tree, 'crates/b/src/crlf.rs', 'use  a::{x10,x2};\r\npub async  fn  f( ){}\r\n');
+  assert.deepEqual(fire('PostToolUse', 'Write', { cwd: tree, tool_input: { file_path: windows }, tool_response: {} }).status, [0]);
+  assert.equal(fs.readFileSync(windows, 'utf8'), 'use a::{x2, x10};\npub async fn f() {}\n', 'the edition, the style edition and the line ends of rustfmt.toml');
+  const tidy = put(tree, 'crates/b/src/tidy.rs', 'pub fn tidy() {}\n');
+  const stamp = new Date(2001, 0, 1);
+  fs.utimesSync(tidy, stamp, stamp);
+  fire('PostToolUse', 'Edit', { cwd: main, tool_input: { file_path: tidy }, tool_response: {} });
+  assert.equal(fs.statSync(tidy).mtimeMs, stamp.getTime(), 'a file that is already formatted is not written again');
 });
 
 function standIn() {
