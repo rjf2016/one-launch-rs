@@ -15,6 +15,7 @@ use crate::args::CapturePlan;
 const SETTLE: Duration = Duration::from_millis(1200);
 const STEP: Duration = Duration::from_millis(400);
 const SWEEP_STEP: f32 = 30.;
+const LONGEST_WAIT: u64 = 60_000;
 
 pub async fn run(
     plan: &CapturePlan,
@@ -77,7 +78,13 @@ pub async fn run(
     }
 
     for step in &plan.keys {
-        let step = Step::parse(step)?;
+        let step = match Step::parse(step)? {
+            Step::Wait(time) => {
+                pause(time, cx).await;
+                continue;
+            }
+            step => step,
+        };
         // Through the untyped handle: a key press can redraw the window, and the typed one holds the root view meanwhile.
         AnyWindowHandle::from(window).update(cx, |_, window, cx| step.take(window, cx))?;
         pause(STEP, cx).await;
@@ -108,16 +115,27 @@ pub async fn run(
     Ok(())
 }
 
-// A step of --capture-keys: a key press, or the pointer at a place of the client area, moved there or clicked.
+// A step of --capture-keys: a key press, the pointer at a place of the client area, moved there or clicked, or a wait for something that takes its time, such as a fake switch.
 enum Step {
     Key(Keystroke),
     Move(Point<Pixels>),
     Click(Point<Pixels>),
+    Wait(Duration),
 }
 
 impl Step {
     fn parse(text: &str) -> anyhow::Result<Self> {
         let (pointer, spot) = match text.split_once(':') {
+            Some(("wait", milliseconds)) => {
+                return milliseconds
+                    .parse::<u64>()
+                    .ok()
+                    .filter(|milliseconds| *milliseconds <= LONGEST_WAIT)
+                    .map(|milliseconds| Self::Wait(Duration::from_millis(milliseconds)))
+                    .with_context(|| {
+                        format!("{text} is not wait:<milliseconds up to {LONGEST_WAIT}>")
+                    });
+            }
             Some(pointer @ ("move" | "click", _)) => pointer,
             _ => {
                 return Keystroke::parse(text.to_owned().leak())
@@ -144,6 +162,7 @@ impl Step {
             }
             Self::Move(position) => (position, false),
             Self::Click(position) => (position, true),
+            Self::Wait(_) => return,
         };
         let modifiers = Modifiers::default();
         window.dispatch_event(

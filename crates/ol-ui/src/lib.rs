@@ -1,9 +1,11 @@
 #![forbid(unsafe_code)]
 
 mod assets;
+mod host;
 mod library;
 mod posters;
 mod shell;
+mod widgets;
 
 use gpui::prelude::*;
 use gpui::{
@@ -26,9 +28,11 @@ pub fn init(cx: &mut App) {
     ol_ui_kit::init(cx);
 }
 
+// `fake_launchers` says so in the title bar, so that no picture of a fake run passes for a real one.
 pub fn open_main_window(
     title: impl Into<SharedString>,
     presence: Presence,
+    fake_launchers: bool,
     backend: Backend,
     cx: &mut App,
 ) -> gpui::Result<WindowHandle<Shell>> {
@@ -48,6 +52,6 @@ pub fn open_main_window(
         ..defaults
     };
     cx.open_window(options, |window, cx| {
-        cx.new(|cx| Shell::new(backend, window, cx))
+        cx.new(|cx| Shell::new(backend, fake_launchers, window, cx))
     })
 }

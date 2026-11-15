@@ -5,20 +5,22 @@ use std::time::{Duration, Instant, SystemTime};
 
 use gpui::prelude::*;
 use gpui::{
-    App, BoxShadow, Context, Div, EventEmitter, FontWeight, Keystroke, ObjectFit, Pixels,
-    RenderImage, ScrollStrategy, SharedString, Stateful, Subscription, Svg,
+    AnyElement, App, BoxShadow, Context, Div, Entity, EventEmitter, FontWeight, Keystroke,
+    ObjectFit, Pixels, RenderImage, ScrollStrategy, SharedString, Stateful, Subscription, Task,
     UniformListScrollHandle, Window, anchored, deferred, div, hsla, img, linear_color_stop,
-    linear_gradient, point, px, svg, uniform_list,
+    linear_gradient, point, px, uniform_list,
 };
-use ol_api::library::{LibraryGame, caption, monogram, visible};
+use ol_api::library::{LibraryGame, caption, monogram, relative, visible};
 use ol_api::{ApiError, Backend, Library};
-use ol_model::{ArtworkSource, LauncherId, LibrarySort};
+use ol_model::{ArtworkSource, Game, LauncherId, LibraryScanResult, LibrarySort, RecentLaunch};
 use ol_ui_kit::TextField;
 use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::assets;
+use crate::host::{JobSettled, LaunchHost};
 use crate::posters::{self, Lookup, Posters, Shape};
 use crate::shell::sidebar_width;
+use crate::widgets::{Button, Tone, icon, launcher_dot, spinner};
 
 const PAGE_PADDING: f32 = 32.;
 const SCROLLBAR: f32 = 12.;
@@ -29,15 +31,31 @@ const HEADER: f32 = 152.;
 const CONTROL: f32 = 34.;
 const MENU_GAP: f32 = 6.;
 const CLOCK: Duration = Duration::from_secs(60);
+// As many launches as the Recent strip asks for.
+const RECENT: u32 = 8;
+// The strip with its heading and the gap under it.
+const RECENT_STRIP: f32 = 110.;
+const FLASH_STAYS: Duration = Duration::from_secs(3);
+const ERROR_FLASH_STAYS: Duration = Duration::from_secs(6);
 
 pub struct LibraryView {
     backend: Backend,
+    host: Entity<LaunchHost>,
     search: TextField,
     scroll: UniformListScrollHandle,
     posters: Posters,
+    // Counts the lists of games shown: a poster decoded for an earlier list is not one of this list's.
+    list: u64,
+    stale: Vec<Arc<RenderImage>>,
     load: Load,
     games: Vec<LibraryGame>,
     cards: Vec<Card>,
+    recent: Vec<RecentLaunch>,
+    scanning: bool,
+    // The scan every start runs has ended: until then an empty Library says nothing about what is installed.
+    scanned: bool,
+    no_launchers: bool,
+    flash: Option<Flash>,
     shown: Vec<usize>,
     query: SharedString,
     filter: Option<LauncherId>,
@@ -46,13 +64,20 @@ pub struct LibraryView {
     over_trigger: Option<Menu>,
     sweep: Option<Sweep>,
     sweep_report: Option<SweepReport>,
-    _subscriptions: [Subscription; 2],
+    _subscriptions: [Subscription; 4],
 }
 
 enum Load {
     Pending,
     Failed(SharedString),
     Ready,
+}
+
+// A line beside Rescan that goes by itself.
+struct Flash {
+    text: SharedString,
+    failed: bool,
+    _timer: Task<()>,
 }
 
 // Sent once, when the games or the reason there are none are about to be drawn.
@@ -166,8 +191,29 @@ impl Grid {
     }
 }
 
+// The games with the stored sort, and the last launches.
+type Loaded = Result<(Library, Vec<RecentLaunch>), ApiError>;
+
+async fn read(backend: &Backend) -> Loaded {
+    let library = backend.library().await?;
+    // The strip is an extra: without it the games still show.
+    let recent = backend.recent_launches(RECENT).await.unwrap_or_default();
+    Ok((library, recent))
+}
+
+// Whether a Play may skip the dialog: nothing to say about an update first, and no job to show instead.
+fn plays_at_once(game: &Game, host: &LaunchHost) -> bool {
+    let update_first = game.needs_update && game.launcher != LauncherId::Steam;
+    !update_first && !host.job_running()
+}
+
 impl LibraryView {
-    pub fn new(backend: Backend, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        backend: Backend,
+        host: Entity<LaunchHost>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let search =
             TextField::new("Search games (Ctrl+F)", false, window, cx).clearing_on_escape(cx);
         search.set_disabled(true, cx);
@@ -190,11 +236,18 @@ impl LibraryView {
             }
         });
 
+        let host_changed = cx.observe(&host, |_, _, cx| cx.notify());
+        let job_settled = cx.subscribe(&host, |this, _, _: &JobSettled, cx| this.reload(cx));
         cx.spawn({
             let backend = backend.clone();
             async move |this, cx| {
-                let library = backend.library().await;
-                this.update(cx, |this, cx| this.loaded(library, cx)).ok();
+                let library = read(&backend).await;
+                this.update(cx, |this, cx| {
+                    this.loaded(library, cx);
+                    cx.emit(LibraryLoaded);
+                    this.rescan(false, cx);
+                })
+                .ok();
             }
         })
         .detach();
@@ -210,12 +263,20 @@ impl LibraryView {
 
         Self {
             backend,
+            host,
             search,
             scroll: UniformListScrollHandle::new(),
             posters: Posters::default(),
+            list: 0,
+            stale: Vec::new(),
             load: Load::Pending,
             games: Vec::new(),
             cards: Vec::new(),
+            recent: Vec::new(),
+            scanning: false,
+            scanned: false,
+            no_launchers: false,
+            flash: None,
             shown: Vec::new(),
             query: SharedString::default(),
             filter: None,
@@ -224,31 +285,182 @@ impl LibraryView {
             over_trigger: None,
             sweep: None,
             sweep_report: None,
-            _subscriptions: [search_changed, keys],
+            _subscriptions: [search_changed, keys, host_changed, job_settled],
         }
     }
 
-    fn loaded(&mut self, library: Result<Library, ApiError>, cx: &mut Context<Self>) {
-        match library {
-            Ok(library) => {
-                let now = SystemTime::now();
-                self.cards = library
-                    .games
-                    .iter()
-                    .map(|entry| Card::of(entry, now))
-                    .collect();
-                self.games = library.games;
-                self.sort = library.sort;
-                self.load = Load::Ready;
-                self.search.set_disabled(self.games.is_empty(), cx);
-                self.show(cx);
-            }
+    fn loaded(&mut self, library: Loaded, cx: &mut Context<Self>) {
+        let (library, recent) = match library {
+            Ok(read) => read,
             Err(error) => {
                 self.load = Load::Failed(error.message.into());
-                cx.notify();
+                return cx.notify();
             }
+        };
+        let now = SystemTime::now();
+        let first = !matches!(self.load, Load::Ready);
+        let same_list = !first
+            && self.games.len() == library.games.len()
+            && self
+                .games
+                .iter()
+                .zip(&library.games)
+                .all(|(old, new)| old.game.id == new.game.id && old.grid == new.grid);
+        self.cards = library
+            .games
+            .iter()
+            .map(|entry| Card::of(entry, now))
+            .collect();
+        self.games = library.games;
+        self.recent = recent;
+        self.load = Load::Ready;
+        self.search.set_disabled(self.games.is_empty(), cx);
+        if same_list {
+            // The same games in the same places: the posters stay, and so does the place scrolled to.
+            self.arrange();
+            return cx.notify();
         }
-        cx.emit(LibraryLoaded);
+        // Later reads keep the order chosen in this run, stored or not.
+        if first {
+            self.sort = library.sort;
+        }
+        self.list += 1;
+        self.stale.extend(self.posters.clear());
+        self.show(cx);
+    }
+
+    // Reads the Library again after something changed it: a scan, or a launch.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        let backend = self.backend.clone();
+        cx.spawn(async move |this, cx| {
+            let library = read(&backend).await;
+            this.update(cx, |this, cx| this.loaded(library, cx)).ok();
+        })
+        .detach();
+    }
+
+    // Asks the backend to read every launcher again. The scan a start runs says nothing; one the user asked for says what it found.
+    fn rescan(&mut self, announce: bool, cx: &mut Context<Self>) {
+        if self.scanning {
+            return;
+        }
+        self.scanning = true;
+        let backend = self.backend.clone();
+        cx.spawn(async move |this, cx| {
+            let scan = backend.rescan().await;
+            let library = read(&backend).await;
+            this.update(cx, |this, cx| {
+                this.scanning = false;
+                this.scanned = true;
+                if let Ok(found) = &scan {
+                    this.no_launchers =
+                        !found.is_empty() && found.iter().all(|launcher| !launcher.installed);
+                }
+                if announce {
+                    let (text, failed) = this.scan_summary(scan);
+                    this.say(text, failed, cx);
+                }
+                this.loaded(library, cx);
+            })
+            .ok();
+        })
+        .detach();
+        cx.notify();
+    }
+
+    fn scan_summary(&self, scan: Result<Vec<LibraryScanResult>, ApiError>) -> (String, bool) {
+        let found = match scan {
+            Ok(found) => found,
+            Err(error) => return (error.message, true),
+        };
+        let failures: Vec<String> = found
+            .iter()
+            .filter_map(|launcher| {
+                let error = launcher.error.as_ref()?;
+                Some(format!("{}: {error}", launcher.launcher.display_name()))
+            })
+            .collect();
+        if !failures.is_empty() {
+            return (failures.join(" \u{b7} "), true);
+        }
+        if found.is_empty() {
+            return (
+                "No launcher is available in this build yet, so nothing was scanned.".to_owned(),
+                true,
+            );
+        }
+        if self.no_launchers {
+            return (
+                "No launchers found. Install Steam, Epic Games, Battle.net, or Riot Games, then rescan."
+                    .to_owned(),
+                true,
+            );
+        }
+        let count = |of: fn(&LibraryScanResult) -> usize| found.iter().map(of).sum::<usize>();
+        let (added, removed) = (
+            count(|launcher| launcher.added),
+            count(|launcher| launcher.removed),
+        );
+        if added + removed == 0 {
+            ("Library is up to date".to_owned(), false)
+        } else {
+            (format!("{added} added, {removed} removed"), false)
+        }
+    }
+
+    fn say(&mut self, text: String, failed: bool, cx: &mut Context<Self>) {
+        let stays = if failed {
+            ERROR_FLASH_STAYS
+        } else {
+            FLASH_STAYS
+        };
+        let timer = cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(stays).await;
+            this.update(cx, |this, cx| {
+                this.flash = None;
+                cx.notify();
+            })
+            .ok();
+        });
+        self.flash = Some(Flash {
+            text: text.into(),
+            failed,
+            _timer: timer,
+        });
+        cx.notify();
+    }
+
+    // A click on a card plays at once as the account the game was last launched with. The dialog comes first when there is no such account, when the launcher wants to update the game, and while a job runs.
+    fn open_card(&mut self, game: usize, cx: &mut Context<Self>) {
+        let Some(entry) = self.games.get(game) else {
+            return;
+        };
+        let game = entry.game.clone();
+        let last = game.last_launch.clone();
+        let known = last
+            .as_ref()
+            .is_some_and(|last| last.account_name.is_some());
+        let instant = known && plays_at_once(&game, self.host.read(cx));
+        let account = last.map(|last| last.account_id);
+        self.host
+            .update(cx, |host, cx| host.open(game, account, instant, cx));
+    }
+
+    fn open_recent(&mut self, entry: usize, cx: &mut Context<Self>) {
+        let Some(recent) = self.recent.get(entry) else {
+            return;
+        };
+        let played = self
+            .games
+            .iter()
+            .find(|game| game.game.id == recent.game_id);
+        let Some(game) = played.map(|game| game.game.clone()) else {
+            return;
+        };
+        let instant = plays_at_once(&game, self.host.read(cx));
+        let account = Some(recent.account_id.clone());
+        self.host
+            .update(cx, |host, cx| host.open(game, account, instant, cx));
     }
 
     fn reword(&mut self, cx: &mut Context<Self>) {
@@ -332,6 +544,10 @@ impl LibraryView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
+        // A dialog over the Library has the keyboard to itself.
+        if self.host.read(cx).is_modal() {
+            return false;
+        }
         if keystroke.key == "escape" && self.menu.is_some() {
             self.menu = None;
             cx.notify();
@@ -354,8 +570,12 @@ impl LibraryView {
         self.show(cx);
     }
 
-    fn show(&mut self, cx: &mut Context<Self>) {
+    fn arrange(&mut self) {
         self.shown = visible(&self.games, &self.query, self.filter, self.sort);
+    }
+
+    fn show(&mut self, cx: &mut Context<Self>) {
+        self.arrange();
         self.scroll
             .0
             .borrow()
@@ -421,14 +641,17 @@ impl LibraryView {
             Lookup::Ready(image) => Some(image),
             Lookup::Pending | Lookup::Unreadable => None,
             Lookup::Missing => {
+                let list = self.list;
                 cx.spawn(async move |this, cx| {
                     let image = cx
                         .background_executor()
                         .spawn(async move { posters::decode(&file, shape, scale).map(Arc::new) })
                         .await;
                     this.update(cx, |this, cx| {
-                        this.posters.insert(game, image);
-                        cx.notify();
+                        if this.list == list {
+                            this.posters.insert(game, image);
+                            cx.notify();
+                        }
                     })
                     .ok();
                 })
@@ -466,6 +689,8 @@ impl LibraryView {
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
         let poster = self.poster(game, scale, cx);
+        // A one-click Play is being checked: its mark stays up and turns.
+        let busy = self.host.read(cx).silent_game() == Some(self.games[game].game.id.as_str());
         let card = &self.cards[game];
         let icon_art = matches!(card.art, Some((_, Shape::Icon)));
         let (width, height) = (grid.poster_width(), grid.poster_width() * 1.5);
@@ -561,8 +786,10 @@ impl LibraryView {
                         linear_color_stop(alpha(theme::BG, 0.8), 0.),
                         linear_color_stop(alpha(theme::BG, 0.), 1.),
                     ))
-                    .opacity(0.)
-                    .group_hover("card", |style| style.opacity(1.))
+                    .when(!busy, |mark| {
+                        mark.opacity(0.)
+                            .group_hover("card", |style| style.opacity(1.))
+                    })
                     .child(
                         div()
                             .flex()
@@ -571,11 +798,16 @@ impl LibraryView {
                             .size(px(40.))
                             .rounded_full()
                             .bg(color(theme::ACCENT))
-                            .child(icon(assets::PLAY, 20., theme::TEXT_STRONG)),
+                            .child(if busy {
+                                spinner("checking", 20., theme::TEXT_STRONG)
+                            } else {
+                                icon(assets::PLAY, 20., theme::TEXT_STRONG).into_any_element()
+                            }),
                     ),
             )
             .child(
                 div()
+                    .id("more")
                     .absolute()
                     .top(px(8.))
                     .right(px(8.))
@@ -589,6 +821,8 @@ impl LibraryView {
                     .bg(alpha(theme::BG, 0.8))
                     .opacity(0.)
                     .group_hover("card", |style| style.opacity(1.))
+                    // The card's menu is not built yet; a press here is not a press on Play.
+                    .on_click(|_, _, cx| cx.stop_propagation())
                     .child(icon(assets::MORE, 16., theme::MUTED)),
             );
         let caption = div()
@@ -626,6 +860,7 @@ impl LibraryView {
             .overflow_hidden()
             .cursor_pointer()
             .hover(|style| style.border_color(color(theme::BORDER_STRONG)))
+            .on_click(cx.listener(move |this, _, _, cx| this.open_card(game, cx)))
             .child(art)
             .child(caption)
     }
@@ -659,7 +894,41 @@ impl LibraryView {
                             ),
                     ),
             )
-            .child(button("rescan", assets::RESCAN, "Rescan"));
+            .child(
+                div()
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .gap(px(8.))
+                    .max_w(px(480.))
+                    .children(self.flash.as_ref().map(|flash| {
+                        div()
+                            .min_w_0()
+                            .text_size(px(12.))
+                            .line_height(px(16.))
+                            .text_color(color(if flash.failed {
+                                theme::DANGER
+                            } else {
+                                theme::SUCCESS
+                            }))
+                            .child(flash.text.clone())
+                    }))
+                    .child(
+                        Button::new(
+                            "rescan",
+                            Tone::Secondary,
+                            if self.scanning {
+                                "Scanning\u{2026}"
+                            } else {
+                                "Rescan"
+                            },
+                        )
+                        .glyph(assets::RESCAN)
+                        .turning(self.scanning)
+                        .disabled(self.scanning)
+                        .on_click(cx.listener(|this, _, _, cx| this.rescan(true, cx))),
+                    ),
+            );
         let empty = self.games.is_empty();
         let clear = (!self.query.is_empty()).then(|| {
             div()
@@ -895,10 +1164,161 @@ impl LibraryView {
             assets::NO_MATCH,
             title,
             description,
-            button("clear-all", assets::CLEAR, "Clear search and filters").on_click(
-                cx.listener(|this, _, window, cx| this.clear_search_and_filter(window, cx)),
-            ),
+            Button::new("clear-all", Tone::Secondary, "Clear search and filters")
+                .glyph(assets::CLEAR)
+                .on_click(
+                    cx.listener(|this, _, window, cx| this.clear_search_and_filter(window, cx)),
+                ),
         )
+    }
+
+    fn render_empty(&self, cx: &mut Context<Self>) -> Div {
+        let waiting = self.scanning || !self.scanned;
+        let title = if waiting {
+            "Scanning your launchers\u{2026}"
+        } else if self.no_launchers {
+            "No launchers found"
+        } else {
+            "No games found"
+        };
+        let description = if self.no_launchers {
+            "One Launch looks for Steam, Epic Games Launcher, Battle.net, and the Riot Client. Install one of them, then rescan."
+        } else {
+            "Installed Steam, Epic, Battle.net, and Riot games appear here after a scan."
+        };
+        empty_state(
+            assets::GAMEPAD,
+            title,
+            description,
+            Button::new("scan-now", Tone::Primary, "Scan now")
+                .glyph(assets::RESCAN)
+                .disabled(waiting)
+                .on_click(cx.listener(|this, _, _, cx| this.rescan(true, cx))),
+        )
+    }
+
+    // The last launches whose game is still in the Library, each with the place of its game. Only while nothing narrows the grid.
+    fn recent_shown(&self) -> Vec<(usize, usize)> {
+        if !self.query.is_empty() || self.filter.is_some() {
+            return Vec::new();
+        }
+        self.recent
+            .iter()
+            .enumerate()
+            .filter_map(|(entry, recent)| {
+                let game = self
+                    .games
+                    .iter()
+                    .position(|game| game.game.id == recent.game_id)?;
+                Some((entry, game))
+            })
+            .collect()
+    }
+
+    // Scrolls away with the grid: it sits over the room the grid leaves at its top, moved by as much as the grid is scrolled.
+    fn render_recent(
+        &mut self,
+        shown: &[(usize, usize)],
+        strip: f32,
+        scale: f32,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let now = SystemTime::now();
+        let scrolled = self.scroll.0.borrow().base_handle.offset().y;
+        let mut cards = Vec::with_capacity(shown.len());
+        for (entry, game) in shown.iter().copied() {
+            let poster = self.poster(game, scale, cx);
+            let recent = &self.recent[entry];
+            let when = relative(&recent.launched_at, now).unwrap_or_default();
+            cards.push(
+                div()
+                    .id(("recent", entry))
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .gap(px(12.))
+                    .w(px(240.))
+                    .py(px(6.))
+                    .pl(px(6.))
+                    .pr(px(12.))
+                    .rounded(px(8.))
+                    .border_1()
+                    .border_color(color(theme::BORDER))
+                    .bg(color(theme::SURFACE))
+                    .cursor_pointer()
+                    .hover(|style| style.border_color(color(theme::BORDER_STRONG)))
+                    .on_click(cx.listener(move |this, _, _, cx| this.open_recent(entry, cx)))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_none()
+                            .items_center()
+                            .justify_center()
+                            .w(px(32.))
+                            .h(px(48.))
+                            .rounded(px(4.))
+                            .overflow_hidden()
+                            .bg(color(theme::SURFACE_3))
+                            .child(match poster {
+                                Some(image) => img(image)
+                                    .size_full()
+                                    .object_fit(ObjectFit::Cover)
+                                    .rounded(px(4.))
+                                    .into_any_element(),
+                                None => launcher_dot(recent.launcher).into_any_element(),
+                            }),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .truncate()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(color(theme::TEXT_STRONG))
+                                    .child(recent.game_name.clone()),
+                            )
+                            .child(
+                                div()
+                                    .truncate()
+                                    .text_size(px(11.))
+                                    .line_height(px(16.))
+                                    .text_color(color(theme::MUTED))
+                                    .child(format!("{} \u{b7} {when}", recent.account_name)),
+                            ),
+                    ),
+            );
+        }
+        div()
+            .absolute()
+            .top(scrolled)
+            .left_0()
+            .right_0()
+            .pl(px(PAGE_PADDING))
+            .pr(px(PAGE_PADDING + strip))
+            .child(
+                div()
+                    .mb(px(8.))
+                    .flex()
+                    .items_center()
+                    .gap(px(6.))
+                    .text_size(px(12.))
+                    .line_height(px(16.))
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(color(theme::MUTED))
+                    .child(icon(assets::CLOCK, 14., theme::MUTED))
+                    .child("RECENT"),
+            )
+            .child(
+                div()
+                    .id("recent-strip")
+                    .flex()
+                    .gap(px(8.))
+                    .overflow_x_scroll()
+                    .restrict_scroll_to_axis()
+                    .children(cards),
+            )
     }
 
     fn render_thumb(&self, content: f32, view: f32) -> Option<Div> {
@@ -944,11 +1364,14 @@ impl Card {
 impl Render for LibraryView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let viewport = window.viewport_size();
-        let pane = (f32::from(viewport.height) - TITLE_BAR - HEADER).max(0.);
+        let banner = self.host.read(cx).banner_height();
+        let pane = (f32::from(viewport.height) - TITLE_BAR - banner - HEADER).max(0.);
+        let recent = self.recent_shown();
+        let above = if recent.is_empty() { 0. } else { RECENT_STRIP };
         let grid = Grid::for_pane(
             viewport.width - sidebar_width(viewport.width),
             viewport.width,
-            pane,
+            pane - above,
             self.shown.len(),
         );
         let rows = self.shown.len().div_ceil(grid.columns);
@@ -956,10 +1379,13 @@ impl Render for LibraryView {
 
         self.posters.tick();
         let on_screen = (pane / f32::from(grid.row_height())).ceil() as usize + 1;
-        for image in self.posters.evict((on_screen * grid.columns * 3).max(96)) {
+        let evicted = self.posters.evict((on_screen * grid.columns * 3).max(96));
+        for image in evicted.into_iter().chain(self.stale.drain(..)) {
             cx.drop_image(image, Some(window));
         }
 
+        let strip = (above > 0. && rows > 0 && matches!(self.load, Load::Ready))
+            .then(|| self.render_recent(&recent, grid.strip, scale, cx));
         let body = match &self.load {
             Load::Pending => div().flex_1(),
             Load::Failed(message) => div()
@@ -967,18 +1393,14 @@ impl Render for LibraryView {
                 .px(px(PAGE_PADDING))
                 .text_color(color(theme::DANGER))
                 .child(format!("Could not load the library: {message}")),
-            Load::Ready if self.games.is_empty() => div().flex_1().child(empty_state(
-                assets::GAMEPAD,
-                "No games found",
-                "Installed Steam, Epic, Battle.net, and Riot games appear here after a scan.",
-                primary_button("scan-now", assets::RESCAN, "Scan now"),
-            )),
+            Load::Ready if self.games.is_empty() => div().flex_1().child(self.render_empty(cx)),
             Load::Ready if rows == 0 => div().flex_1().child(self.render_no_match(cx)),
             Load::Ready => div()
                 .group("pane")
                 .relative()
                 .flex_1()
                 .min_h_0()
+                .overflow_hidden()
                 .child(
                     uniform_list(
                         "library-grid",
@@ -988,9 +1410,11 @@ impl Render for LibraryView {
                         }),
                     )
                     .track_scroll(&self.scroll)
-                    .size_full(),
+                    .size_full()
+                    .pt(px(above)),
                 )
-                .children(self.render_thumb(grid.height_of(self.shown.len()), pane)),
+                .children(strip)
+                .children(self.render_thumb(grid.height_of(self.shown.len()) + above, pane)),
         };
 
         div()
@@ -1006,7 +1430,7 @@ fn empty_state(
     glyph: &'static str,
     title: impl Into<SharedString>,
     description: impl Into<SharedString>,
-    action: Stateful<Div>,
+    action: AnyElement,
 ) -> Div {
     div()
         .flex()
@@ -1045,65 +1469,4 @@ fn empty_state(
                 .child(description.into()),
         )
         .child(div().mt(px(20.)).child(action))
-}
-
-fn launcher_dot(launcher: LauncherId) -> Div {
-    let hex = match launcher {
-        LauncherId::Steam => theme::STEAM,
-        LauncherId::Epic => theme::EPIC,
-        LauncherId::Battlenet => theme::BATTLENET,
-        LauncherId::Riot => theme::RIOT,
-    };
-    div().flex_none().size(px(6.)).rounded_full().bg(color(hex))
-}
-
-fn icon(path: &'static str, size: f32, hex: u32) -> Svg {
-    svg()
-        .path(path)
-        .flex_none()
-        .size(px(size))
-        .text_color(color(hex))
-}
-
-fn button(id: &'static str, glyph: &'static str, label: &'static str) -> Stateful<Div> {
-    div()
-        .id(id)
-        .flex()
-        .flex_none()
-        .items_center()
-        .gap(px(8.))
-        .h(px(CONTROL))
-        .px(px(12.))
-        .rounded(px(8.))
-        .border_1()
-        .border_color(color(theme::BORDER))
-        .bg(color(theme::SURFACE_2))
-        .font_weight(FontWeight::MEDIUM)
-        .cursor_pointer()
-        .hover(|style| {
-            style
-                .bg(color(theme::SURFACE_3))
-                .border_color(color(theme::BORDER_STRONG))
-        })
-        .child(icon(glyph, 16., theme::TEXT))
-        .child(label)
-}
-
-fn primary_button(id: &'static str, glyph: &'static str, label: &'static str) -> Stateful<Div> {
-    div()
-        .id(id)
-        .flex()
-        .flex_none()
-        .items_center()
-        .gap(px(8.))
-        .h(px(32.))
-        .px(px(12.))
-        .rounded(px(8.))
-        .bg(color(theme::ACCENT))
-        .font_weight(FontWeight::MEDIUM)
-        .text_color(color(theme::TEXT_STRONG))
-        .cursor_pointer()
-        .hover(|style| style.bg(color(theme::ACCENT_HOVER)))
-        .child(icon(glyph, 16., theme::TEXT_STRONG))
-        .child(label)
 }

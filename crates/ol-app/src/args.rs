@@ -7,6 +7,16 @@ pub struct Args {
     pub data_dir: PathBuf,
     pub check: Option<Check>,
     pub doctor: Option<DoctorVault>,
+    #[cfg(feature = "fake")]
+    pub fake: Option<FakeMachine>,
+}
+
+// The folder a fake machine lives in, and the scenario and fixtures to fill it from when it holds none yet.
+#[cfg(feature = "fake")]
+#[derive(Debug, PartialEq)]
+pub struct FakeMachine {
+    pub folder: PathBuf,
+    pub lay_down: Option<(PathBuf, PathBuf)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -39,6 +49,8 @@ impl Args {
         let (mut doctor, mut fake_vault) = (false, false);
         let mut plan = CapturePlan::default();
         let mut steps = false;
+        #[cfg(feature = "fake")]
+        let (mut fake_folder, mut fake_scenario, mut fake_fixtures) = (None, None, None);
         for argument in arguments {
             if argument == "--probe" {
                 probe = true;
@@ -97,6 +109,12 @@ impl Args {
                 "--capture-row" => plan.row = Some(number()?),
                 "--capture-type" => plan.text = Some(value.to_owned()),
                 "--capture-keys" => plan.keys = value.split(',').map(str::to_owned).collect(),
+                #[cfg(feature = "fake")]
+                "--fake-launchers" => fake_folder = Some(path()?),
+                #[cfg(feature = "fake")]
+                "--fake-scenario" => fake_scenario = Some(path()?),
+                #[cfg(feature = "fake")]
+                "--fake-fixtures" => fake_fixtures = Some(path()?),
                 _ => return Err(format!("unknown argument {name}")),
             }
             steps |= name.starts_with("--capture-");
@@ -110,6 +128,12 @@ impl Args {
         }
         if doctor && (file.is_some() || probe || steps) {
             return Err("--doctor does not go with --capture or --probe".to_owned());
+        }
+        #[cfg(feature = "fake")]
+        let fake = fake_machine(fake_folder, fake_scenario, fake_fixtures)?;
+        #[cfg(feature = "fake")]
+        if fake.is_some() && doctor {
+            return Err("--doctor does not go with --fake-launchers".to_owned());
         }
         let doctor = doctor.then_some(vault(fake_vault));
         let check = match (file, probe) {
@@ -125,8 +149,39 @@ impl Args {
             data_dir,
             check,
             doctor,
+            #[cfg(feature = "fake")]
+            fake,
         })
     }
+}
+
+#[cfg(feature = "fake")]
+fn fake_machine(
+    folder: Option<PathBuf>,
+    scenario: Option<PathBuf>,
+    fixtures: Option<PathBuf>,
+) -> Result<Option<FakeMachine>, String> {
+    let lay_down = match (scenario, fixtures) {
+        (Some(scenario), Some(fixtures)) => Some((scenario, fixtures)),
+        (None, None) => None,
+        _ => return Err("--fake-scenario and --fake-fixtures go together".to_owned()),
+    };
+    let Some(folder) = folder else {
+        return match lay_down {
+            Some(_) => Err("--fake-scenario needs --fake-launchers=<folder>".to_owned()),
+            None => Ok(None),
+        };
+    };
+    let named = [("--fake-launchers", Some(&folder))].into_iter().chain([
+        ("--fake-scenario", lay_down.as_ref().map(|from| &from.0)),
+        ("--fake-fixtures", lay_down.as_ref().map(|from| &from.1)),
+    ]);
+    for (name, path) in named {
+        if path.is_some_and(|path| !path.is_absolute()) {
+            return Err(format!("{name}=<folder> must be an absolute path"));
+        }
+    }
+    Ok(Some(FakeMachine { folder, lay_down }))
 }
 
 #[cfg(feature = "fake")]
@@ -243,6 +298,60 @@ mod tests {
         assert_eq!(args.doctor, Some(DoctorVault::OfTheFixtures));
         assert!(parse(&[r"--data-dir=D:\scratch", "--fake-vault"]).is_err());
         assert!(parse(&[r"--data-dir=D:\scratch", "--probe", "--fake-vault"]).is_err());
+    }
+
+    #[cfg(not(feature = "fake"))]
+    #[test]
+    fn the_fake_launchers_cannot_be_asked_for() {
+        for extra in [
+            r"--fake-launchers=D:\scratch\launchers",
+            r"--fake-scenario=D:\scenarios\all-four",
+            r"--fake-fixtures=D:\fixtures",
+        ] {
+            assert!(
+                parse(&[r"--data-dir=D:\scratch", extra]).is_err(),
+                "{extra}"
+            );
+        }
+    }
+
+    #[cfg(feature = "fake")]
+    #[test]
+    fn a_fake_machine_is_a_folder_and_what_to_fill_it_from() {
+        let data = r"--data-dir=D:\scratch\data";
+        let folder = r"--fake-launchers=D:\scratch\launchers";
+        let scenario = r"--fake-scenario=D:\scenarios\all-four";
+        let fixtures = r"--fake-fixtures=D:\fixtures";
+        assert_eq!(parse(&[data]).unwrap().fake, None);
+        assert_eq!(
+            parse(&[data, folder]).unwrap().fake,
+            Some(FakeMachine {
+                folder: PathBuf::from(r"D:\scratch\launchers"),
+                lay_down: None,
+            })
+        );
+        assert_eq!(
+            parse(&[data, folder, scenario, fixtures]).unwrap().fake,
+            Some(FakeMachine {
+                folder: PathBuf::from(r"D:\scratch\launchers"),
+                lay_down: Some((
+                    PathBuf::from(r"D:\scenarios\all-four"),
+                    PathBuf::from(r"D:\fixtures")
+                )),
+            })
+        );
+        for refused in [
+            &[data, scenario, fixtures][..],
+            &[data, folder, scenario],
+            &[data, folder, fixtures],
+            &[data, "--fake-launchers=launchers"],
+            &[data, folder, "--fake-scenario=all-four", fixtures],
+            &[data, folder, scenario, "--fake-fixtures=fixtures"],
+            &[data, folder, "--doctor"],
+            &[data, "--fake-launchers"],
+        ] {
+            assert!(parse(refused).is_err(), "{refused:?}");
+        }
     }
 
     #[test]

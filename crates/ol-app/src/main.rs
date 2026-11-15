@@ -3,6 +3,8 @@
 
 mod args;
 mod capture;
+#[cfg(feature = "fake")]
+mod fake;
 mod probe;
 
 use std::cell::{Cell, RefCell};
@@ -22,11 +24,21 @@ use ol_ui::{LibraryLoaded, Presence};
 
 use crate::args::{Args, Check, DoctorVault};
 
-const TITLE: &str = "One Launch (GPUI proof)";
+const TITLE: &str = "One Launch";
+// As in the Electron app: no picture of a fake run can pass for a real one.
+#[cfg(feature = "fake")]
+const FAKE_TITLE: &str = "One Launch (fake launchers)";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const COPY_DELAY: Duration = Duration::from_millis(250);
 
 type TraySlot = Rc<RefCell<Option<Tray>>>;
+
+// What the launchers run on: nothing yet in the app itself, a scenario folder in a build with the fake launchers.
+enum Machine {
+    None,
+    #[cfg(feature = "fake")]
+    Fake(ol_sim::Seed),
+}
 
 fn main() -> ExitCode {
     let args = match Args::parse(std::env::args().skip(1)) {
@@ -41,10 +53,12 @@ fn main() -> ExitCode {
         Some(Check::Capture(plan)) => Some(("--capture", plan.file.as_path())),
         _ => None,
     };
-    for (argument, path) in [Some(("--data-dir", args.data_dir.as_path())), capture]
-        .into_iter()
-        .flatten()
-    {
+    let written = [
+        Some(("--data-dir", args.data_dir.as_path())),
+        capture,
+        fake_folder(&args),
+    ];
+    for (argument, path) in written.into_iter().flatten() {
         if let Err(refusal) = refuse_real_data_folder(argument, path) {
             eprintln!("OneLaunch: {refusal}");
             return ExitCode::from(2);
@@ -54,7 +68,13 @@ fn main() -> ExitCode {
         return doctor(&args.data_dir, vault);
     }
     // Started first: the database opens on its own thread while the window is being made.
-    let backend = Backend::start(args.data_dir.clone(), VERSION);
+    let (backend, machine) = match start_backend(&args) {
+        Ok(started) => started,
+        Err(problem) => {
+            eprintln!("OneLaunch: {problem:#}");
+            return ExitCode::from(2);
+        }
+    };
     let failed = Rc::new(Cell::new(false));
     let tray = TraySlot::default();
     gpui_platform::application()
@@ -62,7 +82,7 @@ fn main() -> ExitCode {
         .run({
             let (backend, failed, tray) = (backend.clone(), failed.clone(), tray.clone());
             move |cx| {
-                if let Err(error) = start(args, backend, failed.clone(), tray, cx) {
+                if let Err(error) = start(args, backend, machine, failed.clone(), tray, cx) {
                     eprintln!("OneLaunch: {error:#}");
                     failed.set(true);
                     cx.quit();
@@ -101,20 +121,73 @@ fn doctor(data_dir: &Path, vault: DoctorVault) -> ExitCode {
     }
 }
 
+// The fake machine writes under its folder, so that folder is held to the rule of the data folder.
+#[cfg(feature = "fake")]
+fn fake_folder(args: &Args) -> Option<(&'static str, &Path)> {
+    args.fake
+        .as_ref()
+        .map(|machine| ("--fake-launchers", machine.folder.as_path()))
+}
+
+#[cfg(not(feature = "fake"))]
+fn fake_folder(_: &Args) -> Option<(&'static str, &Path)> {
+    None
+}
+
+#[cfg(not(feature = "fake"))]
+fn start_backend(args: &Args) -> anyhow::Result<(Backend, Machine)> {
+    Ok((
+        Backend::start(args.data_dir.clone(), VERSION),
+        Machine::None,
+    ))
+}
+
+#[cfg(feature = "fake")]
+fn start_backend(args: &Args) -> anyhow::Result<(Backend, Machine)> {
+    let Some(machine) = &args.fake else {
+        return Ok((
+            Backend::start(args.data_dir.clone(), VERSION),
+            Machine::None,
+        ));
+    };
+    let (backend, seed) = fake::start(&args.data_dir, machine, VERSION)?;
+    Ok((backend, Machine::Fake(seed)))
+}
+
 fn start(
     args: Args,
     backend: Backend,
+    machine: Machine,
     failed: Rc<Cell<bool>>,
     tray: TraySlot,
     cx: &mut App,
 ) -> anyhow::Result<()> {
     ol_ui::init(cx);
+    let title = match machine {
+        Machine::None => TITLE,
+        #[cfg(feature = "fake")]
+        Machine::Fake(seed) => {
+            let backend = backend.clone();
+            cx.spawn(async move |_| {
+                // The code and not the sentence, which can name an account.
+                if let Err(error) = fake::seed(&backend, seed).await {
+                    eprintln!(
+                        "OneLaunch: the scenario's accounts could not be made ({})",
+                        error.code
+                    );
+                }
+            })
+            .detach();
+            FAKE_TITLE
+        }
+    };
+    let fake_launchers = title != TITLE;
     let presence = match &args.check {
         Some(Check::Capture(plan)) if !plan.focus => Presence::Background,
         Some(Check::Probe) => Presence::Background,
         _ => Presence::Foreground,
     };
-    let window = ol_ui::open_main_window(TITLE, presence, backend.clone(), cx)?;
+    let window = ol_ui::open_main_window(title, presence, fake_launchers, backend.clone(), cx)?;
     let library = window.update(cx, |shell, _, _| shell.library().clone())?;
     cx.subscribe(&library, move |_, _: &LibraryLoaded, cx| {
         let _ = window.update(cx, |_, window, _| {
@@ -126,7 +199,7 @@ fn start(
     // In a task and not here: adding the icon waits on the shell, Windows may hand the GPUI window a message meanwhile, and GPUI cannot take one while the app is being updated.
     cx.spawn({
         let tray = tray.clone();
-        async move |cx| add_tray_icon(&tray, cx)
+        async move |cx| add_tray_icon(title, &tray, cx)
     })
     .detach();
 
@@ -196,9 +269,9 @@ async fn copy_database(backend: &Backend, cx: &AsyncApp) {
     }
 }
 
-fn add_tray_icon(tray: &TraySlot, cx: &AsyncApp) {
+fn add_tray_icon(title: &str, tray: &TraySlot, cx: &AsyncApp) {
     let cx = cx.clone();
-    match Tray::new(TITLE, move |event| on_tray_event(event, &cx)) {
+    match Tray::new(title, move |event| on_tray_event(event, &cx)) {
         Ok(icon) => {
             println!("OneLaunch: tray icon added");
             *tray.borrow_mut() = Some(icon);
