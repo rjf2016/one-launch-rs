@@ -17,6 +17,7 @@ thiserror.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]
+ol-platform-win.workspace = true
 ol-testkit.workspace = true
 
 [lints]

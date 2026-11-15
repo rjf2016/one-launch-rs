@@ -4115,6 +4115,7 @@ dependencies = [
  "ol-testkit",
  "thiserror 2.0.21",
  "time",
+ "zeroize",
 ]
 
 [[package]]
@@ -4284,6 +4285,7 @@ dependencies = [
  "getrandom 0.4.3",
  "ol-model",
  "ol-platform-api",
+ "ol-platform-win",
  "ol-testkit",
  "serde",
  "serde_json",

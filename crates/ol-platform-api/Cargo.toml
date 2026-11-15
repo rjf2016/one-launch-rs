@@ -10,6 +10,7 @@ async-trait.workspace = true
 ol-model.workspace = true
 thiserror.workspace = true
 time.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 ol-testkit.workspace = true
