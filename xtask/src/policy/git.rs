@@ -17,6 +17,25 @@ const LOCAL_READS: [&str; 8] = [
     "rev-parse",
 ];
 
+// What git itself lists as local to one repository (`git rev-parse --local-env-vars`): inherited, any of these decides which repository is read, whatever `-C` says.
+const OF_ONE_REPOSITORY: [&str; 15] = [
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_CONFIG",
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_DIR",
+    "GIT_GRAFT_FILE",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_INTERNAL_SUPER_PREFIX",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_PREFIX",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_SHALLOW_FILE",
+    "GIT_WORK_TREE",
+];
+
 pub struct Repo {
     dir: String,
 }
@@ -88,9 +107,13 @@ impl Repo {
     )]
     fn command(&self, args: &[&str]) -> Command {
         let mut command = Command::new("git");
-        // In a partial clone git fetches an object it lacks, and a check that reads must never reach a remote.
+        for name in OF_ONE_REPOSITORY {
+            command.env_remove(name);
+        }
+        // In a partial clone git fetches an object it lacks, and a check that reads must never reach a remote. A replace ref would show it another object than the one GitHub merges.
         command
             .env("GIT_NO_LAZY_FETCH", "1")
+            .env("GIT_NO_REPLACE_OBJECTS", "1")
             .args(["--no-optional-locks", "-C", self.dir.as_str()])
             .args(args)
             .current_dir(workspace::root());
@@ -331,16 +354,45 @@ mod tests {
         }
     }
 
+    fn environment(command: &Command) -> BTreeMap<String, Option<String>> {
+        command
+            .get_envs()
+            .map(|(name, value)| {
+                (
+                    name.to_string_lossy().into_owned(),
+                    value.map(|value| value.to_string_lossy().into_owned()),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn git_is_started_blind_to_what_would_point_it_at_another_repository() {
+        let repo = Repo::workspace();
+        let set = environment(&repo.command(&["rev-parse", "HEAD"]));
+        for name in OF_ONE_REPOSITORY {
+            assert_eq!(set.get(name), Some(&None), "{name}");
+        }
+        assert_eq!(
+            set.get("GIT_NO_REPLACE_OBJECTS"),
+            Some(&Some("1".to_owned()))
+        );
+        assert_eq!(set.len(), OF_ONE_REPOSITORY.len() + 2);
+        let listed = repo.git(&["rev-parse", "--local-env-vars"]).unwrap();
+        for name in text(&listed).split_whitespace() {
+            assert!(
+                set.contains_key(name),
+                "{name}: git lists a variable that this check does not clear"
+            );
+        }
+    }
+
     #[test]
     fn git_is_started_with_lazy_fetching_off() {
         let command = Repo::workspace().command(&["rev-parse", "HEAD"]);
-        let set: Vec<_> = command.get_envs().collect();
         assert_eq!(
-            set,
-            [(
-                std::ffi::OsStr::new("GIT_NO_LAZY_FETCH"),
-                Some(std::ffi::OsStr::new("1"))
-            )]
+            environment(&command).get("GIT_NO_LAZY_FETCH"),
+            Some(&Some("1".to_owned()))
         );
         assert_eq!(command.get_program(), "git");
         let args: Vec<_> = command.get_args().collect();
