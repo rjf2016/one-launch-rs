@@ -23,6 +23,7 @@ use crate::shell::sidebar_width;
 const PAGE_PADDING: f32 = 32.;
 const SCROLLBAR: f32 = 12.;
 const CAPTION: f32 = 62.;
+const BORDER: f32 = 1.;
 const TITLE_BAR: f32 = 36.;
 const HEADER: f32 = 152.;
 const CONTROL: f32 = 34.;
@@ -155,8 +156,13 @@ impl Grid {
         games.div_ceil(self.columns) as f32 * f32::from(self.row_height())
     }
 
+    // The poster is two to three inside the card's border.
+    fn poster_width(self) -> Pixels {
+        self.card - px(2. * BORDER)
+    }
+
     fn row_height(self) -> Pixels {
-        self.card * 1.5 + px(CAPTION) + self.gap
+        self.poster_width() * 1.5 + px(CAPTION + 2. * BORDER) + self.gap
     }
 }
 
@@ -462,7 +468,7 @@ impl LibraryView {
         let poster = self.poster(game, scale, cx);
         let card = &self.cards[game];
         let icon_art = matches!(card.art, Some((_, Shape::Icon)));
-        let height = grid.card * 1.5;
+        let (width, height) = (grid.poster_width(), grid.poster_width() * 1.5);
         let art = div()
             .relative()
             .w_full()
@@ -505,8 +511,8 @@ impl LibraryView {
                     img(image)
                         .absolute()
                         .top(height * 0.22)
-                        .left(grid.card * 0.25)
-                        .size(grid.card * 0.5)
+                        .left(width * 0.25)
+                        .size(width * 0.5)
                         .object_fit(ObjectFit::Contain)
                 } else {
                     img(image)
