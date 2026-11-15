@@ -1,0 +1,75 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "-e",
+              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 'it gave no verdict'}catch(e){process.exitCode=2;require('fs').writeSync(2,'Refused by the safety hook: it could not be loaded ('+(e&&e.code||e)+'). Rule: fail closed (plan/design/workflow.md, Hooks).')}",
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard.cjs",
+              "shell"
+            ],
+            "onFailure": "block",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "-e",
+              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 'it gave no verdict'}catch(e){process.exitCode=2;require('fs').writeSync(2,'Refused by the safety hook: it could not be loaded ('+(e&&e.code||e)+'). Rule: fail closed (plan/design/workflow.md, Hooks).')}",
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard.cjs",
+              "write"
+            ],
+            "onFailure": "block",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "-e",
+              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 'it gave no verdict'}catch(e){process.exitCode=2;require('fs').writeSync(2,'Refused by the safety hook: it could not be loaded ('+(e&&e.code||e)+'). Rule: fail closed (plan/design/workflow.md, Hooks).')}",
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard.cjs",
+              "format"
+            ],
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "-e",
+              "process.exitCode=2;try{if(require(process.argv[1])!==true)throw 'it gave no verdict'}catch(e){process.exitCode=2;require('fs').writeSync(2,'Refused by the safety hook: it could not be loaded ('+(e&&e.code||e)+'). Rule: fail closed (plan/design/workflow.md, Hooks).')}",
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard.cjs",
+              "stop"
+            ],
+            "timeout": 1800
+          }
+        ]
+      }
+    ]
+  }
+}

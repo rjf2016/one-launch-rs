@@ -1,0 +1,702 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { test } = require('node:test');
+const { judge } = require('../lib/commands.cjs');
+const { isWrapper } = require('../lib/checkout.cjs');
+
+const ROOT = path.resolve(__dirname, '..', '..', '..');
+const io = { wrapper: (file, name) => isWrapper(file, name, ROOT), isTag: (_, name) => name === 'v1', commit: () => [] };
+const verdict = (tool, command, cwd = ROOT, using = io) => judge({ tool, command, cwd, io: using })?.rule ?? 'allow';
+
+const W = { word: true };
+const X = { word: true, exe: true };
+
+const REFUSED = [
+  ['process', 'tasklist', X],
+  ['process', 'taskkill /IM x.exe', X],
+  ['process', 'wmic process', X],
+  ['process', 'Get-Process', W],
+  ['process', 'gps', W],
+  ['process', 'ps', W],
+  ['process', 'Stop-Process', W],
+  ['process', 'kill', W],
+  ['process', 'Get-CimInstance Win32_Process', W],
+  ['process', 'Get-WmiObject', W],
+  ['data', 'Get-ChildItem %APPDATA%\\OneLaunch'],
+  ['data', 'Get-ChildItem $env:APPDATA\\OneLaunch'],
+  ['data', 'Get-ChildItem ~\\AppData\\Roaming\\OneLaunch'],
+  ['data', 'Get-ChildItem %APPDATA%/OneLaunch'],
+  ['data', 'Get-ChildItem $env:APPDATA/OneLaunch'],
+  ['data', 'Get-ChildItem ~/AppData/Roaming/OneLaunch'],
+  ['launcher', 'steam.exe', W],
+  ['launcher', 'EpicGamesLauncher.exe', W],
+  ['launcher', 'Battle.net.exe', W],
+  ['launcher', 'RiotClientServices.exe', W],
+  ['launcher', 'Start-Process steam://...', W],
+  ['launcher', 'start riotclient://...', W],
+  ['installer', 'OneLaunch-1.0.0-setup.exe /S', W],
+  ['installer', 'Start-Process x-setup.exe', W],
+  ['installer', 'msiexec /i', X],
+  ['installer', 'winget install', X],
+  ['installer', 'rustup-init.exe', W],
+  ['registry', 'reg add', X],
+  ['registry', 'reg delete', X],
+  ['registry', 'reg import', X],
+  ['registry', 'Set-ItemProperty HKCU:\\...', W],
+  ['registry', 'New-ItemProperty HKLM:\\...', W],
+  ['registry', 'Remove-Item HKCU:\\...', W],
+  ['registry', 'regedit', X],
+  ['tags', 'git tag v1', X],
+  ['github', 'git push origin v1', X],
+  ['tags', 'git push --tags', X],
+  ['tags', 'gh release create', X],
+  ['merge', 'gh pr merge 5', X],
+  ['merge', 'gh pr merge 5 --squash', X],
+  ['merge', 'scripts/agent/gh.ps1 pr merge 5 --squash', W],
+  ['bypass', 'git commit --no-verify', X],
+  ['bypass', 'git push --no-verify', X],
+  ['bypass', 'git push --force', X],
+  ['bypass', 'git push -f', X],
+  ['bypass', 'git push --force-with-lease', X],
+  ['bypass', 'git push origin +main', X],
+  ['deps', 'cargo add serde', X],
+  ['deps', 'cargo update', X],
+  ['deps', 'cargo install cargo-nextest', X],
+  ['app', 'target\\debug\\OneLaunch.exe', W],
+  ['app', 'target/debug/OneLaunch.exe', W],
+  ['app', 'cargo run -p ol-app', X],
+  ['app', 'cargo run -p ol-app -- --start-hidden', X],
+  ['github', 'gh pr list', X],
+  ['github', 'gh api ...', X],
+  ['github', 'gh auth status', X],
+  ['github', 'gh auth token', X],
+  ['github', 'git push origin x', X],
+  ['github', 'git push git@github.com:...', X],
+  ['github', 'ssh git@github.com', X],
+  ['key', 'scripts/agent/git-credential.ps1 get', W],
+  ['key', 'Get-ChildItem D:\\Coding\\slop\\one-launch-rs-bot'],
+  ['key', 'Get-Content app.private-key.pem'],
+];
+
+const ALLOWED = [
+  ['cargo build --locked', X],
+  ['cargo nextest run -p ol-model', X],
+  ['cargo xtask check', X],
+  ['cargo run -p ol-app -- --data-dir C:\\scratch\\x', X],
+  ['cargo run --locked --package xtask -- check', X],
+  ['git status', X],
+  ['git diff', X],
+  ['git commit -m "..."', { ...X, alone: true }],
+  ['git log', X],
+  ['git switch -c x', X],
+  ['scripts/agent/git.ps1 push origin x', W],
+  ['scripts/agent/gh.ps1 pr create ...', W],
+  ['scripts/agent/gh.ps1 pr merge 5 --auto --squash', W],
+  ['scripts/agent/gh.ps1 pr view 5', W],
+  ['reg query HKCU\\Software\\Valve\\Steam', X],
+  ['Get-ItemProperty HKCU:\\Software\\Valve\\Steam', W],
+  ['Get-Content docs\\tasklist-notes.md', W],
+];
+
+const sh = {
+  single: (c) => `'${c.replace(/'/g, "'\\''")}'`,
+  double: (c) => `"${c.replace(/[\\"$`]/g, '\\$&')}"`,
+};
+const ps = {
+  single: (c) => `'${c.replace(/'/g, "''")}'`,
+  double: (c) => `"${c.replace(/[`"$]/g, '`$&')}"`,
+};
+const LEADS = { leads: true };
+
+const SHAPES = {
+  Bash: [
+    ['as written', (c) => c],
+    ['after &&', (c) => `true && ${c}`, LEADS],
+    ['after ||', (c) => `false || ${c}`, LEADS],
+    ['after ;', (c) => `echo start; ${c}`, LEADS],
+    ['on a second line', (c) => `echo start\n${c}`, LEADS],
+    ['after a comment with an apostrophe', (c) => `echo start # don't stop\n${c}`, LEADS],
+    ['after a heredoc with an apostrophe', (c) => `cat <<'EOF'\nit's text\nEOF\n${c}`, LEADS],
+    ['at the end of a pipe', (c) => `echo x | ${c}`, LEADS],
+    ['at the start of a pipe', (c) => `${c} | cat`],
+    ['in the background', (c) => `${c} &`],
+    ['with output redirected', (c) => `${c} > /dev/null 2>&1`],
+    ['in a subshell', (c) => `(${c})`],
+    ['in a group', (c) => `{ ${c}; }`],
+    ['in $( )', (c) => `echo "$(${c})"`, LEADS],
+    ['in backticks', (c) => `echo \`${c.replace(/[\\`]/g, '\\$&')}\``, LEADS],
+    ['in an if', (c) => `if true; then ${c}; fi`, LEADS],
+    ['after an assignment', (c) => `FOO=1 ${c}`],
+    ['behind command', (c) => `command ${c}`],
+    ['behind exec', (c) => `exec ${c}`],
+    ['behind env', (c) => `env FOO=1 ${c}`],
+    ['behind nohup', (c) => `nohup ${c} &`],
+    ['behind time', (c) => `time ${c}`],
+    ['behind timeout', (c) => `timeout 30 ${c}`],
+    ['behind xargs', (c) => `echo x | xargs ${c}`, LEADS],
+    ['bash -c', (c) => `bash -c ${sh.single(c)}`],
+    ['bash -lc', (c) => `bash -lc ${sh.double(c)}`],
+    ['sh -c', (c) => `sh -c ${sh.single(c)}`],
+    ['eval', (c) => `eval ${sh.single(c)}`],
+    ['cmd //c', (c) => `cmd //c ${sh.double(c)}`],
+    ['cmd.exe /c', (c) => `cmd.exe /c ${c}`, { unquoted: true }],
+    ['pwsh -Command', (c) => `pwsh -NoProfile -Command ${sh.single(c)}`],
+    ['powershell -c', (c) => `powershell.exe -c ${sh.double(c)}`],
+  ],
+  PowerShell: [
+    ['as written', (c) => c],
+    ['after ;', (c) => `Write-Output start; ${c}`, LEADS],
+    ['after &&', (c) => `Write-Output start && ${c}`, LEADS],
+    ['on a second line', (c) => `Write-Output start\n${c}`, LEADS],
+    ['after a comment with an apostrophe', (c) => `Write-Output start # don't stop\n${c}`, LEADS],
+    ['after a here-string with an apostrophe', (c) => `Write-Output @'\nit's text\n'@\n${c}`, LEADS],
+    ['at the end of a pipe', (c) => `Write-Output x | ${c}`, LEADS],
+    ['at the start of a pipe', (c) => `${c} | Out-Null`],
+    ['with output redirected', (c) => `${c} *> $null`],
+    ['behind the call operator', (c) => `& ${c}`],
+    ['in a called script block', (c) => `& { ${c} }`, LEADS],
+    ['assigned', (c) => `$out = ${c}`],
+    ['in $( )', (c) => `Write-Output "$(${c})"`, LEADS],
+    ['in parentheses', (c) => `(${c})`],
+    ['in an if', (c) => `if ($true) { ${c} }`, LEADS],
+    ['in ForEach-Object', (c) => `1..2 | ForEach-Object { ${c} }`, LEADS],
+    ['in a function', (c) => `function go { ${c} }; go`, LEADS],
+    ['Invoke-Expression', (c) => `Invoke-Expression ${ps.single(c)}`],
+    ['iex', (c) => `iex ${ps.double(c)}`],
+    ['Start-Job', (c) => `Start-Job { ${c} }`, LEADS],
+    ['Invoke-Command', (c) => `Invoke-Command -ScriptBlock { ${c} }`, LEADS],
+    ['cmd /c', (c) => `cmd /c ${c}`],
+    ['cmd.exe quoted', (c) => `cmd.exe /d /c ${ps.double(c)}`],
+    ['pwsh -Command', (c) => `pwsh -NoProfile -Command ${ps.double(c)}`],
+    ['pwsh script block', (c) => `pwsh -NoProfile -Command { ${c} }`, LEADS],
+    ['powershell -c', (c) => `powershell.exe -c ${ps.single(c)}`],
+    ['bash -c', (c) => `bash -c ${ps.single(c)}`],
+  ],
+};
+
+const mixed = (w) => [...w].map((c, k) => (k % 2 ? c.toUpperCase() : c.toLowerCase())).join('');
+const backticked = (w) => {
+  const at = [...w].findIndex((c, k) => k > 0 && /[A-Za-z]/.test(c) && !'abefnrtuv'.includes(c));
+  return at < 0 ? w : `${w.slice(0, at)}\`${w.slice(at)}`;
+};
+
+const SPELLINGS = {
+  Bash: [
+    ['upper case', (w) => w.toUpperCase()],
+    ['mixed case', mixed],
+    ['double-quoted', (w) => `"${w}"`],
+    ['single-quoted', (w) => `'${w}'`],
+    ['split by empty quotes', (w) => `${w.slice(0, 2)}""${w.slice(2)}`],
+    ['with a backslash escape', (w) => `\\${w}`],
+  ],
+  PowerShell: [
+    ['upper case', (w) => w.toUpperCase()],
+    ['mixed case', mixed],
+    ['called in double quotes', (w) => `& "${w}"`],
+    ['called in single quotes', (w) => `& '${w}'`],
+    ['dot-sourced', (w) => `. ${w}`],
+    ['with a backtick escape', backticked],
+  ],
+};
+
+const PROGRAMS = {
+  Bash: [
+    ['.exe', (w) => `${w}.exe`],
+    ['.EXE with a trailing dot', (w) => `${w}.EXE.`],
+    ['full path', (w) => `/c/Windows/System32/${w}.exe`],
+    ['full path with a drive', (w) => `"C:\\Program Files\\Tools\\${w}.exe"`],
+  ],
+  PowerShell: [
+    ['.exe', (w) => `${w}.exe`],
+    ['.EXE with a trailing dot', (w) => `${w}.EXE.`],
+    ['full path', (w) => `C:\\Windows\\System32\\${w}.exe`],
+    ['called by a quoted full path', (w) => `& "C:\\Program Files\\Tools\\${w}.exe"`],
+  ],
+};
+
+function variants(tool, command, flags = {}) {
+  const eaten = tool === 'Bash' && command.includes('\\');
+  const out = SHAPES[tool]
+    .filter(([, , shape]) => !(flags.alone && shape?.leads) && !(eaten && shape?.unquoted))
+    .map(([name, shape]) => [name, shape(command)]);
+  if (!flags.word) return out;
+  const cut = command.indexOf(' ');
+  const [word, rest] = cut < 0 ? [command, ''] : [command.slice(0, cut), command.slice(cut)];
+  for (const [name, spell] of SPELLINGS[tool]) out.push([name, spell(word) + rest]);
+  if (flags.exe) for (const [name, spell] of PROGRAMS[tool]) out.push([name, spell(word) + rest]);
+  return out;
+}
+
+function mismatches(command, flags, expected) {
+  const wrong = [];
+  for (const tool of ['Bash', 'PowerShell']) {
+    for (const [name, text] of variants(tool, command, flags)) {
+      const got = verdict(tool, text);
+      if (got !== expected) wrong.push(`${tool}, ${name}: ${JSON.stringify(text)} gave ${got}`);
+    }
+  }
+  return wrong;
+}
+
+for (const [rule, command, flags] of REFUSED) {
+  test(`refused in every variant: ${command}`, () => {
+    assert.deepEqual(mismatches(command, flags, rule), []);
+  });
+}
+
+for (const [command, flags] of ALLOWED) {
+  test(`allowed in every variant: ${command}`, () => {
+    assert.deepEqual(mismatches(command, flags, 'allow'), []);
+  });
+}
+
+test('the variant lists are as long as they look', () => {
+  assert.equal(SHAPES.Bash.length, 32);
+  assert.equal(SHAPES.PowerShell.length, 27);
+  assert.equal(variants('Bash', 'tasklist', X).length, 42);
+  assert.equal(variants('PowerShell', 'tasklist', X).length, 37);
+  assert.equal(variants('Bash', 'git commit -m "..."', { ...X, alone: true }).length, 31);
+  assert.equal(variants('Bash', 'target\\debug\\OneLaunch.exe', W).length, 37);
+});
+
+test('Bash eats an unquoted backslash before it hands words to cmd, and the hook reads what cmd gets', () => {
+  assert.equal(verdict('Bash', 'cmd.exe /c target\\debug\\OneLaunch.exe'), 'allow');
+  assert.equal(verdict('Bash', 'cmd.exe /c "target\\debug\\OneLaunch.exe"'), 'app');
+  assert.equal(verdict('Bash', 'cmd.exe /c target\\\\debug\\\\OneLaunch.exe'), 'app');
+  assert.equal(verdict('Bash', 'cmd.exe /c target/debug/OneLaunch.exe'), 'app');
+  assert.equal(verdict('PowerShell', 'cmd.exe /c target\\debug\\OneLaunch.exe'), 'app');
+});
+
+const HOME_DATA = `C:\\Users\\someone\\AppData\\Roaming\\OneLaunch`;
+const NBSP = '\u00A0';
+
+const MORE_REFUSED = [
+  ['unreadable', 'Bash', '$(echo tasklist) /v'],
+  ['unreadable', 'Bash', 'x=tasklist; $x'],
+  ['unreadable', 'Bash', '`echo tasklist`'],
+  ['unreadable', 'Bash', "$'\\x74asklist'"],
+  ['unreadable', 'Bash', '/c/Windows/System32/task*'],
+  ['unreadable', 'Bash', 't{ask,}list'],
+  ['unreadable', 'Bash', 'echo tasklist | bash'],
+  ['unreadable', 'Bash', "bash <<'EOF'\ntasklist\nEOF"],
+  ['unreadable', 'Bash', 'bash -s <<< tasklist'],
+  ['unreadable', 'Bash', 'eval "$x"'],
+  ['unreadable', 'Bash', 'pwsh -EncodedCommand dABhAHMAawBsAGkAcwB0AA=='],
+  ['unreadable', 'Bash', 'pwsh -enc dABhAHMAawBsAGkAcwB0AA=='],
+  ['unreadable', 'Bash', 'powershell -e dABhAHMAawBsAGkAcwB0AA=='],
+  ['unreadable', 'Bash', 'pwsh \u2013ec dABhAHMAawBsAGkAcwB0AA=='],
+  ['unreadable', 'Bash', "echo ${x:-'}'} ; tasklist ; echo ' '"],
+  ['unreadable', 'Bash', "git -c alias.x='!tasklist' x"],
+  ['unreadable', 'Bash', 'cmd'],
+  ['unreadable', 'Bash', 'echo tasklist | cmd //k'],
+  ['unreadable', 'PowerShell', '& $x'],
+  ['unreadable', 'PowerShell', '& (Get-Command tasklist)'],
+  ['unreadable', 'PowerShell', "$c = 'tasklist'; & $c"],
+  ['unreadable', 'PowerShell', "'tasklist' | iex"],
+  ['unreadable', 'PowerShell', 'iex $x'],
+  ['unreadable', 'PowerShell', 'Invoke-Expression ("task" + "list")'],
+  ['unreadable', 'PowerShell', "cmd /c echo --% ' & tasklist & '"],
+  ['unreadable', 'PowerShell', "'tasklist' | pwsh -Command -"],
+  ['unreadable', 'PowerShell', "'tasklist' | pwsh -NoProfile"],
+  ['process', 'Bash', 'cmd //c "t^asklist"'],
+  ['process', 'Bash', 'cmd /ctasklist'],
+  ['process', 'Bash', 'cmd //c "echo a & tasklist"'],
+  ['process', 'Bash', 'cmd //c \'"a & tasklist & b"\''],
+  ['process', 'Bash', 'alias k=kill; k 1'],
+  ['process', 'Bash', 'function f { tasklist; }; f'],
+  ['process', 'Bash', 'f() { tasklist; }; f'],
+  ['process', 'Bash', 'ps aux'],
+  ['process', 'Bash', 'pkill -f x'],
+  ['process', 'Bash', 'pgrep steam'],
+  ['process', 'Bash', 'kill -9 1'],
+  ['process', 'Bash', 'sudo taskkill /F /IM x.exe'],
+  ['process', 'Bash', 'echo 1 | xargs -n1 taskkill /PID'],
+  ['process', 'Bash', 'find . -name x -exec taskkill {} \\;'],
+  ['process', 'Bash', 'git commit -m "run `tasklist` now"'],
+  ['process', 'Bash', 'echo $((1 << 2))\ntasklist'],
+  ['process', 'Bash', 'cat <<EOF\n$(tasklist)\nEOF'],
+  ['process', 'Bash', 'query process'],
+  ['process', 'Bash', 'C:\\\\Windows\\\\System32\\\\tasklist.exe'],
+  ['process', 'Bash', 'while true; do tasklist; done'],
+  ['process', 'Bash', 'case x in x) tasklist;; esac'],
+  ['process', 'Bash', 'trap "taskkill /IM x.exe" EXIT'],
+  ['process', 'PowerShell', "Start-Process cmd -ArgumentList '/c tasklist'"],
+  ['process', 'PowerShell', 'Set-Alias x tasklist; x'],
+  ['process', 'PowerShell', 'function f { tasklist }; f'],
+  ['process', 'PowerShell', 'Microsoft.PowerShell.Management\\Get-Process'],
+  ['process', 'PowerShell', 'Get-CimInstance Win32_OperatingSystem'],
+  ['process', 'PowerShell', 'gwmi Win32_Process'],
+  ['process', 'PowerShell', 'Invoke-CimMethod -ClassName Win32_Process -MethodName Create'],
+  ['process', 'PowerShell', 'tasklist /FI "IMAGENAME eq RiotClientServices.exe"'],
+  ['process', 'PowerShell', 'Write-Output @"\n$(tasklist)\n"@'],
+  ['process', 'PowerShell', "Write-Output 'abc\u2019 ; tasklist ; \u2018def'"],
+  ['process', 'PowerShell', `tasklist${NBSP}/v`],
+  ['process', 'PowerShell', 'qprocess'],
+  ['process', 'PowerShell', '$p = Get-Process'],
+  ['process', 'PowerShell', 'foreach ($p in Get-Process) { $p }'],
+  ['process', 'PowerShell', '$h = @{ a = Get-Process }'],
+  ['process', 'PowerShell', 'Get-Process -Name steam -ErrorAction SilentlyContinue'],
+  ['process', 'PowerShell', 'Stop-Process -Name RiotClientServices -Force'],
+  ['process', 'PowerShell', 'Write-Output a <# note #>; tasklist'],
+  ['launcher', 'PowerShell', '& "C:\\Program Files (x86)\\Steam\\steam.exe" -silent'],
+  ['launcher', 'PowerShell', 'Start-Process "C:\\Riot Games\\Riot Client\\RiotClientServices.exe"'],
+  ['launcher', 'PowerShell', "& 'C:\\Riot Games\\Riot Client\\Riot Client.exe'"],
+  ['launcher', 'PowerShell', 'explorer steam://open/main'],
+  ['launcher', 'PowerShell', 'cmd /c start "" steam://run/730'],
+  ['launcher', 'PowerShell', 'Invoke-Item battlenet://'],
+  ['launcher', 'PowerShell', 'saps com.epicgames.launcher://apps'],
+  ['launcher', 'PowerShell', 'rundll32 url.dll,FileProtocolHandler steam://open/main'],
+  ['launcher', 'PowerShell', "Start-Process -FilePath steam.exe -ArgumentList '-silent'"],
+  ['launcher', 'PowerShell', 'VALORANT.exe'],
+  ['launcher', 'Bash', 'start steam://run/730'],
+  ['launcher', 'Bash', 'cmd //c start "" "C:\\\\Program Files (x86)\\\\Steam\\\\steam.exe"'],
+  ['installer', 'PowerShell', 'choco install git'],
+  ['installer', 'PowerShell', 'scoop install x'],
+  ['installer', 'PowerShell', 'Add-AppxPackage x.msix'],
+  ['installer', 'PowerShell', '.\\thing.msi'],
+  ['installer', 'PowerShell', 'Install-Module Pester'],
+  ['installer', 'PowerShell', '& .\\OneLaunch-Setup.exe'],
+  ['installer', 'PowerShell', 'Start-Process .\\OneLaunch-1.0.0-setup.exe -ArgumentList /S'],
+  ['installer', 'PowerShell', 'cmd /c "x-setup.exe /S"'],
+  ['installer', 'PowerShell', '& "C:\\Program Files\\OneLaunch\\Uninstall OneLaunch.exe"'],
+  ['installer', 'Bash', 'winget upgrade --all'],
+  ['installer', 'Bash', './rustup-init.exe -y'],
+  ['installer', 'Bash', 'msiexec.exe //x thing.msi'],
+  ['registry', 'PowerShell', 'Set-Location HKCU:\\Software'],
+  ['registry', 'PowerShell', 'cd HKLM:\\'],
+  ['registry', 'PowerShell', "'HKCU:\\Software\\x' | Remove-Item"],
+  ['registry', 'PowerShell', "$k = 'HKCU:\\Software\\x'; Remove-Item $k"],
+  ['registry', 'PowerShell', 'New-Item -Path HKCU:\\Software\\x'],
+  ['registry', 'PowerShell', 'sp HKCU:\\x a b'],
+  ['registry', 'PowerShell', 'reg.exe ADD HKCU\\x /v a /d b'],
+  ['registry', 'PowerShell', 'reg copy HKCU\\a HKCU\\b'],
+  ['registry', 'PowerShell', 'regedit /s x.reg'],
+  ['registry', 'PowerShell', '.\\x.reg'],
+  ['registry', 'PowerShell', 'Start-Process x.reg'],
+  ['registry', 'PowerShell', 'New-PSDrive -Name R -PSProvider Registry -Root HKEY_CURRENT_USER'],
+  ['registry', 'PowerShell', 'Set-ItemProperty -Path Registry::HKEY_CURRENT_USER\\Software\\x -Name a -Value b'],
+  ['registry', 'PowerShell', 'New-Item tmp -ItemType Directory; Get-ItemProperty HKCU:\\Software\\Valve\\Steam'],
+  ['registry', 'Bash', "reg add 'HKCU\\Software\\x' //v a"],
+  ['registry', 'Bash', 'powershell -c "Set-ItemProperty HKCU:\\\\Software\\\\x a b"'],
+  ['tags', 'Bash', 'git tag'],
+  ['tags', 'Bash', 'git tag -l'],
+  ['tags', 'Bash', 'git tag -d v1'],
+  ['tags', 'Bash', 'git -C . tag v2'],
+  ['tags', 'Bash', 'git update-ref refs/tags/v2 HEAD'],
+  ['tags', 'PowerShell', 'scripts/agent/git.ps1 tag v1'],
+  ['tags', 'PowerShell', 'scripts/agent/git.ps1 push origin v1'],
+  ['tags', 'PowerShell', 'scripts/agent/git.ps1 push origin HEAD:refs/tags/v2'],
+  ['tags', 'PowerShell', 'scripts/agent/git.ps1 push origin tag v2'],
+  ['tags', 'PowerShell', 'scripts/agent/git.ps1 push --tags'],
+  ['tags', 'PowerShell', 'scripts/agent/git.ps1 push --follow-tags origin x'],
+  ['tags', 'PowerShell', 'scripts/agent/gh.ps1 release list'],
+  ['tags', 'PowerShell', 'scripts/agent/gh.ps1 release create v1'],
+  ['tags', 'PowerShell', 'scripts/agent/gh.ps1 api repos/o/r/releases -f tag_name=v1'],
+  ['tags', 'PowerShell', 'scripts/agent/gh.ps1 api repos/o/r/git/refs -f ref=refs/tags/v1 -f sha=abc'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --auto --admin'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 pr merge --auto=false 5'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 -R o/r pr merge 5 --squash'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 api -X PUT repos/o/r/pulls/5/merge'],
+  ['merge', 'PowerShell', "scripts/agent/gh.ps1 api graphql -f query='mutation { mergePullRequest(input: {}) { clientMutationId } }'"],
+  ['merge', 'PowerShell', "Start-Process pwsh -ArgumentList '-File scripts/agent/gh.ps1 pr merge 5'"],
+  ['merge', 'Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 pr merge 5 --squash'],
+  ['merge', 'Bash', 'pwsh -NoProfile scripts/agent/gh.ps1 pr merge 5 --squash'],
+  ['merge', 'Bash', 'env FOO=1 pwsh -File scripts/agent/gh.ps1 pr merge 5'],
+  ['bypass', 'Bash', 'git commit -n -m x'],
+  ['bypass', 'Bash', 'git commit -nm x'],
+  ['bypass', 'Bash', 'git commit -anm x'],
+  ['bypass', 'Bash', 'git commit --no-verif -m x'],
+  ['bypass', 'Bash', 'git -c core.hooksPath=/dev/null commit -m x'],
+  ['bypass', 'Bash', 'git config core.hooksPath .nohooks'],
+  ['bypass', 'Bash', 'git merge --no-verify x'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push --force'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push -fu origin x'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push -uf origin x'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push --force-with-lease=x origin x'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push --force-if-includes origin x'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push origin +x'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push origin +HEAD:x'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 push --mirror'],
+  ['bypass', 'PowerShell', 'scripts/agent/git.ps1 commit --no-verify -m x'],
+  ['deps', 'Bash', 'cargo +stable add serde'],
+  ['deps', 'Bash', 'cargo --locked update'],
+  ['deps', 'Bash', 'cargo remove serde'],
+  ['deps', 'Bash', 'cargo rm serde'],
+  ['deps', 'Bash', 'cargo generate-lockfile'],
+  ['deps', 'Bash', 'cargo install --path xtask'],
+  ['deps', 'Bash', 'cargo.exe ADD serde'],
+  ['deps', 'Bash', 'rustup run stable cargo add serde'],
+  ['deps', 'PowerShell', '& cargo add serde'],
+  ['app', 'Bash', 'cargo run'],
+  ['app', 'Bash', 'cargo r -p ol-app'],
+  ['app', 'Bash', 'cargo run --bin OneLaunch'],
+  ['app', 'Bash', 'cargo run --package=ol-app'],
+  ['app', 'Bash', 'cargo run -pol-app'],
+  ['app', 'Bash', 'cargo run -p ol-app -- --data-dir'],
+  ['app', 'Bash', 'cargo run -p ol-app --data-dir /c/scratch/x'],
+  ['app', 'Bash', 'cargo run --manifest-path crates/ol-app/Cargo.toml'],
+  ['app', 'Bash', 'cargo run -p $pkg'],
+  ['app', 'Bash', './target/release/OneLaunch.exe --start-hidden'],
+  ['app', 'Bash', 'target/debug/OneLaunch'],
+  ['app', 'PowerShell', '.\\target\\debug\\OneLaunch.exe --data-dir C:\\scratch\\x'],
+  ['app', 'PowerShell', '& "$env:LOCALAPPDATA\\Programs\\OneLaunch\\OneLaunch.exe"'],
+  ['github', 'Bash', 'git fetch'],
+  ['github', 'Bash', 'git pull'],
+  ['github', 'Bash', 'git clone https://github.com/o/r'],
+  ['github', 'Bash', 'git ls-remote origin'],
+  ['github', 'Bash', 'git remote update'],
+  ['github', 'Bash', 'git remote show origin'],
+  ['github', 'Bash', 'git push'],
+  ['github', 'Bash', 'git push https://github.com/o/r.git x'],
+  ['github', 'Bash', 'git -C . push origin x'],
+  ['github', 'Bash', 'git submodule update --init'],
+  ['github', 'Bash', 'GIT_SSH_COMMAND=x git push'],
+  ['github', 'Bash', 'gh'],
+  ['github', 'Bash', 'gh.exe pr view 5'],
+  ['github', 'Bash', 'gh repo view'],
+  ['github', 'Bash', 'ssh -T git@github.com'],
+  ['github', 'Bash', 'scp x git@github.com:y'],
+  ['github', 'Bash', 'curl https://api.github.com/repos/o/r'],
+  ['github', 'Bash', 'curl -H "Accept: x" https://raw.githubusercontent.com/o/r/main/x'],
+  ['github', 'Bash', 'wget https://github.com/o/r/archive/main.zip'],
+  ['github', 'PowerShell', 'Invoke-RestMethod https://api.github.com/user'],
+  ['github', 'PowerShell', 'irm -Uri https://api.github.com/user'],
+  ['github', 'PowerShell', 'iwr https://github.com/o/r'],
+  ['github', 'PowerShell', 'Invoke-WebRequest -Uri "https://api.github.com/repos/o/r/pulls"'],
+  ['github', 'PowerShell', 'C:\\scratch\\scripts\\agent\\gh.ps1 pr view 5'],
+  ['github', 'PowerShell', 'cd ..; scripts/agent/gh.ps1 pr view 5'],
+  ['github', 'PowerShell', '& "$PWD\\scripts\\agent\\gh.ps1" pr view 5'],
+  ['github', 'PowerShell', 'if ($true) { cd .. }; scripts/agent/gh.ps1 pr view 5'],
+  ['github', 'Bash', '(cd /c/scratch); scripts/agent/gh.ps1 pr view 5'],
+  ['key', 'PowerShell', 'pwsh -NoProfile -File scripts/agent/git-credential.ps1 get'],
+  ['key', 'Bash', 'echo "protocol=https" | pwsh -File scripts/agent/git-credential.ps1 get'],
+  ['key', 'Bash', 'git credential fill'],
+  ['key', 'PowerShell', 'scripts/agent/git.ps1 credential fill'],
+  ['key', 'PowerShell', 'scripts/agent/gh.ps1 auth token'],
+  ['key', 'PowerShell', 'scripts/agent/gh.ps1 auth status'],
+  ['key', 'PowerShell', 'Get-Content D:\\Coding\\slop\\one-launch-rs-bot\\app.private-key.pem'],
+  ['key', 'Bash', 'ls D:/Coding/slop/one-launch-rs-bot'],
+  ['key', 'Bash', 'cat key.pem'],
+  ['key', 'PowerShell', 'Get-ChildItem *.pem'],
+  ['key', 'PowerShell', "$env:ONE_LAUNCH_AGENT_KEY_DIR = 'C:\\x'"],
+  ['key', 'Bash', 'openssl rsa -in x.PEM'],
+  ['data', 'PowerShell', 'Get-ChildItem "$env:APPDATA\\OneLaunch"'],
+  ['data', 'PowerShell', 'ls $env:APPDATA/OneLaunch/logs'],
+  ['data', 'PowerShell', 'cmd /c dir %appdata%\\onelaunch'],
+  ['data', 'PowerShell', 'Get-Content $HOME\\AppData\\Roaming\\OneLaunch\\onelaunch.db'],
+  ['data', 'PowerShell', 'Join-Path $env:APPDATA OneLaunch'],
+  ['data', 'PowerShell', "[IO.Path]::Combine($env:APPDATA, 'OneLaunch')"],
+  ['data', 'PowerShell', 'ls %APPDATA%\\x\\..\\OneLaunch'],
+  ['data', 'PowerShell', 'ls %LOCALAPPDATA%\\..\\Roaming\\OneLaunch'],
+  ['data', 'PowerShell', 'ls %APPDATA%\\\\OneLaunch'],
+  ['data', 'PowerShell', 'ls %APPDATA%\\.\\OneLaunch'],
+  ['data', 'PowerShell', 'ls %AppData%\\ONELAUNCH.'],
+  ['data', 'PowerShell', 'ls %APPDATA%\\"One"Launch'],
+  ['data', 'PowerShell', 'git commit -m "never touch %APPDATA%\\OneLaunch"'],
+  ['data', 'PowerShell', `ls ${HOME_DATA}`],
+  ['data', 'PowerShell', 'cargo run -p ol-app -- --data-dir %APPDATA%\\OneLaunch'],
+  ['data', 'Bash', 'ls ~/AppData/Roaming/OneLaunch'],
+  ['data', 'Bash', 'ls "$APPDATA/OneLaunch"'],
+  ['data', 'Bash', 'ls ${APPDATA}/OneLaunch'],
+  ['data', 'Bash', 'ls ~/AppData/Roaming/One\\Launch'],
+  ['data', 'Bash', 'ls /c/Users/someone/AppData/Roaming/OneLaunch'],
+  ['secrets', 'Bash', 'git add -A && git commit -m x'],
+  ['secrets', 'Bash', 'git add .; git commit -m x'],
+  ['secrets', 'Bash', 'echo x > f; git commit -am x'],
+  ['secrets', 'Bash', 'GIT_INDEX_FILE=x git commit -m y'],
+  ['secrets', 'Bash', 'env GIT_INDEX_FILE=x git commit -m y'],
+  ['secrets', 'Bash', 'git --git-dir=x commit -m y'],
+  ['secrets', 'Bash', 'git --work-tree x commit -m y'],
+  ['secrets', 'Bash', 'cd "$somewhere" && git commit -m x'],
+  ['secrets', 'Bash', 'git -C "$somewhere" commit -m x'],
+  ['secrets', 'PowerShell', "$env:GIT_INDEX_FILE = 'x'; git commit -m y"],
+  ['secrets', 'PowerShell', 'git add -A; scripts/agent/git.ps1 commit -m x'],
+];
+
+const MORE_ALLOWED = [
+  ['Bash', 'git commit -m n'],
+  ['Bash', 'git commit -m "-n"'],
+  ['Bash', 'git commit --amend --no-edit'],
+  ['Bash', 'git commit -m "fix \\`tasklist\\` call"'],
+  ['Bash', 'git commit -m "$(cat <<\'EOF\'\nkill the process; it\'s done\nEOF\n)"'],
+  ['Bash', `cd "${ROOT}" && git commit -m x`],
+  ['PowerShell', 'git commit -m "kill the tasklist call; don\'t stop"'],
+  ['PowerShell', "git commit -m @'\nkill it; tasklist\n'@"],
+  ['PowerShell', `Set-Location "${ROOT}"; git commit -m x`],
+  ['Bash', "cat <<'EOF' > notes.txt\ntasklist\nkill 1\nEOF"],
+  ['Bash', 'grep -rn "tasklist" docs'],
+  ['Bash', 'rg taskkill'],
+  ['Bash', 'echo kill'],
+  ['Bash', 'ls target/debug'],
+  ['PowerShell', "Select-String -Pattern 'steam://' -Path spec\\x.md"],
+  ['PowerShell', 'Get-Content docs\\kill.md'],
+  ['PowerShell', 'Get-Command tasklist'],
+  ['Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 pr view 5'],
+  ['Bash', `pwsh -NoProfile -File "${ROOT}\\scripts\\agent\\git.ps1" -C "${ROOT}" status`],
+  ['Bash', `pwsh -NoProfile -File "${ROOT}\\scripts\\agent\\git.ps1" -C "${ROOT}" commit -m "one step"`],
+  ['Bash', `cd "${ROOT}" && pwsh -NoProfile -File scripts/agent/git.ps1 status`],
+  ['PowerShell', `& scripts/agent/git.ps1 -C "${ROOT}" push origin m1/x`],
+  ['PowerShell', `& "${ROOT}\\scripts\\agent\\gh.ps1" pr view 5`],
+  ['PowerShell', './scripts/agent/gh.ps1 pr view 5'],
+  ['PowerShell', '.\\scripts\\agent\\gh.ps1 pr checks 5'],
+  ['PowerShell', 'scripts\\agent/..\\agent\\gh.ps1 pr view 5'],
+  ['PowerShell', 'SCRIPTS/AGENT/GH.PS1 pr view 5'],
+  ['PowerShell', 'scripts/agent/gh.ps1 api repos/o/r/codeowners/errors'],
+  ['PowerShell', 'scripts/agent/gh.ps1 api repos/o/r/pulls/5/comments/1/replies -f body=done'],
+  ['PowerShell', 'scripts/agent/gh.ps1 pr merge 5 --auto --squash --match-head-commit abc --subject s --body b'],
+  ['PowerShell', 'scripts/agent/git.ps1 fetch origin'],
+  ['PowerShell', 'scripts/agent/git.ps1 pull --ff-only'],
+  ['PowerShell', 'scripts/agent/git.ps1 push -u origin m1/x'],
+  ['PowerShell', 'scripts/agent/git.ps1 push origin --delete m1/x'],
+  ['PowerShell', 'scripts/agent/git.ps1 push origin HEAD:m1/x'],
+  ['PowerShell', 'scripts/agent/git.ps1 commit -m x'],
+  ['Bash', 'cargo run -p xtask -- check --tier 0'],
+  ['Bash', 'cargo run -p s05'],
+  ['Bash', 'cargo run -p ol-app --features fake -- --data-dir=/c/scratch/x'],
+  ['Bash', 'cargo test -p ol-model add'],
+  ['Bash', 'cargo build -p ol-app'],
+  ['Bash', 'cargo fmt --all'],
+  ['Bash', 'cargo clippy --locked'],
+  ['Bash', 'cargo deny check'],
+  ['Bash', 'cargo metadata --locked'],
+  ['Bash', './target/debug/OneLaunch.exe --data-dir=/c/scratch/x --start-hidden'],
+  ['PowerShell', '.\\target\\debug\\OneLaunch.exe --data-dir=C:\\scratch\\x'],
+  ['PowerShell', 'reg query "HKCU\\Software\\Blizzard Entertainment\\Battle.net"'],
+  ['PowerShell', 'cmd /c reg query "HKCU\\Software\\Blizzard Entertainment\\Battle.net"'],
+  ['PowerShell', 'reg export HKCU\\Software\\Valve steam.reg'],
+  ['PowerShell', 'Get-ItemProperty -Path HKLM:\\SOFTWARE\\x'],
+  ['PowerShell', 'Get-ChildItem HKCU:\\Software'],
+  ['PowerShell', 'Test-Path HKCU:\\Software\\x'],
+  ['PowerShell', '(Get-ItemProperty HKCU:\\Software\\Valve\\Steam).SteamPath'],
+  ['PowerShell', 'Remove-Item -Recurse target\\tmp'],
+  ['PowerShell', 'New-Item -ItemType Directory x'],
+  ['Bash', 'rm -rf target/tmp'],
+  ['Bash', 'winget list'],
+  ['Bash', 'install -m 755 a b'],
+  ['Bash', 'python setup.py build'],
+  ['Bash', 'npm install'],
+  ['PowerShell', 'ls %LOCALAPPDATA%\\OneLaunch'],
+  ['PowerShell', 'Get-ChildItem $env:APPDATA\\Code'],
+  ['PowerShell', 'cargo run -p ol-app -- --data-dir C:\\scratch\\OneLaunch'],
+  ['Bash', 'curl https://crates.io/api/v1/crates/serde'],
+  ['PowerShell', 'Invoke-RestMethod https://example.com/x'],
+  ['Bash', "bash -c 'git status'"],
+  ['Bash', 'bash scripts/x.sh'],
+  ['Bash', 'pwsh -NoProfile -File scripts/agent/check.ps1'],
+  ['Bash', 'pwsh -NoProfile -Command "Get-ChildItem"'],
+  ['Bash', 'pwsh -Version'],
+  ['Bash', 'powershell -NoProfile -ExecutionPolicy Bypass -File x.ps1'],
+  ['PowerShell', 'cmd /c dir'],
+  ['Bash', 'for f in a b; do echo "$f"; done'],
+  ['Bash', '[ -f x ] && echo y'],
+  ['Bash', 'x=$(git rev-parse HEAD); echo "$x"'],
+  ['Bash', 'case "$1" in a) echo 1;; *) echo 2;; esac'],
+  ['Bash', 'echo $((1 << 2))'],
+  ['Bash', 'echo "${HOME}/x" ${#arr[@]}'],
+  ['Bash', 'arr=(a b c)'],
+  ['Bash', '"$HOME/.cargo/bin/cargo" build --locked'],
+  ['Bash', 'find . -name "*.rs" | xargs grep -l foo'],
+  ['Bash', "awk '{print $1}' f"],
+  ['Bash', "git log --format='%h %s' -5 | head -3"],
+  ['Bash', ": 'a comment'"],
+  ['PowerShell', "Get-ChildItem | Where-Object { $_.Length -gt 1mb } | ? Name -like '*.rs' | % { $_.Name }"],
+  ['PowerShell', '$files = Get-ChildItem; foreach ($f in $files) { Write-Host $f }'],
+  ['PowerShell', "$env:FOO = 'bar'; cargo build --locked"],
+  ['PowerShell', 'if (-not (Test-Path x)) { New-Item -ItemType Directory x }'],
+  ['PowerShell', "[System.IO.File]::ReadAllText('x')"],
+  ['PowerShell', "(Get-Date).ToString('yyyy')"],
+  ['PowerShell', "$h = @{ a = 1; b = 'kill' }"],
+  ['PowerShell', 'try { cargo build --locked } catch { Write-Error $_ }'],
+  ['PowerShell', "Write-Output \"a; b\" 'c | d'"],
+  ['PowerShell', '& "C:\\Program Files\\Git\\cmd\\git.exe" status'],
+  ['PowerShell', 'git log -1 --format=%s | Select-String kill'],
+];
+
+test('more ways to spell a refused command are refused', () => {
+  const wrong = MORE_REFUSED.filter(([rule, tool, command]) => verdict(tool, command) !== rule);
+  assert.deepEqual(wrong.map(([rule, tool, command]) => `${tool}: ${JSON.stringify(command)} should be ${rule}, gave ${verdict(tool, command)}`), []);
+});
+
+test('the nearest allowed commands stay allowed', () => {
+  const wrong = MORE_ALLOWED.filter(([tool, command]) => verdict(tool, command) !== 'allow');
+  assert.deepEqual(wrong.map(([tool, command]) => `${tool}: ${JSON.stringify(command)} gave ${verdict(tool, command)}`), []);
+});
+
+test('a script named like the wrapper somewhere else is not the wrapper', () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'ol-hook-'));
+  try {
+    const agent = path.join(folder, 'scripts', 'agent');
+    fs.mkdirSync(agent, { recursive: true });
+    fs.mkdirSync(path.join(folder, '.git'));
+    fs.writeFileSync(path.join(agent, 'gh.ps1'), 'gh @args\n');
+    assert.equal(verdict('PowerShell', `& "${path.join(agent, 'gh.ps1')}" pr view 5`), 'github');
+    assert.equal(verdict('Bash', `pwsh -NoProfile -File "${path.join(agent, 'gh.ps1')}" pr view 5`), 'github');
+    assert.equal(verdict('PowerShell', 'scripts/agent/gh.ps1 pr view 5', folder), 'github');
+    assert.equal(verdict('PowerShell', `cd "${folder}"; scripts/agent/gh.ps1 pr view 5`), 'github');
+    assert.equal(verdict('PowerShell', `& "${path.join(ROOT, 'scripts', 'agent', 'gh.ps1')}" pr view 5`, folder), 'allow');
+  } finally {
+    fs.rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('a commit is scanned in the checkout it names, staged files only unless it stages more itself', () => {
+  const seen = [];
+  const recording = { ...io, commit: (folder, broad) => (seen.push([folder, broad]), []) };
+  const other = path.join(ROOT, 'crates');
+  for (const [tool, command] of [
+    ['Bash', 'git commit -m x'],
+    ['Bash', 'git commit --amend --no-edit -q'],
+    ['Bash', 'git commit -am x'],
+    ['Bash', 'git commit --all -m x'],
+    ['Bash', 'git commit x.txt -m y'],
+    ['Bash', 'git commit -m x -- x.txt'],
+    ['Bash', 'git commit --only x.txt -m y'],
+    ['Bash', 'git commit -p'],
+    ['Bash', 'git commit --am'],
+    ['Bash', 'git -C crates commit -m x'],
+    ['PowerShell', `scripts/agent/git.ps1 -C "${other}" commit -m x`],
+    ['Bash', `pwsh -NoProfile -File scripts/agent/git.ps1 -C "${other}" commit -m x`],
+    ['Bash', 'cd crates && git commit -m x'],
+  ]) {
+    assert.equal(verdict(tool, command, ROOT, recording), 'allow', command);
+  }
+  assert.deepEqual(seen, [
+    [ROOT, false],
+    [ROOT, false],
+    [ROOT, true],
+    [ROOT, true],
+    [ROOT, true],
+    [ROOT, true],
+    [ROOT, true],
+    [ROOT, true],
+    [ROOT, true],
+    [other, false],
+    [other, false],
+    [other, false],
+    [other, false],
+  ]);
+});
+
+test('a commit with a finding is refused and the finding is shown masked', () => {
+  const finding = 'notes.txt:3: email some…io';
+  const refusal = judge({ tool: 'Bash', command: 'git commit -m x', cwd: ROOT, io: { ...io, commit: () => [finding] } });
+  assert.equal(refusal.rule, 'secrets');
+  assert.match(refusal.message, /notes\.txt:3: email some…io/);
+});
+
+test('a call for another tool is an error, not a pass', () => {
+  assert.throws(() => judge({ tool: 'Read', command: 'tasklist', cwd: ROOT, io }));
+  assert.throws(() => judge({ tool: 'Bash', command: undefined, cwd: ROOT, io }));
+});
+
+test('a deeply nested or very long command is refused, not skipped', () => {
+  let nested = 'tasklist';
+  for (let k = 0; k < 12; k++) nested = `bash -c ${sh.single(nested)}`;
+  assert.notEqual(verdict('Bash', nested), 'allow');
+  assert.equal(verdict('Bash', `env ${'env '.repeat(40)}true`), 'unreadable');
+});
