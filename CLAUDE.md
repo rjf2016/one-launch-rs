@@ -65,7 +65,8 @@ The owner's rule: the goal is the same working app in Rust, with the same featur
 
 - `cargo xtask check`: everything a pull request must pass. `--tier 0` runs formatting, the lints, the secret scan, the oracle's hashes and `cargo deny`; `--tier 1` runs clippy, build and tests of the GPUI-free crates.
 - One crate's tests: `cargo nextest run --locked -p <crate>`.
-- The app is `crates/ol-app`: `cargo run --locked -p ol-app --features fake -- --data-dir <scratch folder>`. The feature `fake` holds the fake launchers. Today its `main` is empty: it reads no argument and exits at once.
+- The app is `crates/ol-app`: `cargo run --locked -p ol-app -- --data-dir=<scratch folder>`, in that spelling; it refuses to start without it. Today it is the GPUI proof: the window, the tray icon and a placeholder Library, with nothing behind them and nothing stored. The feature `fake` is for the fake launchers and still empty.
+- To see the window without looking at the screen: `--capture=<file.png>` writes it to a PNG and exits; keep captures under `target/`. Steps before the shot: `--capture-size=<width>x<height>` resizes the client area, `--capture-row=<n>` scrolls the grid, `--capture-type=<text>` types into both fields, `--capture-keys=<a,b>` presses keys in the search field, `--capture-sweep=<frames>` scrolls and prints frame times, `--capture-focus` takes the keyboard (a selection is only drawn in the active window). `--probe` checks the title bar, the frame, the minimum size and the tray, quits through the tray menu, and exits with 1 when a check fails.
 
 ## Docs and commits
 

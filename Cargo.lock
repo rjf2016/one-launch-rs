@@ -4040,6 +4040,7 @@ dependencies = [
  "anyhow",
  "gpui-pre",
  "gpui-pre-platform",
+ "image",
  "ol-api",
  "ol-automation",
  "ol-model",

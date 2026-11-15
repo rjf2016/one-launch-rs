@@ -17,6 +17,7 @@ fake = ["dep:ol-platform-fake", "dep:ol-replay", "dep:ol-sim"]
 anyhow.workspace = true
 gpui.workspace = true
 gpui_platform.workspace = true
+image.workspace = true
 ol-api.workspace = true
 ol-automation = { workspace = true, optional = true }
 ol-model.workspace = true
