@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
 
@@ -70,9 +71,30 @@ impl Repo {
         if !LOCAL_READS.contains(&command) {
             bail!("git {command} is not a command the policy runs");
         }
-        let mut all = vec!["--no-optional-locks", "-C", self.dir.as_str()];
-        all.extend(args);
-        workspace::output("git", &all)
+        let output = self
+            .command(args)
+            .stderr(Stdio::inherit())
+            .output()
+            .context("could not start git")?;
+        if !output.status.success() {
+            bail!("`git {}` failed", args.join(" "));
+        }
+        Ok(output.stdout)
+    }
+
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "the policy starts git itself, to say what git may not do"
+    )]
+    fn command(&self, args: &[&str]) -> Command {
+        let mut command = Command::new("git");
+        // In a partial clone git fetches an object it lacks, and a check that reads must never reach a remote.
+        command
+            .env("GIT_NO_LAZY_FETCH", "1")
+            .args(["--no-optional-locks", "-C", self.dir.as_str()])
+            .args(args)
+            .current_dir(workspace::root());
+        command
     }
 
     pub fn commit(&self, name: &str) -> Result<String> {
@@ -117,7 +139,7 @@ impl Repo {
                 self.diff(&["--cached", fork], &mut found)?;
                 self.diff(&[], &mut found)?;
                 let untracked = self.git(&["ls-files", "-z", "--others", "--exclude-standard"])?;
-                for path in records(&untracked) {
+                for path in paths(&untracked)? {
                     found.entry(path).or_insert(true);
                 }
             }
@@ -165,26 +187,7 @@ impl Repo {
     }
 
     pub fn entries(&self, commit: &str, under: &str) -> Result<Vec<Entry>> {
-        let listing = self.git(&["ls-tree", "-r", "-z", "--full-tree", commit, "--", under])?;
-        records(&listing)
-            .into_iter()
-            .map(|record| {
-                let fields = record
-                    .split_once('\t')
-                    .map(|(about, path)| (about.split(' ').collect::<Vec<_>>(), path));
-                let Some(([mode, _, object], path)) = fields
-                    .as_ref()
-                    .map(|(about, path)| (about.as_slice(), path))
-                else {
-                    bail!("git ls-tree printed an entry this check does not read");
-                };
-                Ok(Entry {
-                    path: (*path).to_owned(),
-                    object: (*object).to_owned(),
-                    file: mode.starts_with("100"),
-                })
-            })
-            .collect()
+        listed(&self.git(&["ls-tree", "-r", "-z", "--full-tree", commit, "--", under])?)
     }
 
     pub fn blob(&self, object: &str) -> Result<String> {
@@ -225,6 +228,17 @@ fn text(bytes: &[u8]) -> std::borrow::Cow<'_, str> {
     String::from_utf8_lossy(bytes)
 }
 
+const NOT_UTF8: &str = "git printed a path that is not UTF-8, which this check cannot judge";
+
+// Two names that are not UTF-8 can read as one once their bytes are replaced, so a record that holds a path is never decoded loosely.
+fn paths(listing: &[u8]) -> Result<Vec<String>> {
+    listing
+        .split(|byte| *byte == 0)
+        .filter(|record| !record.is_empty())
+        .map(|record| String::from_utf8(record.to_vec()).map_err(|_| anyhow::anyhow!(NOT_UTF8)))
+        .collect()
+}
+
 fn records(listing: &[u8]) -> Vec<String> {
     text(listing)
         .split('\0')
@@ -233,8 +247,30 @@ fn records(listing: &[u8]) -> Vec<String> {
         .collect()
 }
 
+fn listed(listing: &[u8]) -> Result<Vec<Entry>> {
+    paths(listing)?
+        .into_iter()
+        .map(|record| {
+            let fields = record
+                .split_once('\t')
+                .map(|(about, path)| (about.split(' ').collect::<Vec<_>>(), path));
+            let Some(([mode, _, object], path)) = fields
+                .as_ref()
+                .map(|(about, path)| (about.as_slice(), path))
+            else {
+                bail!("git ls-tree printed an entry this check does not read");
+            };
+            Ok(Entry {
+                path: (*path).to_owned(),
+                object: (*object).to_owned(),
+                file: mode.starts_with("100"),
+            })
+        })
+        .collect()
+}
+
 fn statuses(listing: &[u8]) -> Result<Vec<(char, String)>> {
-    let fields = records(listing);
+    let fields = paths(listing)?;
     let mut found = Vec::new();
     for pair in fields.chunks(2) {
         let [status, path] = pair else {
@@ -293,6 +329,72 @@ mod tests {
                 "{command}"
             );
         }
+    }
+
+    #[test]
+    fn git_is_started_with_lazy_fetching_off() {
+        let command = Repo::workspace().command(&["rev-parse", "HEAD"]);
+        let set: Vec<_> = command.get_envs().collect();
+        assert_eq!(
+            set,
+            [(
+                std::ffi::OsStr::new("GIT_NO_LAZY_FETCH"),
+                Some(std::ffi::OsStr::new("1"))
+            )]
+        );
+        assert_eq!(command.get_program(), "git");
+        let args: Vec<_> = command.get_args().collect();
+        assert_eq!(args[0], "--no-optional-locks");
+        assert_eq!(args[3..], ["rev-parse", "HEAD"]);
+    }
+
+    #[test]
+    fn a_path_that_is_not_utf8_is_an_error_that_quotes_nothing() {
+        for listing in [
+            b"A\0crates/f\x80.rs\0".as_slice(),
+            b"A\0crates/ok.rs\0M\0docs/\xff\xfe.md\0",
+            b"M\0\xc3\0",
+        ] {
+            let error = statuses(listing).unwrap_err().to_string();
+            assert_eq!(error, NOT_UTF8);
+        }
+        assert_eq!(paths(b"docs/\xff.md\0").unwrap_err().to_string(), NOT_UTF8);
+        assert_eq!(
+            paths("docs/\u{e9}t\u{e9}.md\0b\0".as_bytes()).unwrap(),
+            ["docs/\u{e9}t\u{e9}.md", "b"]
+        );
+        let tree =
+            b"100644 blob 78981922613b2afb6025042ff6bd878ac1994e85\tplan/tickets/M1-F\xff.md\0";
+        assert_eq!(listed(tree).err().expect("not UTF-8").to_string(), NOT_UTF8);
+    }
+
+    #[test]
+    fn a_tree_listing_gives_each_entry_its_path_its_object_and_its_kind() {
+        let tree = [
+            "100644 blob 78981922613b2afb6025042ff6bd878ac1994e85\tplan/tickets/M1 F1.md",
+            "120000 blob 1916a083dfa163cf6c9c0a417959bb15bfd9f0f3\tplan/tickets/link",
+            "160000 commit 3aab493e184d5faca798322c34bdc6eb9e6e3ce3\tvendor/sub",
+            "",
+        ]
+        .join("\0");
+        let entries = listed(tree.as_bytes()).unwrap();
+        let read: Vec<(&str, bool)> = entries
+            .iter()
+            .map(|entry| (entry.path.as_str(), entry.file))
+            .collect();
+        assert_eq!(
+            read,
+            [
+                ("plan/tickets/M1 F1.md", true),
+                ("plan/tickets/link", false),
+                ("vendor/sub", false)
+            ]
+        );
+        assert_eq!(
+            entries[0].object,
+            "78981922613b2afb6025042ff6bd878ac1994e85"
+        );
+        assert!(listed(b"100644 blob\0").is_err());
     }
 
     #[test]

@@ -461,4 +461,43 @@ mod tests {
             "outside the write_scope of M1-F1: 10 more paths"
         );
     }
+
+    #[test]
+    fn under_this_ticket_the_rest_of_xtask_and_the_cargo_config_are_outside_the_scope() {
+        let own = parse(
+            "M1-F6c",
+            &workspace::read("plan/tickets/M1-F6c.md").unwrap(),
+        )
+        .unwrap();
+        let inside = [
+            change("xtask/src/policy/mod.rs"),
+            change("xtask/src/policy/integrity/mod.rs"),
+            change("xtask/src/main.rs"),
+            change("xtask/tests/policy/rules.rs"),
+            change(".github/workflows/ci.yml"),
+        ];
+        assert_eq!(scope(&own, &inside), Vec::<String>::new());
+        let outside = [
+            "xtask/src/secrets.rs",
+            "xtask/src/check.rs",
+            "xtask/src/workspace.rs",
+            "xtask/src/lints/manifests.rs",
+            "xtask/src/policy.rs",
+            "xtask/Cargo.toml",
+            "xtask/build.rs",
+            "xtask/tests/other.rs",
+            ".cargo/config.toml",
+            ".github/workflows/other.yml",
+            ".github/CODEOWNERS",
+            "Cargo.toml",
+            "Cargo.lock",
+            "rust-toolchain.toml",
+        ];
+        let changes: Vec<Change> = outside.iter().map(|path| change(path)).collect();
+        let expected: Vec<String> = outside
+            .iter()
+            .map(|path| format!("outside the write_scope of M1-F6c: {path}"))
+            .collect();
+        assert_eq!(scope(&own, &changes), expected);
+    }
 }

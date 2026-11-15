@@ -817,6 +817,93 @@ fn rule_5_the_owners_rows_change_only_with_the_owners_approval() {
 }
 
 #[test]
+fn rule_5_a_row_the_base_made_the_owners_after_the_branch_was_cut_is_the_owners() {
+    let triage = format!(
+        "# The triage table.\n\n{}{}",
+        row("S1-01", "", "keep"),
+        row("X-01", "delegated", "fix")
+    );
+    let waivers = format!("{CATEGORIES}{}", waiver("T-0001", "tooling"));
+    let (fixture, cut) = Fixture::new(&[
+        ("README.md", "A fixture.\n"),
+        ("plan/triage.toml", &triage),
+        ("plan/waivers.toml", &waivers),
+    ]);
+    let base = fixture.head(
+        &cut,
+        &[
+            (
+                "plan/triage.toml",
+                Some(&triage.replace("source = \"delegated\"", "source = \"plan\"")),
+            ),
+            (
+                "plan/waivers.toml",
+                Some(&format!("{waivers}{}", waiver("T-0002", "tooling"))),
+            ),
+        ],
+        "Plan: the owner takes a row and adds a waiver",
+    );
+    let judged = |against: &str, head: &str| {
+        let report = fixture.judged("prep/rows-2", against, head);
+        (failed(&report), problems(&report, Rule::OwnersRows))
+    };
+
+    let edited = fixture.head(
+        &cut,
+        &[(
+            "plan/triage.toml",
+            Some(&triage.replace("What X-01 is about.", "Something else.")),
+        )],
+        "Plan: a row that was delegated when the branch was cut",
+    );
+    let (rules, found) = judged(&base, &edited);
+    assert_eq!(rules, [Rule::OwnersRows]);
+    assert_eq!(
+        found[0],
+        "plan/triage.toml:10: the owner's row X-01 is changed"
+    );
+    assert_eq!(judged(&cut, &edited).0, NONE);
+
+    let removed = fixture.head(
+        &cut,
+        &[(
+            "plan/triage.toml",
+            Some(&triage.replace(&row("X-01", "delegated", "fix"), "")),
+        )],
+        "Plan: the row goes",
+    );
+    assert_eq!(
+        judged(&base, &removed).1[0],
+        "plan/triage.toml: the owner's row X-01 is removed"
+    );
+    assert_eq!(judged(&cut, &removed).0, NONE);
+
+    let beside_it = fixture.head(
+        &cut,
+        &[(
+            "plan/triage.toml",
+            Some(&format!("{triage}{}", row("X-02", "delegated", "drop"))),
+        )],
+        "Plan: another row, the one the base took left alone",
+    );
+    assert_eq!(judged(&base, &beside_it).0, NONE);
+
+    let twin = fixture.head(
+        &cut,
+        &[(
+            "plan/waivers.toml",
+            Some(&format!("{waivers}{}", waiver("T-0002", "web-only"))),
+        )],
+        "Plan: a waiver the base has since gained",
+    );
+    assert_eq!(
+        judged(&base, &twin).1[0],
+        "plan/waivers.toml:11: a waiver is added with the id of waiver T-0002, which the base has"
+    );
+    assert_eq!(judged(&cut, &twin).0, NONE);
+}
+
+#[test]
 fn rule_6_no_commit_message_and_no_body_carries_an_attribution() {
     let (fixture, base) = Fixture::new(&[
         ("README.md", "A fixture.\n"),
@@ -1114,6 +1201,35 @@ fn rule_8_the_body_has_its_three_sections_and_an_evidence_block_that_parses() {
         assert_eq!(problems(&report, Rule::Evidence)[0], problem);
     }
     assert_eq!(problems(&with_body(""), Rule::Evidence).len(), 3);
+}
+
+#[test]
+fn sixteen_names_that_are_not_utf8_fail_the_run_and_do_not_count_as_one_file() {
+    let (fixture, base) = Fixture::new(&[
+        ("README.md", "A fixture.\n"),
+        ("plan/tickets/M1-F1.md", &ticket("feature", &["crates/**"])),
+    ]);
+    let names: Vec<Vec<u8>> = (0x80..=0x8f_u8)
+        .map(|byte| [b"f".as_slice(), &[byte], b".rs"].concat())
+        .collect();
+    let names: Vec<&[u8]> = names.iter().map(Vec::as_slice).collect();
+    let head = fixture.head_with_names(&base, Some("crates"), &names);
+    let request = fixture.request("m1/f1-model", &base, &head);
+    let error = pull_request(&fixture.repo, &base, &request, None)
+        .err()
+        .expect("sixteen files whose names are not UTF-8");
+    assert_eq!(
+        error.to_string(),
+        "git printed a path that is not UTF-8, which this check cannot judge"
+    );
+
+    let readable: Vec<Vec<u8>> = (0..16)
+        .map(|index| format!("f{index}.rs").into_bytes())
+        .collect();
+    let readable: Vec<&[u8]> = readable.iter().map(Vec::as_slice).collect();
+    let head = fixture.head_with_names(&base, Some("crates"), &readable);
+    let report = fixture.judged("m1/f1-model", &base, &head);
+    assert_eq!(failed(&report), [Rule::Scope]);
 }
 
 fn event_file(fixture: &Fixture, text: &str) -> String {

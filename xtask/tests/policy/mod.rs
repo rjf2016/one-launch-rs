@@ -146,34 +146,33 @@ impl Fixture {
 
     // git on Windows refuses a quote, a newline or a backslash in a name it is asked to add, so the tree that holds one is written byte by byte.
     pub fn head_with_a_name(&self, from: &str, name: &str) -> String {
-        let mut entries: Vec<(String, String, bool)> = self
+        self.head_with_names(from, None, &[name.as_bytes()])
+    }
+
+    pub fn head_with_names(&self, from: &str, folder: Option<&str>, names: &[&[u8]]) -> String {
+        let blob = self.git(&["rev-parse", &format!("{from}:README.md")]);
+        let added: Vec<(Vec<u8>, String, bool)> = names
+            .iter()
+            .map(|name| (name.to_vec(), blob.clone(), false))
+            .collect();
+        let mut entries: Vec<(Vec<u8>, String, bool)> = self
             .git(&["ls-tree", from])
             .lines()
             .map(|line| {
                 let (about, name) = line.split_once('\t').unwrap();
                 let fields: Vec<&str> = about.split(' ').collect();
-                (name.to_owned(), fields[2].to_owned(), fields[1] == "tree")
+                (
+                    name.as_bytes().to_vec(),
+                    fields[2].to_owned(),
+                    fields[1] == "tree",
+                )
             })
             .collect();
-        let blob = self.git(&["rev-parse", &format!("{from}:README.md")]);
-        entries.push((name.to_owned(), blob, false));
-        let in_tree_order = |(name, _, tree): &(String, String, bool)| {
-            format!("{name}{}", if *tree { "/" } else { "" })
-        };
-        entries.sort_by_key(in_tree_order);
-        let mut tree = Vec::new();
-        for (name, object, is_tree) in &entries {
-            tree.extend(if *is_tree { "40000 " } else { "100644 " }.bytes());
-            tree.extend(name.bytes());
-            tree.push(0);
-            tree.extend(
-                (0..object.len())
-                    .step_by(2)
-                    .map(|at| u8::from_str_radix(&object[at..at + 2], 16).unwrap()),
-            );
+        match folder {
+            Some(folder) => entries.push((folder.as_bytes().to_vec(), self.tree(added), true)),
+            None => entries.extend(added),
         }
-        std::fs::write(self.path(".git/tree.bin"), tree).unwrap();
-        let tree = self.git(&["hash-object", "-t", "tree", "-w", ".git/tree.bin"]);
+        let tree = self.tree(entries);
         self.git(&[
             "commit-tree",
             &tree,
@@ -182,6 +181,27 @@ impl Fixture {
             "-m",
             "A name git on Windows will not add",
         ])
+    }
+
+    fn tree(&self, mut entries: Vec<(Vec<u8>, String, bool)>) -> String {
+        entries.sort_by_key(|(name, _, is_tree)| {
+            let mut in_tree_order = name.clone();
+            in_tree_order.extend(is_tree.then_some(b'/'));
+            in_tree_order
+        });
+        let mut tree = Vec::new();
+        for (name, object, is_tree) in &entries {
+            tree.extend(if *is_tree { "40000 " } else { "100644 " }.bytes());
+            tree.extend(name);
+            tree.push(0);
+            tree.extend(
+                (0..object.len())
+                    .step_by(2)
+                    .map(|at| u8::from_str_radix(&object[at..at + 2], 16).unwrap()),
+            );
+        }
+        std::fs::write(self.path(".git/tree.bin"), tree).unwrap();
+        self.git(&["hash-object", "-t", "tree", "-w", ".git/tree.bin"])
     }
 
     pub fn request(&self, branch: &str, base: &str, head: &str) -> PullRequest {

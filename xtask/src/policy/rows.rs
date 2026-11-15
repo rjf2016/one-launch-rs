@@ -12,6 +12,7 @@ pub const WAIVERS: &str = "plan/waivers.toml";
 const THE_OWNERS: [&str; 2] = ["\"\"", "\"plan\""];
 const DELEGATED: &str = "\"delegated\"";
 const ON_THE_BASE: &str = " on the base";
+const WHERE_CUT: &str = " where the branch was cut";
 const NO_ID: &str =
     "the row's `id` is not one string in double quotes with no escape and nothing after it";
 
@@ -61,11 +62,13 @@ pub fn spellings(changes: &[Change]) -> Vec<String> {
     problems
 }
 
-pub fn triage(fork: &Content, head: &Content) -> Vec<String> {
+// A row is the owner's when it is the owner's at the commit the branch was cut from or on the tip of the base, which may have moved on since. What the pull request did to it is its difference from the commit it was cut from: a merge keeps whatever the base did meanwhile.
+pub fn triage(fork: &Content, head: &Content, base: &Content) -> Vec<String> {
     let mut problems = Vec::new();
-    let before = rows(TRIAGE, ON_THE_BASE, fork, "item", &mut problems);
+    let cut = rows(TRIAGE, WHERE_CUT, fork, "item", &mut problems);
+    let tip = rows(TRIAGE, ON_THE_BASE, base, "item", &mut problems);
     let after = rows(TRIAGE, "", head, "item", &mut problems);
-    let (Some(before), Some(after)) = (before, after) else {
+    let (Some(cut), Some(tip), Some(after)) = (cut, tip, after) else {
         return problems;
     };
 
@@ -93,28 +96,30 @@ pub fn triage(fork: &Content, head: &Content) -> Vec<String> {
         }
     }
 
-    // On the base every row that is not plainly delegated is the owner's.
-    let mut the_owners = BTreeSet::new();
-    for row in &before {
-        if row.get("source") == Some(DELEGATED) {
-            continue;
-        }
-        let Some(id) = row.id() else {
-            problems.push(format!("{TRIAGE}:{}{ON_THE_BASE}: {NO_ID}", row.line));
-            continue;
-        };
-        the_owners.insert(id);
-        match now.get(id) {
-            None => problems.push(format!(
+    let mut the_owners = owners(&cut, WHERE_CUT, &mut problems);
+    the_owners.extend(owners(&tip, ON_THE_BASE, &mut problems));
+    let was: BTreeMap<&str, &Row> = cut
+        .iter()
+        .rev()
+        .filter_map(|row| Some((row.id()?, row)))
+        .collect();
+    for id in &the_owners {
+        match (was.get(id), now.get(id)) {
+            (Some(_), None) => problems.push(format!(
                 "{TRIAGE}: the owner's row {} is removed",
                 printable(id)
             )),
-            Some(found) if found.fields != row.fields => problems.push(format!(
+            (Some(before), Some(found)) if found.fields != before.fields => problems.push(format!(
                 "{TRIAGE}:{}: the owner's row {} is changed",
                 found.line,
                 printable(id)
             )),
-            Some(_) => {}
+            (None, Some(found)) => problems.push(format!(
+                "{TRIAGE}:{}: a row is added with the id of the owner's row {}, which the base has",
+                found.line,
+                printable(id)
+            )),
+            _ => {}
         }
     }
     for row in &after {
@@ -131,17 +136,35 @@ pub fn triage(fork: &Content, head: &Content) -> Vec<String> {
     problems
 }
 
+// Every row that is not plainly delegated is the owner's.
+fn owners<'a>(rows: &[Row<'a>], side: &str, problems: &mut Vec<String>) -> BTreeSet<&'a str> {
+    let mut ids = BTreeSet::new();
+    for row in rows {
+        if row.get("source") == Some(DELEGATED) {
+            continue;
+        }
+        match row.id() {
+            Some(id) => {
+                ids.insert(id);
+            }
+            None => problems.push(format!("{TRIAGE}:{}{side}: {NO_ID}", row.line)),
+        }
+    }
+    ids
+}
+
 // The categories that count are the ones the tip of the base defines; what the pull request itself did to the file is its difference from the commit it was cut from.
 pub fn waivers(fork: &Content, head: &Content, base: &Content) -> Vec<String> {
     let mut problems = Vec::new();
-    let before = rows(WAIVERS, ON_THE_BASE, fork, "waiver", &mut problems);
+    let cut = rows(WAIVERS, WHERE_CUT, fork, "waiver", &mut problems);
+    let tip = rows(WAIVERS, ON_THE_BASE, base, "waiver", &mut problems);
     let after = rows(WAIVERS, "", head, "waiver", &mut problems);
     if above(fork) != above(head) {
         problems.push(format!(
             "{WAIVERS}: the comment above the first waiver, which defines the categories, is changed"
         ));
     }
-    let (Some(before), Some(after)) = (before, after) else {
+    let (Some(cut), Some(tip), Some(after)) = (cut, tip, after) else {
         return problems;
     };
 
@@ -149,22 +172,31 @@ pub fn waivers(fork: &Content, head: &Content, base: &Content) -> Vec<String> {
         .iter()
         .filter_map(|line| Some(CATEGORY.captures(line)?.get(1)?.as_str()))
         .collect();
-    let mut was = BTreeMap::new();
-    for row in &before {
+    let mut was: BTreeMap<&str, &Row> = BTreeMap::new();
+    for row in &cut {
         match row.id() {
             Some(id) => {
-                was.insert(id, row.get("category"));
+                was.insert(id, row);
             }
-            None => problems.push(format!("{WAIVERS}:{}{ON_THE_BASE}: {NO_ID}", row.line)),
+            None => problems.push(format!("{WAIVERS}:{}{WHERE_CUT}: {NO_ID}", row.line)),
         }
     }
+    let since: BTreeSet<&str> = tip
+        .iter()
+        .filter_map(Row::id)
+        .filter(|id| !was.contains_key(id))
+        .collect();
     let mut seen = BTreeMap::new();
     for row in &after {
         let at = format!("{WAIVERS}:{}", row.line);
         let category = row.get("category");
-        if !category
-            .and_then(plain)
-            .is_some_and(|name| defined.contains(name))
+        let before = row.id().and_then(|id| was.get(id));
+        // A waiver the pull request left as it was is the base's to judge: a merge takes whatever the base did to it since.
+        let left_alone = before.is_some_and(|before| before.fields == row.fields);
+        if !left_alone
+            && !category
+                .and_then(plain)
+                .is_some_and(|name| defined.contains(name))
         {
             problems.push(format!(
                 "{at}: the waiver's category is not one the base defines"
@@ -179,9 +211,15 @@ pub fn waivers(fork: &Content, head: &Content, base: &Content) -> Vec<String> {
                 "{at}: a second waiver with the id of the waiver at line {first}"
             ));
         }
-        if was.get(id).is_some_and(|old| *old != category) {
+        if before.is_some_and(|before| before.get("category") != category) {
             problems.push(format!(
                 "{at}: the category of waiver {}, which is on the base, is changed",
+                printable(id)
+            ));
+        }
+        if since.contains(id) {
+            problems.push(format!(
+                "{at}: a waiver is added with the id of waiver {}, which the base has",
                 printable(id)
             ));
         }
@@ -271,7 +309,7 @@ mod tests {
     }
 
     fn triaged(head: &str) -> Vec<String> {
-        triage(&text(&base()), &text(head))
+        triage(&text(&base()), &text(head), &text(&base()))
     }
 
     #[test]
@@ -320,7 +358,10 @@ mod tests {
                 "plan/triage.toml:3: a row with `source` \"\" or \"plan\" is added, and those are the owner's"
             ]
         );
-        assert_eq!(triage(&text(&base()), &Content::Missing).len(), 2);
+        assert_eq!(
+            triage(&text(&base()), &Content::Missing, &text(&base())).len(),
+            2
+        );
     }
 
     #[test]
@@ -332,7 +373,10 @@ mod tests {
             triaged(&base().replace("source = \"delegated\"", "source = \"plan\"")),
             [added.replace(":24:", ":17:")]
         );
-        assert_eq!(triage(&Content::Missing, &text(&base())).len(), 2);
+        assert_eq!(
+            triage(&Content::Missing, &text(&base()), &Content::Missing).len(),
+            2
+        );
     }
 
     #[test]
@@ -386,13 +430,17 @@ mod tests {
             [unreadable(1)]
         );
         assert_eq!(
-            triage(&text("[[item]]\nwhy = \"\"\"\n"), &text(&base())),
+            triage(
+                &text("[[item]]\nwhy = \"\"\"\n"),
+                &text(&base()),
+                &text(&base())
+            ),
             [
-                "plan/triage.toml:2 on the base: not a comment, `[[item]]` or one `key = value` that ends on its line, which is all this check reads"
+                "plan/triage.toml:2 where the branch was cut: not a comment, `[[item]]` or one `key = value` that ends on its line, which is all this check reads"
             ]
         );
         assert_eq!(
-            triage(&text(&base()), &Content::NotAFile),
+            triage(&text(&base()), &Content::NotAFile, &text(&base())),
             ["plan/triage.toml is not a regular file"]
         );
     }
@@ -537,7 +585,10 @@ mod tests {
             Vec::<String>::new()
         );
         let triage = text(&crate::workspace::read(TRIAGE).unwrap());
-        assert_eq!(super::triage(&triage, &triage), Vec::<String>::new());
+        assert_eq!(
+            super::triage(&triage, &triage, &triage),
+            Vec::<String>::new()
+        );
     }
 
     #[test]
@@ -595,7 +646,7 @@ mod tests {
         ] {
             let before = base().replace("source = \"plan\"", &format!("source = {source}"));
             let after = before.replace("decision = \"drop\"", "decision = \"keep\"");
-            let problems = triage(&text(&before), &text(&after));
+            let problems = triage(&text(&before), &text(&after), &text(&before));
             assert!(
                 problems
                     .contains(&"plan/triage.toml:10: the owner's row S1-02 is changed".to_owned()),
@@ -606,14 +657,16 @@ mod tests {
         assert_eq!(
             triage(
                 &text(&no_source),
-                &text(&base().replace(&row("S1-02", "plan", "drop"), ""))
+                &text(&base().replace(&row("S1-02", "plan", "drop"), "")),
+                &text(&no_source)
             ),
             ["plan/triage.toml: the owner's row S1-02 is removed"]
         );
         let no_id = base().replace("id = \"S1-02\"", "id = 'S1-02'");
         assert_eq!(
-            triage(&text(&no_id), &text(&base())),
+            triage(&text(&no_id), &text(&base()), &text(&no_id)),
             [
+                format!("plan/triage.toml:10 where the branch was cut: {NO_ID}"),
                 format!("plan/triage.toml:10 on the base: {NO_ID}"),
                 "plan/triage.toml:10: a row with `source` \"\" or \"plan\" is added, and those are the owner's".to_owned()
             ]
@@ -645,10 +698,115 @@ mod tests {
         );
         assert_eq!(
             waivers(&text(&fork), &text(&head), &Content::Missing),
+            ["plan/waivers.toml:17: the waiver's category is not one the base defines"]
+        );
+    }
+
+    #[test]
+    fn a_waiver_the_pull_request_left_alone_is_not_judged_by_what_the_base_dropped_since() {
+        let fork = format!(
+            "{CATEGORIES}{}{}",
+            waiver("T-0001", "tooling"),
+            waiver("T-0002", "web-only")
+        );
+        let tip = format!("{CATEGORIES}{}", waiver("T-0001", "tooling")).replace(
+            "#   web-only          behaviour that exists because the UI is a web page:\n#                     the preload bridge\n",
+            "",
+        );
+        let head = format!("{fork}{}", waiver("T-0003", "tooling"));
+        assert_eq!(
+            waivers(&text(&fork), &text(&head), &text(&tip)),
+            Vec::<String>::new()
+        );
+        let touched = head.replace("Why T-0002 is not ported.", "Another reason.");
+        assert_eq!(
+            waivers(&text(&fork), &text(&touched), &text(&tip)),
+            ["plan/waivers.toml:17: the waiver's category is not one the base defines"]
+        );
+    }
+
+    #[test]
+    fn a_row_the_base_made_the_owners_after_the_branch_was_cut_is_the_owners() {
+        let fork = base();
+        let tip = fork.replace("source = \"delegated\"", "source = \"plan\"");
+        let edited = fork.replace("What X-01 is about.", "Something else.");
+        assert_eq!(
+            triage(&text(&fork), &text(&edited), &text(&tip)),
+            ["plan/triage.toml:17: the owner's row X-01 is changed"]
+        );
+        assert_eq!(
+            triage(&text(&fork), &text(&edited), &text(&fork)),
+            Vec::<String>::new()
+        );
+        let removed = fork.replace(&row("X-01", "delegated", "fix"), "");
+        assert_eq!(
+            triage(&text(&fork), &text(&removed), &text(&tip)),
+            ["plan/triage.toml: the owner's row X-01 is removed"]
+        );
+        let released = fork.replace("source = \"plan\"", "source = \"delegated\"");
+        let edited = fork.replace("What S1-02 is about.", "Something else.");
+        assert_eq!(
+            triage(&text(&fork), &text(&edited), &text(&released)),
+            ["plan/triage.toml:10: the owner's row S1-02 is changed"]
+        );
+    }
+
+    #[test]
+    fn what_the_base_did_to_the_owners_rows_since_then_is_not_the_pull_requests_doing() {
+        let fork = base();
+        let head = fork.clone() + &row("X-02", "delegated", "drop");
+        for tip in [
+            fork.replace("decision = \"keep\"", "decision = \"drop: decided since\""),
+            fork.replace(&row("S1-02", "plan", "drop"), ""),
+            fork.clone() + &row("S1-03", "plan", "keep"),
+            fork.clone() + &row("S1-03", "", "keep"),
+            fork.replace("source = \"delegated\"", "source = \"plan\""),
+        ] {
+            assert_eq!(
+                triage(&text(&fork), &text(&head), &text(&tip)),
+                Vec::<String>::new(),
+                "{tip}"
+            );
+        }
+        let tip = fork.clone() + &row("S1-03", "plan", "keep");
+        let twin = fork.clone() + &row("S1-03", "delegated", "drop");
+        assert_eq!(
+            triage(&text(&fork), &text(&twin), &text(&tip)),
             [
-                "plan/waivers.toml:12: the waiver's category is not one the base defines",
-                "plan/waivers.toml:17: the waiver's category is not one the base defines"
+                "plan/triage.toml:24: a row is added with the id of the owner's row S1-03, which the base has"
             ]
+        );
+        assert_eq!(
+            triage(
+                &text(&fork),
+                &text(&fork),
+                &text("[[item]]\nwhy = \"\"\"\n")
+            ),
+            [
+                "plan/triage.toml:2 on the base: not a comment, `[[item]]` or one `key = value` that ends on its line, which is all this check reads"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_waiver_the_base_gained_since_the_branch_was_cut_is_not_added_again() {
+        let fork = format!("{CATEGORIES}{}", waiver("T-0001", "tooling"));
+        let tip = format!("{fork}{}", waiver("T-0002", "tooling"));
+        let twin = format!("{fork}{}", waiver("T-0002", "web-only"));
+        assert_eq!(
+            waivers(&text(&fork), &text(&twin), &text(&tip)),
+            [
+                "plan/waivers.toml:17: a waiver is added with the id of waiver T-0002, which the base has"
+            ]
+        );
+        let other = format!("{fork}{}", waiver("T-0003", "web-only"));
+        assert_eq!(
+            waivers(&text(&fork), &text(&other), &text(&tip)),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            waivers(&text(&fork), &text(&fork), &text(&tip)),
+            Vec::<String>::new()
         );
     }
 
@@ -658,7 +816,8 @@ mod tests {
         assert_eq!(
             triage(
                 &text(&odd),
-                &text(&odd.replace("decision = \"drop\"", "decision = \"keep\""))
+                &text(&odd.replace("decision = \"drop\"", "decision = \"keep\"")),
+                &text(&odd)
             ),
             ["plan/triage.toml:10: the owner's row S1?[31m?02 is changed"]
         );

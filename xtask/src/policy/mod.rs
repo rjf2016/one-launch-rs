@@ -416,6 +416,7 @@ fn owners_rows(
         problems.extend(rows::triage(
             &repo.read(&fork, rows::TRIAGE)?,
             &repo.read(head, rows::TRIAGE)?,
+            &repo.read(&Tree::Commit(base), rows::TRIAGE)?,
         ));
     }
     if rows::touched(changes, rows::WAIVERS) {

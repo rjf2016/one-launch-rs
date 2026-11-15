@@ -12,12 +12,24 @@ const RAW_IN_HTML: &str =
     "a comment or a raw block under a line of raw HTML with no blank line between";
 const OPEN_COMMENT: &str =
     "an HTML comment that opens in the middle of a line and does not close on it";
+const UNDERLINE_IN_HTML: &str =
+    "a line of dashes or equals signs under a line of raw HTML with no blank line between";
 
 static HEADING: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$").expect("a fixed pattern")
 });
 static TAG: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^</?[A-Za-z]").expect("a fixed pattern"));
+static UNDERLINE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^ {0,3}(=+|-+)[ \t]*$").expect("a fixed pattern"));
+static RULE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^ {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})$")
+        .expect("a fixed pattern")
+});
+static ITEM: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(?:[-+*]|(\d{1,9})[.)])[ \t]+\S").expect("a fixed pattern"));
+static EMPTY_ITEM: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(?:[-+*]|\d{1,9}[.)])[ \t]*$").expect("a fixed pattern"));
 static RAW: LazyLock<Vec<(Regex, &'static [&'static str])>> = LazyLock::new(|| {
     let blocks: [(&str, &'static [&'static str]); 5] = [
         (
@@ -42,7 +54,14 @@ enum Line<'a> {
     Code(&'a str),
     Closes,
     Other,
+    Underlined(usize, &'a str),
     Unclear(&'static str),
+}
+
+#[derive(Clone, Copy)]
+struct Paragraph<'a> {
+    at_the_margin: bool,
+    title: &'a str,
 }
 
 enum Within {
@@ -72,6 +91,65 @@ fn after<'a>(text: &'a str, ends: &[&str]) -> Option<&'a str> {
         .map(|at| &text[at..])
 }
 
+// A list item or a quote: text under it belongs to it, and a line of dashes under that is a rule, not a heading. An empty item, or a numbered one that does not start at 1, cannot cut into a paragraph.
+fn opens_an_item(text: &str, in_a_paragraph: bool) -> bool {
+    if text.starts_with('>') {
+        return true;
+    }
+    match ITEM.captures(text) {
+        Some(found) => !in_a_paragraph || found.get(1).is_none_or(|number| number.as_str() == "1"),
+        None => !in_a_paragraph && EMPTY_ITEM.is_match(text),
+    }
+}
+
+// Text with a line of dashes or equals signs right under it is a heading as much as a line that starts with `#`.
+fn plain<'a>(line: &'a str, above: Option<Paragraph<'a>>) -> (Line<'a>, Option<Paragraph<'a>>) {
+    let text = line.trim_start_matches(BLANK);
+    let indent = &line[..line.len() - text.len()];
+    let nested = Paragraph {
+        at_the_margin: false,
+        title: "",
+    };
+    if text.is_empty() {
+        return (Line::Other, None);
+    }
+    if let Some(found) = UNDERLINE.captures(line) {
+        let level = if found[1].starts_with('=') { 1 } else { 2 };
+        return match above {
+            Some(paragraph) if paragraph.at_the_margin => {
+                (Line::Underlined(level, paragraph.title), None)
+            }
+            _ if level == 2 => (Line::Other, None),
+            Some(_) => (Line::Other, Some(nested)),
+            None => (
+                Line::Other,
+                Some(Paragraph {
+                    at_the_margin: true,
+                    title: "",
+                }),
+            ),
+        };
+    }
+    if RULE.is_match(line) {
+        return (Line::Other, None);
+    }
+    if opens_an_item(text, above.is_some()) {
+        return (Line::Other, Some(nested));
+    }
+    let below = match above {
+        Some(paragraph) => Some(Paragraph {
+            title: "",
+            ..paragraph
+        }),
+        None if indent.len() >= 4 || indent.contains('\t') => None,
+        None => Some(Paragraph {
+            at_the_margin: true,
+            title: text.trim_end_matches(BLANK),
+        }),
+    };
+    (Line::Other, below)
+}
+
 fn opens_a_comment(mut text: &str) -> bool {
     while let Some(at) = text.find("<!--") {
         let inside = &text[at + 4..];
@@ -83,13 +161,15 @@ fn opens_a_comment(mut text: &str) -> bool {
     false
 }
 
-// No Markdown parser is approved, so the body is read only where a line can be placed for certain: code fences at the margin, comments and raw blocks at the margin, and raw HTML that a blank line ends. Whatever could be read two ways (a fence in a list, a fence under a tag) is named as unclear and fails, because past it this reading and GitHub's could disagree about what is code.
+// No Markdown parser is approved, so the body is read only where a line can be placed for certain: code fences at the margin, comments and raw blocks at the margin, and raw HTML that a blank line ends. Whatever could be read two ways (a fence in a list, a fence or a line of dashes under a tag) is named as unclear and fails, because past it this reading and GitHub's could disagree about what is code or a heading.
 fn read(body: &str) -> Vec<Line<'_>> {
     let mut within = Within::Text;
+    let mut paragraph = None;
     body.lines()
         .map(|line| {
             let text = line.trim_start_matches(BLANK);
             let indented = text.len() != line.len();
+            let above = paragraph.take();
             match within {
                 Within::Fence(mark, length) => {
                     let end = line.trim_end_matches(BLANK);
@@ -123,6 +203,8 @@ fn read(body: &str) -> Vec<Line<'_>> {
                         Line::Unclear(RAW_IN_HTML)
                     } else if opens_a_comment(line) {
                         Line::Unclear(OPEN_COMMENT)
+                    } else if UNDERLINE.is_match(line) {
+                        Line::Unclear(UNDERLINE_IN_HTML)
                     } else {
                         Line::Other
                     }
@@ -155,13 +237,15 @@ fn read(body: &str) -> Vec<Line<'_>> {
                         within = Within::Html;
                         return Line::Other;
                     }
-                    match HEADING.captures(line) {
-                        Some(found) => Line::Heading(
+                    if let Some(found) = HEADING.captures(line) {
+                        return Line::Heading(
                             found[1].len(),
                             found.get(2).map_or("", |title| title.as_str()),
-                        ),
-                        None => Line::Other,
+                        );
                     }
+                    let (read, below) = plain(line, above);
+                    paragraph = below;
+                    read
                 }
             }
         })
@@ -187,10 +271,15 @@ pub fn check(body: &str) -> Vec<String> {
         let places: Vec<usize> = (0..lines.len())
             .filter(|at| lines[*at] == Line::Heading(2, name))
             .collect();
-        match places.as_slice() {
-            [place] => once.push((name, *place)),
-            [] => problems.push(format!("the body has no `## {name}` section")),
-            many => problems.push(format!("the body has {} `## {name}` sections", many.len())),
+        let underlined = (0..lines.len()).find(|at| lines[*at] == Line::Underlined(2, name));
+        match (places.as_slice(), underlined) {
+            ([place], None) => once.push((name, *place)),
+            ([], _) => problems.push(format!("the body has no `## {name}` section")),
+            ([_], Some(at)) => problems.push(format!(
+                "the body has a second `{name}` heading, underlined on line {}",
+                at + 1
+            )),
+            (many, _) => problems.push(format!("the body has {} `## {name}` sections", many.len())),
         }
     }
     if once.len() == SECTIONS.len() && !once.is_sorted_by_key(|(_, place)| *place) {
@@ -203,7 +292,9 @@ pub fn check(body: &str) -> Vec<String> {
         let from = heading + 1;
         let to = lines[from..]
             .iter()
-            .position(|line| matches!(line, Line::Heading(level, _) if *level <= 2))
+            .position(|line| {
+                matches!(line, Line::Heading(level, _) | Line::Underlined(level, _) if *level <= 2)
+            })
             .map_or(lines.len(), |next| from + next);
         let blocks: Vec<usize> = (from..to)
             .filter(|at| lines[*at] == Line::Opens(BLOCK))
@@ -478,6 +569,80 @@ mod tests {
             let problems = check(&body(&evidence));
             assert_eq!(problems.len(), 1, "{evidence}");
             assert!(!problems[0].contains(held), "{problems:?}");
+        }
+    }
+
+    #[test]
+    fn text_with_a_line_of_dashes_or_equals_under_it_is_a_heading() {
+        let no_block = "the Evidence section has no ```evidence block (an empty one is valid)";
+        for under in [
+            "Other\n-----",
+            "Other\n=====",
+            "Other\n-",
+            "Other  \n   ---  ",
+            "Two lines\nof text\n---",
+            "Two lines\n    of text\n===",
+            "| a row that is no table\n---",
+            "Text\n2. not a list\n---",
+            "Text\n*\n---",
+        ] {
+            let text = body(&format!("{under}\n\n{EMPTY}"));
+            assert_eq!(check(&text), [no_block], "{under}");
+        }
+        assert_eq!(
+            check(&body(&format!("{EMPTY}\n\nSummary\n-------"))),
+            ["the body has a second `Summary` heading, underlined on line 11"]
+        );
+        assert_eq!(
+            check(&body(&format!("{EMPTY}\n\nMerge Danger  \n -"))),
+            ["the body has a second `Merge Danger` heading, underlined on line 11"]
+        );
+        for not_a_second in [
+            "Summary\n=======",
+            "Summary of it\n---",
+            "A\nSummary\n---",
+            "Summary\nand more\n---",
+        ] {
+            let text = body(&format!("{EMPTY}\n\n{not_a_second}"));
+            assert_eq!(check(&text), Vec::<String>::new(), "{not_a_second}");
+        }
+        assert_eq!(
+            check(&format!("<span>x\n---\n\n{ALL}")).first(),
+            Some(&unclear(2, UNDERLINE_IN_HTML))
+        );
+        assert_eq!(
+            check(&format!("<div>\n=\n\n{ALL}")).first(),
+            Some(&unclear(2, UNDERLINE_IN_HTML))
+        );
+    }
+
+    #[test]
+    fn a_rule_a_table_and_a_list_are_not_headings() {
+        for inside in [
+            "---",
+            "Text.\n\n---",
+            "Text.\n\n===",
+            "| a | b |\n| --- | --- |\n| 1 | 2 |",
+            "a | b\n--- | ---\n1 | 2",
+            "- an item\n---",
+            "- an item\nstill the item\n---",
+            "* an item\n  - nested\n---",
+            "1. one\n---",
+            "> a quote\n---",
+            "> a quote\nstill the quote\n===",
+            "Text\n- an item\n---",
+            "Text\n> a quote\n---",
+            "***\n---",
+            "- - -\n---",
+            "    code\n---",
+            "### A heading\n---",
+            "```text\ntext\n---\n```",
+            "<!-- a note -->\n---",
+            "Text\n--- and more",
+            "Text\n-- -",
+        ] {
+            let text = body(&format!("{inside}\n\n{EMPTY}"));
+            assert_eq!(check(&text), Vec::<String>::new(), "{inside}");
         }
     }
 }
