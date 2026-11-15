@@ -40,7 +40,7 @@ Decided by the owner on 2026-11-15. This page is the plan. It replaces the miles
 | 6 | Installer, updater, taking over an existing install | A fresh install and an Electron-to-Rust takeover pass on a CI runner |
 | 7 | Speed and memory against the Electron baseline; cutover | The owner says go |
 
-Open: whether anyone besides the owner has One Launch installed. Until that is answered, slice 6 keeps the data folder, the database schema, the vault format, the installer identity and the update feed exact.
+A small number of beta testers have the Electron app installed. So slice 6 keeps the data folder, the database schema, the vault format, the installer identity and the update feed exact: their installs are taken over in place, with their saved accounts intact.
 
 ## Dropped
 
