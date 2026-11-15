@@ -341,16 +341,20 @@ impl LibraryView {
 
     // Asks the backend to read every launcher again. The scan a start runs says nothing; one the user asked for says what it found.
     fn rescan(&mut self, announce: bool, cx: &mut Context<Self>) {
-        if self.scanning {
-            return;
+        if announce {
+            if self.scanning {
+                return;
+            }
+            self.scanning = true;
         }
-        self.scanning = true;
         let backend = self.backend.clone();
         cx.spawn(async move |this, cx| {
             let scan = backend.rescan().await;
             let library = read(&backend).await;
             this.update(cx, |this, cx| {
-                this.scanning = false;
+                if announce {
+                    this.scanning = false;
+                }
                 this.scanned = true;
                 if let Ok(found) = &scan {
                     this.no_launchers =

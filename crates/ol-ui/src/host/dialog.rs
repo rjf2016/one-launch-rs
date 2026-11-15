@@ -805,11 +805,11 @@ impl LaunchHost {
                     .gap(px(6.))
                     .cursor_pointer()
                     .on_click(cx.listener(|this, _, _, cx| this.toggle_plan(cx)))
-                    .child(if request.plan_open {
-                        "\u{25be}"
+                    .child(div().text_size(px(8.)).child(if request.plan_open {
+                        "\u{25bc}"
                     } else {
-                        "\u{25b8}"
-                    })
+                        "\u{25b6}"
+                    }))
                     .child("Details"),
             )
             .when(request.plan_open, |details| details.child(plan_view(plan)))

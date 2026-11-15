@@ -3,7 +3,9 @@
 use std::time::SystemTime;
 
 use gpui::prelude::*;
-use gpui::{BoxShadow, Context, Div, FontWeight, Stateful, StyledText, div, hsla, px};
+use gpui::{
+    BoxShadow, Context, Div, FontWeight, HighlightStyle, Stateful, StyledText, div, hsla, px,
+};
 use ol_api::launch::{Recommend, recovery_copy};
 use ol_api::library::relative;
 use ol_model::SwitchRecovery;
@@ -62,7 +64,9 @@ impl LaunchHost {
                 ".".to_owned()
             };
             let id = before.len()..before.len() + found.backup_id.len();
+            // The plain highlight makes the id a run of its own: a font is only changed for a whole run.
             let meta = StyledText::new(format!("{before}{}{after}", found.backup_id))
+                .with_highlights([(id.clone(), HighlightStyle::default())])
                 .with_font_family_overrides([(id, theme::MONO.into())]);
             vec![
                 div()

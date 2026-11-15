@@ -13,6 +13,20 @@ use crate::args::FakeMachine;
 
 const SCENARIO: &str = "scenario.json";
 const STEAM_PROGRAM: &str = r"steam\steam.exe";
+// What a laid-down scenario holds at its top: its two files, and the folders its launchers and their files live in.
+const SCENARIO_ENTRIES: [&str; 11] = [
+    SCENARIO,
+    "knobs.json",
+    "steam",
+    "epic",
+    "battlenet",
+    "riot",
+    "localappdata",
+    "appdata",
+    "programdata",
+    "games",
+    "nowhere",
+];
 
 pub fn start(
     data_dir: &Path,
@@ -39,6 +53,15 @@ pub fn start(
         bail!(
             "--fake-launchers names a folder without {SCENARIO}; lay one down with --fake-scenario=<folder> and --fake-fixtures=<folder>"
         );
+    }
+    // The fake machine may write anywhere under this folder, so it has to be one a scenario made: nothing in it but a scenario's own folders.
+    for entry in fs::read_dir(folder).context("--fake-launchers could not be listed")? {
+        let name = entry?.file_name().to_string_lossy().to_lowercase();
+        if !SCENARIO_ENTRIES.contains(&name.as_str()) {
+            bail!(
+                "--fake-launchers names a folder that holds more than a scenario; give the fake launchers a folder of their own"
+            );
+        }
     }
     // The fake machine writes beside this program. A scenario's is an empty file; one with content is a real launcher's.
     let real_program =

@@ -255,7 +255,7 @@ fn seed(scenario: &Value) -> Seed {
     Seed { settings, accounts }
 }
 
-// Builds the fake machine for a folder `lay_down` made: an in-memory registry and process table with the Steam simulator, a file port that sees only `dir` and `data_dir`, and a clock that starts at `now`.
+// Builds the fake machine for a folder `lay_down` made: an in-memory registry and process table with the Steam simulator, a file port that sees only `dir` and the snapshots under `data_dir`, and a clock that starts at `now`.
 pub fn materialize(
     dir: &Path,
     data_dir: &Path,
@@ -344,7 +344,9 @@ fn materialize_on(
         }
     }
 
-    let roots: [&Path; 2] = [dir, data_dir];
+    // Of the data folder only the snapshots: a folder a setting names beside them, such as a real launcher's, stays out of reach.
+    let snapshots = data_dir.join("backups");
+    let roots: [&Path; 2] = [dir, &snapshots];
     let platform = Platform {
         registry: Arc::clone(&registry) as _,
         processes: Arc::clone(&processes) as _,
@@ -363,4 +365,40 @@ fn materialize_on(
         steam_default_dir: join(&[&root, "nowhere"]),
         seed: seed(&scenario),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use ol_testkit::{Scratch, oracle};
+    use time::macros::datetime;
+
+    use super::*;
+
+    #[test]
+    fn the_file_port_reaches_the_scenario_and_the_snapshots_and_nothing_else_in_the_data_folder() {
+        let scratch = Scratch::new("sim-roots");
+        let (dir, data) = (scratch.join("launchers"), scratch.join("data"));
+        lay_down(
+            &oracle("fixtures/dev-only/fake-launchers/all-four"),
+            &oracle("fixtures/launchers"),
+            &dir,
+        )
+        .unwrap();
+        let snapshot = data.join("backups").join("steam").join("manifest.json");
+        let beside = data.join("Steam").join("steam.exe");
+        for file in [&snapshot, &beside] {
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(file, b"").unwrap();
+        }
+        let fake = materialize(&dir, &data, datetime!(2026-11-06 16:46:23 UTC)).unwrap();
+        let files = &fake.platform.files;
+        let text = |path: &Path| path.to_string_lossy().into_owned();
+
+        assert!(files.exists(&text(&dir.join("steam").join("steam.exe"))));
+        assert!(files.exists(&text(&snapshot)));
+        assert!(!files.exists(&text(&beside)));
+        let login_users = text(&data.join("Steam").join("config").join("loginusers.vdf"));
+        assert!(files.write_atomic(&[(&login_users, b"x")]).is_err());
+        assert!(!Path::new(&login_users).exists());
+    }
 }
