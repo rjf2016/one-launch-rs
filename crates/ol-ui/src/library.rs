@@ -537,9 +537,16 @@ impl LibraryView {
         self.search.focus(window, cx);
     }
 
-    pub fn scroll_to_row(&mut self, row: usize, cx: &mut Context<Self>) {
+    pub fn scroll_to_row(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
         self.scroll.scroll_to_item_strict(row, ScrollStrategy::Top);
         cx.notify();
+        // The list only moves when it is drawn. What is placed by how far it has moved, the Recent strip and the thumb, is drawn once more after that.
+        let this = cx.weak_entity();
+        window.on_next_frame(move |window, _| {
+            window.on_next_frame(move |_, cx| {
+                this.update(cx, |_, cx| cx.notify()).ok();
+            });
+        });
     }
 
     fn on_keystroke(

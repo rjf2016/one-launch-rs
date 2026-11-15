@@ -64,7 +64,9 @@ pub async fn run(
     }
 
     if let Some(row) = plan.row {
-        in_library(window, cx, |library, _, cx| library.scroll_to_row(row, cx))?;
+        in_library(window, cx, |library, window, cx| {
+            library.scroll_to_row(row, window, cx);
+        })?;
         pause(STEP, cx).await;
     }
 
