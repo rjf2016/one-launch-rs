@@ -18,8 +18,30 @@ function Assert-Equal([string]$What, $Actual, $Expected) {
 $expectedPermissions = 'contents=write metadata=read pull_requests=write'
 $fullName = "$($identity.Owner)/$($identity.Repo)"
 
+$probe = 'ONE_LAUNCH_AGENT_CHECK_PROBE'
+function Get-Probe {
+    if (Test-Path "env:$probe") { "set to '$((Get-Item "env:$probe").Value)'" } else { 'unset' }
+}
+function Set-Probe($Value) {
+    if ($null -eq $Value) { Remove-Item "env:$probe" -ErrorAction Ignore } else { Set-Item "env:$probe" $Value }
+}
+foreach ($start in $null, 'outer') {
+    foreach ($during in $null, 'inner') {
+        $case = 'env {0}, call {1}' -f $(if ($null -eq $start) { 'unset' } else { 'set' }), $(if ($null -eq $during) { 'clears' } else { 'sets' })
+        Set-Probe $start
+        $outside = Get-Probe
+        $inside = Invoke-WithEnvironment @{ $probe = $during } { Get-Probe }
+        Assert-Equal "${case}: inside" $inside $(if ($null -eq $during) { 'unset' } else { "set to '$during'" })
+        Assert-Equal "${case}: after" (Get-Probe) $outside
+    }
+}
+Set-Probe 'outer'
+try { Invoke-WithEnvironment @{ $probe = 'inner' } { throw 'stop' } } catch { }
+Assert-Equal 'env set, call throws: after' (Get-Probe) "set to 'outer'"
+Set-Probe $null
+
 $jwt = New-AgentJwt
-$app = Invoke-AgentApi -Path '/app' -Bearer $jwt
+$app =Invoke-AgentApi -Path '/app' -Bearer $jwt
 Assert-Equal 'app id' $app.id $identity.AppId
 Assert-Equal 'app slug' $app.slug $identity.AppSlug
 Assert-Equal 'app owner' $app.owner.login $identity.Owner
