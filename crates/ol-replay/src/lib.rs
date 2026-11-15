@@ -404,6 +404,14 @@ impl<'a> Replay<'a> {
         let backend = self.backend()?.clone();
         match channel {
             "accounts:list" => drop(block_on(backend.accounts())),
+            "settings:get" | "settings:getAll" => {}
+            "settings:set" => {
+                let key = text("key")
+                    .and_then(SettingKey::parse)
+                    .ok_or_else(|| script_error("settings:set names no setting"))?;
+                let value = text("value").unwrap_or_default().to_owned();
+                drop(block_on(backend.set_setting(key, value)));
+            }
             "library:list" => drop(block_on(backend.library())),
             "library:rescan" => drop(block_on(backend.rescan())),
             "launchers:games" => drop(block_on(backend.installed_games(launcher()?))),

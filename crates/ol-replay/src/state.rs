@@ -79,11 +79,7 @@ fn rows(
     vault: &dyn Vault,
 ) -> Result<Vec<Map<String, Value>>, ReplayError> {
     let mut statement = database.prepare(sql)?;
-    let names: Vec<String> = statement
-        .column_names()
-        .into_iter()
-        .map(str::to_owned)
-        .collect();
+    let names: Vec<String> = statement.column_names().map(str::to_owned).collect();
     let mut found = statement.query([])?;
     let mut out = Vec::new();
     while let Some(row) = found.next()? {

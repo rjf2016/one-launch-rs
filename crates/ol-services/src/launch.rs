@@ -109,6 +109,15 @@ impl JobBoard {
         board.cancel = Some(cancel.clone());
     }
 
+    // A job that was accepted and could not be run after all: the next one is not refused for it.
+    pub fn discard(&self, job_id: &str) {
+        let mut board = self.board();
+        if board.current.as_ref().is_some_and(|job| job.id == job_id) {
+            board.current = None;
+            board.cancel = None;
+        }
+    }
+
     fn update(&self, job: &LaunchJob) {
         self.board().current = Some(job.clone());
     }

@@ -605,10 +605,13 @@ impl Serving {
                 }
                 Ok(job)
             }
-            Err(_) => Err(ApiError {
-                code: "INTERNAL",
-                message: "The switch could not be started.".to_owned(),
-            }),
+            Err(_) => {
+                self.jobs.discard(&job.id);
+                Err(ApiError {
+                    code: "INTERNAL",
+                    message: "The switch could not be started.".to_owned(),
+                })
+            }
         }
     }
 
