@@ -68,7 +68,7 @@ What is there: on fake launchers the backend finds Steam, scans its games into t
 - Launcher-owned writes are the four functions at the top of `crates/ol-services/src/switch.rs`. Nothing but review keeps another module from asking a writer port for the same.
 ## Differences from the Electron app, on purpose
 
-None is visible on data the app wrote itself.
+None of those about stored values and launcher files is visible on data the app wrote itself. The last four are about the window and the fake launchers.
 
 - A stored value shorter than 31 bytes, the empty one included, is `VAULT_UNREADABLE`. So is a decrypted value that is not UTF-8.
 - Integer settings parse strictly: `35px` is not 35.

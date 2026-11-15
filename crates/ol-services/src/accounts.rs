@@ -264,6 +264,34 @@ mod tests {
     }
 
     #[test]
+    fn the_account_used_last_comes_first_and_the_unused_follow_by_name() {
+        let account = |name: &str, used: Option<&str>| Account {
+            id: name.to_owned(),
+            launcher: LauncherId::Steam,
+            display_name: name.to_owned(),
+            login: name.to_owned(),
+            has_secret: false,
+            has_session: false,
+            launcher_uid: None,
+            tags: Vec::new(),
+            notes: String::new(),
+            last_used_at: used.map(str::to_owned),
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        let ordered = in_pick_order(vec![
+            account("zed", None),
+            account("Older", Some("2026-10-20T19:00:00.000Z")),
+            account("alpha", None),
+            account("Twin B", Some("2026-11-01T18:04:12.000Z")),
+            account("Beta", Some("")),
+            account("Twin A", Some("2026-11-01T18:04:12.000Z")),
+        ]);
+        let names: Vec<&str> = ordered.iter().map(|account| account.id.as_str()).collect();
+        assert_eq!(names, ["Twin B", "Twin A", "Older", "alpha", "Beta", "zed"]);
+    }
+
+    #[test]
     fn a_name_is_required_and_has_a_length() {
         let failed = |value: &str| require_text(value, "Login", 4).err().map(|e| e.to_string());
         assert_eq!(failed("  "), Some("Login is required".to_owned()));

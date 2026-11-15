@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use gpui::prelude::*;
 use gpui::{
-    Context, EventEmitter, Keystroke, Pixels, ScrollHandle, SharedString, Size, Stateful,
+    Context, Div, EventEmitter, Keystroke, Pixels, ScrollHandle, SharedString, Size, Stateful,
     Subscription, Task, Window, anchored, deferred, div, point, px,
 };
 use ol_api::launch::in_pick_order;
@@ -673,11 +673,7 @@ impl LaunchHost {
     }
 }
 
-fn overlay(
-    viewport: Size<Pixels>,
-    priority: usize,
-    backdrop: Stateful<gpui::Div>,
-) -> impl IntoElement {
+fn overlay(viewport: Size<Pixels>, priority: usize, backdrop: Stateful<Div>) -> impl IntoElement {
     deferred(
         anchored()
             .position(point(px(0.), px(TITLE_BAR)))
