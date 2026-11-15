@@ -12,7 +12,7 @@ use gpui::{
 use ol_api::Backend;
 
 pub use assets::Assets;
-pub use library::{LibraryView, SweepReport};
+pub use library::{LibraryLoaded, LibraryView, SweepReport};
 pub use shell::Shell;
 
 #[derive(Clone, Copy, PartialEq, Eq)]

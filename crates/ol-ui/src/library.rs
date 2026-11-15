@@ -5,10 +5,10 @@ use std::time::{Duration, Instant, SystemTime};
 
 use gpui::prelude::*;
 use gpui::{
-    App, BoxShadow, Context, Div, FontWeight, Keystroke, ObjectFit, Pixels, RenderImage,
-    ScrollStrategy, SharedString, Stateful, Subscription, Svg, UniformListScrollHandle, Window,
-    anchored, deferred, div, hsla, img, linear_color_stop, linear_gradient, point, px, svg,
-    uniform_list,
+    App, BoxShadow, Context, Div, EventEmitter, FontWeight, Keystroke, ObjectFit, Pixels,
+    RenderImage, ScrollStrategy, SharedString, Stateful, Subscription, Svg,
+    UniformListScrollHandle, Window, anchored, deferred, div, hsla, img, linear_color_stop,
+    linear_gradient, point, px, svg, uniform_list,
 };
 use ol_api::library::{LibraryGame, caption, monogram, visible};
 use ol_api::{ApiError, Backend, Library};
@@ -53,6 +53,11 @@ enum Load {
     Failed(SharedString),
     Ready,
 }
+
+// Sent once, when the games or the reason there are none are about to be drawn.
+pub struct LibraryLoaded;
+
+impl EventEmitter<LibraryLoaded> for LibraryView {}
 
 struct Card {
     name: SharedString,
@@ -237,6 +242,7 @@ impl LibraryView {
                 cx.notify();
             }
         }
+        cx.emit(LibraryLoaded);
     }
 
     fn reword(&mut self, cx: &mut Context<Self>) {
@@ -382,10 +388,9 @@ impl LibraryView {
                 self.filter = launcher.filter(|launcher| Some(*launcher) != self.filter);
             }
             Menu::Sort => {
-                let Some(sort) = LibrarySort::ALL.get(option).copied() else {
-                    return;
-                };
-                if sort != self.sort {
+                if let Some(sort) = LibrarySort::ALL.get(option).copied()
+                    && sort != self.sort
+                {
                     self.sort = sort;
                     let backend = self.backend.clone();
                     // A choice that could not be stored still holds for this run, as in the Electron app.

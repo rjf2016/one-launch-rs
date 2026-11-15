@@ -11,14 +11,14 @@ use std::process::ExitCode;
 use std::rc::Rc;
 use std::time::Duration;
 
-use gpui::{App, AsyncApp};
+use gpui::{App, AsyncApp, Window};
 use ol_api::Backend;
 use ol_platform_win::data_folder::refuse_real_data_folder;
 use ol_platform_win::dpapi::Dpapi;
 use ol_platform_win::own_process;
 use ol_platform_win::tray::{MenuEntry, Tray, TrayEvent};
 use ol_platform_win::window::AppWindow;
-use ol_ui::Presence;
+use ol_ui::{LibraryLoaded, Presence};
 
 use crate::args::{Args, Check, DoctorVault};
 
@@ -115,6 +115,13 @@ fn start(
         _ => Presence::Foreground,
     };
     let window = ol_ui::open_main_window(TITLE, presence, backend.clone(), cx)?;
+    let library = window.update(cx, |shell, _, _| shell.library().clone())?;
+    cx.subscribe(&library, move |_, _: &LibraryLoaded, cx| {
+        let _ = window.update(cx, |_, window, _| {
+            after_the_next_frame(window, "library shown")
+        });
+    })
+    .detach();
 
     // In a task and not here: adding the icon waits on the shell, Windows may hand the GPUI window a message meanwhile, and GPUI cannot take one while the app is being updated.
     cx.spawn({
@@ -124,15 +131,9 @@ fn start(
     .detach();
 
     window.update(cx, |_, window, cx| {
-        // These callbacks run before their frame is drawn, so it is the second one that follows the first frame shown.
+        after_the_next_frame(window, "first frame shown");
         window.on_next_frame(move |window, _| {
             window.on_next_frame(move |_, cx| {
-                if let Some(age) = own_process::age() {
-                    println!(
-                        "OneLaunch: first frame shown {} ms after the process started",
-                        age.as_millis()
-                    );
-                }
                 cx.spawn(async move |cx| copy_database(&backend, cx).await)
                     .detach();
             });
@@ -170,6 +171,20 @@ fn start(
     })
     .detach();
     Ok(())
+}
+
+// A callback of a frame runs before the frame is drawn, so it is the second one that follows the frame shown.
+fn after_the_next_frame(window: &mut Window, what: &'static str) {
+    window.on_next_frame(move |window, _| {
+        window.on_next_frame(move |_, _| {
+            if let Some(age) = own_process::age() {
+                println!(
+                    "OneLaunch: {what} {} ms after the process started",
+                    age.as_millis()
+                );
+            }
+        });
+    });
 }
 
 // After the first paint and not before it, as in the Electron app: the copy must not hold up the window. Neither line names the folder, which can run through the user's profile.
