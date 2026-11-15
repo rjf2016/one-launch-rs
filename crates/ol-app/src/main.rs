@@ -10,6 +10,7 @@ use std::process::ExitCode;
 use std::rc::Rc;
 
 use gpui::{App, AsyncApp};
+use ol_platform_win::own_process;
 use ol_platform_win::tray::{MenuEntry, Tray, TrayEvent};
 use ol_platform_win::window::AppWindow;
 use ol_ui::Presence;
@@ -78,6 +79,17 @@ fn start(args: Args, failed: Rc<Cell<bool>>, cx: &mut App) -> anyhow::Result<()>
 
     let close_to_tray = tray.borrow().is_some();
     window.update(cx, |_, window, cx| {
+        // These callbacks run before their frame is drawn, so it is the second one that follows the first frame shown.
+        window.on_next_frame(|window, _| {
+            window.on_next_frame(|_, _| {
+                if let Some(age) = own_process::age() {
+                    println!(
+                        "OneLaunch: first frame shown {} ms after the process started",
+                        age.as_millis()
+                    );
+                }
+            });
+        });
         window.on_window_should_close(cx, move |_, _| {
             if !close_to_tray {
                 return true;

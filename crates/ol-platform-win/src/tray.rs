@@ -112,6 +112,7 @@ impl Tray {
                 taskbar_created: RegisterWindowMessageW(w!("TaskbarCreated")),
             });
             if !state.add() {
+                let _ = Shell_NotifyIconW(NIM_DELETE, &state.icon);
                 let _ = DestroyWindow(hwnd);
                 return Err(TrayError::Refused);
             }
@@ -246,7 +247,7 @@ unsafe extern "system" fn tray_procedure(
         });
         return LRESULT(0);
     }
-    if message == state.taskbar_created {
+    if message == state.taskbar_created && message != 0 {
         state.add();
         return LRESULT(0);
     }

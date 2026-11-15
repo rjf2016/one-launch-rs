@@ -1,10 +1,13 @@
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use windows::Win32::Foundation::FILETIME;
 use windows::Win32::System::ProcessStatus::{
     GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX,
 };
 use windows::Win32::System::Threading::{GetCurrentProcess, GetProcessTimes};
+
+const TICKS_PER_SECOND: u64 = 10_000_000;
+const SECONDS_FROM_1601_TO_1970: u64 = 11_644_473_600;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MemoryUse {
@@ -32,12 +35,36 @@ pub fn memory() -> Option<MemoryUse> {
 }
 
 pub fn cpu_time() -> Option<Duration> {
+    let times = times()?;
+    Some(from_ticks(times.kernel + times.user))
+}
+
+pub fn age() -> Option<Duration> {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?;
+    let now = (now.as_secs() + SECONDS_FROM_1601_TO_1970) * TICKS_PER_SECOND
+        + u64::from(now.subsec_nanos()) / 100;
+    Some(from_ticks(now.checked_sub(times()?.created)?))
+}
+
+struct Times {
+    created: u64,
+    kernel: u64,
+    user: u64,
+}
+
+fn times() -> Option<Times> {
     let mut times = [FILETIME::default(); 4];
     let [created, exited, kernel, user] = &mut times;
     unsafe { GetProcessTimes(GetCurrentProcess(), created, exited, kernel, user) }.ok()?;
     let ticks =
         |time: FILETIME| (u64::from(time.dwHighDateTime) << 32) | u64::from(time.dwLowDateTime);
-    Some(Duration::from_nanos(
-        (ticks(times[2]) + ticks(times[3])) * 100,
-    ))
+    Some(Times {
+        created: ticks(times[0]),
+        kernel: ticks(times[2]),
+        user: ticks(times[3]),
+    })
+}
+
+fn from_ticks(ticks: u64) -> Duration {
+    Duration::from_nanos(ticks * 100)
 }
