@@ -3,7 +3,7 @@
 const os = require('node:os');
 const path = require('node:path');
 const { Refusal } = require('./rules.cjs');
-const { lex, MARK } = require('./shell.cjs');
+const { lex, MARK, LEADING } = require('./shell.cjs');
 
 const set = (names) => new Set(names.split(' '));
 
@@ -34,7 +34,8 @@ const LAUNCHERS = new Set([
   'vgc',
   'vgtray',
 ]);
-const PROTOCOLS = /^(steam|com\.epicgames\.launcher|battlenet|riotclient):\/\//i;
+const PROTOCOLS = /^(steam|com\.epicgames\.launcher|battlenet|riotclient):/i;
+const TOKEN_MAKERS = set('new-agenttoken new-agentjwt invoke-agentapi');
 const INSTALLERS = set('msiexec wusa rustup-init add-appxpackage add-apppackage add-appxprovisionedpackage');
 const INSTALLER_NAME = /setup|installer|(^|[-_. ])(un)?install([-_. ]|$)/;
 const PACKAGES = /\.(msi|msix|msixbundle|appx|appxbundle|msp|appinstaller)$/;
@@ -47,6 +48,12 @@ const REGISTRY_WRITERS = set(
 const REGISTRY_PATH = /(^|[^a-z0-9])hk(cu|lm|cr|u|cc):|registry::/;
 const MOVES = set('cd chdir pushd popd set-location sl push-location pop-location');
 const GIT_NETWORK = set('push fetch pull clone ls-remote send-pack fetch-pack http-fetch http-push request-pull svn lfs send-email imap-send');
+const GIT_FLAGS = set(
+  '--version -v --help -h --html-path --man-path --info-path -p --paginate -P --no-pager --no-replace-objects --bare --literal-pathspecs --glob-pathspecs --noglob-pathspecs --icase-pathspecs --no-optional-locks --no-lazy-fetch --no-advice --exec-path',
+);
+const GIT_VALUES = set('--namespace --super-prefix --attr-source --list-cmds');
+const CARGO_FLAGS = set('--locked --offline --frozen -q --quiet -v -vv --verbose -V --version --list -h --help');
+const CARGO_VALUES = set('--config -C -Z --color --explain');
 const GITHUB_HOST = /github(usercontent)?\.com|ghcr\.io/i;
 const HTTP_TOOLS = set('curl wget http https invoke-restmethod irm invoke-webrequest iwr start-bitstransfer bitsadmin certutil aria2c');
 const SSH_TOOLS = set('ssh scp sftp plink pscp psftp');
@@ -57,8 +64,6 @@ const POWERSHELL_VALUES = set('executionpolicy ex ep workingdirectory wd windows
 const WRAPPERS = set(
   'env command builtin exec nohup nice time timeout stdbuf setsid winpty xargs watch sudo doas runas start start-process saps explorer rundll32 invoke-item ii cygstart conhost wt psexec schtasks forfiles call wsl busybox rustup set-alias new-alias sal nal find parallel start-job sajb start-threadjob invoke-command icm',
 );
-const BASH_WORDS = set('if then else elif while until do ! time coproc');
-const ASSIGNS = set('= += -= *= /= %= ??= in');
 const COMMIT_PLAIN = set(
   '--amend --no-edit --edit --quiet --verbose --signoff --no-signoff --allow-empty --allow-empty-message --reset-author --gpg-sign --no-gpg-sign --dry-run --short --branch --porcelain --long --null --status --no-status --no-post-rewrite',
 );
@@ -67,35 +72,39 @@ const DATA_FOLDER = [/(?<!local)appdata[^a-z0-9]{0,12}(?:roaming[^a-z0-9]{0,12})
 const KEY_NAMES = [/one-launch-rs-bot/, /one_launch_agent_key_dir/, /\.pem(?![a-z0-9])/];
 const BUDGET = 4000;
 const DEPTH = 8;
+const NAME_LIMIT = 260;
 
 function flatten(text) {
-  const lower = text.toLowerCase().replace(/["'`^‘-„]/g, '');
+  const lower = text.toLowerCase().replace(/["'`^\u2018-\u201E]/g, '');
   const tidy = (flat) => {
     let out = flat.replace(/\/+/g, '/').replace(/\/\.(?=\/)/g, '');
     for (let before = ''; before !== out; ) {
       before = out;
-      out = out.replace(/(?!\.\.\/)[^/\s]+\/\.\.(\/|(?=\s|$))/, '');
+      out = out.replace(/(?<![^/\s])(?!\.\.\/)[^/\s]+\/\.\.(\/|(?=\s|$))/g, '');
     }
     return out;
   };
   return [tidy(lower.replace(/\\/g, '/')), tidy(lower.replace(/\\/g, ''))];
 }
 
+function trimmed(text) {
+  let end = text.length;
+  while (end > 0 && (text[end - 1] === '.' || text[end - 1] === ' ')) end--;
+  return text.slice(0, end);
+}
+
 function identify(text) {
   const flat = text.replace(/\\/g, '/');
   const cut = flat.lastIndexOf('/');
-  const leaf = flat
-    .slice(cut + 1)
-    .toLowerCase()
-    .replace(/[. ]+$/, '');
+  const leaf = trimmed(flat.slice(cut + 1).toLowerCase());
   const exe = /\.(exe|com|cmd|bat)$/.exec(leaf);
-  const name = exe ? leaf.slice(0, exe.index).replace(/[. ]+$/, '') : leaf;
+  const name = exe ? trimmed(leaf.slice(0, exe.index)) : leaf;
   return { name, leaf, ext: exe ? exe[1] : '', pathed: cut >= 0 };
 }
 
 function computed(word) {
   const leaf = word.text.replace(/\\/g, '/').split('/').pop();
-  if (leaf.includes(MARK)) return true;
+  if (leaf.includes(MARK) || leaf.length > NAME_LIMIT) return true;
   return leaf.length > 1 && !/^\[+$/.test(leaf) && /[*?]|\[.+\]|\{.*,.*\}/.test(leaf);
 }
 
@@ -125,8 +134,8 @@ function head(words, dialect, mode, state) {
     }
     const text = first.text;
     const expression = first.quoted || first.block || /^[$[@!+-]/.test(text) || text.startsWith(MARK) || /^\d+(\.\d+)?$/.test(text);
-    const assign = rest.findIndex((word, k) => k > 0 && !word.quoted && ASSIGNS.has(word.text.toLowerCase()));
-    if (expression || assign === 1) {
+    const assign = rest.findIndex((word, k) => k > 0 && (word.assign || (expression && !word.quoted && word.text.toLowerCase() === 'in')));
+    if (expression || assign > 0) {
       return assign < 0 || assign + 1 >= rest.length ? null : head(rest.slice(assign + 1), dialect, mode, state);
     }
     if (/^(return|throw)$/i.test(text)) return rest.length > 1 ? head(rest.slice(1), dialect, mode, state) : null;
@@ -137,7 +146,7 @@ function head(words, dialect, mode, state) {
       if (!word) return null;
       const assign = /^([A-Za-z_]\w*)\+?=/.exec(word.text);
       if (assign && assign[1].startsWith('GIT_')) state.gitEnv = true;
-      if (!assign && (word.quoted || !BASH_WORDS.has(word.text))) break;
+      if (!assign && (word.quoted || !LEADING.has(word.text))) break;
       rest = rest.slice(1);
     }
   }
@@ -214,8 +223,11 @@ function denied(id, args, lower) {
   if (name === 'reg' && lower[0] && !lower[0].startsWith('/') && !REG_READS.has(lower[0])) {
     throw new Refusal('registry', `reg ${lower[0]} changes the registry; only reg query, compare, export and save are allowed`);
   }
-  if (/^(regedit|regedt32|regini)$/.test(name) || leaf.endsWith('.reg')) {
+  if (/^(regedit|regedt32|regini|setx)$/.test(name) || leaf.endsWith('.reg')) {
     throw new Refusal('registry', 'this changes the registry');
+  }
+  if (TOKEN_MAKERS.has(name)) {
+    throw new Refusal('key', `${name} hands out a token of the app; only the two wrappers call it`);
   }
   if (SSH_TOOLS.has(name)) {
     throw new Refusal('github', `${name} would use the owner's SSH key; reach GitHub only through scripts/agent/git.ps1 and scripts/agent/gh.ps1`);
@@ -330,11 +342,14 @@ function git(args, state, wrapper, dialect) {
     if (text === '-C') cwd = into(cwd, args[++k], dialect);
     else if (text === '-c' || text === '--config-env') config(args[++k]?.text ?? '');
     else if (/^--config-env=/.test(text)) config(text.slice(13));
-    else if (/^--(git-dir|work-tree)/.test(text)) {
+    else if (/^--(git-dir|work-tree)(=|$)/.test(text)) {
       elsewhere = true;
       if (!text.includes('=')) k++;
-    } else if (/^--(namespace|super-prefix)$/.test(text)) k++;
+    } else if (GIT_VALUES.has(text)) k++;
     else if (!text.startsWith('-')) break;
+    else if (!GIT_FLAGS.has(text.split('=')[0]) && !GIT_VALUES.has(text.split('=')[0])) {
+      throw new Refusal('unreadable', 'git is given an option before its command that the hook does not know, so it cannot tell which command runs');
+    }
   }
   const sub = (args[k]?.text ?? '').toLowerCase();
   const texts = args.slice(k + 1).map((arg) => arg.text);
@@ -357,10 +372,11 @@ function gh(args, wrapper) {
     if (/^(-r|--repo|--hostname)$/.test(texts[k])) k++;
     else if (!texts[k].startsWith('-')) plain.push(texts[k]);
   }
-  const [group, verb] = plain;
+  const [group] = plain;
   const all = texts.join(' ');
+  const merges = plain.some((word, at) => word === 'merge' && plain[at - 1] === 'pr');
   if (group === 'release') throw new Refusal('tags', 'gh release: releases are the owner\'s');
-  if (group === 'pr' && verb === 'merge' && (!texts.some((text) => text === '--auto' || text === '--auto=true') || texts.some((text) => text.startsWith('--admin')))) {
+  if (merges && (!texts.some((text) => text === '--auto' || text === '--auto=true') || texts.some((text) => text.startsWith('--admin')))) {
     throw new Refusal('merge', 'gh pr merge needs --auto and no --admin, so that GitHub merges once the checks pass');
   }
   if (group === 'api' && /pulls\/[^/\s]+\/merge|mergepullrequest|mergebranch/.test(all)) {
@@ -379,8 +395,12 @@ function cargo(args) {
   const texts = args.map((arg) => arg.text);
   let k = 0;
   for (; k < texts.length; k++) {
-    if (/^(--config|-C|-Z|--color|--explain)$/.test(texts[k])) k++;
-    else if (!/^[-+]/.test(texts[k])) break;
+    const text = texts[k];
+    if (CARGO_VALUES.has(text)) k++;
+    else if (!/^[-+]/.test(text)) break;
+    else if (!text.startsWith('+') && !CARGO_FLAGS.has(text) && !/^(--config=|--color=|-Z.|-C.)/.test(text)) {
+      throw new Refusal('unreadable', 'cargo is given an option before its command that the hook does not know, so it cannot tell which command runs');
+    }
   }
   const sub = (texts[k] ?? '').toLowerCase();
   if (CARGO_DEPS.has(sub)) throw new Refusal('deps', `cargo ${sub} changes the dependency set or installs a tool`);
@@ -411,14 +431,14 @@ function shell(name, args, state, depth) {
   for (let k = 0; k < args.length; k++) {
     const text = args[k].text;
     if (text === '--version' || text === '--help') return;
-    if (!args[k].quoted && /^-[A-Za-z]*c[A-Za-z]*$/.test(text)) {
-      const script = args.slice(k + 1).find((arg) => arg.quoted || !/^[-+]/.test(arg.text));
+    if (/^-[A-Za-z]*c[A-Za-z]*$/.test(text)) {
+      const script = args.slice(k + 1).find((arg) => !/^[-+]/.test(arg.text));
       if (!script) break;
       scoped(state, () => walk(script.text, 'bash', state, depth + 1));
       return;
     }
     if (/^([-+][oO]|--rcfile|--init-file)$/.test(text)) k++;
-    else if (args[k].quoted || !/^[-+]/.test(text)) return;
+    else if (!/^[-+]/.test(text)) return;
   }
   throw new Refusal('unreadable', `${name} with no command and no script file takes its commands from standard input`);
 }
@@ -428,7 +448,7 @@ function powershell(name, args, state, depth, dialect) {
   let positional = false;
   for (let k = 0; k < args.length; k++) {
     const arg = args[k];
-    const flag = !arg.quoted && !arg.block && /^[-/–-―]([A-Za-z]+:?|\?)$/.test(arg.text) ? arg.text.slice(1).toLowerCase().replace(/:$/, '') : null;
+    const flag = !arg.block && /^[-/\u2013-\u2015]([A-Za-z]+:?|\?)$/.test(arg.text) ? arg.text.slice(1).toLowerCase().replace(/:$/, '') : null;
     if (flag === null) {
       positional ||= arg.text !== '-';
       continue;

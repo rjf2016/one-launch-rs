@@ -146,6 +146,31 @@ test('what the Rust scan still finds is found here too', () => {
   assert.deepEqual(rules(`ey${'J'}${random(HEX, 32)}.${random(HEX, 32)}.${random(HEX, 32)}`), ['jwt']);
 });
 
+test('the quick way to find addresses finds what the pattern itself finds, and a long line is read in time', () => {
+  const email = secrets.RULES.find((rule) => rule.id === 'email');
+  assert.equal(email.anchor, '@');
+  assert.deepEqual(secrets.RULES.filter((rule) => rule.anchor).map((rule) => rule.id), ['email']);
+  const at = (...sides) => sides.join('@');
+  const pieces = ['a', 'b.c', 'x_y', '@', '@@', '.', '.io', 'corp.io', ' ', ',', '<', '>', 'é', '1', '-', '+', '%', at('a', 'b.io'), at('', 'b.io'), at('a', 'b'), at('ab', 'c-d.e.fg'), '..', at('a.', 'b.cd'), '"'];
+  let state = 7n;
+  const pick = () => {
+    state = (state * 6364136223846793005n + 1442695040888963407n) & 0xffffffffffffffffn;
+    return pieces[Number((state >> 33n) % BigInt(pieces.length))];
+  };
+  for (let k = 0; k < 3000; k++) {
+    const line = Array.from({ length: 1 + (k % 14) }, pick).join('');
+    const quick = [...secrets.matches(email, line)].map((found) => [found.index, found[0], found[1]]);
+    const plain = [...line.matchAll(email.regex)].map((found) => [found.index, found[0], found[1]]);
+    assert.deepEqual(quick, plain, JSON.stringify(line));
+  }
+  for (const line of ['0123456789abcdef'.repeat(20000), `${'a.b-c_d+e%'.repeat(30000)}@`, `${'x@'.repeat(100000)}y.io`, ' '.repeat(300000)]) {
+    const from = process.hrtime.bigint();
+    scanner.scan(line, false);
+    const ms = Number(process.hrtime.bigint() - from) / 1e6;
+    assert.ok(ms < 3000, `${line.slice(0, 24)}...: ${ms.toFixed(0)} ms`);
+  }
+});
+
 test('an exact value on the allow list passes and its neighbour does not', () => {
   const base = `${'7656119'}7960265728`;
   const allowing = new secrets.Scanner(new Set([base]));

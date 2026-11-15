@@ -110,6 +110,7 @@ test('settings.json wires each hook as node with no shell in between, and a fail
     assert.equal(hook.shell, undefined);
   }
   for (const group of PreToolUse) for (const hook of group.hooks) assert.equal(hook.onFailure, 'block');
+  assert.equal(SETTINGS.disableAllHooks, false, 'a user-level switch must not turn these hooks off');
 });
 
 test('Bash and PowerShell calls: a refusal exits 2 and names the rule, an allowed call exits 0 in silence', () => {

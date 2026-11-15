@@ -79,7 +79,29 @@ const RULES = [
 
 for (const rule of RULES) {
   const insensitive = rule.pattern.startsWith('(?i)');
-  rule.regex = new RegExp(insensitive ? rule.pattern.slice(4) : rule.pattern, insensitive ? 'giu' : 'gu');
+  const source = insensitive ? rule.pattern.slice(4) : rule.pattern;
+  rule.regex = new RegExp(source, insensitive ? 'giu' : 'gu');
+  const run = /^\[([^\]]+)\]\+([^\\.^$*+?()[\]{}|])/.exec(source);
+  if (run) Object.assign(rule, { before: new RegExp(`[${run[1]}]`), anchor: run[2], sticky: new RegExp(source, 'yu') });
+}
+
+// A pattern that opens with a run of one class and then one fixed character is tried once per run, from the run's start: the plain search retries inside every long run and takes quadratic time.
+function* matches(rule, line) {
+  if (!rule.anchor) {
+    yield* line.matchAll(rule.regex);
+    return;
+  }
+  let from = 0;
+  for (let at = line.indexOf(rule.anchor); at >= 0; at = line.indexOf(rule.anchor, Math.max(at + 1, from))) {
+    let start = at;
+    while (start > from && rule.before.test(line[start - 1])) start--;
+    rule.sticky.lastIndex = start;
+    const found = start < at ? rule.sticky.exec(line) : null;
+    if (found) {
+      yield found;
+      from = start + found[0].length;
+    }
+  }
 }
 
 function noGeneratorMade(value) {
@@ -118,7 +140,7 @@ class Scanner {
     const taken = [];
     for (const rule of RULES) {
       if (sealed && !NEVER_MADE_UP.includes(rule.id)) continue;
-      for (const found of line.matchAll(rule.regex)) {
+      for (const found of matches(rule, line)) {
         const start = found.index;
         const end = start + found[0].length;
         if (taken.some(([from, to]) => start < to && end > from)) continue;
@@ -252,4 +274,4 @@ function commitFindings(root, broad) {
   return problems;
 }
 
-module.exports = { RULES, SAFE_USER_FOLDERS, NEVER_MADE_UP, RESERVED, LOCK, SEALED, ALLOW, Scanner, fileFindings, commitFindings, isTag };
+module.exports = { RULES, SAFE_USER_FOLDERS, NEVER_MADE_UP, RESERVED, LOCK, SEALED, ALLOW, Scanner, matches, fileFindings, commitFindings, isTag };

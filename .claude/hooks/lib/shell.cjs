@@ -3,6 +3,8 @@
 const { Refusal } = require('./rules.cjs');
 
 const MARK = '\uE000';
+const LEADING = new Set(['if', 'then', 'else', 'elif', 'while', 'until', 'do', '!', 'time', 'coproc']);
+const DEPTH = 200;
 
 function lex(source, dialect, base = 0, body = false) {
   const bash = dialect === 'bash';
@@ -13,7 +15,7 @@ function lex(source, dialect, base = 0, body = false) {
         .replace(/[\u2018-\u201B]/g, "'")
         .replace(/[\u201C-\u201E]/g, '"')
         .replace(/[\u2013-\u2015]/g, '-')
-        .replace(/[\u00A0\u0085\u1680\u2000-\u200A\u202F\u205F\u3000\f\v]/g, ' ')
+        .replace(/[\u00A0\u0085\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\f\v]/g, ' ')
     : source;
   const n = src.length;
   const escape = bash ? '\\' : ps ? '`' : '^';
@@ -22,7 +24,11 @@ function lex(source, dialect, base = 0, body = false) {
   let i = 0;
   let level = 0;
   let math = 0;
+  let cases = 0;
+  let table = false;
+  let assigned = 0;
   let piped = false;
+  let glued = false;
   let words = [];
   let word = null;
 
@@ -36,8 +42,16 @@ function lex(source, dialect, base = 0, body = false) {
     open().dynamic = true;
     add(MARK);
   };
+  const keyword = () => {
+    if (!bash || !word || word.counted || word.quoted || !words.every((before) => !before.quoted && LEADING.has(before.text))) return;
+    if (word.text === 'case') cases++;
+    else if (word.text === 'esac' && cases) cases--;
+    else return;
+    word.counted = true;
+  };
   const endWord = () => {
     if (!word) return;
+    keyword();
     if (word.alt === word.text) delete word.alt;
     words.push(word);
     word = null;
@@ -47,19 +61,38 @@ function lex(source, dialect, base = 0, body = false) {
     if (words.length) commands.push({ words, at: words[0].at, level, piped: piped || pipe });
     words = [];
     piped = pipe;
+    glued = false;
+    assigned = 0;
   };
-  const nested = (closer) => {
-    const outer = [words, word, piped];
+  const nested = (closer, keyed = false) => {
+    if (level >= DEPTH) throw new Refusal('unreadable', 'brackets are nested too deep for the hook to read');
+    const outer = [words, word, piped, cases, table, assigned];
     const before = commands.length;
     words = [];
     word = null;
     piped = false;
+    cases = 0;
+    table = keyed;
+    assigned = 0;
     level++;
     run(closer);
     endCommand();
     level--;
-    [words, word, piped] = outer;
+    [words, word, piped, cases, table, assigned] = outer;
     return commands.length > before;
+  };
+  const assignment = () => {
+    const c = src[i];
+    const length = c === '=' ? 1 : '+-*/%'.includes(c) && src[i + 1] === '=' ? 2 : 0;
+    const first = words[assigned] ?? word;
+    if (!length || !first) return false;
+    const key = table && assigned === 0 && (words.length ? words.length === 1 && !word : true);
+    if (!key && first.text[0] !== MARK && first.text[0] !== '[') return false;
+    endWord();
+    words.push({ text: '=', quoted: false, dynamic: false, assign: true, at: base + i });
+    assigned = words.length;
+    i += length;
+    return true;
   };
   const inner = (text, as, at, asBody) => {
     for (const command of lex(text, as, at, asBody)) commands.push({ ...command, level: command.level + level + 1 });
@@ -251,7 +284,8 @@ function lex(source, dialect, base = 0, body = false) {
     while (i < n) {
       const c = src[i];
       const next = src[i + 1];
-      if (c === closer) {
+      if (c === ')') keyword();
+      if (c === closer && !(c === ')' && cases)) {
         i++;
         return;
       }
@@ -263,11 +297,13 @@ function lex(source, dialect, base = 0, body = false) {
       }
       if (c === '\r') {
         i++;
+        if (next !== '\n') endCommand();
         continue;
       }
       if (c === ' ' || c === '\t' || (cmd && ',;='.includes(c))) {
         i++;
         endWord();
+        glued = false;
         continue;
       }
       if (c === escape) {
@@ -279,17 +315,18 @@ function lex(source, dialect, base = 0, body = false) {
         }
         continue;
       }
-      if (c === '#' && !word && !cmd) {
+      if (c === '#' && !word && !glued && !cmd) {
         const end = src.indexOf('\n', i);
         i = end < 0 ? n : end;
         continue;
       }
-      if (ps && c === '<' && next === '#') {
+      if (ps && !word && !glued && c === '<' && next === '#') {
         const end = src.indexOf('#>', i + 2);
         i = end < 0 ? n : end + 2;
         continue;
       }
-      if (ps && c === '@' && (next === "'" || next === '"') && hereString()) continue;
+      if (ps && !word && !glued && c === '@' && (next === "'" || next === '"') && hereString()) continue;
+      if (ps && assignment()) continue;
       if (c === "'" && !cmd) {
         i++;
         single();
@@ -321,7 +358,8 @@ function lex(source, dialect, base = 0, body = false) {
         if (arithmetic) math++;
         const some = nested(')');
         if (arithmetic) math--;
-        if (some && !subshell) mark();
+        if (bash && cases) endCommand();
+        else if (some && !subshell) mark();
         continue;
       }
       if (c === ')' || (ps && c === '}')) {
@@ -331,7 +369,7 @@ function lex(source, dialect, base = 0, body = false) {
       }
       if (ps && c === '{') {
         i++;
-        nested('}');
+        nested('}', Boolean(word?.text.endsWith('@')));
         open().block = true;
         continue;
       }
@@ -368,10 +406,12 @@ function lex(source, dialect, base = 0, body = false) {
         continue;
       }
       if (c === '<' || c === '>') {
-        if (bash && !math && c === '<' && next === '<' && src[i + 2] !== '<') {
+        if (bash && c === '<' && next === '<' && src[i + 2] !== '<') {
+          if (math) throw new Refusal('unreadable', 'a << inside (( )) is a shift to one reading and a here-document to another');
           heredoc();
           continue;
         }
+        if (ps && word) glued = true;
         i++;
         endWord();
         continue;
@@ -391,4 +431,4 @@ function lex(source, dialect, base = 0, body = false) {
   return commands.sort((a, b) => a.at - b.at);
 }
 
-module.exports = { lex, MARK };
+module.exports = { lex, MARK, LEADING };

@@ -292,6 +292,13 @@ const MORE_REFUSED = [
   ['unreadable', 'Bash', "echo ${x:-'}'} ; tasklist ; echo ' '"],
   ['unreadable', 'Bash', "git -c alias.x='!tasklist' x"],
   ['unreadable', 'Bash', 'cmd'],
+  ['unreadable', 'Bash', 'echo tasklist | bash "-s"'],
+  ['unreadable', 'Bash', 'pwsh "-EncodedCommand" dABhAHMAawBsAGkAcwB0AA=='],
+  ['unreadable', 'Bash', 'echo $((1 << 2))'],
+  ['unreadable', 'Bash', 'echo $((1 << 2))\ntasklist'],
+  ['unreadable', 'Bash', "echo $((cat <<'EOF'\nit's\nEOF\n)); tasklist"],
+  ['unreadable', 'Bash', 'git --some-new-option x tag v1'],
+  ['unreadable', 'Bash', 'cargo --some-new-option x add serde'],
   ['unreadable', 'Bash', 'echo tasklist | cmd //k'],
   ['unreadable', 'PowerShell', '& $x'],
   ['unreadable', 'PowerShell', '& (Get-Command tasklist)'],
@@ -317,7 +324,13 @@ const MORE_REFUSED = [
   ['process', 'Bash', 'echo 1 | xargs -n1 taskkill /PID'],
   ['process', 'Bash', 'find . -name x -exec taskkill {} \\;'],
   ['process', 'Bash', 'git commit -m "run `tasklist` now"'],
-  ['process', 'Bash', 'echo $((1 << 2))\ntasklist'],
+  ['process', 'Bash', 'bash "-c" tasklist'],
+  ['process', 'Bash', "pwsh '-Command' tasklist"],
+  ['process', 'Bash', 'echo "$(case x in x) tasklist;; esac)"'],
+  ['process', 'Bash', 'echo "$(if true; then case x in x) tasklist;; esac; fi)"'],
+  ['process', 'Bash', 'echo "$(case x in x) echo a;; esac)"; tasklist'],
+  ['process', 'Bash', 'echo "$(case x in x) echo "a";; esac)"; tasklist; echo "b"'],
+  ['process', 'Bash', 'echo a\rtasklist'],
   ['process', 'Bash', 'cat <<EOF\n$(tasklist)\nEOF'],
   ['process', 'Bash', 'query process'],
   ['process', 'Bash', 'C:\\\\Windows\\\\System32\\\\tasklist.exe'],
@@ -342,6 +355,7 @@ const MORE_REFUSED = [
   ['process', 'PowerShell', 'Get-Process -Name steam -ErrorAction SilentlyContinue'],
   ['process', 'PowerShell', 'Stop-Process -Name RiotClientServices -Force'],
   ['process', 'PowerShell', 'Write-Output a <# note #>; tasklist'],
+  ['process', 'PowerShell', 'Write-Output a\rtasklist'],
   ['launcher', 'PowerShell', '& "C:\\Program Files (x86)\\Steam\\steam.exe" -silent'],
   ['launcher', 'PowerShell', 'Start-Process "C:\\Riot Games\\Riot Client\\RiotClientServices.exe"'],
   ['launcher', 'PowerShell', "& 'C:\\Riot Games\\Riot Client\\Riot Client.exe'"],
@@ -352,6 +366,19 @@ const MORE_REFUSED = [
   ['launcher', 'PowerShell', 'rundll32 url.dll,FileProtocolHandler steam://open/main'],
   ['launcher', 'PowerShell', "Start-Process -FilePath steam.exe -ArgumentList '-silent'"],
   ['launcher', 'PowerShell', 'VALORANT.exe'],
+  ['launcher', 'PowerShell', 'Start-Process steam:open/main'],
+  ['process', 'PowerShell', '$p=Get-Process'],
+  ['process', 'PowerShell', '$p =Get-Process'],
+  ['process', 'PowerShell', '$a, $b = $c = Get-Process'],
+  ['process', 'PowerShell', '$h["k"]+=Get-Process'],
+  ['process', 'PowerShell', '@{a=Get-Process}'],
+  ['process', 'PowerShell', '[ordered]@{ a = Get-Process }'],
+  ['process', 'PowerShell', 'tasklist = 1'],
+  ['process', 'PowerShell', 'Write-Output a<# ; tasklist ; #>'],
+  ['process', 'PowerShell', 'Write-Output a>#b ; tasklist'],
+  ['process', 'PowerShell', 'return tasklist'],
+  ['process', 'Bash', 'echo "$(case x in (x) tasklist;; esac)"'],
+  ['process', 'Bash', 'case x in (x) tasklist;; esac'],
   ['launcher', 'Bash', 'start steam://run/730'],
   ['launcher', 'Bash', 'cmd //c start "" "C:\\\\Program Files (x86)\\\\Steam\\\\steam.exe"'],
   ['installer', 'PowerShell', 'choco install git'],
@@ -375,6 +402,7 @@ const MORE_REFUSED = [
   ['registry', 'PowerShell', 'reg.exe ADD HKCU\\x /v a /d b'],
   ['registry', 'PowerShell', 'reg copy HKCU\\a HKCU\\b'],
   ['registry', 'PowerShell', 'regedit /s x.reg'],
+  ['registry', 'PowerShell', 'setx FOO bar'],
   ['registry', 'PowerShell', '.\\x.reg'],
   ['registry', 'PowerShell', 'Start-Process x.reg'],
   ['registry', 'PowerShell', 'New-PSDrive -Name R -PSProvider Registry -Root HKEY_CURRENT_USER'],
@@ -387,6 +415,7 @@ const MORE_REFUSED = [
   ['tags', 'Bash', 'git tag -d v1'],
   ['tags', 'Bash', 'git -C . tag v2'],
   ['tags', 'Bash', 'git update-ref refs/tags/v2 HEAD'],
+  ['tags', 'Bash', 'git --no-pager --attr-source HEAD -P tag v2'],
   ['tags', 'PowerShell', 'scripts/agent/git.ps1 tag v1'],
   ['tags', 'PowerShell', 'scripts/agent/git.ps1 push origin v1'],
   ['tags', 'PowerShell', 'scripts/agent/git.ps1 push origin HEAD:refs/tags/v2'],
@@ -407,6 +436,8 @@ const MORE_REFUSED = [
   ['merge', 'Bash', 'pwsh -NoProfile -File scripts/agent/gh.ps1 pr merge 5 --squash'],
   ['merge', 'Bash', 'pwsh -NoProfile scripts/agent/gh.ps1 pr merge 5 --squash'],
   ['merge', 'Bash', 'env FOO=1 pwsh -File scripts/agent/gh.ps1 pr merge 5'],
+  ['merge', 'Bash', 'pwsh "-File" scripts/agent/gh.ps1 pr merge 5'],
+  ['merge', 'PowerShell', 'scripts/agent/gh.ps1 --some-new-option x pr merge 5'],
   ['bypass', 'Bash', 'git commit -n -m x'],
   ['bypass', 'Bash', 'git commit -nm x'],
   ['bypass', 'Bash', 'git commit -anm x'],
@@ -432,6 +463,7 @@ const MORE_REFUSED = [
   ['deps', 'Bash', 'cargo.exe ADD serde'],
   ['deps', 'Bash', 'rustup run stable cargo add serde'],
   ['deps', 'PowerShell', '& cargo add serde'],
+  ['deps', 'Bash', 'cargo -q --config net.offline=true -Zunstable-options --color=never add serde'],
   ['app', 'Bash', 'cargo run'],
   ['app', 'Bash', 'cargo r -p ol-app'],
   ['app', 'Bash', 'cargo run --bin OneLaunch'],
@@ -479,6 +511,9 @@ const MORE_REFUSED = [
   ['key', 'PowerShell', 'scripts/agent/git.ps1 credential fill'],
   ['key', 'PowerShell', 'scripts/agent/gh.ps1 auth token'],
   ['key', 'PowerShell', 'scripts/agent/gh.ps1 auth status'],
+  ['key', 'PowerShell', 'Import-Module scripts/agent/AgentApp.psm1; (New-AgentToken).token'],
+  ['key', 'PowerShell', '$t=New-AgentJwt'],
+  ['key', 'PowerShell', 'Invoke-AgentApi -Path /user -Bearer $t'],
   ['key', 'PowerShell', 'Get-Content D:\\Coding\\slop\\one-launch-rs-bot\\app.private-key.pem'],
   ['key', 'Bash', 'ls D:/Coding/slop/one-launch-rs-bot'],
   ['key', 'Bash', 'cat key.pem'],
@@ -564,6 +599,10 @@ const MORE_ALLOWED = [
   ['Bash', 'cargo clippy --locked'],
   ['Bash', 'cargo deny check'],
   ['Bash', 'cargo metadata --locked'],
+  ['Bash', 'cargo -q --locked +stable --config net.offline=true build'],
+  ['Bash', 'git --no-pager -P --exec-path=/x --attr-source HEAD -c color.ui=never log -1'],
+  ['Bash', 'echo "$(case "$1" in a) echo 1;; *) echo 2;; esac)" done'],
+  ['Bash', 'case "$1" in a) case x in y) echo 1;; esac;; esac; echo done'],
   ['Bash', './target/debug/OneLaunch.exe --data-dir=/c/scratch/x --start-hidden'],
   ['PowerShell', '.\\target\\debug\\OneLaunch.exe --data-dir=C:\\scratch\\x'],
   ['PowerShell', 'reg query "HKCU\\Software\\Blizzard Entertainment\\Battle.net"'],
@@ -596,7 +635,7 @@ const MORE_ALLOWED = [
   ['Bash', '[ -f x ] && echo y'],
   ['Bash', 'x=$(git rev-parse HEAD); echo "$x"'],
   ['Bash', 'case "$1" in a) echo 1;; *) echo 2;; esac'],
-  ['Bash', 'echo $((1 << 2))'],
+  ['Bash', 'echo $((1 + 2)) $((x > 1))'],
   ['Bash', 'echo "${HOME}/x" ${#arr[@]}'],
   ['Bash', 'arr=(a b c)'],
   ['Bash', '"$HOME/.cargo/bin/cargo" build --locked'],
@@ -615,6 +654,16 @@ const MORE_ALLOWED = [
   ['PowerShell', "Write-Output \"a; b\" 'c | d'"],
   ['PowerShell', '& "C:\\Program Files\\Git\\cmd\\git.exe" status'],
   ['PowerShell', 'git log -1 --format=%s | Select-String kill'],
+  ['PowerShell', '$out = .\\target\\debug\\OneLaunch.exe --data-dir=C:\\scratch\\x'],
+  ['PowerShell', '$out=cargo run -p ol-app -- --data-dir=C:\\scratch\\x'],
+  ['PowerShell', '$x = Get-Content a.txt; $y=1; Write-Output $x'],
+  ['PowerShell', "$h = @{ n = 'kill'; e = { $_.Name } }"],
+  ['PowerShell', 'Get-ChildItem | Select-Object @{n="a";e={$_.Length}}'],
+  ['PowerShell', 'Write-Output a <# tasklist #> b'],
+  ['PowerShell', "Write-Output @'\ntasklist\n'@"],
+  ['PowerShell', 'Import-Module scripts/agent/AgentApp.psm1'],
+  ['PowerShell', 'Get-Content scripts/agent/git-credential.ps1'],
+  ['Bash', 'case "$x" in (a) echo 1;; (b) echo 2;; esac'],
 ];
 
 test('more ways to spell a refused command are refused', () => {
@@ -692,6 +741,28 @@ test('a commit with a finding is refused and the finding is shown masked', () =>
 test('a call for another tool is an error, not a pass', () => {
   assert.throws(() => judge({ tool: 'Read', command: 'tasklist', cwd: ROOT, io }));
   assert.throws(() => judge({ tool: 'Bash', command: undefined, cwd: ROOT, io }));
+});
+
+test('a very long command is judged in time', () => {
+  const texts = {
+    'one long argument': `git commit -m ${'a1'.repeat(150000)}`,
+    'many folders up and down': `ls ${'a/../'.repeat(60000)}b`,
+    'a long quoted command name': `"${' '.repeat(200000)}x" y`,
+    'a long run of dots': `ls ${'.'.repeat(200000)}`,
+    'a long command name full of braces': `${'{a,'.repeat(50000)} x`,
+    'many words behind a wrapper': `env ${'a '.repeat(3000)}`,
+    'many small commands': 'true; '.repeat(3000),
+    'a long here-document': `cat <<'EOF'\n${"it's a line\n".repeat(20000)}EOF\ngit status`,
+    'many expansions': `echo ${'$x '.repeat(40000)}`,
+  };
+  for (const [name, text] of Object.entries(texts)) {
+    for (const tool of ['Bash', 'PowerShell']) {
+      const from = process.hrtime.bigint();
+      judge({ tool, command: text, cwd: ROOT, io });
+      const ms = Number(process.hrtime.bigint() - from) / 1e6;
+      assert.ok(ms < 3000, `${tool}, ${name}: ${ms.toFixed(0)} ms`);
+    }
+  }
 });
 
 test('a deeply nested or very long command is refused, not skipped', () => {

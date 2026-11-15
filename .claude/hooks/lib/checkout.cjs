@@ -98,7 +98,7 @@ function ticket(root) {
   }
   let id;
   try {
-    id = JSON.parse(raw.replace(/^﻿/, '')).ticket;
+    id = JSON.parse(raw.replace(/^\uFEFF/, '')).ticket;
   } catch {
     id = undefined;
   }
@@ -116,7 +116,7 @@ function writeScope(root, id) {
     if (error.code !== 'ENOENT') throw error;
     throw new Refusal('scope', `plan/tickets/${id}.md does not exist in this checkout, so the ticket names no path`);
   }
-  const front = /^﻿?---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+  const front = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/.exec(text);
   const lines = front ? front[1].split(/\r?\n/) : [];
   const at = lines.findIndex((line) => /^write_scope:/.test(line));
   if (at < 0) throw new Refusal('scope', `plan/tickets/${id}.md has no write_scope`);

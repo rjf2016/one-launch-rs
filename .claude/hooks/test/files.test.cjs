@@ -190,7 +190,7 @@ test('a ticket file that cannot be read refuses every write in its checkout', ()
     'no ticket field': '{"id": "M1-F6b"}',
     'a ticket that is a path': '{"ticket": "../../x"}',
     'a ticket with no file': '{"ticket": "M9-NONE"}',
-    'UTF-16': Buffer.from('﻿{"ticket": "M1-F6b"}', 'utf16le'),
+    'UTF-16': Buffer.from('\uFEFF{"ticket": "M1-F6b"}', 'utf16le'),
     empty: '',
   };
   for (const [name, content] of Object.entries(cases)) {
@@ -200,7 +200,7 @@ test('a ticket file that cannot be read refuses every write in its checkout', ()
     assert.equal(verdict(path.join(root, 'crates', 'a.rs')), 'scope', name);
   }
   const marked = checkout(null);
-  put(marked, '.claude/ticket.local.json', '﻿{"ticket": "M1-F6b", "round": 2}\r\n');
+  put(marked, '.claude/ticket.local.json', '\uFEFF{"ticket": "M1-F6b", "round": 2}\r\n');
   assert.equal(verdict(path.join(marked, 'CLAUDE.md')), 'allow');
   const scopeless = checkout(null);
   put(scopeless, 'plan/tickets/M9-BARE.md', '---\nid: M9-BARE\n---\n');
