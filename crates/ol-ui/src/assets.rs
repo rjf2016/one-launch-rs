@@ -12,7 +12,12 @@ pub const FILTER: &str = "icons/filter.svg";
 pub const SORT: &str = "icons/sort.svg";
 pub const RESCAN: &str = "icons/rescan.svg";
 pub const PLAY: &str = "icons/play.svg";
-pub const KEY: &str = "icons/key.svg";
+pub const GAMEPAD: &str = "icons/gamepad.svg";
+pub const NO_MATCH: &str = "icons/no-match.svg";
+pub const CLEAR: &str = "icons/clear.svg";
+pub const UPDATE: &str = "icons/update.svg";
+pub const CHECK: &str = "icons/check.svg";
+pub const MORE: &str = "icons/more.svg";
 pub const MINIMIZE: &str = "icons/minimize.svg";
 pub const MAXIMIZE: &str = "icons/maximize.svg";
 pub const RESTORE: &str = "icons/restore.svg";
@@ -35,7 +40,7 @@ macro_rules! caption_icon {
     };
 }
 
-const FILES: [(&str, &[u8]); 15] = [
+const FILES: [(&str, &[u8]); 20] = [
     (BRAND, oracle_icon!("build-icon-mono.svg")),
     (LIBRARY, oracle_icon!("lucide/LayoutGrid.svg")),
     (ACCOUNTS, oracle_icon!("lucide/Users.svg")),
@@ -46,7 +51,12 @@ const FILES: [(&str, &[u8]); 15] = [
     (SORT, oracle_icon!("lucide/ArrowDownUp.svg")),
     (RESCAN, oracle_icon!("lucide/RefreshCw.svg")),
     (PLAY, oracle_icon!("lucide/Play.svg")),
-    (KEY, oracle_icon!("lucide/KeyRound.svg")),
+    (GAMEPAD, oracle_icon!("lucide/Gamepad2.svg")),
+    (NO_MATCH, oracle_icon!("lucide/SearchX.svg")),
+    (CLEAR, oracle_icon!("lucide/X.svg")),
+    (UPDATE, oracle_icon!("lucide/AlertTriangle.svg")),
+    (CHECK, oracle_icon!("lucide/Check.svg")),
+    (MORE, oracle_icon!("lucide/MoreHorizontal.svg")),
     (MINIMIZE, caption_icon!(r#"<path d="M0 5.5h10"/>"#)),
     (
         MAXIMIZE,

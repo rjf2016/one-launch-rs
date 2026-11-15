@@ -13,15 +13,15 @@ pub const TEXT_STRONG: u32 = 0xffffff;
 pub const MUTED: u32 = 0x8f97ab;
 pub const FAINT: u32 = 0x7f879b;
 pub const ACCENT: u32 = 0x8b5cf6;
+pub const ACCENT_HOVER: u32 = 0x9d75ff;
 pub const WARNING: u32 = 0xf5b750;
+pub const DANGER: u32 = 0xf25f5c;
 pub const CLOSE_HOVER: u32 = 0xc42b1c;
 
-pub const LAUNCHERS: [(&str, u32); 4] = [
-    ("Steam", 0x66c0f4),
-    ("Epic Games", 0xe6e6e6),
-    ("Battle.net", 0x148eff),
-    ("Riot Games", 0xff4655),
-];
+pub const STEAM: u32 = 0x66c0f4;
+pub const EPIC: u32 = 0xe6e6e6;
+pub const BATTLENET: u32 = 0x148eff;
+pub const RIOT: u32 = 0xff4655;
 
 pub fn color(hex: u32) -> Rgba {
     rgb(hex)

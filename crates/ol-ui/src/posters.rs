@@ -1,21 +1,36 @@
 use std::collections::HashMap;
+use std::fs;
+use std::io::Cursor;
+use std::path::Path;
 use std::sync::Arc;
 
 use gpui::RenderImage;
-use image::{Frame, Rgba, RgbaImage};
+use image::imageops::FilterType;
+use image::{DynamicImage, Frame, ImageDecoder, ImageReader, Limits};
 
-const WIDTH: u32 = 240;
-const HEIGHT: u32 = 360;
+const WIDTH: f32 = 240.;
+const HEIGHT: f32 = 360.;
+const ICON: f32 = 128.;
+const LARGEST_FILE: u64 = 32 * 1024 * 1024;
+const LARGEST_SIDE: u32 = 8192;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Shape {
+    Cover,
+    Icon,
+}
 
 pub enum Lookup {
     Ready(Arc<RenderImage>),
     Pending,
     Missing,
+    Unreadable,
 }
 
 enum Slot {
     Pending,
     Ready { image: Arc<RenderImage>, used: u64 },
+    Unreadable,
 }
 
 #[derive(Default)]
@@ -36,6 +51,7 @@ impl Posters {
                 Lookup::Ready(image.clone())
             }
             Some(Slot::Pending) => Lookup::Pending,
+            Some(Slot::Unreadable) => Lookup::Unreadable,
             None => {
                 self.slots.insert(game, Slot::Pending);
                 Lookup::Missing
@@ -43,9 +59,13 @@ impl Posters {
         }
     }
 
-    pub fn insert(&mut self, game: usize, image: Arc<RenderImage>) {
+    pub fn insert(&mut self, game: usize, image: Option<Arc<RenderImage>>) {
         let used = self.clock;
-        self.slots.insert(game, Slot::Ready { image, used });
+        let slot = match image {
+            Some(image) => Slot::Ready { image, used },
+            None => Slot::Unreadable,
+        };
+        self.slots.insert(game, slot);
     }
 
     pub fn evict(&mut self, keep: usize) -> Vec<Arc<RenderImage>> {
@@ -54,7 +74,7 @@ impl Posters {
             .iter()
             .filter_map(|(game, slot)| match slot {
                 Slot::Ready { used, .. } => Some((*used, *game)),
-                Slot::Pending => None,
+                Slot::Pending | Slot::Unreadable => None,
             })
             .collect();
         if ready.len() <= keep {
@@ -73,40 +93,35 @@ impl Posters {
     }
 }
 
-pub fn placeholder(game: usize) -> RenderImage {
-    let hue = (game as f32 * 0.618_034).fract();
-    let top = hsl(hue, 0.55, 0.46);
-    let bottom = hsl((hue + 0.07).fract(), 0.6, 0.14);
-    let band = (game % 5) as f32 * 0.12 + 0.2;
-    let buffer = RgbaImage::from_fn(WIDTH, HEIGHT, |x, y| {
-        let across = x as f32 / WIDTH as f32;
-        let down = y as f32 / HEIGHT as f32;
-        let slant = down + across * 0.3;
-        let glow = (1. - ((slant - band) * 6.).abs()).clamp(0., 1.) * 0.18;
-        let [red, green, blue] = mix(top, bottom, (slant / 1.3).clamp(0., 1.))
-            .map(|channel| ((channel + glow).clamp(0., 1.) * 255.) as u8);
-        // GPUI's render images are BGRA.
-        Rgba([blue, green, red, 255])
-    });
-    RenderImage::new(vec![Frame::new(buffer)])
-}
+// Run off the UI thread. A file that is missing, too large or no picture gives nothing, and the card keeps its letters.
+pub fn decode(file: &Path, shape: Shape, scale: f32) -> Option<RenderImage> {
+    if fs::metadata(file).ok()?.len() > LARGEST_FILE {
+        return None;
+    }
+    let mut reader = ImageReader::new(Cursor::new(fs::read(file).ok()?))
+        .with_guessed_format()
+        .ok()?;
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(LARGEST_SIDE);
+    limits.max_image_height = Some(LARGEST_SIDE);
+    reader.limits(limits);
+    let mut decoder = reader.into_decoder().ok()?;
+    let orientation = decoder.orientation().ok()?;
+    let mut picture = DynamicImage::from_decoder(decoder).ok()?;
+    picture.apply_orientation(orientation);
 
-fn mix(from: [f32; 3], to: [f32; 3], amount: f32) -> [f32; 3] {
-    [0, 1, 2].map(|channel| from[channel] + (to[channel] - from[channel]) * amount)
-}
-
-fn hsl(hue: f32, saturation: f32, lightness: f32) -> [f32; 3] {
-    let chroma = (1. - (2. * lightness - 1.).abs()) * saturation;
-    let sector = hue * 6.;
-    let second = chroma * (1. - (sector % 2. - 1.).abs());
-    let [red, green, blue] = match sector as u32 {
-        0 => [chroma, second, 0.],
-        1 => [second, chroma, 0.],
-        2 => [0., chroma, second],
-        3 => [0., second, chroma],
-        4 => [second, 0., chroma],
-        _ => [chroma, 0., second],
+    let side = |length: f32| (length * scale.clamp(1., 3.)).ceil() as u32;
+    let fitted = match shape {
+        Shape::Cover => picture.resize_to_fill(side(WIDTH), side(HEIGHT), FilterType::CatmullRom),
+        Shape::Icon if picture.width().max(picture.height()) > side(ICON) => {
+            picture.resize(side(ICON), side(ICON), FilterType::CatmullRom)
+        }
+        Shape::Icon => picture,
     };
-    let lift = lightness - chroma / 2.;
-    [red + lift, green + lift, blue + lift]
+    let mut pixels = fitted.into_rgba8();
+    // GPUI's render images are BGRA.
+    for pixel in pixels.pixels_mut() {
+        pixel.0.swap(0, 2);
+    }
+    Some(RenderImage::new(vec![Frame::new(pixels)]))
 }

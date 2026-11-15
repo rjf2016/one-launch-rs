@@ -9,8 +9,10 @@ use std::cell::{Cell, RefCell};
 use std::path::Path;
 use std::process::ExitCode;
 use std::rc::Rc;
+use std::time::Duration;
 
 use gpui::{App, AsyncApp};
+use ol_api::Backend;
 use ol_platform_win::data_folder::refuse_real_data_folder;
 use ol_platform_win::dpapi::Dpapi;
 use ol_platform_win::own_process;
@@ -21,6 +23,8 @@ use ol_ui::Presence;
 use crate::args::{Args, Check, DoctorVault};
 
 const TITLE: &str = "One Launch (GPUI proof)";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+const COPY_DELAY: Duration = Duration::from_millis(250);
 
 type TraySlot = Rc<RefCell<Option<Tray>>>;
 
@@ -49,14 +53,16 @@ fn main() -> ExitCode {
     if let Some(vault) = args.doctor {
         return doctor(&args.data_dir, vault);
     }
+    // Started first: the database opens on its own thread while the window is being made.
+    let backend = Backend::start(args.data_dir.clone(), VERSION);
     let failed = Rc::new(Cell::new(false));
     let tray = TraySlot::default();
     gpui_platform::application()
         .with_assets(ol_ui::Assets)
         .run({
-            let (failed, tray) = (failed.clone(), tray.clone());
+            let (backend, failed, tray) = (backend.clone(), failed.clone(), tray.clone());
             move |cx| {
-                if let Err(error) = start(args, failed.clone(), tray, cx) {
+                if let Err(error) = start(args, backend, failed.clone(), tray, cx) {
                     eprintln!("OneLaunch: {error:#}");
                     failed.set(true);
                     cx.quit();
@@ -69,6 +75,7 @@ fn main() -> ExitCode {
         drop(icon);
         println!("OneLaunch: tray icon removed");
     }
+    backend.shut_down();
     if failed.get() {
         ExitCode::FAILURE
     } else {
@@ -94,16 +101,20 @@ fn doctor(data_dir: &Path, vault: DoctorVault) -> ExitCode {
     }
 }
 
-fn start(args: Args, failed: Rc<Cell<bool>>, tray: TraySlot, cx: &mut App) -> anyhow::Result<()> {
-    // The folder itself is not printed: a copy of real data tends to sit under the user's profile.
-    println!("OneLaunch: the window stores nothing in the data folder yet");
+fn start(
+    args: Args,
+    backend: Backend,
+    failed: Rc<Cell<bool>>,
+    tray: TraySlot,
+    cx: &mut App,
+) -> anyhow::Result<()> {
     ol_ui::init(cx);
     let presence = match &args.check {
         Some(Check::Capture(plan)) if !plan.focus => Presence::Background,
         Some(Check::Probe) => Presence::Background,
         _ => Presence::Foreground,
     };
-    let window = ol_ui::open_main_window(TITLE, presence, cx)?;
+    let window = ol_ui::open_main_window(TITLE, presence, backend.clone(), cx)?;
 
     // In a task and not here: adding the icon waits on the shell, Windows may hand the GPUI window a message meanwhile, and GPUI cannot take one while the app is being updated.
     cx.spawn({
@@ -114,14 +125,16 @@ fn start(args: Args, failed: Rc<Cell<bool>>, tray: TraySlot, cx: &mut App) -> an
 
     window.update(cx, |_, window, cx| {
         // These callbacks run before their frame is drawn, so it is the second one that follows the first frame shown.
-        window.on_next_frame(|window, _| {
-            window.on_next_frame(|_, _| {
+        window.on_next_frame(move |window, _| {
+            window.on_next_frame(move |_, cx| {
                 if let Some(age) = own_process::age() {
                     println!(
                         "OneLaunch: first frame shown {} ms after the process started",
                         age.as_millis()
                     );
                 }
+                cx.spawn(async move |cx| copy_database(&backend, cx).await)
+                    .detach();
             });
         });
         let tray = tray.clone();
@@ -157,6 +170,15 @@ fn start(args: Args, failed: Rc<Cell<bool>>, tray: TraySlot, cx: &mut App) -> an
     })
     .detach();
     Ok(())
+}
+
+// After the first paint and not before it, as in the Electron app: the copy must not hold up the window. Neither line names the folder, which can run through the user's profile.
+async fn copy_database(backend: &Backend, cx: &AsyncApp) {
+    capture::pause(COPY_DELAY, cx).await;
+    match backend.back_up_database().await {
+        Ok(()) => println!("OneLaunch: database copied"),
+        Err(error) => eprintln!("OneLaunch: database copy failed: {error}"),
+    }
 }
 
 fn add_tray_icon(tray: &TraySlot, cx: &AsyncApp) {

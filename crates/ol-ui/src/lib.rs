@@ -9,6 +9,7 @@ use gpui::prelude::*;
 use gpui::{
     App, SharedString, TitlebarOptions, WindowBounds, WindowHandle, WindowOptions, px, size,
 };
+use ol_api::Backend;
 
 pub use assets::Assets;
 pub use library::{LibraryView, SweepReport};
@@ -28,6 +29,7 @@ pub fn init(cx: &mut App) {
 pub fn open_main_window(
     title: impl Into<SharedString>,
     presence: Presence,
+    backend: Backend,
     cx: &mut App,
 ) -> gpui::Result<WindowHandle<Shell>> {
     let defaults = WindowOptions::default();
@@ -45,5 +47,7 @@ pub fn open_main_window(
             .filter(|_| presence == Presence::Foreground),
         ..defaults
     };
-    cx.open_window(options, |window, cx| cx.new(|cx| Shell::new(window, cx)))
+    cx.open_window(options, |window, cx| {
+        cx.new(|cx| Shell::new(backend, window, cx))
+    })
 }
