@@ -1,4 +1,4 @@
-// A stand-in program for the tests of the process port, copied under a name of its own for each test. `--window` gives it a hidden top-level window and it exits when that window is asked to close; `--child=<exe>` starts another program through the port; `--echo=<file>` writes its arguments and its folder there, after the child. It always exits within a minute.
+// A stand-in program for the tests of the process port, copied under a name of its own for each test. `--window` gives it a hidden top-level window and it exits when that window is asked to close; `--child=<exe>` starts another program through the port; `--echo=<file>` writes its arguments and its folder there, after the child and, with `--window`, once the window exists. It always exits within a minute.
 
 use std::time::Duration;
 
@@ -24,19 +24,22 @@ fn main() {
     if let Some(exe) = value("--child=") {
         let _ = WindowsProcesses::new().start(&exe, &[], "");
     }
-    // Written last: a test that sees the file knows the child, if any, has been started in full.
-    if let Some(file) = value("--echo=") {
-        let folder = std::env::current_dir().unwrap_or_default();
-        let mut text = format!("{}\n", folder.display());
-        for arg in &args {
-            text.push_str(arg);
-            text.push('\n');
+    // Written last: a test that sees the file knows the child, if any, has been started in full, and the window made.
+    let echo = || {
+        if let Some(file) = value("--echo=") {
+            let folder = std::env::current_dir().unwrap_or_default();
+            let mut text = format!("{}\n", folder.display());
+            for arg in &args {
+                text.push_str(arg);
+                text.push('\n');
+            }
+            let _ = std::fs::write(file, text);
         }
-        let _ = std::fs::write(file, text);
-    }
+    };
     if args.iter().any(|arg| arg == "--window") {
-        run_window();
+        run_window(echo);
     } else {
+        echo();
         std::thread::sleep(LIFETIME);
     }
 }
@@ -62,7 +65,7 @@ unsafe extern "system" fn procedure(
     }
 }
 
-fn run_window() {
+fn run_window(ready: impl FnOnce()) {
     unsafe {
         let Ok(module) = GetModuleHandleW(None) else {
             return;
@@ -92,6 +95,7 @@ fn run_window() {
             return;
         };
         SetTimer(Some(hwnd), 1, LIFETIME.as_millis() as u32, None);
+        ready();
         let mut message = MSG::default();
         while GetMessageW(&mut message, None, 0, 0).as_bool() {
             DispatchMessageW(&message);

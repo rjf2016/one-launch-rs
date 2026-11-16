@@ -69,14 +69,20 @@ fn a_started_program_is_listed_by_name_and_path_and_a_close_ends_it() {
     let mut guard = EndOnDrop(Vec::new());
     let child = copy(&scratch, &mut guard);
     let processes = WindowsProcesses::new();
+    let ready = scratch.join(&format!("{}.ready", child.image));
+    let echo = format!("--echo={}", text(&ready));
     processes
         .start(
             &text(&child.exe),
-            &[ProcessArg::Plain("--window")],
+            &[ProcessArg::Plain("--window"), ProcessArg::Plain(&echo)],
             &text(scratch.path()),
         )
         .unwrap();
-    assert!(until(|| runs(&child.image)), "the child did not start");
+    // A close before the child has made its window finds nothing to ask.
+    assert!(
+        until(|| ready.exists() && runs(&child.image)),
+        "the child did not make its window"
+    );
     assert!(runs(&child.image.to_uppercase()));
     assert!(runs(child.image.trim_end_matches(".exe")));
 
