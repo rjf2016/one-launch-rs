@@ -34,6 +34,16 @@ pub mod launchers {
     pub fn on_the_stand_in_vault(platform: ol_platform_api::Platform) -> Launchers {
         Launchers::on(platform, std::sync::Arc::new(ol_vault::FakeVault))
     }
+
+    // The launchers on this PC, with the data folder's own vault: its key is opened, or made for a folder that has none, as the Electron app does at its first start.
+    pub fn on_this_pc(
+        platform: ol_platform_api::Platform,
+        data_dir: &std::path::Path,
+        protector: &dyn ol_platform_api::DataProtector,
+    ) -> Result<Launchers, ol_vault::KeyError> {
+        let vault = ol_vault::OsCryptVault::open_or_create(data_dir, protector)?;
+        Ok(Launchers::on(platform, std::sync::Arc::new(vault)))
+    }
 }
 
 pub mod doctor {
