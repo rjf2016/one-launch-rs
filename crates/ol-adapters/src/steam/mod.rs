@@ -5,6 +5,7 @@ mod plan;
 use std::collections::HashSet;
 use std::time::Duration;
 
+use ol_formats::js;
 use ol_formats::steam::bootstrap_log::update_in_progress;
 use ol_formats::steam::login_log::{SignInOutcome, latest_outcome, parse_login_states};
 use ol_formats::steam::loginusers::{SteamLoginUser, parse_login_users};
@@ -13,18 +14,20 @@ use ol_formats::steam::manifests::{
     parse_library_folders,
 };
 use ol_formats::winpath::{join, normalize_launcher_path, path_key, resolve_from};
-use ol_formats::{js, winpath};
 use ol_model::{
     InstallSource, InstalledGame, LauncherId, LauncherInstall, RememberedAccount, RunningGame,
     RunningGameSource,
 };
-use ol_platform_api::{CancelToken, Hive, Platform, ProcessArg, ProcessInfo};
+use ol_platform_api::{CancelToken, Hive, Platform, ProcessArg};
 use ol_runtime::{TimingOverrides, wait_until};
 use time::OffsetDateTime;
 
 use crate::AdapterError;
 use crate::files::{MAX_TAIL_BYTES, MAX_VDF_BYTES, log_mark, read_launcher_text, read_log_since};
+use crate::running::game_with_running_process;
 
+pub use crate::directory::AccountRef;
+pub(crate) use plan::step;
 pub use plan::{PlanContext, STEP, SwitchPreflight, close_message};
 
 pub const HKCU_KEY: &str = r"Software\Valve\Steam";
@@ -119,16 +122,6 @@ pub struct SteamConfig {
     // Where a snapshot of Steam's files would go, for the plan's wording.
     pub backups_dir: String,
     pub timing: Timing,
-}
-
-// The account a switch is for. It never carries the password.
-#[derive(Clone, PartialEq, Eq)]
-pub struct AccountRef {
-    pub id: Option<String>,
-    pub display_name: String,
-    pub login: String,
-    pub launcher_uid: Option<String>,
-    pub has_secret: bool,
 }
 
 pub struct SteamAdapter<'a> {
@@ -454,52 +447,15 @@ impl<'a> SteamAdapter<'a> {
             return Ok(None);
         }
         let games = self.list_installed_games()?;
-        Ok(self
-            .game_with_running_process(&processes, &games)
-            .map(|game| RunningGame {
+        let files = self.platform.files.as_ref();
+        Ok(
+            game_with_running_process(files, &processes, &games).map(|game| RunningGame {
                 launcher: LauncherId::Steam,
                 launcher_game_id: game.launcher_game_id.clone(),
                 name: game.name.clone(),
                 source: RunningGameSource::Process,
-            }))
-    }
-
-    fn game_with_running_process<'g>(
-        &self,
-        processes: &[ProcessInfo],
-        games: &'g [InstalledGame],
-    ) -> Option<&'g InstalledGame> {
-        let paths: Vec<String> = processes
-            .iter()
-            .filter_map(|process| process.path.as_deref())
-            .filter(|path| !path.is_empty())
-            .map(str::to_lowercase)
-            .collect();
-        if paths.is_empty() {
-            return None;
-        }
-        // A process path is where the image really is, so a game's folder counts as recorded and with links followed. Lettered drives only: a launcher file must not send the app to a share it names.
-        let folders: Vec<(&InstalledGame, Vec<String>)> = games
-            .iter()
-            .map(|game| {
-                let lettered = winpath::is_absolute(&game.install_path)
-                    && game.install_path.as_bytes().get(1) == Some(&b':');
-                let resolved = lettered
-                    .then(|| self.platform.files.resolved(&game.install_path))
-                    .flatten();
-                let prefixes = std::iter::once(game.install_path.clone())
-                    .chain(resolved)
-                    .map(|folder| format!("{}\\", folder.to_lowercase()))
-                    .collect();
-                (game, prefixes)
-            })
-            .collect();
-        paths.iter().find_map(|path| {
-            folders
-                .iter()
-                .find(|(_, prefixes)| prefixes.iter().any(|prefix| path.starts_with(prefix)))
-                .map(|(game, _)| *game)
-        })
+            }),
+        )
     }
 
     // Asks Steam to close with `steam.exe -shutdown`, waits, then ends it and what it started. Fails when Steam still runs after that.

@@ -1,13 +1,16 @@
-// What stands between the app and its launcher adapters: the machine they run on, the error every adapter failure is wrapped in, the accounts a launcher remembers and the library scan.
+// What stands between the app and its launcher adapters: the machine they run on, one adapter for the launcher a call names, the error every adapter failure is wrapped in, the accounts a launcher remembers and the library scan.
 
 use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
 
-use ol_adapters::AdapterError;
-use ol_adapters::steam::{self, SteamAdapter, SteamConfig, Timing};
+use ol_adapters::epic::{self, EpicAdapter, EpicConfig};
+use ol_adapters::steam::{self, SteamAdapter, SteamConfig, SwitchPreflight, Timing};
+use ol_adapters::{AccountRef, AdapterError, Directory};
+use ol_formats::epic::manifests::LaunchUriForm;
 use ol_model::{
-    Account, InstalledGame, LauncherId, LibraryScanResult, RememberedAccount, SettingKey, Settings,
+    Account, InstalledGame, LauncherId, LauncherSessionState, LibraryScanResult, RememberedAccount,
+    SettingKey, Settings, SwitchPlan,
 };
 use ol_platform_api::Platform;
 use ol_store::{Store, StoreError};
@@ -16,9 +19,32 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::{self, AccountError, NewAccount};
-use crate::backup::{BackupError, DEFAULT_BACKUPS_TO_KEEP};
+use crate::backup::{BackupError, BackupService, DEFAULT_BACKUPS_TO_KEEP};
+use crate::sessions::StoreDirectory;
 
-// The machine the adapters run on and the vault that keeps passwords. A build with fake launchers hands in fakes; nothing else in the app can tell.
+// Where the Epic Games Launcher keeps its files on this PC, and how long a switch waits for it.
+#[derive(Clone)]
+pub struct EpicMachine {
+    pub timing: epic::Timing,
+    pub default_dir: String,
+    // %LOCALAPPDATA% and %ProgramData%.
+    pub local_app_data: String,
+    pub program_data: String,
+}
+
+// The two folders where Windows has them when it names none, which is what the Electron app falls back to. Whoever builds the machine puts the real ones in: the environment is read by ol-platform-win, not here.
+impl Default for EpicMachine {
+    fn default() -> Self {
+        Self {
+            timing: epic::Timing::default(),
+            default_dir: epic::DEFAULT_DIR.to_owned(),
+            local_app_data: r"C:\AppData\Local".to_owned(),
+            program_data: r"C:\ProgramData".to_owned(),
+        }
+    }
+}
+
+// The machine the adapters run on and the vault that keeps passwords and saved sign-ins. A build with fake launchers hands in fakes; nothing else in the app can tell.
 #[derive(Clone)]
 pub struct Launchers {
     pub platform: Platform,
@@ -26,6 +52,79 @@ pub struct Launchers {
     pub steam_timing: Timing,
     // Where Steam is looked for when neither the settings nor the registry name a folder.
     pub steam_default_dir: String,
+    pub epic: EpicMachine,
+}
+
+// What the settings say to each launcher's adapter, read once for the call in hand.
+#[derive(Clone)]
+pub struct Configs {
+    pub steam: SteamConfig,
+    pub epic: EpicConfig,
+}
+
+impl Configs {
+    pub const fn backups_to_keep(&self) -> i64 {
+        self.steam.backups_to_keep
+    }
+}
+
+// The adapter of the launcher a call is for.
+pub enum Adapter<'a> {
+    Steam(SteamAdapter<'a>),
+    Epic(EpicAdapter<'a>),
+}
+
+impl Adapter<'_> {
+    pub const fn launcher(&self) -> LauncherId {
+        match self {
+            Self::Steam(_) => LauncherId::Steam,
+            Self::Epic(_) => LauncherId::Epic,
+        }
+    }
+
+    pub fn installed_games(&self) -> Result<Vec<InstalledGame>, AdapterError> {
+        match self {
+            Self::Steam(steam) => steam.list_installed_games(),
+            Self::Epic(epic) => epic.list_installed_games(),
+        }
+    }
+
+    pub fn remembered_accounts(&self) -> Result<Vec<RememberedAccount>, AdapterError> {
+        match self {
+            Self::Steam(steam) => steam.list_remembered_accounts(),
+            Self::Epic(epic) => epic.list_remembered_accounts(),
+        }
+    }
+
+    pub fn preflight(&self, account: &AccountRef) -> Result<SwitchPreflight, AdapterError> {
+        match self {
+            Self::Steam(steam) => steam.preflight(account),
+            Self::Epic(epic) => epic.preflight(account),
+        }
+    }
+
+    pub fn plan_switch(&self, account: &AccountRef) -> Result<SwitchPlan, AdapterError> {
+        match self {
+            Self::Steam(steam) => steam.plan_switch(account),
+            Self::Epic(epic) => epic.plan_switch(account),
+        }
+    }
+
+    // Starts a game, with the right account signed in already. Returns what was sent.
+    pub fn launch_game(&self, launcher_game_id: &str) -> Result<String, AdapterError> {
+        match self {
+            Self::Steam(steam) => steam.launch_game(launcher_game_id),
+            Self::Epic(epic) => epic.launch_game(launcher_game_id),
+        }
+    }
+
+    // What the launcher's own files say about the session it remembers. None for a launcher that keeps a list of accounts instead.
+    pub fn session_state(&self) -> Option<Result<LauncherSessionState, AdapterError>> {
+        match self {
+            Self::Steam(_) => None,
+            Self::Epic(epic) => Some(epic.session_state()),
+        }
+    }
 }
 
 impl Launchers {
@@ -35,25 +134,80 @@ impl Launchers {
             vault,
             steam_timing: Timing::default(),
             steam_default_dir: steam::DEFAULT_DIR.to_owned(),
+            epic: EpicMachine::default(),
         }
     }
 
     // The launchers this build can scan, switch and start, in the order they are scanned.
-    pub const IMPLEMENTED: [LauncherId; 1] = [LauncherId::Steam];
+    pub const IMPLEMENTED: [LauncherId; 2] = [LauncherId::Steam, LauncherId::Epic];
 
-    pub fn steam_config(&self, settings: &Settings, data_dir: &Path) -> SteamConfig {
-        SteamConfig {
-            chosen_dir: settings.get(SettingKey::SteamPath).map(str::to_owned),
-            default_dir: self.steam_default_dir.clone(),
-            auto_login: settings.get_bool(SettingKey::SteamAutoLogin, false),
-            backups_to_keep: settings.get_int(SettingKey::BackupsKeep, DEFAULT_BACKUPS_TO_KEEP),
-            backups_dir: data_dir.join("backups").to_string_lossy().into_owned(),
-            timing: self.steam_timing,
+    pub fn configs(&self, settings: &Settings, data_dir: &Path) -> Configs {
+        let backups_to_keep = settings.get_int(SettingKey::BackupsKeep, DEFAULT_BACKUPS_TO_KEEP);
+        let backups_dir = data_dir.join("backups").to_string_lossy().into_owned();
+        Configs {
+            steam: SteamConfig {
+                chosen_dir: settings.get(SettingKey::SteamPath).map(str::to_owned),
+                default_dir: self.steam_default_dir.clone(),
+                auto_login: settings.get_bool(SettingKey::SteamAutoLogin, false),
+                backups_to_keep,
+                backups_dir: backups_dir.clone(),
+                timing: self.steam_timing,
+            },
+            epic: EpicConfig {
+                chosen_dir: settings.get(SettingKey::EpicPath).map(str::to_owned),
+                default_dir: self.epic.default_dir.clone(),
+                local_app_data: self.epic.local_app_data.clone(),
+                program_data: self.epic.program_data.clone(),
+                launch_uri_form: if settings.get(SettingKey::EpicLaunchUri) == Some("appname") {
+                    LaunchUriForm::AppName
+                } else {
+                    LaunchUriForm::Catalog
+                },
+                backups_to_keep,
+                backups_dir,
+                timing: self.epic.timing,
+            },
         }
     }
 
-    pub fn steam<'a>(&'a self, config: &'a SteamConfig) -> SteamAdapter<'a> {
-        SteamAdapter::new(&self.platform, config)
+    // `directory` answers the adapter's questions about One Launch's own accounts of that launcher.
+    pub fn adapter<'a>(
+        &'a self,
+        launcher: LauncherId,
+        configs: &'a Configs,
+        directory: &'a dyn Directory,
+    ) -> Result<Adapter<'a>, ServiceError> {
+        match launcher {
+            LauncherId::Steam => Ok(Adapter::Steam(SteamAdapter::new(
+                &self.platform,
+                &configs.steam,
+            ))),
+            LauncherId::Epic => Ok(Adapter::Epic(EpicAdapter::new(
+                &self.platform,
+                &configs.epic,
+                directory,
+            ))),
+            other => Err(ServiceError::NotImplemented(other)),
+        }
+    }
+
+    pub fn directory<'a>(&'a self, store: &'a Store, launcher: LauncherId) -> StoreDirectory<'a> {
+        StoreDirectory {
+            store,
+            vault: self.vault.as_ref(),
+            clock: self.platform.clock.as_ref(),
+            launcher,
+        }
+    }
+
+    pub fn backups<'a>(&'a self, data_dir: &Path, configs: &Configs) -> BackupService<'a> {
+        BackupService::new(
+            data_dir,
+            configs.backups_to_keep(),
+            self.platform.files.as_ref(),
+            self.platform.clock.as_ref(),
+            self.vault.as_ref(),
+        )
     }
 }
 
@@ -136,20 +290,20 @@ pub fn require_implemented(launcher: LauncherId) -> Result<(), ServiceError> {
     }
 }
 
-pub fn installed_games(steam: &SteamAdapter<'_>) -> Result<Vec<InstalledGame>, ServiceError> {
-    steam
-        .list_installed_games()
-        .map_err(ServiceError::adapter(LauncherId::Steam))
+pub fn installed_games(adapter: &Adapter<'_>) -> Result<Vec<InstalledGame>, ServiceError> {
+    adapter
+        .installed_games()
+        .map_err(ServiceError::adapter(adapter.launcher()))
 }
 
-// The accounts Steam remembers, each with the One Launch account that goes with it: the one with the same launcher id, else the one with the same login.
+// The accounts a launcher remembers, each with the One Launch account that goes with it: the one with the same launcher id, else the one with the same login.
 pub fn remembered_accounts(
     store: &Store,
-    steam: &SteamAdapter<'_>,
+    adapter: &Adapter<'_>,
 ) -> Result<Vec<RememberedAccount>, ServiceError> {
-    let launcher = LauncherId::Steam;
-    let mut entries = steam
-        .list_remembered_accounts()
+    let launcher = adapter.launcher();
+    let mut entries = adapter
+        .remembered_accounts()
         .map_err(ServiceError::adapter(launcher))?;
     for entry in &mut entries {
         let mut linked = None;
@@ -183,11 +337,11 @@ pub struct ImportResult {
 pub fn import_accounts(
     store: &Store,
     vault: &dyn Vault,
-    steam: &SteamAdapter<'_>,
+    adapter: &Adapter<'_>,
     keys: &[String],
     now: &str,
 ) -> Result<ImportResult, ServiceError> {
-    let remembered = remembered_accounts(store, steam)?;
+    let remembered = remembered_accounts(store, adapter)?;
     let mut result = ImportResult {
         accounts: Vec::new(),
         skipped: Vec::new(),
@@ -247,30 +401,42 @@ pub fn import_accounts(
 }
 
 // Reads every launcher this build knows again and brings the games table in line. A launcher that is not installed counts as having no games; any other failure is reported on its entry and leaves its rows alone.
-pub fn scan_library(store: &Store, steam: &SteamAdapter<'_>, now: &str) -> Vec<LibraryScanResult> {
-    let launcher = LauncherId::Steam;
-    let sync = |games: &[InstalledGame], installed: bool| match store.sync_games(
-        launcher,
-        games,
-        now,
-        || Uuid::new_v4().to_string(),
-    ) {
-        Ok(sync) => LibraryScanResult {
-            launcher,
-            added: sync.added,
-            updated: sync.updated,
-            removed: sync.removed,
-            installed,
-            error: None,
-        },
-        Err(error) => failed(launcher, error.to_string()),
-    };
-    let result = match installed_games(steam) {
-        Ok(games) => sync(&games, true),
-        Err(error) if error.code() == "NOT_INSTALLED" => sync(&[], false),
-        Err(error) => failed(launcher, error.to_string()),
-    };
-    vec![result]
+pub fn scan_library(
+    store: &Store,
+    launchers: &Launchers,
+    configs: &Configs,
+    now: &str,
+) -> Vec<LibraryScanResult> {
+    Launchers::IMPLEMENTED
+        .into_iter()
+        .map(|launcher| {
+            let sync = |games: &[InstalledGame], installed: bool| match store.sync_games(
+                launcher,
+                games,
+                now,
+                || Uuid::new_v4().to_string(),
+            ) {
+                Ok(sync) => LibraryScanResult {
+                    launcher,
+                    added: sync.added,
+                    updated: sync.updated,
+                    removed: sync.removed,
+                    installed,
+                    error: None,
+                },
+                Err(error) => failed(launcher, error.to_string()),
+            };
+            let directory = launchers.directory(store, launcher);
+            let games = launchers
+                .adapter(launcher, configs, &directory)
+                .and_then(|adapter| installed_games(&adapter));
+            match games {
+                Ok(games) => sync(&games, true),
+                Err(error) if error.code() == "NOT_INSTALLED" => sync(&[], false),
+                Err(error) => failed(launcher, error.to_string()),
+            }
+        })
+        .collect()
 }
 
 fn failed(launcher: LauncherId, error: String) -> LibraryScanResult {

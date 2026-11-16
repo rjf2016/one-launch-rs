@@ -8,7 +8,7 @@ use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, Mutex};
 
 use futures_lite::future::block_on;
-use ol_api::launchers::{Launchers, NewAccount, Secret, SteamTiming};
+use ol_api::launchers::{EpicMachine, EpicTiming, Launchers, NewAccount, Secret, SteamTiming};
 use ol_api::{ApiError, Backend, StartLaunch};
 use ol_model::{JobState, JobStepStatus, LaunchJob, LauncherId, SettingKey};
 use ol_sim::FakeLaunchers;
@@ -43,7 +43,11 @@ impl Fakes {
 
     fn game(&self) -> String {
         let library = block_on(self.backend.library()).unwrap();
-        library.games[0].game.id.clone()
+        let steam = library
+            .games
+            .iter()
+            .find(|entry| entry.game.launcher == LauncherId::Steam);
+        steam.expect("the scan found Steam's game").game.id.clone()
     }
 
     fn finished(&self) -> LaunchJob {
@@ -106,6 +110,12 @@ fn start(scratch: Scratch) -> Fakes {
     launchers
         .steam_default_dir
         .clone_from(&fake.steam_default_dir);
+    launchers.epic = EpicMachine {
+        timing: EpicTiming::with(&fake.epic_timing),
+        default_dir: fake.epic_default_dir.clone(),
+        local_app_data: fake.local_app_data.clone(),
+        program_data: fake.program_data.clone(),
+    };
     let (changed, jobs) = channel();
     let changed = Mutex::new(changed);
     let backend = Backend::start_with(
@@ -200,7 +210,8 @@ fn a_scan_brings_steams_games_into_the_library_and_a_missing_steam_takes_them_ou
     assert!(block_on(fakes.backend.library()).unwrap().games.is_empty());
 
     let scanned = block_on(fakes.backend.rescan()).unwrap();
-    assert_eq!(scanned.len(), 1);
+    let scanned_launchers: Vec<LauncherId> = scanned.iter().map(|scan| scan.launcher).collect();
+    assert_eq!(scanned_launchers, [LauncherId::Steam, LauncherId::Epic]);
     let steam = &scanned[0];
     assert_eq!(
         (
@@ -213,9 +224,16 @@ fn a_scan_brings_steams_games_into_the_library_and_a_missing_steam_takes_them_ou
         ),
         (LauncherId::Steam, 1, 0, 0, true, &None)
     );
-    let library = block_on(fakes.backend.library()).unwrap();
-    assert_eq!(library.games.len(), 1);
-    let game = &library.games[0].game;
+    let steams_games = || -> Vec<ol_model::Game> {
+        let library = block_on(fakes.backend.library()).unwrap();
+        let games = library.games.into_iter().map(|entry| entry.game);
+        games
+            .filter(|game| game.launcher == LauncherId::Steam)
+            .collect()
+    };
+    let found = steams_games();
+    assert_eq!(found.len(), 1);
+    let game = &found[0];
     assert_eq!(game.name, recorded["name"].as_str().unwrap());
     assert_eq!(
         game.launcher_game_id,
@@ -230,10 +248,7 @@ fn a_scan_brings_steams_games_into_the_library_and_a_missing_steam_takes_them_ou
 
     let again = &block_on(fakes.backend.rescan()).unwrap()[0];
     assert_eq!((again.added, again.updated, again.removed), (0, 1, 0));
-    assert_eq!(
-        block_on(fakes.backend.library()).unwrap().games[0].game.id,
-        id
-    );
+    assert_eq!(steams_games()[0].id, id);
 
     let from_files = block_on(fakes.backend.installed_games(LauncherId::Steam)).unwrap();
     assert_eq!(from_files.len(), 1);
@@ -245,7 +260,7 @@ fn a_scan_brings_steams_games_into_the_library_and_a_missing_steam_takes_them_ou
         (gone.removed, gone.installed, &gone.error),
         (1, false, &None)
     );
-    assert!(block_on(fakes.backend.library()).unwrap().games.is_empty());
+    assert!(steams_games().is_empty());
     assert_eq!(
         refusal(block_on(fakes.backend.installed_games(LauncherId::Steam))),
         (
@@ -335,11 +350,11 @@ fn the_accounts_steam_remembers_are_listed_and_imported_once() {
 
     assert_eq!(
         refusal(block_on(
-            fakes.backend.remembered_accounts(LauncherId::Epic)
+            fakes.backend.remembered_accounts(LauncherId::Battlenet)
         )),
         (
             "NOT_IMPLEMENTED",
-            "The Epic Games adapter is not available yet".to_owned()
+            "The Battle.net adapter is not available yet".to_owned()
         )
     );
     fakes.backend.shut_down();

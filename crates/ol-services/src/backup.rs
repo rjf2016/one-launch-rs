@@ -3,9 +3,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use ol_formats::winpath::{is_absolute, same_path};
+use ol_model::Ciphertext;
 use ol_model::{BackupSnapshot, LauncherId};
 use ol_platform_api::{Clock, Files};
+use ol_vault::{Secret, Vault, VaultError};
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -36,8 +40,8 @@ pub enum BackupError {
     },
     #[error("Snapshot file is corrupt: {0}")]
     Corrupt(String),
-    #[error("Snapshot file {0} is encrypted and no vault is available to decrypt it")]
-    Encrypted(String),
+    #[error(transparent)]
+    Vault(#[from] VaultError),
     #[error("The snapshot could not be read or written: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -58,6 +62,8 @@ pub struct BackupFile<'a> {
     pub source: &'a str,
     // Where it lands inside the snapshot, such as config/loginusers.vdf.
     pub relative: &'a str,
+    // The file holds a sign-in. Its copy is stored encrypted, as <relative>.enc, so that nothing under backups\ signs anyone in.
+    pub sensitive: bool,
 }
 
 pub struct SnapshotRequest<'a> {
@@ -69,6 +75,8 @@ pub struct SnapshotRequest<'a> {
     pub meta: Map<String, Value>,
     // A snapshot this one's clean-up must not remove: the one about to be put back.
     pub protect: Option<&'a str>,
+    // Why the snapshot holds the only copy of something, which keeps it out of the usual clean-up. Shown to the user, so it names no secret.
+    pub pinned: Option<&'a str>,
 }
 
 struct ManifestFile {
@@ -100,6 +108,7 @@ pub struct BackupService<'a> {
     keep: i64,
     files: &'a dyn Files,
     clock: &'a dyn Clock,
+    vault: &'a dyn Vault,
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -162,12 +171,19 @@ fn manifest_file(value: &Value) -> Option<ManifestFile> {
 }
 
 impl<'a> BackupService<'a> {
-    pub fn new(data_dir: &Path, keep: i64, files: &'a dyn Files, clock: &'a dyn Clock) -> Self {
+    pub fn new(
+        data_dir: &Path,
+        keep: i64,
+        files: &'a dyn Files,
+        clock: &'a dyn Clock,
+        vault: &'a dyn Vault,
+    ) -> Self {
         Self {
             root: data_dir.join("backups").to_string_lossy().into_owned(),
             keep,
             files,
             clock,
+            vault,
         }
     }
 
@@ -218,14 +234,22 @@ impl<'a> BackupService<'a> {
             };
             if self.files.exists(file.source) {
                 let bytes = self.files.read(file.source)?;
+                entry.encrypted = file.sensitive;
+                // A copy that holds a sign-in is the vault's ciphertext of the file in base64, as the Electron app stores it.
+                let kept = if file.sensitive {
+                    let sealed = self.vault.encrypt(&Secret::new(STANDARD.encode(&bytes)))?;
+                    sealed.into_bytes()
+                } else {
+                    bytes.clone()
+                };
                 let stored = Self::stored_path(&folder, &entry);
                 if let Some(parent) = stored.parent() {
                     fs::create_dir_all(parent)?;
                 }
-                fs::write(&stored, &bytes)?;
+                fs::write(&stored, &kept)?;
                 entry.existed = true;
                 entry.bytes = bytes.len() as u64;
-                entry.sha256 = Some(sha256_hex(&bytes));
+                entry.sha256 = Some(sha256_hex(&kept));
             }
             files.push(entry);
         }
@@ -236,22 +260,34 @@ impl<'a> BackupService<'a> {
             reason: request.reason.to_owned(),
             files,
             meta: request.meta.clone(),
-            pinned: None,
+            pinned: request
+                .pinned
+                .filter(|pinned| !pinned.is_empty())
+                .map(str::to_owned),
         };
-        let written = json!({
+        let mut written = json!({
             "version": 1,
             "launcher": manifest.launcher,
             "createdAt": manifest.created_at,
             "reason": manifest.reason,
-            "files": manifest.files.iter().map(|file| json!({
-                "relative": file.relative,
-                "source": file.source,
-                "existed": file.existed,
-                "bytes": file.bytes,
-                "sha256": file.sha256,
-            })).collect::<Vec<_>>(),
+            "files": manifest.files.iter().map(|file| {
+                let mut entry = json!({
+                    "relative": file.relative,
+                    "source": file.source,
+                    "existed": file.existed,
+                    "bytes": file.bytes,
+                    "sha256": file.sha256,
+                });
+                if file.encrypted {
+                    entry["encrypted"] = true.into();
+                }
+                entry
+            }).collect::<Vec<_>>(),
             "meta": manifest.meta,
         });
+        if let Some(pinned) = &manifest.pinned {
+            written["pinned"] = pinned.as_str().into();
+        }
         let text = serde_json::to_string_pretty(&written).expect("a manifest is plain JSON");
         let manifest_path = folder.join(MANIFEST_NAME).to_string_lossy().into_owned();
         self.files
@@ -364,9 +400,14 @@ impl<'a> BackupService<'a> {
             {
                 return Err(BackupError::Corrupt(file.relative.clone()));
             }
-            if file.encrypted {
-                return Err(BackupError::Encrypted(file.relative.clone()));
-            }
+            let bytes = if file.encrypted {
+                let opened = self.vault.decrypt(&Ciphertext::new(bytes))?;
+                STANDARD
+                    .decode(opened.expose())
+                    .map_err(|_| BackupError::Corrupt(file.relative.clone()))?
+            } else {
+                bytes
+            };
             files.push((file.source.clone(), bytes));
         }
         Ok(Restorable {

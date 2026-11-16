@@ -12,6 +12,6 @@ mod shell;
 pub use clock::FakeClock;
 pub use files::ScratchFiles;
 pub use oplog::OpLog;
-pub use processes::{FakeProcesses, ProcessKnobs};
+pub use processes::{CLOSE_ARGUMENT, FakeProcesses, ProcessKnobs};
 pub use registry::{FakeRegistry, RegistryValue};
 pub use shell::FakeShell;

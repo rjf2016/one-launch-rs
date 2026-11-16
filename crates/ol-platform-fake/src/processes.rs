@@ -7,6 +7,8 @@ use serde_json::Value;
 use crate::OpLog;
 
 const SECRET_ARGUMENT: &str = "<password>";
+// What a listener hears in place of arguments when a program is asked to close.
+pub const CLOSE_ARGUMENT: &str = "<close>";
 
 // How the fake process table behaves beyond "a started program runs".
 #[derive(Clone, Default)]
@@ -85,6 +87,13 @@ impl FakeProcesses {
         }
     }
 
+    fn listeners(&self) -> Vec<StartListener> {
+        self.listeners
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
     fn state(&self) -> MutexGuard<'_, State> {
         self.state
             .lock()
@@ -142,12 +151,7 @@ impl ProcessRunner for FakeProcesses {
                 ProcessArg::Plain(text) | ProcessArg::Secret(text) => (*text).to_owned(),
             })
             .collect();
-        let listeners = self
-            .listeners
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        for listener in listeners {
+        for listener in self.listeners() {
             listener(exe, &passed);
         }
         let image = image_of(exe);
@@ -158,6 +162,25 @@ impl ProcessRunner for FakeProcesses {
         } else if !state.start_fails.contains(&image) {
             state.running.insert(image);
         }
+        Ok(())
+    }
+
+    // The image goes after a few looks, as one started with -shutdown does.
+    fn close(&self, image: &str) -> Result<(), ProcessError> {
+        let lower = image.to_lowercase();
+        if self.state().elevated.contains(&lower) {
+            return Err(ProcessError::AccessDenied(image.to_owned()));
+        }
+        self.log.record(
+            "proc.close",
+            [("exe", image.into()), ("args", vec![CLOSE_ARGUMENT].into())],
+        );
+        for listener in self.listeners() {
+            listener(image, &[CLOSE_ARGUMENT.to_owned()]);
+        }
+        let mut state = self.state();
+        let polls = i64::from(state.shutdown_polls);
+        state.pending_shutdown = Some((lower, polls));
         Ok(())
     }
 

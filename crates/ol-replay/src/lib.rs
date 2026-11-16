@@ -5,12 +5,11 @@
 mod state;
 
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
 use futures_lite::future::block_on;
-use ol_api::launchers::{Launchers, NewAccount, Secret, SteamTiming};
+use ol_api::launchers::{EpicMachine, EpicTiming, Launchers, NewAccount, Secret, SteamTiming};
 use ol_api::{ApiError, Backend, StartLaunch};
 use ol_model::{JobState, LaunchJob, LauncherId, SettingKey};
 use ol_platform_api::Clock;
@@ -88,6 +87,8 @@ struct Watch {
     reached: bool,
     // The job thread stands still at its next wait until the script has acted.
     held: bool,
+    // The app this gate belongs to has crashed: its job thread never moves again.
+    abandoned: bool,
 }
 
 #[derive(Clone, Default)]
@@ -126,6 +127,9 @@ impl Gate {
     // The job is about to wait: when it is in the state the script waits for, it stands still here until the script lets it go.
     fn before_sleep(&self) {
         let mut watch = self.watch();
+        while watch.abandoned {
+            watch = self.wait(watch);
+        }
         let reached = match &watch.until {
             Some(until) => watch.jobs.values().any(|job| until.holds(job)),
             None => false,
@@ -139,6 +143,14 @@ impl Gate {
         while watch.held {
             watch = self.wait(watch);
         }
+    }
+
+    // Whatever thread waits at this gate next stays there, and so does one that stands there now.
+    fn hold_for_good(&self) {
+        let mut watch = self.watch();
+        watch.until = None;
+        watch.abandoned = true;
+        watch.held = true;
     }
 
     fn release(&self) {
@@ -257,6 +269,12 @@ impl<'a> Replay<'a> {
         launchers
             .steam_default_dir
             .clone_from(&fake.steam_default_dir);
+        launchers.epic = EpicMachine {
+            timing: EpicTiming::with(&fake.epic_timing),
+            default_dir: fake.epic_default_dir.clone(),
+            local_app_data: fake.local_app_data.clone(),
+            program_data: fake.program_data.clone(),
+        };
 
         let (log, gate) = (fake.log.clone(), self.gate.clone());
         let observer = move |job: &LaunchJob| {
@@ -285,6 +303,19 @@ impl<'a> Replay<'a> {
                         notes: String::new(),
                     }))?;
                 }
+                let accounts = block_on(backend.accounts())?;
+                for session in &fake.seed.sessions {
+                    let owner = accounts.iter().find(|account| {
+                        account.launcher == session.launcher && account.login == session.login
+                    });
+                    if let Some(owner) = owner {
+                        block_on(backend.seed_session(
+                            &owner.id,
+                            Some(session.launcher_uid.clone()),
+                            Secret::new(session.blob.clone()),
+                        ))?;
+                    }
+                }
                 for (key, value) in &fake.seed.settings {
                     if let Some(key) = SettingKey::parse(key) {
                         block_on(backend.set_setting(key, value.clone()))?;
@@ -303,6 +334,17 @@ impl<'a> Replay<'a> {
             .as_ref()
             .map(|running| &running.backend)
             .ok_or_else(|| script_error("the app is not running"))
+    }
+
+    // The process ends with none of its quit path run. A thread cannot be ended as a process can, so the switch is left standing at the wait it is in, for good: it writes nothing more, the journal and the files stay as they are, and the fake machine's memory goes with it.
+    fn crash(&mut self) {
+        if let Some(running) = self.running.take() {
+            self.events.extend(running.fake.log.snapshot());
+            self.now = running.fake.clock.now();
+            self.gate.hold_for_good();
+            self.gate = Gate::default();
+            std::mem::forget(running);
+        }
     }
 
     // The app quits: a running switch is stopped and waited for, and the database is closed.
@@ -431,6 +473,7 @@ impl<'a> Replay<'a> {
                 drop(block_on(backend.import_accounts(launcher()?, keys)));
             }
             "launchers:switchPlan" => drop(block_on(backend.switch_plan(&account(self)?))),
+            "sessions:get" => drop(block_on(backend.session(&account(self)?))),
             "launch:preflight" => {
                 let (account, game) = (account(self)?, game(self)?);
                 drop(block_on(
@@ -497,12 +540,14 @@ impl<'a> Replay<'a> {
                 self.shut_down();
                 Ok(())
             }
+            Some("crash") => {
+                self.crash();
+                Ok(())
+            }
             Some("restart") => {
                 self.shut_down();
                 if let Some(knobs) = step.get("knobs") {
                     ol_sim::write_knobs(&self.launchers_dir, knobs)?;
-                } else {
-                    let _ = fs::remove_file(self.launchers_dir.join("knobs.json"));
                 }
                 self.start()
             }

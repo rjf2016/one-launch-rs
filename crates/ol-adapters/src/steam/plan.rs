@@ -66,7 +66,7 @@ pub struct SwitchPreflight {
     pub close_message: String,
 }
 
-fn step(
+pub(crate) fn step(
     id: &'static str,
     kind: SwitchStepKind,
     title: &str,

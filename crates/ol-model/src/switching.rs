@@ -58,6 +58,38 @@ pub struct RememberedAccount {
     pub linked_account_id: Option<String>,
 }
 
+// A saved sign-in as anyone but the vault may see it: whose it is and the SHA-256 of what it holds, never the sign-in itself.
+#[derive(Clone, PartialEq, Eq)]
+pub struct LauncherSession {
+    pub account_id: String,
+    pub launcher: LauncherId,
+    pub launcher_uid: Option<String>,
+    pub fingerprint: String,
+    pub captured_at: String,
+    pub verified_at: Option<String>,
+    // Why the launcher refused it, until it is saved or confirmed again.
+    pub stale_reason: Option<String>,
+}
+
+// How the launcher's last sign-in ended, by its own log.
+#[derive(Clone, PartialEq, Eq)]
+pub struct LastSignIn {
+    pub ok: bool,
+    pub reason: Option<String>,
+}
+
+// What a launcher's own files say about the session it would sign in from now.
+#[derive(Clone, PartialEq, Eq)]
+pub struct LauncherSessionState {
+    pub launcher: LauncherId,
+    pub remembered: bool,
+    pub fingerprint: Option<String>,
+    pub launcher_uid: Option<String>,
+    pub linked_account_id: Option<String>,
+    pub launcher_running: bool,
+    pub last_sign_in: Option<LastSignIn>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SwitchStepKind {
     Process,

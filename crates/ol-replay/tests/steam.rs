@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-// A recorded run is held to its Steam part only, because this build has no code yet for the rest: the other three launchers (their games, files, registry values and saved sign-ins), artwork, the vault probe and the log lines are left out of every comparison here.
+// The recorded runs that turn on Steam alone, each held to its Steam part: the other launchers (their games, files, registry values and saved sign-ins), artwork, the vault probe and the log lines are left out of every comparison here. The runs that turn on Epic are in epic.rs.
 
 use std::fs;
 
@@ -195,7 +195,7 @@ fn import() {
     check_with("import", Accounts::SteamOnly);
 }
 
-// The script goes on to Epic, which this build has no adapter for. Its Steam half is replayed: a session that has expired, the hand-over to the user, a stop, and a wait that runs out. Left out with the rest of the script: the final state. Left out of the platform events: the two copies to the clipboard, which this build does not have yet.
+// The Steam half of a script that goes on to Epic, by itself: a session that has expired, the hand-over to the user, a stop, and a wait that runs out. epic.rs replays the whole script and holds what it leaves behind. Left out of the platform events: the two copies to the clipboard, which this build does not have yet.
 #[test]
 fn handover_up_to_the_first_epic_step() {
     let name = "handover";

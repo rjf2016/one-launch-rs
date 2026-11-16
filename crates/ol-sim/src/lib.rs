@@ -1,12 +1,14 @@
 #![forbid(unsafe_code)]
 
-// Fake launchers: a scenario folder laid down under a scratch folder, and a scripted Steam client that reacts to being started as the real one would. Nothing here reaches a real launcher, the real registry or the real process list.
+// Fake launchers: a scenario folder laid down under a scratch folder, and scripted Steam and Epic clients that react to being started as the real ones would. Nothing here reaches a real launcher, the real registry or the real process list.
 
+mod epic;
 mod scenario;
 mod steam;
 
+pub use epic::{EpicKnobs, EpicSim};
 pub use scenario::{
-    FakeLaunchers, ScenarioError, Seed, SeedAccount, lay_down, materialize,
+    FakeLaunchers, ScenarioError, Seed, SeedAccount, SeedSession, lay_down, materialize,
     materialize_in_real_time, write_knobs,
 };
 pub use steam::{SteamKnobs, SteamSim};

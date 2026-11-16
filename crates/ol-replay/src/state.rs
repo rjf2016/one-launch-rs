@@ -3,6 +3,9 @@
 use std::fs;
 use std::path::Path;
 
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
+use ol_formats::epic::session::read_session_from_ini;
 use ol_formats::steam::loginusers::parse_login_users;
 use ol_model::{Ciphertext, LauncherId};
 use ol_platform_fake::{FakeRegistry, RegistryValue};
@@ -15,6 +18,8 @@ use serde_json::{Map, Value, json};
 use crate::ReplayError;
 
 const STEAM_LOGIN_USERS: &str = "steam/config/loginusers.vdf";
+const EPIC_SETTINGS: &str =
+    "localappdata/EpicGamesLauncher/Saved/Config/Windows/GameUserSettings.ini";
 
 pub struct Read {
     pub state: Value,
@@ -88,6 +93,8 @@ fn rows(
             let value = row.get_ref(index)?;
             let shown = if name.ends_with("_enc") {
                 sealed(value, vault)
+            } else if name == "fingerprint" {
+                json!({ "sha256": value.as_str().unwrap_or_default() })
             } else {
                 match value {
                     ValueRef::Null => Value::Null,
@@ -108,7 +115,17 @@ fn text(row: &Map<String, Value>, column: &str) -> String {
     row[column].as_str().unwrap_or_default().to_owned()
 }
 
-fn backups(data_dir: &Path, launcher: LauncherId) -> Vec<Value> {
+// The bytes a snapshot holds of a file, as they were in the launcher's own: a copy stored encrypted is the vault's ciphertext of the file in base64.
+fn original(folder: &Path, relative: &str, encrypted: bool, vault: &dyn Vault) -> Option<Vec<u8>> {
+    if !encrypted {
+        return fs::read(folder.join(relative)).ok();
+    }
+    let sealed = fs::read(folder.join(format!("{relative}.enc"))).ok()?;
+    let opened = vault.decrypt(&Ciphertext::new(sealed)).ok()?;
+    STANDARD.decode(opened.expose()).ok()
+}
+
+fn backups(data_dir: &Path, launcher: LauncherId, vault: &dyn Vault) -> Vec<Value> {
     snapshot_ids(data_dir, launcher)
         .into_iter()
         .filter_map(|id| {
@@ -120,13 +137,14 @@ fn backups(data_dir: &Path, launcher: LauncherId) -> Vec<Value> {
                 .iter()
                 .map(|file| {
                     let relative = file["relative"].as_str().unwrap_or_default();
-                    let stored = fs::read(folder.join(relative)).ok();
+                    let encrypted = file["encrypted"] == true;
+                    let stored = original(&folder, relative, encrypted, vault);
                     json!({
                         "relative": relative,
                         "source": file["source"],
                         "existed": file["existed"],
                         "bytes": file["bytes"],
-                        "encrypted": file["encrypted"] == true,
+                        "encrypted": encrypted,
                         "sha256": stored.map(|bytes| sha256_hex(&bytes)),
                     })
                 })
@@ -163,6 +181,23 @@ fn login_users(launchers_dir: &Path) -> Option<Value> {
     Some(json!({ "bytes": bytes.len(), "sha256": sha256_hex(&bytes), "parsed": parsed }))
 }
 
+// Epic's settings file, and of the session it remembers only the digests.
+fn epic_settings(launchers_dir: &Path) -> Option<Value> {
+    let bytes = fs::read(launchers_dir.join(EPIC_SETTINGS)).ok()?;
+    let session = read_session_from_ini(&String::from_utf8_lossy(&bytes));
+    let digest = |value: &Option<String>| value.as_ref().map(|value| sha256_hex(value.as_bytes()));
+    Some(json!({
+        "bytes": bytes.len(),
+        "sha256": sha256_hex(&bytes),
+        "parsed": {
+            "remembered": session.remembered,
+            "enable": session.enable,
+            "dataSha256": digest(&session.data),
+            "offlineDataSha256": digest(&session.offline_data),
+        },
+    }))
+}
+
 // The final state, as the app left it once it had quit.
 pub fn read(
     data_dir: &Path,
@@ -189,6 +224,10 @@ pub fn read(
     )?;
     let settings =
         table("SELECT key, value FROM settings WHERE key <> 'window.bounds' ORDER BY key")?;
+    let sessions = table(
+        "SELECT s.account_id, s.launcher, s.launcher_uid, s.blob_enc, s.fingerprint, s.captured_at, s.verified_at, s.stale_reason
+         FROM launcher_sessions s JOIN accounts a ON a.id = s.account_id ORDER BY a.launcher, a.login",
+    )?;
 
     let mut ids = Vec::new();
     for account in &accounts {
@@ -225,7 +264,7 @@ pub fn read(
         }
         snapshots.insert(
             launcher.as_str().to_owned(),
-            backups(data_dir, launcher).into(),
+            backups(data_dir, launcher, vault).into(),
         );
     }
 
@@ -236,6 +275,9 @@ pub fn read(
     let mut launcher_files = Map::new();
     if let Some(file) = login_users(launchers_dir) {
         launcher_files.insert(STEAM_LOGIN_USERS.to_owned(), file);
+    }
+    if let Some(file) = epic_settings(launchers_dir) {
+        launcher_files.insert(EPIC_SETTINGS.to_owned(), file);
     }
     let as_values = |rows: Vec<Map<String, Value>>| -> Value {
         rows.into_iter()
@@ -250,6 +292,7 @@ pub fn read(
                 "accounts": as_values(accounts),
                 "games": as_values(games),
                 "launch_history": as_values(history),
+                "launcher_sessions": as_values(sessions),
                 "settings": as_values(settings),
             },
         },

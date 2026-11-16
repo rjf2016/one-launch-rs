@@ -4085,7 +4085,9 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
  "thiserror 2.0.21",
+ "zeroize",
 ]
 
 [[package]]
@@ -4156,6 +4158,7 @@ dependencies = [
 name = "ol-replay"
 version = "0.0.0"
 dependencies = [
+ "base64 0.23.1",
  "futures-lite",
  "ol-api",
  "ol-formats",
@@ -4221,6 +4224,7 @@ name = "ol-sim"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "base64 0.23.1",
  "ol-formats",
  "ol-model",
  "ol-platform-api",

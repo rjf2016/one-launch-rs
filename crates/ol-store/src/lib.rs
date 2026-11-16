@@ -6,6 +6,7 @@ mod launchers;
 mod migrations;
 mod open;
 mod read;
+mod sessions;
 #[cfg(test)]
 mod tests;
 mod write;
@@ -20,6 +21,7 @@ pub use error::StoreError;
 pub use launchers::{GameSync, NewAccount};
 pub use open::{MigrationReport, Snapshot};
 pub use read::{Ciphertexts, RowCounts};
+pub use sessions::NewSession;
 
 pub const DATABASE_FILE: &str = "onelaunch.db";
 pub const SCHEMA_VERSION: u32 = 5;
