@@ -20,6 +20,13 @@ pub mod epic {
     pub mod session;
 }
 
+pub mod riot {
+    pub mod client_log;
+    pub mod lockfile;
+    pub mod products;
+    pub mod session;
+}
+
 pub mod steam {
     pub mod bootstrap_log;
     pub mod login_log;
