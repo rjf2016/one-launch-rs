@@ -2,7 +2,8 @@
 
 use ol_formats::js;
 use ol_formats::steam::loginusers::{
-    SteamLoginUser, find_login_user, parse_login_users, plan_auto_login_rewrite, steam_id3,
+    SteamLoginUser, UNWRITABLE_LAYOUT, find_login_user, marks_most_recent, parse_login_users,
+    plan_auto_login_rewrite, steam_id3,
 };
 use ol_formats::winpath::join;
 use ol_model::{
@@ -180,7 +181,12 @@ impl SteamAdapter<'_> {
             _ => false,
         };
         let expected_id3 = target.as_ref().and_then(|user| steam_id3(&user.steam_id64));
-        let points_at_target = rewrite.as_ref().is_some_and(|rewrite| rewrite.noop) && same_user;
+        let unwritable = match (&rewrite, &target) {
+            (Some(rewrite), Some(target)) => !marks_most_recent(&rewrite.text, &target.steam_id64),
+            _ => false,
+        };
+        let points_at_target =
+            !unwritable && rewrite.as_ref().is_some_and(|rewrite| rewrite.noop) && same_user;
         // The files name the target, but the client that runs signed in as someone else, or as nobody yet.
         let signed_in_elsewhere = match expected_id3 {
             Some(id3) if points_at_target && running => !self.signed_in_as(&install, id3)?,
@@ -540,6 +546,9 @@ impl SteamAdapter<'_> {
             ));
         }
 
+        if unwritable {
+            warnings.insert(0, UNWRITABLE_LAYOUT.to_owned());
+        }
         let plan = SwitchPlan {
             launcher: LauncherId::Steam,
             account: PlanAccount {
@@ -558,7 +567,7 @@ impl SteamAdapter<'_> {
             steps,
             warnings,
             notes,
-            executable: true,
+            executable: !unwritable,
             generated_at: ol_store::iso_timestamp(now),
         };
         Ok((

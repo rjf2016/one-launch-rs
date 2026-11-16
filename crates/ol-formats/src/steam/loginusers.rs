@@ -257,3 +257,14 @@ pub fn plan_auto_login_rewrite(
         noop,
     })
 }
+
+pub const UNWRITABLE_LAYOUT: &str = "loginusers.vdf is laid out in a way One Launch cannot rewrite. Start Steam and close it, so that it writes the file again, then try again.";
+
+// Whether `text` makes `target` the account Steam signs in. The rewrite cannot say: on a layout the parser takes and the rewrite does not, such as a brace on the key's line or a comment after a flag, it changes nothing and reports nothing to change, as the recorded cases hold.
+pub fn marks_most_recent(text: &str, target: &str) -> bool {
+    parse_login_users(text).is_ok_and(|users| {
+        users
+            .iter()
+            .any(|user| user.steam_id64 == target && user.most_recent)
+    })
+}
