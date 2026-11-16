@@ -547,28 +547,20 @@ impl<S: System> ProcessRunner for Port<S> {
             .filter(|target| still.contains(target))
             .collect();
         let ended = self.system.end(&targets);
-        // Every chosen process counts; the image's own is named first, as it is what the caller waits to see gone.
+        // Only the image's own processes count, as in the Electron app: the caller waits to see the image gone, and a helper or a game it started that will not end is not what stands in a switch's way.
         let left = targets
             .iter()
             .zip(&ended)
+            .filter(|(target, _)| named(target, image))
             .filter(|(_, ended)| matches!(ended, Ended::Refused | Ended::Failed(_)))
-            .min_by_key(|(target, ended)| {
-                (!named(target, image), !matches!(ended, Ended::Refused))
-            });
-        let Some((target, ended)) = left else {
-            return Ok(());
-        };
-        let who = if named(target, image) {
-            image.to_owned()
-        } else {
-            format!("{}, which {image} started", target.name)
-        };
-        Err(match ended {
-            Ended::Failed(code) => {
-                ProcessError::Failed(format!("Could not end {who} (Windows error {code})"))
-            }
-            _ => ProcessError::AccessDenied(who),
-        })
+            .min_by_key(|(_, ended)| !matches!(ended, Ended::Refused));
+        match left {
+            None => Ok(()),
+            Some((_, Ended::Failed(code))) => Err(ProcessError::Failed(format!(
+                "Could not end {image} (Windows error {code})"
+            ))),
+            Some(_) => Err(ProcessError::AccessDenied(image.to_owned())),
+        }
     }
 }
 
@@ -1299,7 +1291,7 @@ mod tests {
     }
 
     #[test]
-    fn a_tree_end_that_leaves_a_chosen_process_running_says_which_and_one_already_gone_is_fine() {
+    fn a_tree_end_fails_over_the_images_own_process_alone_and_one_already_gone_is_fine() {
         let table = vec![
             entry(200, 4, 2, "explorer.exe"),
             entry(OWN, 200, 3, "OneLaunch.exe"),
@@ -1319,17 +1311,9 @@ mod tests {
         let everything = HashSet::from([400, 410, 411, 420]);
 
         let (refused_child, ended) = kill(&[(420, Ended::Refused)], true);
-        assert_eq!(
-            refused_child,
-            Err(ProcessError::AccessDenied(
-                "Game.exe, which steam.exe started".to_owned()
-            ))
-        );
+        assert_eq!(refused_child, Ok(()));
         assert_eq!(ended, everything);
-        assert_eq!(
-            refused_child.unwrap_err().to_string(),
-            "Windows would not let One Launch close Game.exe, which steam.exe started. It is most likely running as administrator: close it yourself, or start One Launch as administrator too, then try again."
-        );
+        assert_eq!(kill(&[(411, Ended::Failed(31))], true).0, Ok(()));
 
         let (refused_parent, ended) = kill(&[(400, Ended::Refused)], true);
         assert_eq!(
@@ -1341,13 +1325,6 @@ mod tests {
             kill(&[(400, Ended::Failed(31)), (411, Ended::Refused)], true).0,
             Err(ProcessError::Failed(
                 "Could not end steam.exe (Windows error 31)".to_owned()
-            ))
-        );
-        assert_eq!(
-            kill(&[(411, Ended::Failed(31))], true).0,
-            Err(ProcessError::Failed(
-                "Could not end steamwebhelper.exe, which steam.exe started (Windows error 31)"
-                    .to_owned()
             ))
         );
         assert_eq!(
