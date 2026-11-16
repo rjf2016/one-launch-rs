@@ -1,5 +1,7 @@
 // How both file ports write: each file to a new temporary file beside its target, and each target's old content kept beside it under a second new name, by a hard link or else a copy; then each new file is moved over its target, which is never missing. A move that fails puts back every target already replaced, so a failure leaves each as it was; nothing but the targets is left behind, and a folder made for a write that failed is removed again.
 
+use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
@@ -11,6 +13,10 @@ const ATTEMPTS: usize = 16;
 
 static NAMED: AtomicU64 = AtomicU64::new(0);
 
+thread_local! {
+    static FIRST: RefCell<VecDeque<PathBuf>> = const { RefCell::new(VecDeque::new()) };
+}
+
 struct Staged<'a> {
     target: PathBuf,
     bytes: &'a [u8],
@@ -20,18 +26,32 @@ struct Staged<'a> {
     stuck: bool,
 }
 
-// A name no file had a moment ago, from this process, a count and the clock: the file is made with `create_new`, so one that has it already is never opened, and the next name is tried.
-fn fresh_name(target: &Path, suffix: &str) -> PathBuf {
-    let count = NAMED.fetch_add(1, Ordering::Relaxed);
-    let clock = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |since| since.as_nanos());
+pub(crate) fn name_beside(target: &Path, suffix: &str, count: u64, clock: u128) -> PathBuf {
     let mut name = OsString::from(target.as_os_str());
     name.push(format!(
         ".onelaunch-{}-{count}-{clock:x}.{suffix}",
         std::process::id()
     ));
     PathBuf::from(name)
+}
+
+// A name no file had a moment ago, from this process, a count and the clock: the file is made with `create_new`, so one that has it already is never opened, and the next name is tried.
+fn fresh_name(target: &Path, suffix: &str) -> PathBuf {
+    if let Some(first) = FIRST.with_borrow_mut(VecDeque::pop_front) {
+        return first;
+    }
+    let count = NAMED.fetch_add(1, Ordering::Relaxed);
+    let clock = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_nanos());
+    name_beside(target, suffix, count, clock)
+}
+
+// For the contract: the writes `write` makes on this thread try `names` first, in turn, so a test can have a name taken before the writer picks it. Gives back how many were not tried.
+pub(crate) fn trying_first<R>(names: Vec<PathBuf>, write: impl FnOnce() -> R) -> (R, usize) {
+    FIRST.set(names.into());
+    let written = write();
+    (written, FIRST.take().len())
 }
 
 fn beside(

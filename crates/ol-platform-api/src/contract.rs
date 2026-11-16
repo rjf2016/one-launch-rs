@@ -1,11 +1,13 @@
 // What a registry port and a file port must both do, the fake's and the real one: the tests of each run these, so the pipeline proven on the fakes meets the same behaviour on the machine.
 
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io;
 use std::os::windows::fs::OpenOptionsExt;
+use std::path::Path;
 
 use time::{Duration, OffsetDateTime};
 
+use crate::atomic::{name_beside, trying_first};
 use crate::{Files, Hive, Registry, RegistryData};
 
 fn names(listed: &[crate::RegistryNamedValue]) -> Vec<&str> {
@@ -211,20 +213,24 @@ pub fn files(files: &dyn Files, folder: &str) {
     assert_eq!(files.list(folder).unwrap(), ["b.txt", "blocker", "sub"]);
     assert_eq!(files.list(&path("sub")).unwrap(), ["a.txt"]);
 
-    // A file that already has a name the write could pick for itself is neither followed, emptied nor moved.
-    let planted = |suffix: &str| format!("{second}.onelaunch-{}.{suffix}", std::process::id());
-    for suffix in ["tmp", "old"] {
-        std::fs::write(planted(suffix), b"planted").unwrap();
-    }
-    files.write_atomic(&[(&second, b"newest")]).unwrap();
+    // A file that already has the name the write picks first, the temporary file's a hard link to another file, is neither followed, emptied, moved nor removed, and the write takes the next name.
+    let elsewhere = path("elsewhere.txt");
+    fs::write(&elsewhere, b"elsewhere").unwrap();
+    let temporary = name_beside(Path::new(&second), "tmp", 0, 0);
+    let aside = name_beside(Path::new(&second), "old", 0, 0);
+    fs::hard_link(&elsewhere, &temporary).unwrap();
+    fs::write(&aside, b"planted").unwrap();
+    let (written, untried) = trying_first(vec![temporary.clone(), aside.clone()], || {
+        files.write_atomic(&[(&second, b"newest")])
+    });
+    written.unwrap();
+    assert_eq!(untried, 0, "the write did not try the planted names");
     assert_eq!(files.read(&second).unwrap(), b"newest");
-    for suffix in ["tmp", "old"] {
-        assert_eq!(
-            files.read(&planted(suffix)).unwrap(),
-            b"planted",
-            "{suffix}"
-        );
-        std::fs::remove_file(planted(suffix)).unwrap();
+    assert_eq!(fs::read(&elsewhere).unwrap(), b"elsewhere");
+    assert_eq!(fs::read(&temporary).unwrap(), b"elsewhere");
+    assert_eq!(fs::read(&aside).unwrap(), b"planted");
+    for planted in [&temporary, &aside, Path::new(&elsewhere)] {
+        fs::remove_file(planted).unwrap();
     }
     assert_eq!(files.list(folder).unwrap(), ["b.txt", "blocker", "sub"]);
 }
