@@ -412,12 +412,18 @@ impl<'a> RiotAdapter<'a> {
 
     // One record for each `<product>.<patchline>` folder under Metadata, installed or not.
     fn products(&self) -> Vec<ProductRecord> {
+        self.listed_products().0
+    }
+
+    // The products, and why the list can be short: a metadata folder that could not be listed gives none.
+    fn listed_products(&self) -> (Vec<ProductRecord>, Option<String>) {
         let dir = self.metadata_dir();
         if !self.files.exists(&dir) {
-            return Vec::new();
+            return (Vec::new(), None);
         }
-        let Ok(names) = self.files.list(&dir) else {
-            return Vec::new();
+        let names = match self.files.list(&dir) {
+            Ok(names) => names,
+            Err(error) => return (Vec::new(), Some(format!("Could not list {dir}: {error}"))),
         };
         let mut records: Vec<ProductRecord> = names
             .iter()
@@ -445,7 +451,7 @@ impl<'a> RiotAdapter<'a> {
             })
             .collect();
         records.sort_by(|a, b| a.id.id().cmp(b.id.id()));
-        records
+        (records, None)
     }
 
     // What Windows' list of apps calls the product, from its uninstall entry.
@@ -506,9 +512,17 @@ impl<'a> RiotAdapter<'a> {
 
     // The client logs every product's patch state at each start and again when it changes, so the newest run's last word on a product stands until the next run.
     pub fn list_installed_games(&self) -> Result<Vec<InstalledGame>, AdapterError> {
+        Ok(self.scan_installed_games()?.0)
+    }
+
+    // The games, and why the list can be short.
+    pub fn scan_installed_games(
+        &self,
+    ) -> Result<(Vec<InstalledGame>, Option<String>), AdapterError> {
         self.require_install()?;
         let out_of_date = products_needing_update(&self.current_run_events());
-        Ok(self.games_from(&self.products(), &out_of_date))
+        let (products, unread) = self.listed_products();
+        Ok((self.games_from(&products, &out_of_date), unread))
     }
 
     // The current run's log: the newest by name, which holds the local time the run started, that is not the few lines a second RiotClientServices.exe leaves behind.

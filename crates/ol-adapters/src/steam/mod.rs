@@ -263,9 +263,16 @@ impl<'a> SteamAdapter<'a> {
     }
 
     pub fn list_installed_games(&self) -> Result<Vec<InstalledGame>, AdapterError> {
+        Ok(self.scan_installed_games()?.0)
+    }
+
+    // The games, and why the list can be short: a library list that could not be read leaves out every library but the main one.
+    pub fn scan_installed_games(
+        &self,
+    ) -> Result<(Vec<InstalledGame>, Option<String>), AdapterError> {
         let install = self.require_install()?;
         let files = self.platform.files.as_ref();
-        let (folders, _) = self.library_folders(&install);
+        let (folders, unread) = self.library_folders(&install);
         let mut games = Vec::new();
         let mut seen = HashSet::new();
         for library in folders {
@@ -303,7 +310,7 @@ impl<'a> SteamAdapter<'a> {
             }
         }
         games.sort_by_cached_key(|game| game.name.to_lowercase());
-        Ok(games)
+        Ok((games, unread))
     }
 
     pub fn read_login_users(
