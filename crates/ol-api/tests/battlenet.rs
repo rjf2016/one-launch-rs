@@ -1054,3 +1054,84 @@ fn a_sign_in_as_another_account_while_the_token_is_awaited_is_not_saved_for_the_
     );
     fakes.backend.shut_down();
 }
+
+#[test]
+fn a_sign_in_as_another_account_while_the_token_is_awaited_ends_the_switch_as_a_wrong_account_and_starts_no_game()
+ {
+    let first = "0c3d4e5f";
+    let fakes = fakes(None);
+    let new = fakes.account(NEW);
+    let before = fakes.tokens();
+    // As above: a sign-in by hand is logged once the client is up, and at the next look the user signs in as Main. The hook never panics, so a failure here cannot strand the job.
+    let client = Arc::clone(fakes.fake.battlenet.as_ref().unwrap());
+    let processes = Arc::clone(&fakes.fake.platform.processes);
+    let logs = fakes
+        .scratch
+        .join("launchers")
+        .join("localappdata/Battle.net/Logs");
+    let main_uid = account_id_of(MAIN);
+    let looks = std::sync::atomic::AtomicU32::new(0);
+    fakes.fake.clock.before_sleep(move || {
+        if !processes.is_running("Battle.net.exe").unwrap_or(false) {
+            return;
+        }
+        match looks.fetch_add(1, Ordering::SeqCst) {
+            0 => {
+                let mut names: Vec<_> = fs::read_dir(&logs)
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .map(|entry| entry.path())
+                    .collect();
+                names.sort();
+                if let Some(newest) = names.pop()
+                    && let Ok(mut text) = fs::read_to_string(&newest)
+                {
+                    text.push_str(&format!(
+                        "I 2026-09-13 03:21:00.000000 [BNLogin] {{Main}} Logged into Battle.net successfully. |bnet=1:0:{first}|game=2:100000000:0a1b2c3\r\n"
+                    ));
+                    let _ = fs::write(&newest, text);
+                }
+            }
+            1 => client.sign_in_by_hand(Some(&main_uid)),
+            _ => {}
+        }
+    });
+    let states = fakes.play(NEW);
+    let last = states.last().unwrap();
+    assert!(
+        last.state == JobState::Failed && !last.switched,
+        "{:?}",
+        last.error
+    );
+    assert_eq!(
+        last.error.as_deref(),
+        Some(
+            "Battle.net signed in as Main (account …2c3d) instead of New (…4e5f). Sign in to the client as new@example.com, or fix the account ID on the account page."
+        )
+    );
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(
+        detail(last, "verify"),
+        format!("Signed in as {NEW}. Linked to Battle.net account …4e5f.")
+    );
+    assert_eq!(step("recapture").status, JobStepStatus::Failed);
+    assert_eq!(
+        detail(last, "recapture"),
+        "Not saved: the client signed in as account …2c3d meanwhile."
+    );
+    assert_ne!(step("launch").status, JobStepStatus::Done);
+    // The snapshot went back, as for a wrong account seen at the sign-in, and the client was started once, by the switch, and never for the game.
+    assert_eq!(last.restored, Some(true));
+    assert_eq!(fakes.tokens(), before);
+    assert!(fs::read(fakes.config_file()).unwrap() == fixture_config());
+    let asked = asked_of_the_machine(&fakes);
+    assert_eq!(asked.iter().filter(|op| *op == "proc.start").count(), 1);
+    assert!(
+        block_on(fakes.backend.session(&new.id))
+            .unwrap()
+            .session
+            .is_none()
+    );
+    fakes.backend.shut_down();
+}

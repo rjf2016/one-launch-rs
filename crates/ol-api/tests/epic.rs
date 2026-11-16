@@ -869,3 +869,75 @@ fn a_sign_in_as_another_account_while_the_session_is_awaited_is_not_saved_for_th
     );
     fakes.backend.shut_down();
 }
+
+#[test]
+fn a_sign_in_as_another_account_while_the_session_is_awaited_ends_the_switch_as_a_wrong_account_and_starts_no_game()
+ {
+    let first = "55555555555555555555555555555555";
+    let fakes = fakes(None);
+    let new = fakes.account("new@example.com");
+    // As above: a sign-in by hand is logged as soon as the launcher is up, and at the next look the user signs in as Main. The hook never panics, so a failure here cannot strand the job.
+    let launcher = Arc::clone(fakes.fake.epic.as_ref().unwrap());
+    let processes = Arc::clone(&fakes.fake.platform.processes);
+    let log = fakes
+        .scratch
+        .join("launchers")
+        .join("localappdata/EpicGamesLauncher/Saved/Logs/EpicGamesLauncher.log");
+    let main_uid = account_id_of(MAIN);
+    let looks = std::sync::atomic::AtomicU32::new(0);
+    fakes.fake.clock.before_sleep(move || {
+        if !processes
+            .is_running("EpicGamesLauncher.exe")
+            .unwrap_or(false)
+        {
+            return;
+        }
+        match looks.fetch_add(1, std::sync::atomic::Ordering::SeqCst) {
+            0 => {
+                if let Ok(mut text) = fs::read_to_string(&log) {
+                    text.push_str(&format!(
+                        "[..]FAccountService::OnLoginComplete - 0 TRUE {first} \r\n"
+                    ));
+                    let _ = fs::write(&log, text);
+                }
+            }
+            1 => launcher.sign_in_by_hand(Some(&main_uid)),
+            _ => {}
+        }
+    });
+    let states = fakes.play("new@example.com");
+    let last = states.last().unwrap();
+    assert!(
+        last.state == JobState::Failed && !last.switched,
+        "{:?}",
+        last.error
+    );
+    assert_eq!(
+        last.error.as_deref(),
+        Some(
+            "Epic Games Launcher signed in as Main (account …333333) instead of New (…555555). Sign in to the launcher as new@example.com, or fix the launcher account ID on the account page."
+        )
+    );
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert_eq!(step("recapture").status, JobStepStatus::Failed);
+    assert!(
+        step("recapture")
+            .detail
+            .starts_with("Not saved: the launcher signed in as account …333333"),
+        "{}",
+        step("recapture").detail
+    );
+    assert_ne!(step("launch").status, JobStepStatus::Done);
+    // The snapshot went back, as for a wrong account seen at the sign-in, and no game was started.
+    assert_eq!(last.restored, Some(true));
+    assert!(fs::read(fakes.settings_file()).unwrap() == fixture_settings());
+    assert!(!asked_of_the_machine(&fakes).contains(&"shell.open".to_owned()));
+    assert!(
+        block_on(fakes.backend.session(&new.id))
+            .unwrap()
+            .session
+            .is_none()
+    );
+    fakes.backend.shut_down();
+}
