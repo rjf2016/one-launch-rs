@@ -1,4 +1,4 @@
-// The process list, a close by window, an end, and a start, from the kernel's own process table: no process is opened to list it, to name its file or to close its windows, and one is opened only to end it. Which process may be touched is decided here, in plain functions; the calls to Windows sit behind `System`, so a made-up table can show that a Riot game, Vanguard and whatever they started are never handed to them.
+// The process list, a close by window, an end, and a start, from the kernel's own process table: no process is opened to list it, to name its file or to close its windows, and one is opened only to end it. Which process may be touched is decided here, in plain functions; the calls to Windows sit behind `System`, so a made-up table can show that a Riot game, Vanguard and whatever they started are never chosen. Windows answers by id and by window handle, which it hands out again: one handed to such a process between the last read of the table and the call is the window that is left.
 
 mod command_line;
 mod win32;
@@ -138,6 +138,10 @@ fn ancestors(entries: &[Entry], own_pid: u32) -> HashSet<u32> {
 
 fn named(entry: &Entry, image: &str) -> bool {
     image_key(&entry.name) == image_key(image)
+}
+
+fn same_process(entry: &Entry, now: &Entry) -> bool {
+    now.pid == entry.pid && now.created == entry.created && now.name == entry.name
 }
 
 fn session_of(entries: &[Entry], own_pid: u32) -> Option<u32> {
@@ -342,6 +346,7 @@ impl<S: System> ProcessLister for Port<S> {
             .any(|entry| !entry.name.is_empty() && named(entry, image)))
     }
 
+    // A path is asked by id: the table is read again just before, so an id handed to another process since is not asked, and just after, so a path that may be another process's is dropped.
     fn list_processes(&self) -> Result<Vec<ProcessInfo>, ProcessError> {
         let entries = self.system.snapshot()?;
         let wanted = path_wanted(&entries);
@@ -350,16 +355,41 @@ impl<S: System> ProcessLister for Port<S> {
             .zip(wanted)
             .filter(|(entry, _)| !entry.name.is_empty())
             .collect();
-        let asked: Vec<u32> = named
+        let before = self.system.snapshot()?;
+        let still_wanted = path_wanted(&before);
+        let before_by_pid: HashMap<u32, (&Entry, bool)> = before
             .iter()
-            .filter(|(_, wanted)| *wanted)
-            .map(|(entry, _)| entry.pid)
+            .zip(still_wanted)
+            .map(|(entry, wanted)| (entry.pid, (entry, wanted)))
             .collect();
-        let mut paths = self.system.image_paths(&asked).into_iter();
+        let asked: Vec<&Entry> = named
+            .iter()
+            .filter(|(entry, wanted)| {
+                *wanted
+                    && before_by_pid
+                        .get(&entry.pid)
+                        .is_some_and(|(now, wanted)| *wanted && same_process(entry, now))
+            })
+            .map(|(entry, _)| entry)
+            .collect();
+        let pids: Vec<u32> = asked.iter().map(|entry| entry.pid).collect();
+        let found = self.system.image_paths(&pids);
+        let after = self.system.snapshot()?;
+        let after_by_pid = index(&after);
+        let mut paths: HashMap<u32, String> = asked
+            .iter()
+            .zip(found)
+            .filter_map(|(entry, path)| {
+                let kept = after_by_pid
+                    .get(&entry.pid)
+                    .is_some_and(|now| same_process(entry, now));
+                Some((entry.pid, path.filter(|_| kept)?))
+            })
+            .collect();
         Ok(named
             .into_iter()
-            .map(|(entry, wanted)| ProcessInfo {
-                path: if wanted { paths.next().flatten() } else { None },
+            .map(|(entry, _)| ProcessInfo {
+                path: paths.remove(&entry.pid),
                 name: entry.name,
                 pid: entry.pid,
             })
@@ -436,10 +466,16 @@ impl<S: System> ProcessRunner for Port<S> {
                 "One Launch was started from {image}, so it will not end it. Close {image} yourself, or start One Launch on its own, then try again."
             )));
         }
-        let targets = end_targets(&entries, image, tree, own_pid);
-        if targets.is_empty() {
+        let chosen = end_targets(&entries, image, tree, own_pid);
+        if chosen.is_empty() {
             return Ok(());
         }
+        // Chosen again from a table read just before the opens: an id handed to another process since, or a process that now has a Riot game below it, is left.
+        let still = end_targets(&self.system.snapshot()?, image, tree, own_pid);
+        let targets: Vec<Entry> = chosen
+            .into_iter()
+            .filter(|target| still.contains(target))
+            .collect();
         let ended = self.system.end(&targets);
         let (mut denied, mut failed) = (false, None);
         for (target, ended) in targets.iter().zip(ended) {
@@ -521,10 +557,13 @@ mod tests {
         posted: Vec<isize>,
         pathed: Vec<u32>,
         created: Vec<String>,
+        reads: usize,
     }
 
     struct MadeUp {
         entries: Vec<Entry>,
+        // The tables the reads after the first one see, in turn; the last one stays.
+        then: Vec<Vec<Entry>>,
         windows: Vec<TopWindow>,
         calls: Mutex<Calls>,
         refuse: bool,
@@ -560,6 +599,7 @@ mod tests {
                 .collect();
             Self {
                 entries,
+                then: Vec::new(),
                 windows,
                 calls: Mutex::default(),
                 refuse: false,
@@ -577,7 +617,15 @@ mod tests {
         }
 
         fn snapshot(&self) -> Result<Vec<Entry>, ProcessError> {
-            Ok(self.entries.clone())
+            let mut calls = self.calls();
+            calls.reads += 1;
+            let later = calls.reads.checked_sub(2).map(|at| {
+                self.then
+                    .get(at)
+                    .or(self.then.last())
+                    .unwrap_or(&self.entries)
+            });
+            Ok(later.unwrap_or(&self.entries).clone())
         }
 
         fn top_windows(&self) -> Vec<TopWindow> {
@@ -788,6 +836,75 @@ mod tests {
         );
         let windows = MadeUp::new(table.clone()).windows;
         assert!(close_targets(&table, &windows, &table, "Agent.exe", OWN).is_empty());
+    }
+
+    #[test]
+    fn an_id_handed_to_another_process_before_the_open_is_not_opened() {
+        let first = vec![
+            entry(200, 4, 2, "explorer.exe"),
+            entry(OWN, 200, 3, "OneLaunch.exe"),
+            entry(400, 200, 10, "steam.exe"),
+            entry(410, 400, 11, "steamwebhelper.exe"),
+            entry(420, 400, 12, "Game.exe"),
+            entry(430, 400, 13, "Overlay.exe"),
+        ];
+        let mut taken = first.clone();
+        taken[2] = entry(400, 200, 50, "VALORANT.exe");
+        let mut gone = first.clone();
+        gone.retain(|entry| entry.pid != 420);
+        let mut riot_below = first.clone();
+        riot_below.push(entry(431, 430, 14, "LeagueClient.exe"));
+
+        let ended = |then: Vec<Entry>, image: &str| {
+            let mut made_up = MadeUp::new(first.clone());
+            made_up.then = vec![then];
+            let processes = Port { system: made_up };
+            let _ = processes.kill(image, true);
+            let calls = processes.system.calls();
+            calls.ended.iter().copied().collect::<HashSet<_>>()
+        };
+        assert_eq!(
+            ended(first.clone(), "steam.exe"),
+            HashSet::from([400, 410, 420, 430])
+        );
+        assert!(ended(taken, "steam.exe").is_empty());
+        assert_eq!(ended(gone, "steam.exe"), HashSet::from([400, 410, 430]));
+        assert_eq!(
+            ended(riot_below, "steam.exe"),
+            HashSet::from([400, 410, 420])
+        );
+    }
+
+    #[test]
+    fn a_path_is_asked_only_of_a_process_that_stayed_the_same_and_kept_only_while_it_does() {
+        let first = table();
+        let mut taken = first.clone();
+        let reused = taken.iter_mut().find(|entry| entry.pid == 410).unwrap();
+        *reused = entry(410, 300, 60, "VALORANT.exe");
+        let mut renewed = taken.clone();
+        renewed
+            .iter_mut()
+            .find(|entry| entry.pid == 420)
+            .unwrap()
+            .created = 70;
+
+        let mut made_up = MadeUp::new(first);
+        made_up.then = vec![taken, renewed];
+        let processes = Port { system: made_up };
+        let listed = processes.list_processes().unwrap();
+        let path = |pid: u32| {
+            listed
+                .iter()
+                .find(|process| process.pid == pid)
+                .unwrap()
+                .path
+                .clone()
+        };
+        assert!(!processes.system.calls().pathed.contains(&410));
+        assert_eq!(path(410), None);
+        assert_eq!(path(420), None);
+        assert_eq!(path(400).as_deref(), Some(r"D:\made-up\400.exe"));
+        assert_eq!(path(200).as_deref(), Some(r"D:\made-up\200.exe"));
     }
 
     #[test]

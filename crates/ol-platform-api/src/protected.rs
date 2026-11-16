@@ -1,4 +1,4 @@
-// Riot's games and Vanguard. A port never opens, asks the path of, closes or ends a process with one of these names, nor anything one of them started: their names are all that is ever read of them.
+// Riot's games and Vanguard. A port never chooses to open, ask the path of, close or end a process with one of these names, nor anything one of them started. Windows names a process by an id it hands out again, so one handed to such a process between a port's last read of the table and its call is the window that is left.
 pub const PROTECTED_IMAGES: [&str; 12] = [
     "VALORANT.exe",
     "VALORANT-Win64-Shipping.exe",
