@@ -817,13 +817,17 @@ impl Switch<'_> {
     }
 
     // The client writes its token at a sign-in and its config when it exits, so it is closed before the snapshot goes back. Nothing stops this once it has begun.
+    // A client that will not close keeps the snapshot for the next start: it would write its own token and list over the ones put back.
     fn roll_back(&self, backup_id: &str) -> Result<(), String> {
-        if self
-            .battlenet
-            .is_running()
-            .map_err(|error| error.to_string())?
-        {
-            let _ = self.battlenet.shutdown(None, &CancelToken::new());
+        let text = |error: AdapterError| error.to_string();
+        if self.battlenet.is_running().map_err(text)? {
+            let closed = self.battlenet.shutdown(None, &CancelToken::new());
+            if self.battlenet.is_running().map_err(text)? {
+                return Err(closed.err().map_or_else(
+                    || "Battle.net is still running, and it rewrites Battle.net.config while it runs".to_owned(),
+                    text,
+                ));
+            }
         }
         restore_battlenet(self.battlenet, self.platform, self.backups, backup_id)
             .map(|_| ())

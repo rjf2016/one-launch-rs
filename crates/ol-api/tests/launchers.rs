@@ -563,6 +563,50 @@ fn a_stored_password_goes_to_steams_command_line_and_nowhere_else() {
 }
 
 #[test]
+fn a_failed_switch_is_not_put_back_under_a_steam_that_will_not_close() {
+    let stuck = json!({
+        "processes": { "elevated": ["steam.exe"], "shutdownPolls": 100_000 },
+        "knobs": { "steam": { "expiredSessions": ["user_3"] } },
+        "timing": { "steam": { "shutdownMs": 1000, "killGraceMs": 500 } }
+    });
+    let fakes = fakes(Some(&stuck));
+    block_on(
+        fakes
+            .backend
+            .set_setting(SettingKey::SteamAutoLogin, "true".to_owned()),
+    )
+    .unwrap();
+    let login_users = fakes
+        .launchers_dir()
+        .join("steam")
+        .join("config")
+        .join("loginusers.vdf");
+    let switch = StartLaunch {
+        account_id: fakes.account("user_3"),
+        game_id: None,
+        confirm_close: false,
+    };
+    block_on(fakes.backend.start_launch(switch)).unwrap();
+    let job = fakes.finished();
+    assert_eq!(job.state, JobState::Failed);
+    assert_eq!(job.restored, Some(false), "{:?}", job.error);
+    let written = fs::read(&login_users).unwrap();
+    assert!(
+        job.error
+            .as_deref()
+            .is_some_and(|error| error.contains("Windows would not let One Launch close steam.exe"))
+    );
+
+    let fakes = fakes.restart();
+    let pending = block_on(fakes.backend.recovery())
+        .unwrap()
+        .expect("the snapshot is offered at the next start");
+    assert_eq!(Some(pending.backup_id), job.backup_id);
+    assert_eq!(fs::read(&login_users).unwrap(), written);
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn a_switch_the_last_run_did_not_finish_is_offered_and_put_back() {
     let fakes = fakes(None);
     block_on(fakes.backend.rescan()).unwrap();

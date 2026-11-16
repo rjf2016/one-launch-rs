@@ -748,10 +748,20 @@ impl Switch<'_> {
         Ok(ending)
     }
 
-    // Steam rewrites loginusers.vdf when it exits, so it is closed before the file goes back. Nothing stops this once it has begun.
+    // Steam rewrites loginusers.vdf when it exits, so it is closed before the file goes back, and a Steam that will not close keeps the snapshot for the next start. Nothing stops this once it has begun.
     fn roll_back(&self, backup_id: &str) -> Result<(), String> {
-        if self.steam.is_running().map_err(|error| error.to_string())? {
-            let _ = self.steam.shutdown(None, &CancelToken::new());
+        let text = |error: AdapterError| error.to_string();
+        if self.steam.is_running().map_err(text)? {
+            let closed = self.steam.shutdown(None, &CancelToken::new());
+            if self.steam.is_running().map_err(text)? {
+                return Err(closed.err().map_or_else(
+                    || {
+                        "Steam is still running, and it rewrites loginusers.vdf when it exits"
+                            .to_owned()
+                    },
+                    text,
+                ));
+            }
         }
         restore_steam(self.steam, self.platform, self.backups, backup_id)
             .map(|_| ())
