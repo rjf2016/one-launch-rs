@@ -68,15 +68,27 @@ fn parent_of<'a>(child: &Entry, by_pid: &HashMap<u32, &'a Entry>) -> Option<&'a 
         .filter(|parent| parent.pid != child.pid && parent.created <= child.created)
 }
 
-fn lineage<'a>(entry: &'a Entry, by_pid: &HashMap<u32, &'a Entry>) -> Vec<&'a Entry> {
+// Whoever has the parent's id now, however old: for the shield alone, which a clock set back must not cut short and which may take in too much.
+fn any_parent_of<'a>(child: &Entry, by_pid: &HashMap<u32, &'a Entry>) -> Option<&'a Entry> {
+    by_pid
+        .get(&child.parent)
+        .copied()
+        .filter(|parent| parent.pid != child.pid)
+}
+
+fn lineage<'a>(
+    entry: &'a Entry,
+    by_pid: &HashMap<u32, &'a Entry>,
+    parent: impl Fn(&Entry, &HashMap<u32, &'a Entry>) -> Option<&'a Entry>,
+) -> Vec<&'a Entry> {
     let mut line = vec![entry];
     let mut at = entry;
-    while let Some(parent) = parent_of(at, by_pid) {
-        if line.iter().any(|seen| seen.pid == parent.pid) || line.len() > by_pid.len() {
+    while let Some(up) = parent(at, by_pid) {
+        if line.iter().any(|seen| seen.pid == up.pid) || line.len() > by_pid.len() {
             break;
         }
-        line.push(parent);
-        at = parent;
+        line.push(up);
+        at = up;
     }
     line
 }
@@ -87,7 +99,7 @@ pub(crate) fn shielded(entries: &[Entry]) -> HashSet<u32> {
     entries
         .iter()
         .filter(|entry| {
-            lineage(entry, &by_pid)
+            lineage(entry, &by_pid, any_parent_of)
                 .iter()
                 .any(|step| is_protected(&step.name))
         })
@@ -95,17 +107,35 @@ pub(crate) fn shielded(entries: &[Entry]) -> HashSet<u32> {
         .collect()
 }
 
+// The processes with a shielded one anywhere below them.
+fn above_shielded(entries: &[Entry], shielded: &HashSet<u32>) -> HashSet<u32> {
+    let by_pid = index(entries);
+    entries
+        .iter()
+        .filter(|entry| shielded.contains(&entry.pid))
+        .flat_map(|entry| lineage(entry, &by_pid, any_parent_of).into_iter().skip(1))
+        .map(|step| step.pid)
+        .filter(|pid| !shielded.contains(pid))
+        .collect()
+}
+
 fn named(entry: &Entry, image: &str) -> bool {
     image_key(&entry.name) == image_key(image)
 }
 
-// The processes a kill ends, the ones they started first. Never a protected process or one of its descendants, never this app or what it descends from.
+// The processes a kill ends, the ones they started first. Never a protected process or one of its descendants, never this app or what it descends from, and below the named image nothing with a protected process under it, nor what that started.
 pub(crate) fn end_targets(entries: &[Entry], image: &str, tree: bool, own_pid: u32) -> Vec<Entry> {
     let by_pid = index(entries);
     let shielded = shielded(entries);
+    let above = above_shielded(entries, &shielded);
     let mut spared: HashSet<u32> = by_pid
         .get(&own_pid)
-        .map(|own| lineage(own, &by_pid).iter().map(|step| step.pid).collect())
+        .map(|own| {
+            lineage(own, &by_pid, parent_of)
+                .iter()
+                .map(|step| step.pid)
+                .collect()
+        })
         .unwrap_or_default();
     spared.insert(own_pid);
     let untouchable = |entry: &Entry| shielded.contains(&entry.pid) || spared.contains(&entry.pid);
@@ -129,6 +159,7 @@ pub(crate) fn end_targets(entries: &[Entry], image: &str, tree: bool, own_pid: u
             if tree {
                 let children = entries.iter().filter(|child| {
                     !untouchable(child)
+                        && !above.contains(&child.pid)
                         && parent_of(child, &by_pid).is_some_and(|parent| parent.pid == node.pid)
                 });
                 stack.extend(children.map(|child| (child, false)));
@@ -585,6 +616,55 @@ mod tests {
                 "{image}"
             );
         }
+    }
+
+    #[test]
+    fn a_tree_end_spares_whatever_has_a_riot_game_below_it_but_still_ends_the_named_image() {
+        let table = vec![
+            entry(4, 0, 1, "System"),
+            entry(200, 4, 2, "explorer.exe"),
+            entry(OWN, 200, 3, "OneLaunch.exe"),
+            entry(400, 200, 10, "steam.exe"),
+            entry(401, 400, 11, "RiotClientServices.exe"),
+            entry(402, 401, 12, "VALORANT.exe"),
+            entry(403, 402, 13, "VALORANT-Win64-Shipping.exe"),
+            entry(404, 401, 14, "Riot Client.exe"),
+            entry(405, 404, 15, "RiotClientCrashHandler.exe"),
+            entry(410, 400, 16, "steamwebhelper.exe"),
+            entry(411, 410, 17, "steamwebhelper.exe"),
+            entry(420, 400, 18, "Game.exe"),
+        ];
+        let ended: HashSet<u32> = end_targets(&table, "steam.exe", true, OWN)
+            .iter()
+            .map(|target| target.pid)
+            .collect();
+        assert_eq!(ended, HashSet::from([400, 410, 411, 420]));
+
+        let processes = Port {
+            system: MadeUp::new(table),
+        };
+        processes.kill("steam.exe", true).unwrap();
+        let calls = processes.system.calls();
+        assert_eq!(
+            calls.ended.iter().copied().collect::<HashSet<_>>(),
+            HashSet::from([400, 410, 411, 420])
+        );
+    }
+
+    #[test]
+    fn a_child_of_a_riot_game_stays_shielded_after_the_clock_was_set_back() {
+        let mut table = table();
+        table.push(entry(323, 320, 4, "Overlay.exe"));
+        table.push(entry(324, 323, 5, "Helper.exe"));
+        let shield = shielded(&table);
+        assert!(shield.contains(&323) && shield.contains(&324));
+        assert!(end_targets(&table, "Overlay.exe", true, OWN).is_empty());
+        assert!(end_targets(&table, "Helper.exe", false, OWN).is_empty());
+        let client: HashSet<u32> = end_targets(&table, "RiotClientServices.exe", true, OWN)
+            .iter()
+            .map(|target| target.pid)
+            .collect();
+        assert_eq!(client, HashSet::from([300, 310, 330]));
     }
 
     #[test]
