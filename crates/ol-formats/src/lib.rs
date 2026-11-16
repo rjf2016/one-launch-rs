@@ -1,8 +1,17 @@
 #![forbid(unsafe_code)]
 
 pub mod js;
+pub mod js_json;
 pub mod vdf;
 pub mod winpath;
+
+pub mod battlenet {
+    pub mod client_log;
+    pub mod config;
+    pub mod product_state;
+    pub mod products;
+    pub mod session;
+}
 
 pub mod epic {
     pub mod ini;
