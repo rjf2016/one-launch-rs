@@ -648,7 +648,7 @@ impl Switch<'_> {
         waited
     }
 
-    // After a confirmed sign-in by hand: stores the file once the client has written a sign-in that differs from what the switch left there. The file names the account, so one that names another, because the user changed accounts in the client meanwhile, is not stored.
+    // After a confirmed sign-in by hand: stores the file once the client has written a sign-in that differs from what the switch left there. The file names the account, so one that names another, because the user changed accounts in the client meanwhile, is not stored and ends the switch as a wrong account.
     fn capture_fresh(&mut self, wait: Duration) -> Result<(), Thrown> {
         let Some(account_id) = self.account.id.clone() else {
             return Ok(());
@@ -674,8 +674,12 @@ impl Switch<'_> {
                         "Not saved: {SESSION_FILE} names Riot account {}, not this account's.",
                         id_tail(Some(&session.account_id), 4)
                     );
-                    self.mark(STEP.recapture, JobStepStatus::Done, detail);
-                    return Ok(());
+                    let owner = self
+                        .directory
+                        .account_by_launcher_uid(&session.account_id)?;
+                    let wrong = self.wrong_account(&session.account_id, owner.as_ref());
+                    self.mark(STEP.recapture, JobStepStatus::Failed, detail);
+                    return Err(wrong);
                 }
                 store_session(self.directory, self.account, session, file)?;
                 self.directory.mark_session_verified(&account_id)?;

@@ -1744,3 +1744,99 @@ fn a_file_that_changed_after_the_store_found_nothing_to_store_is_not_written_ove
         fakes.backend.shut_down();
     }
 }
+
+#[test]
+fn a_sign_in_as_another_account_while_the_sign_in_is_awaited_for_storing_ends_the_switch_as_a_wrong_account_and_starts_no_game()
+ {
+    // Alt's saved sign-in meets a network error, so the user is asked to sign in. The client then signs in with what the switch wrote, which is already stored, and while the switch waits for a new one the user signs in as Main. The hook never panics, so a failure here cannot strand the job.
+    let knobs = json!({ "knobs": { "riot": { "authError": "network_unreachable" } } });
+    let fakes = fakes(Some(&knobs));
+    let alt = fakes.account(ALT);
+    let saved_of = |id: &str| {
+        let saved = block_on(fakes.backend.session(id))
+            .unwrap()
+            .session
+            .unwrap();
+        (saved.fingerprint, saved.verified_at, saved.stale_reason)
+    };
+    let before = saved_of(&alt.id);
+    let riot = Arc::clone(fakes.fake.riot.as_ref().unwrap());
+    let latest = Arc::clone(&fakes.latest);
+    let logs = fakes
+        .launchers()
+        .join("localappdata/Riot Games/Riot Client/Logs/Riot Client Logs");
+    let (logged, signed_in) = (
+        std::sync::atomic::AtomicBool::new(false),
+        std::sync::atomic::AtomicBool::new(false),
+    );
+    fakes.fake.clock.before_sleep(move || {
+        let job = latest.lock().map(|job| job.clone()).unwrap_or(None);
+        let running = |step: &str| {
+            job.as_ref().is_some_and(|job| {
+                let at_it = |at: &JobStep| at.id == step && at.status == JobStepStatus::Running;
+                job.steps.iter().any(at_it)
+            })
+        };
+        let ordering = std::sync::atomic::Ordering::SeqCst;
+        if running("manual") && !logged.swap(true, ordering) {
+            let mut names: Vec<_> = fs::read_dir(&logs)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .map(|entry| entry.path())
+                .collect();
+            names.sort();
+            if let Some(newest) = names.pop()
+                && let Ok(mut text) = fs::read_to_string(&newest)
+            {
+                text.push_str("009000.000| ALWAYS| riot-client-lifecycle: PSLProvider: PSL state changed to RestoreAuthorization\r\n");
+                text.push_str("009000.050| ALWAYS| riot-client-lifecycle: PSLProvider: PSL state changed to PendingProductContext\r\n");
+                let _ = fs::write(&newest, text);
+            }
+        } else if running("recapture") && !signed_in.swap(true, ordering) {
+            riot.sign_in_by_hand(Some(MAIN_UID));
+        }
+    });
+    let states = fakes.play(ALT);
+    let last = states.last().unwrap();
+    assert!(
+        last.state == JobState::Failed && !last.switched,
+        "{:?}",
+        last.error
+    );
+    assert_eq!(
+        last.error.as_deref(),
+        Some(
+            "The Riot Client signed in as Riot Main (Riot account …1111) instead of Riot Alt (…3333). Sign in to the client as riot_alt, or fix the Riot account id on the account page."
+        )
+    );
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(detail(last, "manual"), format!("Signed in as {ALT}."));
+    assert_eq!(step("recapture").status, JobStepStatus::Failed);
+    assert_eq!(
+        detail(last, "recapture"),
+        "Not saved: RiotGamesPrivateSettings.yaml names Riot account …1111, not this account's."
+    );
+    assert_ne!(step("launch").status, JobStepStatus::Done);
+    assert!(last.hand_off.is_none());
+    // The snapshot went back through the rollback, which closed the client and stored Main's sign-in for Main first; Alt's saved sign-in was neither replaced nor confirmed, and nothing was asked of the client's port.
+    assert_eq!(last.restored, Some(true));
+    assert!(fakes.on_disk() == planted_file());
+    assert_eq!(
+        asked_of_the_machine(&fakes),
+        [
+            "file.write",
+            "proc.start",
+            "proc.close",
+            "proc.close",
+            "file.write"
+        ]
+    );
+    assert_eq!(saved_of(&alt.id), before);
+    assert_eq!(fakes.account(ALT).launcher_uid.as_deref(), Some(ALT_UID));
+    assert_eq!(
+        fakes.saved(MAIN),
+        Some(sha256_hex(clients_token(1).as_bytes()))
+    );
+    fakes.backend.shut_down();
+}
