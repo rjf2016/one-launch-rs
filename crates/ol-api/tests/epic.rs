@@ -819,3 +819,53 @@ fn a_sign_in_that_lands_while_the_launcher_closes_is_saved_before_the_switch_rep
     );
     fakes.backend.shut_down();
 }
+
+#[test]
+fn a_sign_in_as_another_account_while_the_session_is_awaited_is_not_saved_for_the_first() {
+    let first = "55555555555555555555555555555555";
+    let fakes = fakes(None);
+    let new = fakes.account("new@example.com");
+    // The launcher logs a sign-in by hand as soon as it is up, and has not written its session yet; at the next look the user signs in as Main.
+    let launcher = Arc::clone(fakes.fake.epic.as_ref().unwrap());
+    let processes = Arc::clone(&fakes.fake.platform.processes);
+    let log = fakes
+        .scratch
+        .join("launchers")
+        .join("localappdata/EpicGamesLauncher/Saved/Logs/EpicGamesLauncher.log");
+    let main_uid = account_id_of(MAIN);
+    let looks = std::sync::atomic::AtomicU32::new(0);
+    fakes.fake.clock.before_sleep(move || {
+        if !processes.is_running("EpicGamesLauncher.exe").unwrap() {
+            return;
+        }
+        match looks.fetch_add(1, std::sync::atomic::Ordering::SeqCst) {
+            0 => {
+                let mut text = fs::read_to_string(&log).unwrap();
+                text.push_str(&format!(
+                    "[..]FAccountService::OnLoginComplete - 0 TRUE {first} \r\n"
+                ));
+                fs::write(&log, text).unwrap();
+            }
+            1 => launcher.sign_in_by_hand(Some(&main_uid)),
+            _ => {}
+        }
+    });
+    let states = fakes.play("new@example.com");
+    let last = states.last().unwrap();
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert!(
+        step("recapture")
+            .detail
+            .starts_with("Not saved: the launcher signed in as account "),
+        "{}",
+        step("recapture").detail
+    );
+    assert!(
+        block_on(fakes.backend.session(&new.id))
+            .unwrap()
+            .session
+            .is_none()
+    );
+    fakes.backend.shut_down();
+}

@@ -958,3 +958,99 @@ fn a_sign_in_by_hand_seen_at_the_first_look_keeps_its_token() {
     assert!(saved.verified_at.is_some());
     fakes.backend.shut_down();
 }
+
+#[test]
+fn a_value_that_was_under_unified_auth_before_the_client_started_is_never_saved_as_the_accounts() {
+    let fakes = fakes(None);
+    let (alt_name, alt_hex) = seeded_token(ALT);
+    let (planted, _) = remembered_token();
+    // UnifiedAuth holds Alt's own saved token and, beside it, a value another program left there; Alt's login is first, so the client signs in from Alt's.
+    let registry = &fakes.fake.registry;
+    registry.remove(&format!("{UNIFIED_AUTH}{planted}"));
+    registry.seed(
+        &format!("{UNIFIED_AUTH}{alt_name}"),
+        RegistryValue::Binary(alt_hex.clone()),
+    );
+    let foreign = format!("01000000d08c9ddf00ff{}", "cd".repeat(24));
+    registry.seed(
+        &format!("{UNIFIED_AUTH}CC33DD44"),
+        RegistryValue::Binary(foreign.clone()),
+    );
+    let config = String::from_utf8(fs::read(fakes.config_file()).unwrap()).unwrap();
+    let reordered = config.replacen(
+        "saved1@example.com,saved2@example.com,saved3@example.com",
+        "saved3@example.com,saved1@example.com,saved2@example.com",
+        1,
+    );
+    assert!(reordered != config);
+    fs::write(fakes.config_file(), reordered).unwrap();
+
+    let states = fakes.play(ALT);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    assert_eq!(detail(last, "verify"), format!("Signed in as {ALT}."));
+    assert_eq!(detail(last, "recapture"), "The stored session is current.");
+    let saved = block_on(fakes.backend.session(&fakes.account(ALT).id)).unwrap();
+    assert_eq!(
+        saved.session.unwrap().fingerprint,
+        sha256_hex(alt_hex.as_bytes())
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_sign_in_as_another_account_while_the_token_is_awaited_is_not_saved_for_the_first() {
+    let first = "0c3d4e5f";
+    let fakes = fakes(None);
+    let new = fakes.account(NEW);
+    // The client logs a sign-in by hand once it is up, before the switch's first look, and has not written its token yet; at the next look the user signs in as Main.
+    let client = Arc::clone(fakes.fake.battlenet.as_ref().unwrap());
+    let processes = Arc::clone(&fakes.fake.platform.processes);
+    let logs = fakes
+        .scratch
+        .join("launchers")
+        .join("localappdata/Battle.net/Logs");
+    let main_uid = account_id_of(MAIN);
+    let looks = std::sync::atomic::AtomicU32::new(0);
+    fakes.fake.clock.before_sleep(move || {
+        if !processes.is_running("Battle.net.exe").unwrap() {
+            return;
+        }
+        match looks.fetch_add(1, Ordering::SeqCst) {
+            0 => {
+                let mut names: Vec<_> = fs::read_dir(&logs)
+                    .unwrap()
+                    .flatten()
+                    .map(|entry| entry.path())
+                    .collect();
+                names.sort();
+                let newest = names.pop().unwrap();
+                let mut text = fs::read_to_string(&newest).unwrap();
+                text.push_str(&format!(
+                    "I 2026-09-13 03:21:00.000000 [BNLogin] {{Main}} Logged into Battle.net successfully. |bnet=1:0:{first}|game=2:100000000:0a1b2c3\r\n"
+                ));
+                fs::write(&newest, text).unwrap();
+            }
+            1 => client.sign_in_by_hand(Some(&main_uid)),
+            _ => {}
+        }
+    });
+    let states = fakes.play(NEW);
+    let last = states.last().unwrap();
+    assert_eq!(
+        detail(last, "verify"),
+        format!("Signed in as {NEW}. Linked to Battle.net account …4e5f.")
+    );
+    assert!(
+        detail(last, "recapture").starts_with("Not saved: the client signed in as account "),
+        "{}",
+        detail(last, "recapture")
+    );
+    assert!(
+        block_on(fakes.backend.session(&new.id))
+            .unwrap()
+            .session
+            .is_none()
+    );
+    fakes.backend.shut_down();
+}
