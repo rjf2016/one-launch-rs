@@ -291,44 +291,63 @@ impl Switch<'_> {
         Ok(())
     }
 
-    // Runs once the client is closed: the token is then the last run's, and the client's log names the account. A token that cannot be saved costs one sign-in by hand later, never the switch.
-    fn save_outgoing(&mut self) {
-        if !self.planned(STEP.capture) {
+    // Runs once the client is closed: the token is then the last run's, and the client's log names the account. When the plan passed the step over, the client is looked at all the same if this switch closed it, because a sign-in can land while it closes; the step then shows only a token that was saved. A token that cannot be saved costs one sign-in by hand later, never the switch.
+    fn save_outgoing(&mut self, closed: bool) {
+        let planned = self.planned(STEP.capture);
+        if !planned && !closed {
             return;
         }
-        self.mark(STEP.capture, JobStepStatus::Running, "");
-        let saved = (|| -> Result<String, AdapterError> {
+        if planned {
+            self.mark(STEP.capture, JobStepStatus::Running, "");
+        }
+        let saved = (|| -> Result<(bool, String), AdapterError> {
             let fresh = self.battlenet.current_session(false)?;
             let Some(token) = &fresh.token else {
-                return Ok("The client left no remembered session behind (signed out).".to_owned());
+                let detail = "The client left no remembered session behind (signed out).";
+                return Ok((false, detail.to_owned()));
             };
             let Some((owner, owner_id)) = fresh
                 .owner
                 .as_ref()
                 .and_then(|owner| Some((owner, owner.id.as_deref()?)))
             else {
-                return Ok(
-                    "The remembered session belongs to no One Launch account; left alone."
-                        .to_owned(),
-                );
+                let detail = "The remembered session belongs to no One Launch account; left alone.";
+                return Ok((false, detail.to_owned()));
             };
             let name = &owner.display_name;
             let known = self.directory.session(owner_id)?;
             if known.is_some_and(|known| Some(&known.fingerprint) == fresh.fingerprint.as_ref()) {
-                return Ok(format!("{name}'s stored session is already current."));
+                return Ok((
+                    false,
+                    format!("{name}'s stored session is already current."),
+                ));
+            }
+            if !planned {
+                self.mark(STEP.capture, JobStepStatus::Running, "");
             }
             let uid = owner
                 .launcher_uid
                 .as_deref()
                 .or(fresh.logged_uid.as_deref());
             self.store_session(owner, token, uid)?;
-            Ok(format!(
-                "Saved {name}'s session (fingerprint {}).",
-                short_fingerprint(fresh.fingerprint.as_deref())
+            Ok((
+                true,
+                format!(
+                    "Saved {name}'s session (fingerprint {}).",
+                    short_fingerprint(fresh.fingerprint.as_deref())
+                ),
             ))
         })();
-        let detail = saved.unwrap_or_else(|error| format!("Not saved: {error}"));
-        self.mark(STEP.capture, JobStepStatus::Done, detail);
+        let (shown, detail) = match saved {
+            Ok((stored, detail)) => (planned || stored, detail),
+            Err(error) => (
+                planned || self.current == Some(STEP.capture),
+                format!("Not saved: {error}"),
+            ),
+        };
+        if shown {
+            self.mark(STEP.capture, JobStepStatus::Done, detail);
+        }
     }
 
     fn take_snapshot(&mut self) -> Result<(), Thrown> {
@@ -404,13 +423,15 @@ impl Switch<'_> {
         Ok(())
     }
 
-    // The file is read again here: the client wrote it when it exited, after the plan was made.
+    // The file is read again here: the client wrote it when it exited, after the plan was made. That holds for a login the plan found first as well, so its step is looked at again and shown only when the list has to change.
     fn write_file(&mut self) -> Result<(), Thrown> {
-        if !self.planned(STEP.file) {
-            self.list_ready = self.login_first;
+        let planned = self.planned(STEP.file);
+        if !planned && !self.login_first {
             return Ok(());
         }
-        self.mark(STEP.file, JobStepStatus::Running, "");
+        if planned {
+            self.mark(STEP.file, JobStepStatus::Running, "");
+        }
         let account = self.account;
         let login = &account.login;
         let read = if self.config_exists {
@@ -424,12 +445,12 @@ impl Switch<'_> {
             return Ok(());
         };
         // A byte that is not UTF-8 would be written back as another, so such a file is left as it is.
-        let planned = if exact {
+        let rewrite = if exact {
             plan_saved_account_names(&text, login)
         } else {
             Err(ConfigError::NoRoundTrip)
         };
-        let write = match planned {
+        let write = match rewrite {
             Ok(write) => write,
             Err(error) => {
                 let detail = format!("Left alone: {error}");
@@ -439,9 +460,14 @@ impl Switch<'_> {
         };
         self.list_ready = true;
         if write.noop {
-            let detail = format!("{login} is already first in Client.SavedAccountNames.");
-            self.mark(STEP.file, JobStepStatus::Skipped, detail);
+            if planned {
+                let detail = format!("{login} is already first in Client.SavedAccountNames.");
+                self.mark(STEP.file, JobStepStatus::Skipped, detail);
+            }
             return Ok(());
+        }
+        if !planned {
+            self.mark(STEP.file, JobStepStatus::Running, "");
         }
         self.modified = true;
         write_battlenet_config(self.platform.files.as_ref(), &self.config_path, &write.text)?;
@@ -751,7 +777,7 @@ impl Switch<'_> {
             return Err(self.started_meanwhile(STEP.close));
         }
 
-        self.save_outgoing();
+        self.save_outgoing(running && !self.already_active);
         if !self.already_active && !self.in_place {
             self.take_snapshot()?;
             self.write_registry()?;
