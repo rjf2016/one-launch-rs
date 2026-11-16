@@ -508,13 +508,21 @@ impl Switch<'_> {
         else {
             return Ok(());
         };
-        let login = self.account.login.to_lowercase();
+        let login = self.account.login.trim().to_lowercase();
         let entry = users
             .iter()
             .find(|user| user.account_name.to_lowercase() == login);
-        if let (Some(entry), Some(signed_in)) = (entry, signed_in)
-            && steam_id3(&entry.steam_id64) != Some(signed_in)
-        {
+        let Some(signed_in) = signed_in else {
+            return Ok(());
+        };
+        // Without an entry for the account yet, only an entry of another account for the id that signed in says who it was.
+        let wrong = match entry {
+            Some(entry) => steam_id3(&entry.steam_id64) != Some(signed_in),
+            None => users
+                .iter()
+                .any(|user| steam_id3(&user.steam_id64) == Some(signed_in)),
+        };
+        if wrong {
             let other = users
                 .iter()
                 .find(|user| steam_id3(&user.steam_id64) == Some(signed_in));

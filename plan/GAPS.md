@@ -126,6 +126,7 @@ None of those about stored values and launcher files is visible on data the app 
 - A `Timestamp` in `loginusers.vdf` or a `LastPlayed` in an app manifest outside the years 0 to 9999 reads as no time. The Electron app fails the whole account list or the whole scan on one.
 - A game folder a manifest names relative to a library folder that is itself not a full path is taken as `steamapps\common`. The Electron app resolves it against the folder it runs in.
 - The games a scan finds are ordered by their lower-cased names, as the Library is.
+- A first sign-in for an account Steam has never seen that lands on another account `loginusers.vdf` names fails the switch: "Steam signed in as <that account> instead of <login>.", and no game is started. The Electron app takes any new sign-in for the account while Steam has no entry for it yet. An id Steam has no entry for is still taken, as there.
 - A scan that could not read Steam's `libraryfolders.vdf`, or list Riot's metadata folder, changes nothing in the Library and says so on that launcher's entry. The Electron app keeps what it could read and marks every other game of that launcher as not installed until a later scan.
 - A journal whose `startedAt` is not a full timestamp is unreadable and moved aside. The Electron app takes any text its date parser takes.
 - A snapshot manifest whose `bytes` is not a whole number from 0 up is unreadable.

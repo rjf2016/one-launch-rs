@@ -459,6 +459,43 @@ fn a_switch_that_would_close_steam_asks_first_and_preview_mode_refuses_any() {
 }
 
 #[test]
+fn a_first_sign_in_as_another_account_steam_knows_is_not_taken_for_the_account() {
+    let other = recorded_login_users()
+        .iter()
+        .find(|user| user["accountName"] == "user_2")
+        .and_then(|user| user["steamId64"].as_str())
+        .and_then(|id| id.parse::<u64>().ok())
+        // The account id Steam keeps in ActiveUser is the low half of the SteamID64.
+        .map(|id| id & 0xffff_ffff)
+        .unwrap();
+    let by_hand = json!({ "knobs": { "steam": { "signInWhenAskedMs": 500, "signInAs": other } } });
+    let fakes = fakes(Some(&by_hand));
+    let account = block_on(fakes.backend.create_account(NewAccount {
+        launcher: LauncherId::Steam,
+        display_name: "Newcomer".to_owned(),
+        login: "new_user".to_owned(),
+        launcher_uid: None,
+        password: None,
+        tags: Vec::new(),
+        notes: String::new(),
+    }))
+    .unwrap();
+    let start = StartLaunch {
+        account_id: account.id,
+        game_id: None,
+        confirm_close: true,
+    };
+    block_on(fakes.backend.start_launch(start)).unwrap();
+    let job = fakes.finished();
+    assert_eq!(job.state, JobState::Failed);
+    assert_eq!(
+        job.error.as_deref(),
+        Some("Steam signed in as user_2 instead of new_user.")
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn a_stored_password_goes_to_steams_command_line_and_nowhere_else() {
     let expired = json!({ "knobs": { "steam": { "expiredSessions": ["user_3"] } } });
     let fakes = fakes(Some(&expired));
