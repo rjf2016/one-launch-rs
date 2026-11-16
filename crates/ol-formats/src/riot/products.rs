@@ -92,12 +92,33 @@ pub fn image_key(name: &str) -> String {
     }
 }
 
-// The product one of these process names belongs to, with or without `.exe`.
+// A game started by its 8.3 path runs under that name, such as VALORA~1.EXE: it keeps the long name's first two characters without its spaces and has `~` and a digit. Any name of that shape counts, as `ol_platform_api::protected` counts it.
+fn short_form(name: &str, long: &str) -> bool {
+    let numbered = name
+        .as_bytes()
+        .windows(2)
+        .any(|pair| pair[0] == b'~' && pair[1].is_ascii_digit());
+    let head = |text: &str| -> Vec<u8> {
+        text.bytes()
+            .filter(|byte| *byte != b' ')
+            .take(2)
+            .map(|byte| byte.to_ascii_lowercase())
+            .collect()
+    };
+    let start = head(long);
+    numbered && start.len() == 2 && head(name) == start
+}
+
+// The product one of these process names belongs to, with or without `.exe`, or under its short name.
 pub fn product_with_running_image<'n>(
     names: impl IntoIterator<Item = &'n str>,
 ) -> Option<&'static str> {
     let running: Vec<String> = names.into_iter().map(image_key).collect();
-    let runs = |image: &&str| running.contains(&image_key(image));
+    let runs = |image: &&str| {
+        running
+            .iter()
+            .any(|name| *name == image_key(image) || short_form(name, image))
+    };
     let found = PRODUCTS
         .iter()
         .find(|(_, info)| info.game_images.iter().any(runs));
@@ -333,6 +354,27 @@ mod tests {
         assert_eq!(product_display_name("bacon"), "Legends of Runeterra");
         assert_eq!(product_display_name("constructor"), "constructor");
         assert!(game_images_of("toString").is_empty());
+    }
+
+    #[test]
+    fn a_game_under_the_short_name_windows_made_for_it_counts_and_vanguard_does_not() {
+        assert_eq!(
+            product_with_running_image(["VALORA~1.EXE"]),
+            Some("valorant")
+        );
+        assert_eq!(
+            product_with_running_image(["explorer", "league~2"]),
+            Some("league_of_legends")
+        );
+        assert_eq!(product_with_running_image(["2XKO-W~1"]), Some("lion"));
+        assert_eq!(
+            product_with_running_image(["VA3F2A~1.EXE"]),
+            Some("valorant")
+        );
+        assert_eq!(
+            product_with_running_image(["VGTRAY~1.EXE", "riotcl~1", "valora~x", "steamw~1"]),
+            None
+        );
     }
 
     #[test]
