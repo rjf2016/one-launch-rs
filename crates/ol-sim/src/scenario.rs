@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
+use ol_formats::battlenet::session as battlenet_session;
 use ol_formats::epic::session::{parse_blob, serialize_blob, session_blob_from_ini};
 use ol_formats::winpath::join;
 use ol_model::LauncherId;
@@ -16,15 +17,18 @@ use serde_json::{Map, Value};
 use thiserror::Error;
 use time::OffsetDateTime;
 
+use crate::battlenet::{BattlenetFolders, BattlenetKnobs, BattlenetScript, BattlenetSim};
 use crate::epic::{EpicKnobs, EpicSim};
 use crate::steam::{SteamKnobs, SteamSim};
 
 const SCENARIO_FILE: &str = "scenario.json";
 const KNOBS_FILE: &str = "knobs.json";
 const FIXTURE_PREFIX: &str = "@fixtures/";
+const UNIFIED_AUTH: &str = r"Software\Blizzard Entertainment\Battle.net\UnifiedAuth";
+const BINARY_PREFIX: &str = "binary:";
 
 // Waits short enough that a fake switch is over in a few seconds of its own clock.
-const SIM_TIMING: [(&str, u64); 14] = [
+const SIM_TIMING: [(&str, u64); 15] = [
     ("pollMs", 100),
     ("logPollMs", 100),
     ("shutdownMs", 3_000),
@@ -39,6 +43,7 @@ const SIM_TIMING: [(&str, u64); 14] = [
     ("updateMs", 20_000),
     ("manualSignInMs", 30_000),
     ("readyGraceMs", 300),
+    ("launchConfirmMs", 2_000),
 ];
 
 #[derive(Debug, Error)]
@@ -91,7 +96,11 @@ pub struct FakeLaunchers {
     pub epic: Option<Arc<EpicSim>>,
     pub epic_timing: TimingOverrides,
     pub epic_default_dir: String,
-    // The scenario's stand-ins for %LOCALAPPDATA% and %ProgramData%.
+    pub battlenet: Option<Arc<BattlenetSim>>,
+    pub battlenet_timing: TimingOverrides,
+    pub battlenet_default_dir: String,
+    // The scenario's stand-ins for %APPDATA%, %LOCALAPPDATA% and %ProgramData%.
+    pub app_data: String,
     pub local_app_data: String,
     pub program_data: String,
     pub seed: Seed,
@@ -258,25 +267,93 @@ fn epic_knobs(fields: &Map<String, Value>) -> EpicKnobs {
     }
 }
 
-// A seeded Epic sign-in: the account id it signs in as, and the data the launcher would hold for it.
-fn epic_sessions(scenario: &Value) -> Vec<(String, String, SeedSession)> {
+fn battlenet_knobs(fields: &Map<String, Value>) -> BattlenetKnobs {
+    let text = |name: &str| fields.get(name).and_then(Value::as_str).map(str::to_owned);
+    BattlenetKnobs {
+        rejected: strings(fields.get("rejected")),
+        rotate_on_sign_in: fields.get("rotateOnSignIn").and_then(Value::as_bool) == Some(true),
+        react_ms: fields.get("reactMs").and_then(Value::as_u64).unwrap_or(0),
+        sign_in_when_asked_ms: fields.get("signInWhenAskedMs").and_then(Value::as_u64),
+        sign_in_as: text("signInAs"),
+        running_as: text("runningAs"),
+        updates_pending: strings(fields.get("updatesPending")),
+        games_running: strings(fields.get("gamesRunning")),
+    }
+}
+
+// The sign-ins a scenario saves for Epic and Battle.net accounts, each with what its launcher's servers know it by: Epic's session data, Battle.net's token.
+fn seeded_sessions(scenario: &Value) -> Vec<(String, SeedSession)> {
     let sessions = scenario["seed"]["sessions"].as_array();
     sessions
         .into_iter()
         .flatten()
-        .filter(|session| session["launcher"] == "epic")
         .filter_map(|session| {
             let text = |name: &str| session[name].as_str().map(str::to_owned);
-            let blob = parse_blob(&session["blob"].to_string()).ok()?;
+            let launcher = LauncherId::parse(session["launcher"].as_str()?)?;
+            let given = session["blob"].to_string();
+            let (known_by, blob) = match launcher {
+                LauncherId::Epic => {
+                    let blob = parse_blob(&given).ok()?;
+                    (blob.data.clone(), serialize_blob(&blob))
+                }
+                LauncherId::Battlenet => {
+                    let blob = battlenet_session::parse_blob(&given).ok()?;
+                    let token = blob.unified_auth.hex.clone();
+                    (token, battlenet_session::serialize_blob(&blob))
+                }
+                _ => return None,
+            };
             let seeded = SeedSession {
-                launcher: LauncherId::Epic,
+                launcher,
                 login: text("login")?,
                 launcher_uid: text("launcherUid")?,
-                blob: serialize_blob(&blob),
+                blob,
             };
-            Some((blob.data.clone(), seeded.launcher_uid.clone(), seeded))
+            Some((known_by, seeded))
         })
         .collect()
+}
+
+// Which account each sign-in of one launcher signs in as.
+fn servers(scenario: &Value, launcher: LauncherId) -> HashMap<String, String> {
+    seeded_sessions(scenario)
+        .into_iter()
+        .filter(|(_, session)| session.launcher == launcher)
+        .map(|(known_by, session)| (known_by, session.launcher_uid))
+        .collect()
+}
+
+// What the scripted Battle.net client is told: the token in the scenario's registry signs in as the account the scenario names, each saved token as its own account, and each account with the login the scenario gives it.
+fn battlenet_script(scenario: &Value, knobs: BattlenetKnobs) -> BattlenetScript {
+    let on_disk = scenario["onDisk"]["battlenet"].as_str().map(str::to_owned);
+    let mut servers = HashMap::new();
+    if let (Some(uid), Some(values)) = (&on_disk, scenario["registry"].as_object()) {
+        for (path, value) in values {
+            let token = value
+                .as_str()
+                .and_then(|text| text.strip_prefix(BINARY_PREFIX));
+            if let (true, Some(token)) = (path.contains(UNIFIED_AUTH), token) {
+                servers.insert(token.to_lowercase(), uid.clone());
+            }
+        }
+    }
+    servers.extend(self::servers(scenario, LauncherId::Battlenet));
+    let accounts = scenario["seed"]["accounts"].as_array();
+    let logins = accounts
+        .into_iter()
+        .flatten()
+        .filter(|account| account["launcher"] == "battlenet")
+        .filter_map(|account| {
+            let text = |name: &str| account[name].as_str().map(str::to_owned);
+            Some((text("launcherUid")?, text("login")?))
+        })
+        .collect();
+    BattlenetScript {
+        servers,
+        logins,
+        on_disk,
+        knobs,
+    }
 }
 
 fn timing(scenario: &Value, overrides: &Value, launcher: &str) -> TimingOverrides {
@@ -324,9 +401,9 @@ fn seed(scenario: &Value) -> Seed {
     Seed {
         settings,
         accounts,
-        sessions: epic_sessions(scenario)
+        sessions: seeded_sessions(scenario)
             .into_iter()
-            .map(|(_, _, session)| session)
+            .map(|(_, session)| session)
             .collect(),
     }
 }
@@ -374,8 +451,10 @@ fn materialize_on(
 
     let root = text_path(dir)?;
     let steam_dir = join(&[&root, "steam"]);
+    let app_data = join(&[&root, "appdata"]);
     let local_app_data = join(&[&root, "localappdata"]);
     let program_data = join(&[&root, "programdata"]);
+    let games_dir = join(&[&root, "games"]);
     let log = OpLog::new();
     let registry = Arc::new(FakeRegistry::new(log.clone()));
     if installed.contains(&LauncherId::Steam) {
@@ -384,10 +463,13 @@ fn materialize_on(
     if installed.contains(&LauncherId::Epic) {
         EpicSim::seed_registry(&registry, &join(&[&root, "epic"]), &program_data);
     }
+    if installed.contains(&LauncherId::Battlenet) {
+        BattlenetSim::seed_registry(&registry, &join(&[&root, "battlenet"]), &games_dir);
+    }
     if let Some(values) = scenario["registry"].as_object() {
         for (path, value) in values {
             let value = match (value.as_str(), value.as_u64()) {
-                (Some(text), _) => match text.strip_prefix("binary:") {
+                (Some(text), _) => match text.strip_prefix(BINARY_PREFIX) {
                     Some(hex) => RegistryValue::Binary(hex.to_owned()),
                     None => RegistryValue::Text(text.to_owned()),
                 },
@@ -424,15 +506,29 @@ fn materialize_on(
         if let (Some(uid), Some(blob)) = (scenario["onDisk"]["epic"].as_str(), on_disk) {
             servers.insert(blob.data.clone(), uid.to_owned());
         }
-        for (data, uid, _) in epic_sessions(&scenario) {
-            servers.insert(data, uid);
-        }
+        servers.extend(self::servers(&scenario, LauncherId::Epic));
         EpicSim::attach(
             &local_app_data,
             &processes,
             Arc::clone(&clock),
             servers,
             epic_knobs(&merged(&scenario, &overrides, &["knobs", "epic"])),
+        )
+    });
+
+    let battlenet = installed.contains(&LauncherId::Battlenet).then(|| {
+        let knobs = battlenet_knobs(&merged(&scenario, &overrides, &["knobs", "battlenet"]));
+        BattlenetSim::attach(
+            &BattlenetFolders {
+                app_data: &app_data,
+                local_app_data: &local_app_data,
+                program_data: &program_data,
+                games: &games_dir,
+            },
+            Arc::clone(&registry),
+            &processes,
+            Arc::clone(&clock),
+            battlenet_script(&scenario, knobs),
         )
     });
 
@@ -458,6 +554,10 @@ fn materialize_on(
         epic,
         epic_timing: timing(&scenario, &overrides, "epic"),
         epic_default_dir: join(&[&root, "nowhere"]),
+        battlenet,
+        battlenet_timing: timing(&scenario, &overrides, "battlenet"),
+        battlenet_default_dir: join(&[&root, "nowhere"]),
+        app_data,
         local_app_data,
         program_data,
         seed: seed(&scenario),
