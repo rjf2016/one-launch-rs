@@ -324,8 +324,15 @@ fn differs(actual: &Value, expected: &Value, path: &mut String) -> Option<String
             }
             None
         }
-        (Value::Number(actual), Value::Number(expected)) => (actual.as_f64() != expected.as_f64())
-            .then(|| format!("{path}: {actual}, expected {expected}")),
+        (Value::Number(actual), Value::Number(expected)) => {
+            // Two whole numbers are compared exactly: past 2^53 a float holds neighbours as one.
+            let same = if actual.is_f64() || expected.is_f64() {
+                actual.as_f64() == expected.as_f64()
+            } else {
+                actual.as_i64() == expected.as_i64() && actual.as_u64() == expected.as_u64()
+            };
+            (!same).then(|| format!("{path}: {actual}, expected {expected}"))
+        }
         _ => (actual != expected).then(|| format!("{path}: {actual}, expected {expected}")),
     }
 }
@@ -335,6 +342,26 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn whole_numbers_are_compared_exactly_and_a_whole_float_is_the_same_number() {
+        assert!(
+            difference(
+                &json!(9_007_199_254_740_992_u64),
+                &json!(9_007_199_254_740_993_u64)
+            )
+            .is_some()
+        );
+        assert!(
+            difference(
+                &json!(-9_007_199_254_740_993_i64),
+                &json!(-9_007_199_254_740_992_i64)
+            )
+            .is_some()
+        );
+        assert_eq!(difference(&json!(1), &json!(1.0)), None);
+        assert_eq!(difference(&json!(u64::MAX), &json!(u64::MAX)), None);
+    }
 
     #[test]
     fn half_a_surrogate_pair_is_marked_and_a_whole_pair_is_kept() {

@@ -137,6 +137,9 @@ impl Clock for FakeClock {
         let until = self.now() + duration;
         while let Some(run) = self.take_due(until) {
             run();
+            if cancel.is_cancelled() {
+                return;
+            }
         }
         let mut state = self.state();
         state.now = state.now.max(until);
@@ -204,6 +207,20 @@ mod tests {
         clock.sleep(Duration::from_secs(30), &cancel);
         assert!(started.elapsed() < Duration::from_secs(10));
         stopper.join().unwrap();
+    }
+
+    #[test]
+    fn a_timer_that_stops_the_sleep_leaves_later_timers_and_the_rest_of_the_time() {
+        let clock = Arc::new(FakeClock::starting_at(datetime!(2026-01-02 03:04:05 UTC)));
+        let cancel = CancelToken::new();
+        let stop = cancel.clone();
+        clock.schedule(Duration::from_secs(1), move || stop.cancel());
+        let later = Arc::new(Mutex::new(false));
+        let ran = Arc::clone(&later);
+        clock.schedule(Duration::from_secs(2), move || *ran.lock().unwrap() = true);
+        clock.sleep(Duration::from_secs(4), &cancel);
+        assert!(!*later.lock().unwrap());
+        assert_eq!(clock.now(), datetime!(2026-01-02 03:04:06 UTC));
     }
 
     #[test]

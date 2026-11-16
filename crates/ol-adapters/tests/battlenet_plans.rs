@@ -300,8 +300,8 @@ fn plan_json(plan: &SwitchPlan) -> Value {
 fn without_root(value: &mut Value, root: &str) {
     match value {
         Value::String(text) => {
-            let lower = root.to_lowercase();
-            while let Some(at) = text.to_lowercase().find(&lower) {
+            let lower = root.to_ascii_lowercase();
+            while let Some(at) = text.to_ascii_lowercase().find(&lower) {
                 text.replace_range(at..at + root.len(), "{tmp}");
             }
         }

@@ -464,11 +464,11 @@ fn without_folder(text: &str, folder: &Path, name: &str) -> String {
         plain.clone(),
         plain.replace('\\', "/"),
     ] {
-        let lower = spelling.to_lowercase();
+        let lower = spelling.to_ascii_lowercase();
         let mut replaced = String::with_capacity(out.len());
         let mut rest = out.as_str();
-        while let Some(at) = rest.to_lowercase().find(&lower) {
-            // Lower-casing keeps the length of everything a scratch path is made of, so the place is the same in both.
+        while let Some(at) = rest.to_ascii_lowercase().find(&lower) {
+            // Lower-casing ASCII alone keeps every byte where it was, so the place is the same in both.
             replaced.push_str(&rest[..at]);
             replaced.push_str(name);
             rest = &rest[at + spelling.len()..];
@@ -554,5 +554,20 @@ pub fn normalise(report: &mut Value, aliases: &Aliases<'_>, rules: &Value) {
                 *value = "<ts>".into();
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_letter_whose_lower_case_is_longer_does_not_move_the_folder() {
+        let folder = Path::new(r"D:\Scratch\Data");
+        let text = r"İ D:\scratch\data\onelaunch.db";
+        assert_eq!(
+            without_folder(text, folder, "{data}"),
+            r"İ {data}\onelaunch.db"
+        );
     }
 }

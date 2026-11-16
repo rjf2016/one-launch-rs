@@ -734,13 +734,21 @@ impl Switch<'_> {
     }
 
     // The launcher rewrites its settings file when its state changes and when it exits, so it is closed before the file goes back. Nothing stops this once it has begun.
+    // A launcher that will not close keeps the snapshot for the next start: it would write its own sign-in over the one put back.
     fn roll_back(&self, backup_id: &str) -> Result<(), String> {
-        if self.epic.is_running().map_err(|error| error.to_string())? {
-            let _ = self.epic.shutdown(None, &CancelToken::new());
+        let text = |error: AdapterError| error.to_string();
+        if self.epic.is_running().map_err(text)? {
+            let closed = self.epic.shutdown(None, &CancelToken::new());
+            if self.epic.is_running().map_err(text)? {
+                return Err(closed.err().map_or_else(
+                    || "Epic Games Launcher is still running, and it rewrites GameUserSettings.ini while it runs".to_owned(),
+                    text,
+                ));
+            }
         }
         restore_epic(self.epic, self.platform, self.backups, backup_id)
             .map(|_| ())
-            .map_err(|error| error.message())
+            .map_err(|error| error.to_string())
     }
 }
 

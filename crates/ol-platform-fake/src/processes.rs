@@ -258,7 +258,13 @@ impl ProcessRunner for FakeProcesses {
             return Err(ProcessError::AccessDenied(image.to_owned()));
         }
         state.running.remove(&lower);
-        state.pending_shutdown = None;
+        if state
+            .pending_shutdown
+            .as_ref()
+            .is_some_and(|(pending, _)| *pending == lower)
+        {
+            state.pending_shutdown = None;
+        }
         Ok(())
     }
 }
@@ -274,6 +280,19 @@ mod tests {
     fn processes(knobs: ProcessKnobs) -> (FakeProcesses, OpLog) {
         let log = OpLog::new();
         (FakeProcesses::new(log.clone(), knobs), log)
+    }
+
+    #[test]
+    fn ending_another_image_leaves_a_shutdown_under_way() {
+        let (processes, _) = processes(ProcessKnobs {
+            shutdown_polls: Some(2),
+            ..ProcessKnobs::default()
+        });
+        processes.start(EXE, &[], r"D:\Scratch\launcher").unwrap();
+        processes.close("launcher.exe").unwrap();
+        processes.kill("helper.exe", false).unwrap();
+        assert!(processes.is_running("launcher.exe").unwrap());
+        assert!(!processes.is_running("launcher.exe").unwrap());
     }
 
     #[test]

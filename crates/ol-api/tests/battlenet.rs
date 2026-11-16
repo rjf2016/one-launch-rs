@@ -678,6 +678,26 @@ fn an_account_without_a_saved_token_is_signed_in_by_hand_once_and_its_token_is_k
 }
 
 #[test]
+fn a_failed_switch_is_not_put_back_under_a_client_that_will_not_close() {
+    let probe = fakes(None);
+    let main_uid = probe.account(MAIN).launcher_uid.unwrap();
+    probe.backend.shut_down();
+    let knobs = json!({
+        "processes": { "elevated": ["Battle.net.exe"], "shutdownPolls": 100_000 },
+        "knobs": { "battlenet": { "signInWhenAskedMs": 600, "signInAs": main_uid } },
+        "timing": { "battlenet": { "shutdownMs": 1000, "killGraceMs": 500 } },
+    });
+    let fakes = fakes(Some(&knobs));
+    let states = fakes.play(NEW);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Failed);
+    assert_eq!(last.restored, Some(false), "{:?}", last.error);
+    let fakes = fakes.restart();
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_some());
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn a_snapshot_puts_the_token_and_the_list_back_once_the_client_is_closed() {
     let fakes = fakes(None);
     let before = fakes.tokens();

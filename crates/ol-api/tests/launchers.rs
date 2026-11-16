@@ -459,6 +459,43 @@ fn a_switch_that_would_close_steam_asks_first_and_preview_mode_refuses_any() {
 }
 
 #[test]
+fn a_first_sign_in_as_another_account_steam_knows_is_not_taken_for_the_account() {
+    let other = recorded_login_users()
+        .iter()
+        .find(|user| user["accountName"] == "user_2")
+        .and_then(|user| user["steamId64"].as_str())
+        .and_then(|id| id.parse::<u64>().ok())
+        // The account id Steam keeps in ActiveUser is the low half of the SteamID64.
+        .map(|id| id & 0xffff_ffff)
+        .unwrap();
+    let by_hand = json!({ "knobs": { "steam": { "signInWhenAskedMs": 500, "signInAs": other } } });
+    let fakes = fakes(Some(&by_hand));
+    let account = block_on(fakes.backend.create_account(NewAccount {
+        launcher: LauncherId::Steam,
+        display_name: "Newcomer".to_owned(),
+        login: "new_user".to_owned(),
+        launcher_uid: None,
+        password: None,
+        tags: Vec::new(),
+        notes: String::new(),
+    }))
+    .unwrap();
+    let start = StartLaunch {
+        account_id: account.id,
+        game_id: None,
+        confirm_close: true,
+    };
+    block_on(fakes.backend.start_launch(start)).unwrap();
+    let job = fakes.finished();
+    assert_eq!(job.state, JobState::Failed);
+    assert_eq!(
+        job.error.as_deref(),
+        Some("Steam signed in as user_2 instead of new_user.")
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn a_stored_password_goes_to_steams_command_line_and_nowhere_else() {
     let expired = json!({ "knobs": { "steam": { "expiredSessions": ["user_3"] } } });
     let fakes = fakes(Some(&expired));
@@ -523,6 +560,84 @@ fn a_stored_password_goes_to_steams_command_line_and_nowhere_else() {
             "{name} holds the password"
         );
     }
+}
+
+#[test]
+fn a_failed_switch_is_not_put_back_under_a_steam_that_will_not_close() {
+    let stuck = json!({
+        "processes": { "elevated": ["steam.exe"], "shutdownPolls": 100_000 },
+        "knobs": { "steam": { "expiredSessions": ["user_3"] } },
+        "timing": { "steam": { "shutdownMs": 1000, "killGraceMs": 500 } }
+    });
+    let fakes = fakes(Some(&stuck));
+    block_on(
+        fakes
+            .backend
+            .set_setting(SettingKey::SteamAutoLogin, "true".to_owned()),
+    )
+    .unwrap();
+    let login_users = fakes
+        .launchers_dir()
+        .join("steam")
+        .join("config")
+        .join("loginusers.vdf");
+    let switch = StartLaunch {
+        account_id: fakes.account("user_3"),
+        game_id: None,
+        confirm_close: false,
+    };
+    block_on(fakes.backend.start_launch(switch)).unwrap();
+    let job = fakes.finished();
+    assert_eq!(job.state, JobState::Failed);
+    assert_eq!(job.restored, Some(false), "{:?}", job.error);
+    let written = fs::read(&login_users).unwrap();
+    assert!(
+        job.error
+            .as_deref()
+            .is_some_and(|error| error.contains("Windows would not let One Launch close steam.exe"))
+    );
+
+    let fakes = fakes.restart();
+    let pending = block_on(fakes.backend.recovery())
+        .unwrap()
+        .expect("the snapshot is offered at the next start");
+    assert_eq!(Some(pending.backup_id), job.backup_id);
+    assert_eq!(fs::read(&login_users).unwrap(), written);
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_snapshot_records_the_registry_as_it_is_when_the_snapshot_is_taken() {
+    let running = json!({ "knobs": { "steam": { "runningAs": "user_1" } } });
+    let fakes = fakes(Some(&running));
+    let registry = Arc::clone(&fakes.fake.registry);
+    fakes.fake.processes.on_start(move |_, args| {
+        if args.iter().any(|arg| arg == "-shutdown") {
+            registry.seed(
+                r"HKCU\Software\Valve\Steam\AutoLoginUser",
+                ol_platform_fake::RegistryValue::Text("user_4".to_owned()),
+            );
+        }
+    });
+    let switch = StartLaunch {
+        account_id: fakes.account("user_3"),
+        game_id: None,
+        confirm_close: true,
+    };
+    block_on(fakes.backend.start_launch(switch)).unwrap();
+    let job = fakes.finished();
+    assert!(job.state == JobState::Done, "{:?}", job.error);
+    let backup_id = job.backup_id.expect("the switch took a snapshot");
+    fakes.fake.processes.set_running("steam.exe", false);
+    let restored = block_on(fakes.backend.restore_backup(LauncherId::Steam, &backup_id)).unwrap();
+    assert!(
+        restored
+            .registry
+            .contains(&"AutoLoginUser = user_4".to_owned()),
+        "{:?}",
+        restored.registry
+    );
+    fakes.backend.shut_down();
 }
 
 #[test]

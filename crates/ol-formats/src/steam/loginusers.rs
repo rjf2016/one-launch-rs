@@ -165,6 +165,8 @@ static MOST_RECENT_LINE: LazyLock<Regex> = LazyLock::new(|| {
     ))
     .expect("a fixed pattern")
 });
+static KEY_ONLY_LINE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(&format!(r#"^{WS}*"([^"]*)"{WS}*$"#)).expect("a fixed pattern"));
 static ANY_KEY_LINE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&format!(r#"^({WS}*)"[^"]*"({WS}+)"[^"]*"{WS}*$"#)).expect("a fixed pattern")
 });
@@ -185,6 +187,9 @@ pub fn plan_auto_login_rewrite(
     let mut out: Vec<String> = Vec::new();
     let mut changes = Vec::new();
     let mut depth = 0_i64;
+    // The reader takes the accounts from the top-level users block alone, so only its children are accounts here.
+    let mut top_key: Option<String> = None;
+    let mut in_users = false;
     let mut current_user: Option<String> = None;
     let mut saw_key_in_block = false;
     let mut indent = "\t\t".to_owned();
@@ -193,6 +198,11 @@ pub fn plan_auto_login_rewrite(
     for (index, raw) in js::lines(text).enumerate() {
         let trimmed = js::trim(raw);
         if trimmed == "{" {
+            if depth == 0 {
+                in_users = top_key
+                    .take()
+                    .is_some_and(|key| key.eq_ignore_ascii_case("users"));
+            }
             depth += 1;
             out.push(raw.to_owned());
             continue;
@@ -215,8 +225,13 @@ pub fn plan_auto_login_rewrite(
             out.push(raw.to_owned());
             continue;
         }
+        if depth == 0 && !trimmed.is_empty() {
+            top_key = KEY_ONLY_LINE.captures(raw).map(|found| found[1].to_owned());
+        }
         if depth == 1 {
-            if let Some(found) = USER_KEY_LINE.captures(raw) {
+            if !in_users {
+                current_user = None;
+            } else if let Some(found) = USER_KEY_LINE.captures(raw) {
                 current_user = Some(found[1].to_owned());
                 saw_key_in_block = false;
             }
@@ -267,4 +282,20 @@ pub fn marks_most_recent(text: &str, target: &str) -> bool {
             .iter()
             .any(|user| user.steam_id64 == target && user.most_recent)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_account_shaped_key_outside_the_users_block_is_left_alone() {
+        let text = "\"users\"\n{\n\t\"111111111111111\"\n\t{\n\t\t\"AccountName\"\t\t\"a\"\n\t\t\"AutoLogin\"\t\t\"0\"\n\t}\n}\n\"other\"\n{\n\t\"222222222222222\"\n\t{\n\t\t\"AutoLogin\"\t\t\"1\"\n\t}\n\t\"333333333333333\"\n\t{\n\t\t\"Name\"\t\t\"c\"\n\t}\n}\n";
+        let rewrite = plan_auto_login_rewrite(text, "111111111111111").unwrap();
+        assert_eq!(rewrite.changes.len(), 1);
+        assert_eq!(
+            rewrite.text,
+            text.replacen("\"AutoLogin\"\t\t\"0\"", "\"AutoLogin\"\t\t\"1\"", 1)
+        );
+    }
 }

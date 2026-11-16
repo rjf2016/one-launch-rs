@@ -506,6 +506,13 @@ pub fn run(
     let ran: Result<(), ServiceError> = (|| {
         let adapter = launchers.adapter(launcher, &configs, &directory)?;
         if direct && let Some(game) = &game {
+            if cancel.is_cancelled() {
+                sink.set_launch(JobStepStatus::Skipped);
+                sink.job.error = Some(format!("Stopped before launching {}.", game.name));
+                sink.job.state = JobState::Cancelled;
+                result = LaunchResult::Cancelled;
+                return Ok(());
+            }
             sink.job.switched = true;
             launch(&mut sink, &adapter, game, false)?;
             touch_last_used = true;
@@ -649,4 +656,107 @@ pub fn settle(store: &Store, finished: FinishedJob, now: &str, changed: &dyn Fn(
 pub fn abandon(finished: FinishedJob, changed: &dyn Fn(&LaunchJob)) {
     finished.board.finish(&finished.job);
     changed(&finished.job);
+}
+
+#[cfg(test)]
+mod tests {
+    use ol_model::LauncherId;
+    use ol_testkit::{Scratch, oracle};
+    use ol_vault::FakeVault;
+    use time::macros::datetime;
+
+    use super::*;
+    use crate::accounts::NewAccount;
+    use crate::sessions::StoreWork;
+
+    struct NoDatabase;
+
+    impl StoreThread for NoDatabase {
+        fn run(&self, _: StoreWork) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn a_job_stopped_before_it_runs_starts_no_game() {
+        let scratch = Scratch::new("launch-direct");
+        let launchers_dir = scratch.join("launchers");
+        let data_dir = scratch.join("data");
+        ol_sim::lay_down(
+            &oracle("fixtures/dev-only/fake-launchers/all-four"),
+            &oracle("fixtures/launchers"),
+            &launchers_dir,
+        )
+        .unwrap();
+        let running = serde_json::json!({ "knobs": { "steam": { "runningAs": "user_1" } } });
+        ol_sim::write_knobs(&launchers_dir, &running).unwrap();
+        let fake = ol_sim::materialize(
+            &launchers_dir,
+            &data_dir,
+            datetime!(2026-11-06 16:46:23 UTC),
+        )
+        .unwrap();
+        let mut launchers = Launchers::on(fake.platform.clone(), Arc::new(FakeVault));
+        launchers.steam_timing = ol_adapters::steam::Timing::with(&fake.steam_timing);
+        launchers
+            .steam_default_dir
+            .clone_from(&fake.steam_default_dir);
+        let (store, _) = crate::data_folder::open(&data_dir, "9.8.7").unwrap();
+        let seeded = fake
+            .seed
+            .accounts
+            .iter()
+            .find(|account| account.login == "user_1")
+            .unwrap();
+        let now = "2026-11-06T16:46:23.000Z";
+        let account = accounts::create(
+            &store,
+            &FakeVault,
+            &NewAccount {
+                launcher: LauncherId::Steam,
+                display_name: seeded.display_name.clone(),
+                login: seeded.login.clone(),
+                launcher_uid: seeded.launcher_uid.clone(),
+                password: None,
+                tags: Vec::new(),
+                notes: String::new(),
+            },
+            now,
+        )
+        .unwrap();
+        let configs = launchers.configs(&store.settings().unwrap(), &data_dir);
+        crate::launchers::scan_library(&store, &launchers, &configs, now);
+        let game = store
+            .installed_games()
+            .unwrap()
+            .into_iter()
+            .find(|game| game.launcher == LauncherId::Steam)
+            .unwrap();
+
+        let board = JobBoard::default();
+        let prepared = prepare(
+            &store,
+            &launchers,
+            &data_dir,
+            &board,
+            &mut LastPreflight::default(),
+            &StartInput {
+                account_id: account.id,
+                game_id: Some(game.id),
+                confirm_close: false,
+            },
+        )
+        .unwrap();
+        assert!(prepared.job().direct);
+        board.cancel(&prepared.job().id).unwrap();
+        let finished = run(prepared, Arc::new(NoDatabase), &|_| {});
+        assert_eq!(finished.job.state, JobState::Cancelled);
+        assert_eq!(finished.result, LaunchResult::Cancelled);
+        let opened = fake.log.snapshot().iter().any(|event| {
+            event["op"]
+                .as_str()
+                .is_some_and(|op| op.starts_with("shell"))
+        });
+        assert!(!opened, "no launch request was sent");
+    }
 }

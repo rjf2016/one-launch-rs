@@ -481,6 +481,26 @@ fn a_switch_that_fails_after_its_write_puts_the_file_back_from_its_encrypted_cop
     fakes.backend.shut_down();
 }
 
+#[test]
+fn a_failed_switch_is_not_put_back_under_a_launcher_that_will_not_close() {
+    let probe = fakes(None);
+    let main_uid = probe.account(MAIN).launcher_uid.unwrap();
+    probe.backend.shut_down();
+    let knobs = json!({
+        "processes": { "elevated": ["EpicGamesLauncher.exe"], "shutdownPolls": 100_000 },
+        "knobs": { "epic": { "signInWhenAskedMs": 2000, "signInAs": main_uid } },
+        "timing": { "epic": { "shutdownMs": 1000, "killGraceMs": 500 } },
+    });
+    let fakes = fakes(Some(&knobs));
+    let states = fakes.play("new@example.com");
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Failed);
+    assert_eq!(last.restored, Some(false), "{:?}", last.error);
+    let fakes = fakes.restart();
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_some());
+    fakes.backend.shut_down();
+}
+
 // What the fake machine was asked to do to a process or to a launcher's file, in order.
 fn asked_of_the_machine(fakes: &Fakes) -> Vec<String> {
     let events = fakes.fake.log.snapshot();

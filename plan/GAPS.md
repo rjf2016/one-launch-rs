@@ -137,6 +137,12 @@ None of those about stored values and launcher files is visible on data the app 
 - A `Timestamp` in `loginusers.vdf` or a `LastPlayed` in an app manifest outside the years 0 to 9999 reads as no time. The Electron app fails the whole account list or the whole scan on one.
 - A game folder a manifest names relative to a library folder that is itself not a full path is taken as `steamapps\common`. The Electron app resolves it against the folder it runs in.
 - The games a scan finds are ordered by their lower-cased names, as the Library is.
+- A failed switch is not put back while Steam, the Epic Games Launcher or the Battle.net client will not close: nothing is written, the job says why ("Restoring backup <id> also failed: …"), and the snapshot stays for the next start to offer, as for Riot. The Electron app writes the snapshot back under the running launcher and reports it restored.
+- A first sign-in for an account Steam has never seen that lands on another account `loginusers.vdf` names fails the switch: "Steam signed in as <that account> instead of <login>.", and no game is started. The Electron app takes any new sign-in for the account while Steam has no entry for it yet. An id Steam has no entry for is still taken, as there.
+- A Steam switch's snapshot records AutoLoginUser and RememberPassword as they are when it copies `loginusers.vdf`, after Steam has exited. The Electron app records the values its plan read before Steam was closed.
+- The rewrite of `loginusers.vdf` changes the accounts of the top-level `users` block alone. The Electron app also changes a block with an account-shaped key under any other top-level key, which its reader never takes for an account.
+- A log tail cut short where a line starts keeps that line. The Electron app drops the first line of every tail it cuts.
+- A job stopped before its thread runs starts no game, on the way straight to the game too. The Electron app sends the launch.
 - A scan that could not read Steam's `libraryfolders.vdf`, or list Riot's metadata folder, changes nothing in the Library and says so on that launcher's entry. The Electron app keeps what it could read and marks every other game of that launcher as not installed until a later scan.
 - A journal whose `startedAt` is not a full timestamp is unreadable and moved aside. The Electron app takes any text its date parser takes.
 - A snapshot manifest whose `bytes` is not a whole number from 0 up is unreadable.

@@ -193,8 +193,6 @@ struct Switch<'a> {
     handed_over: bool,
     log_mark: u64,
     bootstrap_mark: u64,
-    plan_auto_login_user: Option<String>,
-    plan_remember: Option<u32>,
 }
 
 impl Switch<'_> {
@@ -228,8 +226,12 @@ impl Switch<'_> {
         Ok(self.steam.active_user()?)
     }
 
+    // The registry values are read here, beside the file's copy: Steam can change them as it exits.
     fn take_snapshot(&mut self) -> Result<(), Thrown> {
         self.mark(STEP.backup, JobStepStatus::Running, "");
+        let registry = &self.platform.registry;
+        let auto_login_user = registry.get_string(Hive::Hkcu, HKCU_KEY, AUTO_LOGIN_USER)?;
+        let remember = registry.get_dword(Hive::Hkcu, HKCU_KEY, REMEMBER_PASSWORD)?;
         let snapshot = self
             .backups
             .snapshot(&SnapshotRequest {
@@ -240,7 +242,7 @@ impl Switch<'_> {
                     relative: SNAPSHOT_RELATIVE,
                     sensitive: false,
                 }],
-                meta: snapshot_meta(self.plan_auto_login_user.as_deref(), self.plan_remember),
+                meta: snapshot_meta(auto_login_user.as_deref(), remember),
                 protect: None,
                 pinned: None,
             })
@@ -508,13 +510,21 @@ impl Switch<'_> {
         else {
             return Ok(());
         };
-        let login = self.account.login.to_lowercase();
+        let login = self.account.login.trim().to_lowercase();
         let entry = users
             .iter()
             .find(|user| user.account_name.to_lowercase() == login);
-        if let (Some(entry), Some(signed_in)) = (entry, signed_in)
-            && steam_id3(&entry.steam_id64) != Some(signed_in)
-        {
+        let Some(signed_in) = signed_in else {
+            return Ok(());
+        };
+        // Without an entry for the account yet, only an entry of another account for the id that signed in says who it was.
+        let wrong = match entry {
+            Some(entry) => steam_id3(&entry.steam_id64) != Some(signed_in),
+            None => users
+                .iter()
+                .any(|user| steam_id3(&user.steam_id64) == Some(signed_in)),
+        };
+        if wrong {
             let other = users
                 .iter()
                 .find(|user| steam_id3(&user.steam_id64) == Some(signed_in));
@@ -740,14 +750,24 @@ impl Switch<'_> {
         Ok(ending)
     }
 
-    // Steam rewrites loginusers.vdf when it exits, so it is closed before the file goes back. Nothing stops this once it has begun.
+    // Steam rewrites loginusers.vdf when it exits, so it is closed before the file goes back, and a Steam that will not close keeps the snapshot for the next start. Nothing stops this once it has begun.
     fn roll_back(&self, backup_id: &str) -> Result<(), String> {
-        if self.steam.is_running().map_err(|error| error.to_string())? {
-            let _ = self.steam.shutdown(None, &CancelToken::new());
+        let text = |error: AdapterError| error.to_string();
+        if self.steam.is_running().map_err(text)? {
+            let closed = self.steam.shutdown(None, &CancelToken::new());
+            if self.steam.is_running().map_err(text)? {
+                return Err(closed.err().map_or_else(
+                    || {
+                        "Steam is still running, and it rewrites loginusers.vdf when it exits"
+                            .to_owned()
+                    },
+                    text,
+                ));
+            }
         }
         restore_steam(self.steam, self.platform, self.backups, backup_id)
             .map(|_| ())
-            .map_err(|error| error.message())
+            .map_err(|error| error.to_string())
     }
 }
 
@@ -809,8 +829,6 @@ pub fn run_switch(
         modified: false,
         launcher_started: false,
         handed_over: false,
-        plan_auto_login_user: context.auto_login_user,
-        plan_remember: context.remember_dword,
     };
 
     let attempt = switch.attempt(plan.running, context.already_active, plan.strategy);
