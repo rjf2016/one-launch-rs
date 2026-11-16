@@ -119,6 +119,21 @@ fn above_shielded(entries: &[Entry], shielded: &HashSet<u32>) -> HashSet<u32> {
         .collect()
 }
 
+// The processes this app descends from, not counting itself.
+fn ancestors(entries: &[Entry], own_pid: u32) -> HashSet<u32> {
+    let by_pid = index(entries);
+    by_pid
+        .get(&own_pid)
+        .map(|own| {
+            lineage(own, &by_pid, parent_of)
+                .iter()
+                .skip(1)
+                .map(|step| step.pid)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn named(entry: &Entry, image: &str) -> bool {
     image_key(&entry.name) == image_key(image)
 }
@@ -128,15 +143,7 @@ pub(crate) fn end_targets(entries: &[Entry], image: &str, tree: bool, own_pid: u
     let by_pid = index(entries);
     let shielded = shielded(entries);
     let above = above_shielded(entries, &shielded);
-    let mut spared: HashSet<u32> = by_pid
-        .get(&own_pid)
-        .map(|own| {
-            lineage(own, &by_pid, parent_of)
-                .iter()
-                .map(|step| step.pid)
-                .collect()
-        })
-        .unwrap_or_default();
+    let mut spared = ancestors(entries, own_pid);
     spared.insert(own_pid);
     let untouchable = |entry: &Entry| shielded.contains(&entry.pid) || spared.contains(&entry.pid);
 
@@ -385,7 +392,17 @@ impl<S: System> ProcessRunner for Port<S> {
     fn kill(&self, image: &str, tree: bool) -> Result<(), ProcessError> {
         checked(image)?;
         let entries = self.system.snapshot()?;
-        let targets = end_targets(&entries, image, tree, self.system.own_pid());
+        let own_pid = self.system.own_pid();
+        let ancestors = ancestors(&entries, own_pid);
+        if entries
+            .iter()
+            .any(|entry| named(entry, image) && ancestors.contains(&entry.pid))
+        {
+            return Err(ProcessError::Failed(format!(
+                "One Launch was started from {image}, so it will not end it. Close {image} yourself, or start One Launch on its own, then try again."
+            )));
+        }
+        let targets = end_targets(&entries, image, tree, own_pid);
         if targets.is_empty() {
             return Ok(());
         }
@@ -649,6 +666,29 @@ mod tests {
             calls.ended.iter().copied().collect::<HashSet<_>>(),
             HashSet::from([400, 410, 411, 420])
         );
+    }
+
+    #[test]
+    fn an_end_of_the_program_this_app_was_started_from_says_why_and_ends_nothing() {
+        let table = vec![
+            entry(200, 4, 2, "explorer.exe"),
+            entry(400, 200, 10, "steam.exe"),
+            entry(410, 400, 11, "steamwebhelper.exe"),
+            entry(OWN, 400, 12, "OneLaunch.exe"),
+        ];
+        let processes = Port {
+            system: MadeUp::new(table),
+        };
+        for tree in [true, false] {
+            let refused = processes.kill("STEAM.exe", tree).unwrap_err().to_string();
+            assert_eq!(
+                refused,
+                "One Launch was started from STEAM.exe, so it will not end it. Close STEAM.exe yourself, or start One Launch on its own, then try again."
+            );
+        }
+        assert!(processes.kill("steamwebhelper.exe", false).is_ok());
+        let calls = processes.system.calls();
+        assert_eq!(calls.ended, [410]);
     }
 
     #[test]
