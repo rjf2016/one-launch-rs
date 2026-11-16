@@ -7,9 +7,12 @@ use std::time::Duration;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use ol_formats::epic::session::{EpicSessionBlob, plan_session_write, read_session_from_ini};
+use ol_formats::epic::session::{
+    EpicSessionBlob, fingerprint_of, plan_session_write, read_session_from_ini,
+};
 use ol_platform_api::Clock;
 use ol_platform_fake::{CLOSE_ARGUMENT, FakeClock, FakeProcesses, FakeRegistry, RegistryValue};
+use serde_json::{Map, Value, json};
 use time::format_description::well_known::Rfc3339;
 
 // Where an Epic Games Launcher keeps what the app reads. The simulator has its own copy of these names: it stands in for the launcher, not for the app's idea of the launcher.
@@ -38,8 +41,10 @@ pub struct EpicKnobs {
 }
 
 struct State {
-    // What "Epic's servers" know: the account each session signs in as.
+    // What "Epic's servers" know: the account each session signs in as, by the session's fingerprint.
     servers: HashMap<String, String>,
+    // The sessions this launcher made up, by fingerprint, which the next start of the fake machine reads back.
+    issued: Map<String, Value>,
     // One count for log headers and new sessions, as the Electron app's simulator keeps it.
     counter: u32,
 }
@@ -48,6 +53,7 @@ pub struct EpicSim {
     knobs: EpicKnobs,
     ini_path: PathBuf,
     log_path: PathBuf,
+    issued_path: PathBuf,
     clock: Arc<FakeClock>,
     state: Mutex<State>,
 }
@@ -83,13 +89,27 @@ impl EpicSim {
         .collect()
     }
 
+    // `servers` maps each session's data to its account; `issued_path` keeps those the launcher makes up from one start of the fake machine to the next.
     pub fn attach(
         local_app_data: &str,
+        issued_path: PathBuf,
         processes: &FakeProcesses,
         clock: Arc<FakeClock>,
         servers: HashMap<String, String>,
         knobs: EpicKnobs,
     ) -> Arc<Self> {
+        let kept: Value = fs::read(&issued_path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_default();
+        let issued = kept["sessions"].as_object().cloned().unwrap_or_default();
+        let mut servers: HashMap<String, String> = servers
+            .into_iter()
+            .map(|(data, uid)| (fingerprint_of(&data), uid))
+            .collect();
+        servers.extend(issued.iter().filter_map(|(fingerprint, uid)| {
+            Some((fingerprint.clone(), uid.as_str()?.to_owned()))
+        }));
         let sim = Arc::new(Self {
             knobs,
             ini_path: Self::settings_file(local_app_data),
@@ -102,9 +122,11 @@ impl EpicSim {
             ]
             .iter()
             .collect(),
+            issued_path,
             clock,
             state: Mutex::new(State {
                 servers,
+                issued,
                 counter: 0,
             }),
         });
@@ -191,7 +213,19 @@ impl EpicSim {
     // The launcher remembers a new session for this account.
     fn remember_fresh(&self, text: &str, uid: &str) {
         let fresh = self.fresh_blob();
-        self.state().servers.insert(fresh.clone(), uid.to_owned());
+        let fingerprint = fingerprint_of(&fresh);
+        let kept = {
+            let mut state = self.state();
+            state.servers.insert(fingerprint.clone(), uid.to_owned());
+            state.issued.insert(fingerprint, uid.into());
+            json!({ "sessions": state.issued })
+        };
+        let written = self
+            .issued_path
+            .parent()
+            .map_or(Ok(()), fs::create_dir_all)
+            .and_then(|()| fs::write(&self.issued_path, kept.to_string()));
+        written.expect("the simulated launcher could not keep the sessions it made up");
         let blob = EpicSessionBlob {
             enable: "True".to_owned(),
             data: fresh,
@@ -222,7 +256,7 @@ impl EpicSim {
         ];
         let mut signed_in = false;
         if let (true, Some(data)) = (disk.remembered, &disk.data) {
-            let known = self.state().servers.get(data).cloned();
+            let known = self.state().servers.get(&fingerprint_of(data)).cloned();
             let refused = |uid: &String| {
                 self.knobs.expired.contains(data) || self.knobs.expired.contains(uid)
             };

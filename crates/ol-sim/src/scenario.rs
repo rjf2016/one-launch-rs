@@ -26,6 +26,8 @@ use crate::steam::{SteamKnobs, SteamSim};
 
 const SCENARIO_FILE: &str = "scenario.json";
 const KNOBS_FILE: &str = "knobs.json";
+// The sessions the scripted Epic launcher made up, by fingerprint, with the account each signs in as. None of their data.
+const ISSUED_SESSIONS_FILE: &str = "issued-sessions.json";
 const FIXTURE_PREFIX: &str = "@fixtures/";
 const UNIFIED_AUTH: &str = r"Software\Blizzard Entertainment\Battle.net\UnifiedAuth";
 const BINARY_PREFIX: &str = "binary:";
@@ -554,6 +556,7 @@ fn materialize_on(
         servers.extend(self::servers(&scenario, LauncherId::Epic));
         EpicSim::attach(
             &local_app_data,
+            dir.join("epic").join(ISSUED_SESSIONS_FILE),
             &processes,
             Arc::clone(&clock),
             servers,
@@ -697,5 +700,44 @@ mod tests {
         assert!(read.unwrap());
         assert!(written.unwrap());
         assert_eq!(kept, b"old");
+    }
+
+    #[test]
+    fn a_session_the_epic_launcher_made_up_signs_in_as_its_own_account_after_a_restart() {
+        let scratch = Scratch::new("sim-issued");
+        let (dir, data) = (scratch.join("launchers"), scratch.join("data"));
+        lay_down(
+            &oracle("fixtures/dev-only/fake-launchers/all-four"),
+            &oracle("fixtures/launchers"),
+            &dir,
+        )
+        .unwrap();
+        write_knobs(
+            &dir,
+            &serde_json::json!({ "knobs": { "epic": { "reactMs": 0 } } }),
+        )
+        .unwrap();
+        let scenario = read_json(&dir.join(SCENARIO_FILE), SCENARIO_FILE).unwrap();
+        let on_disk = scenario["onDisk"]["epic"].as_str().unwrap();
+        let accounts = scenario["seed"]["accounts"].as_array().unwrap();
+        let other = accounts
+            .iter()
+            .filter(|account| account["launcher"] == "epic")
+            .filter_map(|account| account["launcherUid"].as_str())
+            .find(|uid| *uid != on_disk)
+            .unwrap();
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &data, at).unwrap();
+        fake.epic.as_ref().unwrap().sign_in_by_hand(Some(other));
+        drop(fake);
+
+        let fake = materialize(&dir, &data, at).unwrap();
+        let exe = dir.join(r"epic\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe");
+        let exe = exe.to_string_lossy().into_owned();
+        fake.platform.processes.start(&exe, &[], "").unwrap();
+        let log = dir.join(r"localappdata\EpicGamesLauncher\Saved\Logs\EpicGamesLauncher.log");
+        let log = fs::read_to_string(log).unwrap();
+        assert!(log.contains(&format!("OnLoginComplete - 0 TRUE {other} ")));
+        assert!(!log.contains(&format!("OnLoginComplete - 0 TRUE {on_disk} ")));
     }
 }
