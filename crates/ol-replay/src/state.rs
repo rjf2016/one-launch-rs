@@ -5,6 +5,7 @@ use std::path::Path;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use ol_formats::battlenet::config::{parse_config, read_client_settings};
 use ol_formats::epic::session::read_session_from_ini;
 use ol_formats::steam::loginusers::parse_login_users;
 use ol_model::{Ciphertext, LauncherId};
@@ -20,6 +21,7 @@ use crate::ReplayError;
 const STEAM_LOGIN_USERS: &str = "steam/config/loginusers.vdf";
 const EPIC_SETTINGS: &str =
     "localappdata/EpicGamesLauncher/Saved/Config/Windows/GameUserSettings.ini";
+const BATTLENET_CONFIG: &str = "appdata/Battle.net/Battle.net.config";
 
 pub struct Read {
     pub state: Value,
@@ -149,16 +151,52 @@ fn backups(data_dir: &Path, launcher: LauncherId, vault: &dyn Vault) -> Vec<Valu
                     })
                 })
                 .collect();
+            let mut meta = manifest["meta"].clone();
+            if let Some(tokens) = unsealed_tokens(&meta["unifiedAuth"], vault) {
+                meta["unifiedAuth"] = tokens;
+            }
             Some(json!({
                 "id": id,
                 "createdAt": manifest["createdAt"],
                 "reason": manifest["reason"],
                 "pinned": manifest.get("pinned").cloned().unwrap_or(Value::Null),
-                "meta": manifest["meta"],
+                "meta": meta,
                 "files": files,
             }))
         })
         .collect()
+}
+
+// A Battle.net snapshot keeps the UnifiedAuth values as a JSON list in a text, each token sealed under `enc`. Shown as that list with the digest of what was sealed in the place of each `enc`.
+fn unsealed_tokens(recorded: &Value, vault: &dyn Vault) -> Option<Value> {
+    let list: Value = serde_json::from_str(recorded.as_str()?).ok()?;
+    let shown = list.as_array()?.iter().map(|token| {
+        let opened = STANDARD
+            .decode(token["enc"].as_str().unwrap_or_default())
+            .ok()
+            .and_then(|sealed| vault.decrypt(&Ciphertext::new(sealed)).ok());
+        json!({
+            "name": token["name"],
+            "plaintextSha256": opened.map(|token| sha256_hex(token.expose().as_bytes())),
+        })
+    });
+    Some(shown.collect())
+}
+
+// Battle.net.config, and of what it says the client's settings as the app reads them.
+fn battlenet_config(launchers_dir: &Path) -> Option<Value> {
+    let bytes = fs::read(launchers_dir.join(BATTLENET_CONFIG)).ok()?;
+    let (doc, _) = parse_config(&String::from_utf8_lossy(&bytes)).ok()?;
+    let client = read_client_settings(&doc);
+    Some(json!({
+        "bytes": bytes.len(),
+        "sha256": sha256_hex(&bytes),
+        "parsed": {
+            "autoLogin": client.auto_login,
+            "savedAccountNames": client.saved_account_names,
+            "version": client.version,
+        },
+    }))
 }
 
 fn login_users(launchers_dir: &Path) -> Option<Value> {
@@ -278,6 +316,9 @@ pub fn read(
     }
     if let Some(file) = epic_settings(launchers_dir) {
         launcher_files.insert(EPIC_SETTINGS.to_owned(), file);
+    }
+    if let Some(file) = battlenet_config(launchers_dir) {
+        launcher_files.insert(BATTLENET_CONFIG.to_owned(), file);
     }
     let as_values = |rows: Vec<Map<String, Value>>| -> Value {
         rows.into_iter()

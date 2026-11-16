@@ -2,6 +2,7 @@
 
 // Runs a replay script of oracle/l2 against the backend on fake launchers and says what the app did, in the shape of an expectation: the job and platform events in order, and what was left on disk and in the fake registry.
 
+pub mod check;
 mod state;
 
 use std::collections::BTreeMap;
@@ -9,7 +10,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
 use futures_lite::future::block_on;
-use ol_api::launchers::{EpicMachine, EpicTiming, Launchers, NewAccount, Secret, SteamTiming};
+use ol_api::launchers::{
+    BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, Launchers, NewAccount, Secret,
+    SteamTiming,
+};
 use ol_api::{ApiError, Backend, StartLaunch};
 use ol_model::{JobState, LaunchJob, LauncherId, SettingKey};
 use ol_platform_api::Clock;
@@ -199,8 +203,10 @@ pub struct Replay<'a> {
     now: OffsetDateTime,
     gate: Gate,
     events: Vec<Value>,
+    // The id of each job in the order they were started. Empty for one a call that was left out would have started.
     jobs: Vec<String>,
     registry: Vec<Value>,
+    without: Option<LauncherId>,
 }
 
 fn job_event(job: &LaunchJob) -> Value {
@@ -256,6 +262,7 @@ impl<'a> Replay<'a> {
             events: Vec::new(),
             jobs: Vec::new(),
             registry: Vec::new(),
+            without: None,
         };
         replay.start()?;
         Ok(replay)
@@ -272,6 +279,13 @@ impl<'a> Replay<'a> {
         launchers.epic = EpicMachine {
             timing: EpicTiming::with(&fake.epic_timing),
             default_dir: fake.epic_default_dir.clone(),
+            local_app_data: fake.local_app_data.clone(),
+            program_data: fake.program_data.clone(),
+        };
+        launchers.battlenet = BattlenetMachine {
+            timing: BattlenetTiming::with(&fake.battlenet_timing),
+            default_dir: fake.battlenet_default_dir.clone(),
+            app_data: fake.app_data.clone(),
             local_app_data: fake.local_app_data.clone(),
             program_data: fake.program_data.clone(),
         };
@@ -446,8 +460,9 @@ impl<'a> Replay<'a> {
         let backend = self.backend()?.clone();
         match channel {
             "accounts:list" => drop(block_on(backend.accounts())),
-            // Reads the replay has nothing to check, and the copy to the clipboard, which this build does not have yet.
-            "settings:get" | "settings:getAll" | "accounts:copy" => {}
+            // Reads the replay has nothing to check, and what this build does not have yet: the copy to the clipboard, and the status of the launchers and of the artwork, which are reads too.
+            "settings:get" | "settings:getAll" | "accounts:copy" | "launchers:status"
+            | "artwork:status" => {}
             "settings:set" => {
                 let key = text("key")
                     .and_then(SettingKey::parse)
@@ -518,16 +533,40 @@ impl<'a> Replay<'a> {
         Ok(())
     }
 
+    // Whether a call is about the launcher this replay leaves out: it names one of its accounts, games or snapshots.
+    fn left_out(&self, request: &Value) -> bool {
+        let Some(launcher) = self.without else {
+            return false;
+        };
+        let name = launcher.as_str();
+        let aliased = |field: &str| {
+            let alias = request[field].as_str();
+            alias.is_some_and(|alias| alias.split(':').nth(1) == Some(name))
+        };
+        aliased("accountId") || aliased("gameId") || request["launcher"] == name
+    }
+
     fn step(&mut self, step: &Value) -> Result<(), ReplayError> {
         match step["op"].as_str() {
             Some("invoke") => {
                 let channel = step["channel"]
                     .as_str()
                     .ok_or_else(|| script_error("an invoke without a channel"))?;
-                self.invoke(channel, step.get("req").unwrap_or(&Value::Null))
+                let request = step.get("req").unwrap_or(&Value::Null);
+                if self.left_out(request) {
+                    // The job such a call would have started keeps its number, so the later ones keep theirs.
+                    if channel == "launch:start" {
+                        self.jobs.push(String::new());
+                    }
+                    return Ok(());
+                }
+                self.invoke(channel, request)
             }
             Some("awaitJob") => {
                 let job = self.job_id(step["job"].as_str().unwrap_or_default())?;
+                if job.is_empty() {
+                    return Ok(());
+                }
                 let until = &step["until"];
                 let text = |name: &str| until[name].as_str().map(str::to_owned);
                 self.gate.wait_for(Until {
@@ -564,24 +603,31 @@ impl<'a> Replay<'a> {
 
     // Runs every step and answers with what the app did: `events` and `final`, with ids as aliases, the two folders as {launchers} and {data}, and times as the normalisation rules of the script say.
     pub fn run(setup: &'a Setup<'a>, script: &Value, rules: &Value) -> Result<Value, ReplayError> {
-        Self::run_first(setup, script, rules, usize::MAX)
+        Self::run_steps(setup, script, rules, None)
     }
 
-    // As `run`, for the first `count` steps only: the part of a script that comes before a launcher this build has no adapter for. The app quits after them, as it does at a snapshot.
-    pub fn run_first(
+    // As `run`, with every call left out that names an account, a game or a snapshot of `launcher`, and every wait for a job such a call would have started: what a script does around a launcher this build has no adapter for.
+    pub fn run_without(
         setup: &'a Setup<'a>,
         script: &Value,
         rules: &Value,
-        count: usize,
+        launcher: LauncherId,
+    ) -> Result<Value, ReplayError> {
+        Self::run_steps(setup, script, rules, Some(launcher))
+    }
+
+    fn run_steps(
+        setup: &'a Setup<'a>,
+        script: &Value,
+        rules: &Value,
+        without: Option<LauncherId>,
     ) -> Result<Value, ReplayError> {
         let mut replay = Self::begin(setup, script)?;
+        replay.without = without;
         let steps = script["steps"]
             .as_array()
             .ok_or_else(|| script_error("no steps"))?;
-        let ran = steps
-            .iter()
-            .take(count)
-            .try_for_each(|step| replay.step(step));
+        let ran = steps.iter().try_for_each(|step| replay.step(step));
         replay.shut_down();
         ran?;
         replay.report(rules)

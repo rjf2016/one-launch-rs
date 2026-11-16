@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
 
-use ol_platform_api::{Hive, RegistryError, RegistryReader, RegistryWriter};
+use ol_platform_api::{
+    Hive, RegistryData, RegistryError, RegistryNamedValue, RegistryReader, RegistryWriter,
+};
 
 use crate::OpLog;
 
@@ -84,6 +86,20 @@ impl FakeRegistry {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
+    // Every value below a key at any depth, each with its path below the key as first written.
+    fn below(&self, hive: Hive, key: &str) -> Vec<(String, RegistryValue)> {
+        let prefix = path(hive, key, "").to_lowercase();
+        self.state()
+            .values
+            .iter()
+            .filter(|(lower, _)| lower.starts_with(&prefix))
+            .filter_map(|(_, entry)| {
+                let rest = entry.path.get(prefix.len()..)?;
+                Some((rest.to_owned(), entry.value.clone()))
+            })
+            .collect()
+    }
+
     fn write(&self, path: &str, value: Option<RegistryValue>) -> Result<(), RegistryError> {
         let mut state = self.state();
         if let Some(message) = state.fail_next_write.take() {
@@ -145,6 +161,43 @@ impl RegistryReader for FakeRegistry {
             _ => None,
         })
     }
+
+    fn list_values(&self, hive: Hive, key: &str) -> Result<Vec<RegistryNamedValue>, RegistryError> {
+        Ok(self
+            .below(hive, key)
+            .into_iter()
+            .filter(|(rest, _)| !rest.contains('\\'))
+            .map(|(name, value)| RegistryNamedValue {
+                name,
+                data: match value {
+                    RegistryValue::Text(text) => RegistryData::Text(text),
+                    RegistryValue::Dword(number) => RegistryData::Dword(number),
+                    RegistryValue::Binary(hex) => RegistryData::Binary(hex),
+                },
+            })
+            .collect())
+    }
+
+    fn keys_holding(
+        &self,
+        hive: Hive,
+        key: &str,
+        text: &str,
+    ) -> Result<Vec<String>, RegistryError> {
+        let wanted = text.to_lowercase();
+        let mut keys: Vec<String> = Vec::new();
+        for (rest, value) in self.below(hive, key) {
+            let (Some((subkey, _)), RegistryValue::Text(data)) = (rest.rsplit_once('\\'), value)
+            else {
+                continue;
+            };
+            let known = keys.iter().any(|known| known.eq_ignore_ascii_case(subkey));
+            if !known && data.to_lowercase().contains(&wanted) {
+                keys.push(subkey.to_owned());
+            }
+        }
+        Ok(keys)
+    }
 }
 
 impl RegistryWriter for FakeRegistry {
@@ -169,6 +222,19 @@ impl RegistryWriter for FakeRegistry {
         value: u32,
     ) -> Result<(), RegistryError> {
         self.write(&path(hive, key, name), Some(RegistryValue::Dword(value)))
+    }
+
+    fn set_binary(
+        &self,
+        hive: Hive,
+        key: &str,
+        name: &str,
+        hex: &str,
+    ) -> Result<(), RegistryError> {
+        self.write(
+            &path(hive, key, name),
+            Some(RegistryValue::Binary(hex.to_uppercase())),
+        )
     }
 
     fn delete_value(&self, hive: Hive, key: &str, name: &str) -> Result<(), RegistryError> {
@@ -237,6 +303,65 @@ mod tests {
                 r"HKCU\Software\Example\Launcher\Count".to_owned(),
                 RegistryValue::Dword(1)
             )]
+        );
+    }
+
+    #[test]
+    fn a_key_lists_its_own_values_and_a_search_names_the_keys_below_it_that_hold_a_text() {
+        let log = OpLog::new();
+        let registry = FakeRegistry::new(log.clone());
+        let text = |value: &str| RegistryValue::Text(value.to_owned());
+        registry.seed(
+            r"HKLM\Software\Example\Products\One\Uninstall",
+            text("Remove One.exe"),
+        );
+        registry.seed(r"HKLM\Software\Example\Products\One\Name", text("One"));
+        registry.seed(
+            r"HKLM\Software\Example\Products\Two\Uninstall",
+            text("other.exe"),
+        );
+        registry.seed(
+            r"HKLM\Software\Example\Products\Deep\Er\Uninstall",
+            text("REMOVE x"),
+        );
+        registry.seed(
+            r"HKLM\Software\Example\Products\Count",
+            RegistryValue::Dword(3),
+        );
+        registry
+            .set_binary(Hive::Hkcu, KEY, "Token", "0a0b")
+            .unwrap();
+
+        let listed = registry
+            .list_values(Hive::Hklm, r"software\example\products\one")
+            .unwrap();
+        let names: Vec<&str> = listed.iter().map(|value| value.name.as_str()).collect();
+        assert_eq!(names, ["Name", "Uninstall"]);
+        assert!(listed[0].data == RegistryData::Text("One".to_owned()));
+        let products = registry
+            .list_values(Hive::Hklm, r"Software\Example\Products")
+            .unwrap();
+        assert!(products.len() == 1 && products[0].data == RegistryData::Dword(3));
+        assert!(
+            registry
+                .list_values(Hive::Hklm, "Nowhere")
+                .unwrap()
+                .is_empty()
+        );
+
+        assert_eq!(
+            registry
+                .keys_holding(Hive::Hklm, r"Software\Example\Products", "remove")
+                .unwrap(),
+            [r"Deep\Er", "One"]
+        );
+        let tokens = registry.list_values(Hive::Hkcu, KEY).unwrap();
+        assert!(tokens.len() == 1 && tokens[0].data == RegistryData::Binary("0A0B".to_owned()));
+        assert_eq!(
+            log.snapshot(),
+            [
+                json!({ "k": "plat", "op": "reg.set", "path": r"HKCU\Software\Example\Launcher\Token", "value": "binary" })
+            ]
         );
     }
 

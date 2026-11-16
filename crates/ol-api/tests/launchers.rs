@@ -8,7 +8,10 @@ use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, Mutex};
 
 use futures_lite::future::block_on;
-use ol_api::launchers::{EpicMachine, EpicTiming, Launchers, NewAccount, Secret, SteamTiming};
+use ol_api::launchers::{
+    BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, Launchers, NewAccount, Secret,
+    SteamTiming,
+};
 use ol_api::{ApiError, Backend, StartLaunch};
 use ol_model::{JobState, JobStepStatus, LaunchJob, LauncherId, SettingKey};
 use ol_sim::FakeLaunchers;
@@ -116,6 +119,13 @@ fn start(scratch: Scratch) -> Fakes {
         local_app_data: fake.local_app_data.clone(),
         program_data: fake.program_data.clone(),
     };
+    launchers.battlenet = BattlenetMachine {
+        timing: BattlenetTiming::with(&fake.battlenet_timing),
+        default_dir: fake.battlenet_default_dir.clone(),
+        app_data: fake.app_data.clone(),
+        local_app_data: fake.local_app_data.clone(),
+        program_data: fake.program_data.clone(),
+    };
     let (changed, jobs) = channel();
     let changed = Mutex::new(changed);
     let backend = Backend::start_with(
@@ -211,7 +221,10 @@ fn a_scan_brings_steams_games_into_the_library_and_a_missing_steam_takes_them_ou
 
     let scanned = block_on(fakes.backend.rescan()).unwrap();
     let scanned_launchers: Vec<LauncherId> = scanned.iter().map(|scan| scan.launcher).collect();
-    assert_eq!(scanned_launchers, [LauncherId::Steam, LauncherId::Epic]);
+    assert_eq!(
+        scanned_launchers,
+        [LauncherId::Steam, LauncherId::Epic, LauncherId::Battlenet]
+    );
     let steam = &scanned[0];
     assert_eq!(
         (
@@ -350,11 +363,11 @@ fn the_accounts_steam_remembers_are_listed_and_imported_once() {
 
     assert_eq!(
         refusal(block_on(
-            fakes.backend.remembered_accounts(LauncherId::Battlenet)
+            fakes.backend.remembered_accounts(LauncherId::Riot)
         )),
         (
             "NOT_IMPLEMENTED",
-            "The Battle.net adapter is not available yet".to_owned()
+            "The Riot Games adapter is not available yet".to_owned()
         )
     );
     fakes.backend.shut_down();

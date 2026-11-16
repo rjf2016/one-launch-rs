@@ -40,6 +40,8 @@ pub enum BackupError {
     },
     #[error("Snapshot file is corrupt: {0}")]
     Corrupt(String),
+    #[error("Snapshot meta has an unexpected shape")]
+    MetaShape,
     #[error(transparent)]
     Vault(#[from] VaultError),
     #[error("The snapshot could not be read or written: {0}")]
@@ -189,6 +191,18 @@ impl<'a> BackupService<'a> {
 
     pub fn root(&self) -> &str {
         &self.root
+    }
+
+    // A small secret for a snapshot's meta, such as a registry value that signs someone in: the vault's ciphertext of it in base64, as the Electron app keeps it.
+    pub fn seal(&self, secret: &Secret) -> Result<String, BackupError> {
+        Ok(STANDARD.encode(self.vault.encrypt(secret)?.into_bytes()))
+    }
+
+    pub fn open(&self, sealed: &str) -> Result<Secret, BackupError> {
+        let bytes = STANDARD
+            .decode(sealed)
+            .map_err(|_| BackupError::MetaShape)?;
+        Ok(self.vault.decrypt(&Ciphertext::new(bytes))?)
     }
 
     fn launcher_dir(&self, launcher: LauncherId) -> PathBuf {
