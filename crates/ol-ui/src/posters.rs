@@ -123,7 +123,7 @@ pub fn decode(file: &Path, shape: Shape, scale: f32) -> Option<RenderImage> {
 
     let side = |length: f32| (length * scale.clamp(1., 3.)).ceil() as u32;
     let fitted = match shape {
-        Shape::Cover => picture.resize_to_fill(side(WIDTH), side(HEIGHT), FilterType::CatmullRom),
+        Shape::Cover => cover(&picture, side(WIDTH), side(HEIGHT)),
         Shape::Icon if picture.width().max(picture.height()) > side(ICON) => {
             picture.resize(side(ICON), side(ICON), FilterType::CatmullRom)
         }
@@ -135,4 +135,62 @@ pub fn decode(file: &Path, shape: Shape, scale: f32) -> Option<RenderImage> {
         pixel.0.swap(0, 2);
     }
     Some(RenderImage::new(vec![Frame::new(pixels)]))
+}
+
+// Cropped to the card's proportions before it is scaled. Scaled first, a picture one pixel tall would be blown up to the card's height at its full width, which is gigabytes.
+fn cover(picture: &DynamicImage, width: u32, height: u32) -> DynamicImage {
+    let (from_width, from_height) = (u64::from(picture.width()), u64::from(picture.height()));
+    let (wide, tall) = (u64::from(width), u64::from(height));
+    let (kept_width, kept_height) = if from_width * tall > from_height * wide {
+        ((from_height * wide / tall).max(1), from_height)
+    } else {
+        (from_width, (from_width * tall / wide).max(1))
+    };
+    let left = (from_width - kept_width) / 2;
+    let top = (from_height - kept_height) / 2;
+    picture
+        .crop_imm(
+            left as u32,
+            top as u32,
+            kept_width as u32,
+            kept_height as u32,
+        )
+        .resize_exact(width, height, FilterType::CatmullRom)
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{Rgba, RgbaImage};
+
+    use super::*;
+
+    #[test]
+    fn a_picture_of_any_proportions_fills_the_card_without_being_scaled_whole() {
+        for (from_width, from_height) in [(8192, 1), (1, 8192), (600, 900), (460, 215), (1, 1)] {
+            let picture = DynamicImage::ImageRgba8(RgbaImage::from_pixel(
+                from_width,
+                from_height,
+                Rgba([10, 20, 30, 255]),
+            ));
+            let fitted = cover(&picture, 720, 1080);
+            assert_eq!(
+                (fitted.width(), fitted.height()),
+                (720, 1080),
+                "{from_width}x{from_height}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_middle_of_a_wide_picture_is_what_is_kept() {
+        let mut wide = RgbaImage::from_pixel(300, 100, Rgba([0, 0, 0, 255]));
+        for x in 100..200 {
+            for y in 0..100 {
+                wide.put_pixel(x, y, Rgba([255, 255, 255, 255]));
+            }
+        }
+        let fitted = cover(&DynamicImage::ImageRgba8(wide), 60, 90).into_rgba8();
+        assert_eq!(fitted.get_pixel(30, 45).0, [255, 255, 255, 255]);
+        assert_eq!(fitted.get_pixel(1, 45).0, [255, 255, 255, 255]);
+    }
 }
