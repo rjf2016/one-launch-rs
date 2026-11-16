@@ -16,10 +16,9 @@ use ol_services::launchers::{
     self, Adapter, Configs, ImportResult, Launchers, ServiceError, require_implemented,
 };
 use ol_services::library::{self, LibraryGame};
-use ol_services::sessions::{self, StoreThread, StoreWork};
+use ol_services::sessions::{StoreThread, StoreWork};
 use ol_services::switch;
 use ol_store::{Store, StoreError};
-use ol_vault::Secret;
 use thiserror::Error;
 
 const RECENT_LAUNCHES_MOST: u32 = 50;
@@ -124,7 +123,8 @@ enum Command {
     RestoreRecovery(Reply<RestoreResult>),
     DismissRecovery(Reply<()>),
     Session(String, Reply<SavedSignIn>),
-    SeedSession(String, Option<String>, Secret, Reply<()>),
+    #[cfg(feature = "fake")]
+    SeedSession(String, Option<String>, ol_vault::Secret, Reply<()>),
     // Work a switch hands over from its own thread: a question about accounts or saved sign-ins.
     OnStore(StoreWork),
     Settle(Box<FinishedJob>),
@@ -353,12 +353,13 @@ impl Backend {
         self.ask(|reply| Command::Session(account_id, reply)).await
     }
 
-    // Stores a sign-in for an account as it is given, encrypted like any other. The fake launchers' seed is its only caller: the app itself saves a sign-in only from the launcher's own file.
+    // Stores a sign-in for an account as it is given, encrypted like any other. Only a build with the fake launchers has it: the app itself saves a sign-in only from the launcher's own file.
+    #[cfg(feature = "fake")]
     pub async fn seed_session(
         &self,
         account_id: &str,
         launcher_uid: Option<String>,
-        blob: Secret,
+        blob: ol_vault::Secret,
     ) -> Result<(), ApiError> {
         let account_id = account_id.to_owned();
         self.ask(|reply| Command::SeedSession(account_id, launcher_uid, blob, reply))
@@ -571,13 +572,14 @@ impl Serving {
                 &reply,
                 store.and_then(|store| self.saved_sign_in(store, &account_id)),
             ),
+            #[cfg(feature = "fake")]
             Command::SeedSession(account_id, launcher_uid, blob, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     let account = accounts::require(store, &account_id)?;
                     let launchers = self.launchers.as_ref().ok_or_else(no_launchers)?;
                     let directory = launchers.directory(store, account.launcher);
-                    Ok(sessions::seed(
+                    Ok(ol_services::sessions::seed(
                         &directory,
                         &account,
                         launcher_uid.as_deref(),
