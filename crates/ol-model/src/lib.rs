@@ -16,10 +16,10 @@ pub use secret::{Ciphertext, SecretKey};
 pub use settings::{SettingKey, Settings};
 pub use switching::{
     BackupSnapshot, InstallSource, InstalledGame, JobAccount, JobGame, JobState, JobStep,
-    JobStepStatus, LaunchAttention, LaunchJob, LaunchPreflight, LaunchResult, LauncherInstall,
-    LibraryScanResult, PlanAccount, RecentLaunch, RecoveryPhase, RememberedAccount, RestoreResult,
-    RunningGame, RunningGameSource, SwitchChange, SwitchPlan, SwitchPlanStep, SwitchRecovery,
-    SwitchStepKind, SwitchStrategy,
+    JobStepStatus, LastSignIn, LaunchAttention, LaunchJob, LaunchPreflight, LaunchResult,
+    LauncherInstall, LauncherSession, LauncherSessionState, LibraryScanResult, PlanAccount,
+    RecentLaunch, RecoveryPhase, RememberedAccount, RestoreResult, RunningGame, RunningGameSource,
+    SwitchChange, SwitchPlan, SwitchPlanStep, SwitchRecovery, SwitchStepKind, SwitchStrategy,
 };
 
 const REDACTED: &str = "[REDACTED]";

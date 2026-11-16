@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use ol_platform_api::{FileReader, FileWriter};
 use sha2::{Digest, Sha256};
+use time::OffsetDateTime;
 
 use crate::OpLog;
 
@@ -57,6 +58,10 @@ impl FileReader for ScratchFiles {
 
     fn size(&self, path: &str) -> io::Result<u64> {
         Ok(fs::metadata(self.inside(path)?)?.len())
+    }
+
+    fn modified(&self, path: &str) -> io::Result<OffsetDateTime> {
+        Ok(fs::metadata(self.inside(path)?)?.modified()?.into())
     }
 
     fn read(&self, path: &str) -> io::Result<Vec<u8>> {

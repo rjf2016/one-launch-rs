@@ -112,6 +112,8 @@ pub trait ProcessLister: Send + Sync {
 
 pub trait ProcessRunner: Send + Sync {
     fn start(&self, exe: &str, args: &[ProcessArg<'_>], cwd: &str) -> Result<(), ProcessError>;
+    // Asks every window of this image to close, as a click on its close button does. A program without a window hears nothing.
+    fn close(&self, image: &str) -> Result<(), ProcessError>;
     // Ends every process with this image name and, with `tree`, the processes they started.
     fn kill(&self, image: &str, tree: bool) -> Result<(), ProcessError>;
 }
@@ -123,6 +125,8 @@ impl<T: ProcessLister + ProcessRunner> Processes for T {}
 pub trait FileReader: Send + Sync {
     fn exists(&self, path: &str) -> bool;
     fn size(&self, path: &str) -> io::Result<u64>;
+    // When the file was last written.
+    fn modified(&self, path: &str) -> io::Result<OffsetDateTime>;
     fn read(&self, path: &str) -> io::Result<Vec<u8>>;
     // At most `length` bytes from `from` on.
     fn read_range(&self, path: &str, from: u64, length: u64) -> io::Result<Vec<u8>>;
