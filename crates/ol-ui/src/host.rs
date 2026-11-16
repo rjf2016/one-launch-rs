@@ -212,6 +212,14 @@ impl LaunchHost {
         instant: bool,
         cx: &mut Context<Self>,
     ) {
+        // The start under way reports to the request that asked for it.
+        if self
+            .request
+            .as_ref()
+            .is_some_and(|request| request.starting)
+        {
+            return;
+        }
         self.serial += 1;
         let mut request = Request {
             key: self.serial,
