@@ -322,18 +322,21 @@ pub fn prepare(
         started_at: ol_store::iso_timestamp(clock.now()),
         finished_at: None,
     };
+    // What can still fail is read before the job takes the board: a job that was begun and never run would refuse every later one.
+    let password = if account.has_secret {
+        store.account_password(&account.id)?
+    } else {
+        None
+    };
+    let configs = launchers.configs(&store.settings()?, data_dir);
     let cancel = CancelToken::new();
     board.begin(&job, &cancel);
     Ok(PreparedJob {
         job,
         account: account_ref(&account),
         confirm_close: input.confirm_close,
-        password: if account.has_secret {
-            store.account_password(&account.id)?
-        } else {
-            None
-        },
-        configs: launchers.configs(&store.settings()?, data_dir),
+        password,
+        configs,
         data_dir: data_dir.to_path_buf(),
         launchers: launchers.clone(),
         cancel,

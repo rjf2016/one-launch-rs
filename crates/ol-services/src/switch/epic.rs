@@ -336,10 +336,15 @@ impl Switch<'_> {
         }
         let files = self.platform.files.as_ref();
         let mut written = 0;
-        for path in &paths {
+        for (age, path) in paths.iter().enumerate() {
             let before = files
                 .read(path)
                 .map_err(|error| Thrown::Failed(error.to_string()))?;
+            // Only the newest file was looked at when the plan read it. An older one that is not UTF-8 text is left as it is: a rewrite would break it, and the launcher does not read it.
+            let not_text = before.contains(&0) || std::str::from_utf8(&before).is_err();
+            if age > 0 && not_text {
+                continue;
+            }
             let write = plan_session_write(&String::from_utf8_lossy(&before), blob.as_ref());
             if write.noop {
                 continue;

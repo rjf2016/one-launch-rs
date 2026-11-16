@@ -390,6 +390,16 @@ impl Backend {
     }
 }
 
+// When the database's thread ends, however it ends, what was still asked of it is dropped: whoever waits for an answer hears that none will come, and a switch on its own thread does not wait for good.
+struct Unanswered<'a>(&'a Receiver<Command>);
+
+impl Drop for Unanswered<'_> {
+    fn drop(&mut self) {
+        self.0.close();
+        while self.0.try_recv().is_ok() {}
+    }
+}
+
 struct Serving {
     data_dir: PathBuf,
     launchers: Option<Launchers>,
@@ -403,6 +413,7 @@ struct Serving {
 
 impl Serving {
     fn serve(mut self, version: &str, requests: &Receiver<Command>) {
+        let _answered = Unanswered(requests);
         let opened = data_folder::open(&self.data_dir, version)
             .map(|(store, _)| store)
             .map_err(ApiError::from);

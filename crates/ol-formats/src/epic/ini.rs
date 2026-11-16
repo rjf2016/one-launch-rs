@@ -83,7 +83,8 @@ fn entry(line: &str) -> Option<(&str, &str)> {
     (!js::is_whitespace(first) && !value.chars().any(ends_a_line)).then_some((key, value))
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+// No Debug: a section can be named after an account's id.
+#[derive(Clone, PartialEq, Eq)]
 pub struct IniSection {
     pub name: String,
     // The header's line.

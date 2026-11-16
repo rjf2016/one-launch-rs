@@ -79,6 +79,7 @@ What is there: on fake launchers the backend finds the Epic Games Launcher, scan
 - The folders `%LOCALAPPDATA%` and `%ProgramData%` come from whoever builds `Launchers` (`EpicMachine`). The fakes put the scenario's in. The default is where the Electron app falls back to when Windows names none, because only `ol-platform-win` reads the environment: the real ports have to put the real ones in.
 - Not exercised by any test or recorded run: a launcher that starts itself again after it was closed (the three tries of the shutdown), two settings files at once (`Config\Windows` and `Config\WindowsEditor`), a session that changes at every start (`rotateOnStart`), and a sign-in that fails for a reason other than a refused token.
 - Whether a snapshot is pinned (it holds a sign-in no account owns) is decided and written; the end of `unowned`, which restores such a snapshot, is not replayed.
+- Carried over from the Electron app, because `oracle/l1/epic` records it, and against "every other byte left alone" on a file no launcher writes: in a settings file that mixes CRLF and bare LF a rewrite makes every line end CRLF, and when such a file ends in a bare LF the character before it is lost; and a byte that is not UTF-8 in the settings file in use becomes U+FFFD when the file is rewritten. Keeping each line's own end and refusing such a file would differ from the recorded cases on purpose. The owner decides.
 
 ## Differences from the Electron app, on purpose
 
@@ -114,6 +115,7 @@ Since Epic. The first is the one a user could meet, and is the owner's to confir
 - A saved sign-in, an `.item` file or `LauncherInstalled.dat` nested deeper than 128 levels, or holding a number past the largest float, does not read. The Electron app reads them.
 - Epic's games are ordered by their lower-cased names, and its `.item` files are read in the order of their lower-cased names, so of two manifests for one app the first by name counts. The Electron app takes the order the folder lists them in.
 - An `InstallSize` that is not a whole number counts as no size. Nothing stores or shows a size yet.
+- Of two settings files, an older one that is not UTF-8 text (UTF-16, say) is left as it is. The Electron app rewrites it as if it were UTF-8, which breaks it; the launcher does not read that file.
 - A relative program path in the command of the `com.epicgames.launcher` link is not resolved against the folder the app runs in: it finds no launcher.
 - `epic.path` and `epic.launchUri` are read when the job starts, like the settings of a Steam switch.
 - The scripted Epic launcher stamps its log with the fake machine's clock. The Electron app's stamps it with the system's.
