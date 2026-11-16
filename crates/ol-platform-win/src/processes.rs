@@ -505,26 +505,28 @@ impl<S: System> ProcessRunner for Port<S> {
             .filter(|target| still.contains(target))
             .collect();
         let ended = self.system.end(&targets);
-        let (mut denied, mut failed) = (false, None);
-        for (target, ended) in targets.iter().zip(ended) {
-            if !named(target, image) {
-                continue;
+        // Every chosen process counts; the image's own is named first, as it is what the caller waits to see gone.
+        let left = targets
+            .iter()
+            .zip(&ended)
+            .filter(|(_, ended)| matches!(ended, Ended::Refused | Ended::Failed(_)))
+            .min_by_key(|(target, ended)| {
+                (!named(target, image), !matches!(ended, Ended::Refused))
+            });
+        let Some((target, ended)) = left else {
+            return Ok(());
+        };
+        let who = if named(target, image) {
+            image.to_owned()
+        } else {
+            format!("{}, which {image} started", target.name)
+        };
+        Err(match ended {
+            Ended::Failed(code) => {
+                ProcessError::Failed(format!("Could not end {who} (Windows error {code})"))
             }
-            match ended {
-                Ended::Refused => denied = true,
-                Ended::Failed(code) => failed = Some(code),
-                Ended::Yes | Ended::Gone => {}
-            }
-        }
-        if denied {
-            return Err(ProcessError::AccessDenied(image.to_owned()));
-        }
-        if let Some(code) = failed {
-            return Err(ProcessError::Failed(format!(
-                "Could not end {image} (Windows error {code})"
-            )));
-        }
-        Ok(())
+            _ => ProcessError::AccessDenied(who),
+        })
     }
 }
 
@@ -595,6 +597,7 @@ mod tests {
         windows: Vec<TopWindow>,
         calls: Mutex<Calls>,
         refuse: bool,
+        ending: HashMap<u32, Ended>,
     }
 
     impl MadeUp {
@@ -631,6 +634,7 @@ mod tests {
                 windows,
                 calls: Mutex::default(),
                 refuse: false,
+                ending: HashMap::new(),
             }
         }
 
@@ -675,12 +679,10 @@ mod tests {
                 .extend(targets.iter().map(|target| target.pid));
             targets
                 .iter()
-                .map(|_| {
-                    if self.refuse {
-                        Ended::Refused
-                    } else {
-                        Ended::Yes
-                    }
+                .map(|target| match self.ending.get(&target.pid) {
+                    Some(ended) => *ended,
+                    None if self.refuse => Ended::Refused,
+                    None => Ended::Yes,
                 })
                 .collect()
         }
@@ -1118,6 +1120,67 @@ mod tests {
         let ended = processes.kill("steam.exe", true).unwrap_err();
         assert_eq!(ended, ProcessError::AccessDenied("steam.exe".to_owned()));
         assert!(processes.kill("nothing-runs-this.exe", true).is_ok());
+    }
+
+    #[test]
+    fn a_tree_end_that_leaves_a_chosen_process_running_says_which_and_one_already_gone_is_fine() {
+        let table = vec![
+            entry(200, 4, 2, "explorer.exe"),
+            entry(OWN, 200, 3, "OneLaunch.exe"),
+            entry(400, 200, 10, "steam.exe"),
+            entry(410, 400, 11, "steamwebhelper.exe"),
+            entry(411, 410, 12, "steamwebhelper.exe"),
+            entry(420, 400, 13, "Game.exe"),
+        ];
+        let kill = |outcomes: &[(u32, Ended)], tree: bool| {
+            let mut made_up = MadeUp::new(table.clone());
+            made_up.ending = outcomes.iter().copied().collect();
+            let processes = Port { system: made_up };
+            let result = processes.kill("steam.exe", tree);
+            let ended: HashSet<u32> = processes.system.calls().ended.iter().copied().collect();
+            (result, ended)
+        };
+        let everything = HashSet::from([400, 410, 411, 420]);
+
+        let (refused_child, ended) = kill(&[(420, Ended::Refused)], true);
+        assert_eq!(
+            refused_child,
+            Err(ProcessError::AccessDenied(
+                "Game.exe, which steam.exe started".to_owned()
+            ))
+        );
+        assert_eq!(ended, everything);
+        assert_eq!(
+            refused_child.unwrap_err().to_string(),
+            "Windows would not let One Launch close Game.exe, which steam.exe started. It is most likely running as administrator: close it yourself, or start One Launch as administrator too, then try again."
+        );
+
+        let (refused_parent, ended) = kill(&[(400, Ended::Refused)], true);
+        assert_eq!(
+            refused_parent,
+            Err(ProcessError::AccessDenied("steam.exe".to_owned()))
+        );
+        assert_eq!(ended, everything);
+        assert_eq!(
+            kill(&[(400, Ended::Failed(31)), (411, Ended::Refused)], true).0,
+            Err(ProcessError::Failed(
+                "Could not end steam.exe (Windows error 31)".to_owned()
+            ))
+        );
+        assert_eq!(
+            kill(&[(411, Ended::Failed(31))], true).0,
+            Err(ProcessError::Failed(
+                "Could not end steamwebhelper.exe, which steam.exe started (Windows error 31)"
+                    .to_owned()
+            ))
+        );
+        assert_eq!(
+            kill(&[(411, Ended::Gone), (420, Ended::Gone)], true).0,
+            Ok(())
+        );
+        let (plain, ended) = kill(&[(420, Ended::Refused)], false);
+        assert_eq!(plain, Ok(()));
+        assert_eq!(ended, HashSet::from([400]));
     }
 
     #[test]
