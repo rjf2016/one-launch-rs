@@ -761,11 +761,13 @@ impl<'a> RiotAdapter<'a> {
     ) -> Result<bool, AdapterError> {
         let timing = self.timing();
         let gone = || Ok::<_, AdapterError>(!self.processes.is_running(image)?);
+        self.no_game_runs()?;
         self.processes.close(image)?;
         if wait_until(self.clock, cancel, timeout, timing.poll, gone)? {
             return Ok(false);
         }
-        // A window close that was ignored is followed by the end of the image's own processes, never of what they started: a running game is the client's child.
+        // A window close that was ignored is followed by the end of the image's own processes, never of what they started: a running game is the client's child. A game can have started during the wait.
+        self.no_game_runs()?;
         self.processes.end(image)?;
         if !wait_until(self.clock, cancel, timing.kill_grace, timing.poll, gone)? {
             return Err(AdapterError::Failed(format!(
@@ -822,7 +824,7 @@ impl<'a> RiotAdapter<'a> {
         }
     }
 
-    // Closes the client's own processes and nothing else: a window close for the client, which is ended alone when it ignores the close, then the same for the window processes it leaves behind. A client that comes back by itself is given time to finish starting and is closed again, three times at most. A Riot game is looked for before every close, the later ones included, because a client that came back may have started one: beside a game nothing is closed.
+    // Closes the client's own processes and nothing else: a window close for the client, which is ended alone when it ignores the close, then the same for the window processes it leaves behind. A client that comes back by itself is given time to finish starting and is closed again, three times at most. A Riot game is looked for directly before every close and every end, the later ones included, because a game can start while a close is waited for: beside a game nothing is closed or ended.
     pub fn shutdown(
         &self,
         timeout: Option<Duration>,
@@ -835,7 +837,6 @@ impl<'a> RiotAdapter<'a> {
         }
         let timing = self.timing();
         for attempt in 1.. {
-            self.no_game_runs()?;
             let mark = self.log_mark();
             let ended = self.close_and_wait(
                 ClientImage::Core,

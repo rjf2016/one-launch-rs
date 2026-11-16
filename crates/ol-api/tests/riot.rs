@@ -696,6 +696,46 @@ fn a_running_riot_game_refuses_the_switch_and_the_restore_and_nothing_is_written
     fakes.backend.shut_down();
 }
 
+// Adds a Riot game to the process table the first time the job sleeps while the named step runs.
+fn game_starts_at(fakes: &Fakes, step: &'static str, image: &'static str) {
+    let (processes, latest) = (Arc::clone(&fakes.fake.processes), Arc::clone(&fakes.latest));
+    fakes.fake.clock.before_sleep(move || {
+        let job = latest.lock().unwrap().clone();
+        let at_the_step = |job: &LaunchJob| {
+            let running = |at: &JobStep| at.id == step && at.status == JobStepStatus::Running;
+            job.steps.iter().any(running)
+        };
+        if job.is_some_and(|job| at_the_step(&job)) {
+            processes.add_name_to_table(image);
+        }
+    });
+}
+
+#[test]
+fn a_riot_game_that_starts_while_the_client_ignores_its_close_stops_the_switch_before_the_client_is_ended()
+ {
+    let knobs = json!({
+        "knobs": { "riot": { "runningAs": MAIN_UID } },
+        "processes": { "shutdownPolls": 1000 },
+    });
+    let fakes = fakes(Some(&knobs));
+    let before = fakes.on_disk();
+    game_starts_at(&fakes, "close", "VALORANT-Win64-Shipping.exe");
+    let states = fakes.play_with(ALT, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Failed && !last.switched);
+    assert!(last.backup_id.is_none() && last.restored.is_none());
+    assert_eq!(
+        last.error.as_deref(),
+        Some("VALORANT is running. Close it, then try again: One Launch never closes a Riot game.")
+    );
+    // The window close went out before the game started; the client is not ended beside it, its windows are not closed, and nothing is saved or written.
+    assert_eq!(asked_of_the_machine(&fakes), ["proc.close"]);
+    assert!(fakes.on_disk() == before);
+    assert!(fakes.saved(MAIN).is_none());
+    fakes.backend.shut_down();
+}
+
 #[test]
 fn a_process_list_that_cannot_be_read_refuses_the_switch_the_launch_and_the_restore() {
     let fakes = fakes(None).without_the_press();
