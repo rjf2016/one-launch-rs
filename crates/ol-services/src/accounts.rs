@@ -237,6 +237,17 @@ pub fn set_launcher_uid(
     require(store, id)
 }
 
+// The order of a list to pick an account from: the one used last first, then those never used by name. Names compare by their lower-cased characters; the Electron app compares them by the rules of the system language.
+pub fn in_pick_order(mut accounts: Vec<Account>) -> Vec<Account> {
+    accounts.sort_by_cached_key(|account| {
+        match account.last_used_at.clone().filter(|at| !at.is_empty()) {
+            Some(used) => (false, Some(std::cmp::Reverse(used)), String::new()),
+            None => (true, None, account.display_name.to_lowercase()),
+        }
+    });
+    accounts
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250,6 +261,34 @@ mod tests {
         assert_eq!(normalize_tags(&tags), ["main", "alt", &"x".repeat(40)]);
         let many: Vec<String> = (0..40).map(|index| format!("tag-{index}")).collect();
         assert_eq!(normalize_tags(&many).len(), 32);
+    }
+
+    #[test]
+    fn the_account_used_last_comes_first_and_the_unused_follow_by_name() {
+        let account = |name: &str, used: Option<&str>| Account {
+            id: name.to_owned(),
+            launcher: LauncherId::Steam,
+            display_name: name.to_owned(),
+            login: name.to_owned(),
+            has_secret: false,
+            has_session: false,
+            launcher_uid: None,
+            tags: Vec::new(),
+            notes: String::new(),
+            last_used_at: used.map(str::to_owned),
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        let ordered = in_pick_order(vec![
+            account("zed", None),
+            account("Older", Some("2026-10-20T19:00:00.000Z")),
+            account("alpha", None),
+            account("Twin B", Some("2026-11-01T18:04:12.000Z")),
+            account("Beta", Some("")),
+            account("Twin A", Some("2026-11-01T18:04:12.000Z")),
+        ]);
+        let names: Vec<&str> = ordered.iter().map(|account| account.id.as_str()).collect();
+        assert_eq!(names, ["Twin B", "Twin A", "Older", "alpha", "Beta", "zed"]);
     }
 
     #[test]

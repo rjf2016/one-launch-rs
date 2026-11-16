@@ -68,6 +68,17 @@ impl Posters {
         self.slots.insert(game, slot);
     }
 
+    // Forgets every poster, for a list of other games. What comes back is still held by the window that drew it.
+    pub fn clear(&mut self) -> Vec<Arc<RenderImage>> {
+        self.slots
+            .drain()
+            .filter_map(|(_, slot)| match slot {
+                Slot::Ready { image, .. } => Some(image),
+                Slot::Pending | Slot::Unreadable => None,
+            })
+            .collect()
+    }
+
     pub fn evict(&mut self, keep: usize) -> Vec<Arc<RenderImage>> {
         let mut ready: Vec<(u64, usize)> = self
             .slots

@@ -1,6 +1,7 @@
 use gpui::{Hsla, Rgba, rgb};
 
 pub const FONT: &str = "Segoe UI";
+pub const MONO: &str = "Cascadia Code";
 
 pub const BG: u32 = 0x0b0d12;
 pub const SURFACE: u32 = 0x12151c;
@@ -14,6 +15,7 @@ pub const MUTED: u32 = 0x8f97ab;
 pub const FAINT: u32 = 0x7f879b;
 pub const ACCENT: u32 = 0x8b5cf6;
 pub const ACCENT_HOVER: u32 = 0x9d75ff;
+pub const SUCCESS: u32 = 0x3ddc97;
 pub const WARNING: u32 = 0xf5b750;
 pub const DANGER: u32 = 0xf25f5c;
 pub const CLOSE_HOVER: u32 = 0xc42b1c;

@@ -6,6 +6,7 @@ mod scenario;
 mod steam;
 
 pub use scenario::{
-    FakeLaunchers, ScenarioError, Seed, SeedAccount, lay_down, materialize, write_knobs,
+    FakeLaunchers, ScenarioError, Seed, SeedAccount, lay_down, materialize,
+    materialize_in_real_time, write_knobs,
 };
 pub use steam::{SteamKnobs, SteamSim};

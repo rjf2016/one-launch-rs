@@ -7,6 +7,7 @@ use ol_api::Backend;
 use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::assets;
+use crate::host::LaunchHost;
 use crate::library::LibraryView;
 
 const SIDEBAR: f32 = 224.;
@@ -14,7 +15,9 @@ const SIDEBAR_COLLAPSED: f32 = 60.;
 const NARROW: f32 = 1100.;
 
 pub struct Shell {
+    host: Entity<LaunchHost>,
     library: Entity<LibraryView>,
+    fake_launchers: bool,
 }
 
 pub fn sidebar_width(viewport: Pixels) -> Pixels {
@@ -26,9 +29,17 @@ pub fn sidebar_width(viewport: Pixels) -> Pixels {
 }
 
 impl Shell {
-    pub fn new(backend: Backend, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        backend: Backend,
+        fake_launchers: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let host = cx.new(|cx| LaunchHost::new(backend.clone(), cx));
         Self {
-            library: cx.new(|cx| LibraryView::new(backend, window, cx)),
+            library: cx.new(|cx| LibraryView::new(backend, host.clone(), window, cx)),
+            host,
+            fake_launchers,
         }
     }
 
@@ -49,7 +60,8 @@ impl Render for Shell {
             .font_family(theme::FONT)
             .text_size(px(14.))
             .line_height(px(20.))
-            .child(title_bar(window.is_maximized()))
+            .child(title_bar(window.is_maximized(), self.fake_launchers))
+            .child(self.host.clone())
             .child(
                 div()
                     .flex()
@@ -68,17 +80,19 @@ impl Render for Shell {
     }
 }
 
-fn title_bar(maximized: bool) -> Div {
-    let badge = div()
-        .rounded(px(4.))
-        .px(px(6.))
-        .py(px(1.))
-        .bg(alpha(theme::WARNING, 0.2))
-        .text_size(px(10.))
-        .line_height(px(15.))
-        .font_weight(FontWeight::SEMIBOLD)
-        .text_color(color(theme::WARNING))
-        .child("GPUI PROOF");
+fn title_bar(maximized: bool, fake_launchers: bool) -> Div {
+    let badge = fake_launchers.then(|| {
+        div()
+            .rounded(px(4.))
+            .px(px(6.))
+            .py(px(1.))
+            .bg(alpha(theme::WARNING, 0.2))
+            .text_size(px(10.))
+            .line_height(px(15.))
+            .font_weight(FontWeight::SEMIBOLD)
+            .text_color(color(theme::WARNING))
+            .child("FAKE LAUNCHERS")
+    });
     let drag = div()
         .id("title-drag")
         .window_control_area(WindowControlArea::Drag)
@@ -96,7 +110,7 @@ fn title_bar(maximized: bool) -> Div {
                 .text_color(color(theme::MUTED))
                 .child("One Launch"),
         )
-        .child(badge);
+        .children(badge);
     div()
         .flex()
         .flex_none()

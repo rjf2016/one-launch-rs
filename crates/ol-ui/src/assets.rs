@@ -18,6 +18,22 @@ pub const CLEAR: &str = "icons/clear.svg";
 pub const UPDATE: &str = "icons/update.svg";
 pub const CHECK: &str = "icons/check.svg";
 pub const MORE: &str = "icons/more.svg";
+pub const SWITCH: &str = "icons/switch.svg";
+pub const DASHED: &str = "icons/dashed.svg";
+pub const STOP: &str = "icons/stop.svg";
+pub const HIDE: &str = "icons/hide.svg";
+pub const FLASK: &str = "icons/flask.svg";
+pub const INFO: &str = "icons/info.svg";
+pub const KEY: &str = "icons/key.svg";
+pub const SPINNER: &str = "icons/spinner.svg";
+pub const POWER: &str = "icons/power.svg";
+pub const RETRY: &str = "icons/retry.svg";
+pub const FAILED: &str = "icons/failed.svg";
+pub const CLOCK: &str = "icons/clock.svg";
+pub const ARCHIVE: &str = "icons/archive.svg";
+pub const FILE: &str = "icons/file.svg";
+pub const HOURGLASS: &str = "icons/hourglass.svg";
+pub const SLIDERS: &str = "icons/sliders.svg";
 pub const MINIMIZE: &str = "icons/minimize.svg";
 pub const MAXIMIZE: &str = "icons/maximize.svg";
 pub const RESTORE: &str = "icons/restore.svg";
@@ -40,7 +56,7 @@ macro_rules! caption_icon {
     };
 }
 
-const FILES: [(&str, &[u8]); 20] = [
+const FILES: &[(&str, &[u8])] = &[
     (BRAND, oracle_icon!("build-icon-mono.svg")),
     (LIBRARY, oracle_icon!("lucide/LayoutGrid.svg")),
     (ACCOUNTS, oracle_icon!("lucide/Users.svg")),
@@ -57,6 +73,22 @@ const FILES: [(&str, &[u8]); 20] = [
     (UPDATE, oracle_icon!("lucide/AlertTriangle.svg")),
     (CHECK, oracle_icon!("lucide/Check.svg")),
     (MORE, oracle_icon!("lucide/MoreHorizontal.svg")),
+    (SWITCH, oracle_icon!("lucide/ArrowRightLeft.svg")),
+    (DASHED, oracle_icon!("lucide/CircleDashed.svg")),
+    (STOP, oracle_icon!("lucide/CircleStop.svg")),
+    (HIDE, oracle_icon!("lucide/EyeOff.svg")),
+    (FLASK, oracle_icon!("lucide/FlaskConical.svg")),
+    (INFO, oracle_icon!("lucide/Info.svg")),
+    (KEY, oracle_icon!("lucide/KeyRound.svg")),
+    (SPINNER, oracle_icon!("lucide/Loader2.svg")),
+    (POWER, oracle_icon!("lucide/Power.svg")),
+    (RETRY, oracle_icon!("lucide/RotateCcw.svg")),
+    (FAILED, oracle_icon!("lucide/XCircle.svg")),
+    (CLOCK, oracle_icon!("lucide/Clock.svg")),
+    (ARCHIVE, oracle_icon!("lucide/Archive.svg")),
+    (FILE, oracle_icon!("lucide/FileText.svg")),
+    (HOURGLASS, oracle_icon!("lucide/Hourglass.svg")),
+    (SLIDERS, oracle_icon!("lucide/SlidersHorizontal.svg")),
     (MINIMIZE, caption_icon!(r#"<path d="M0 5.5h10"/>"#)),
     (
         MAXIMIZE,

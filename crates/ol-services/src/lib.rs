@@ -8,4 +8,5 @@ pub mod journal;
 pub mod launch;
 pub mod launchers;
 pub mod library;
+pub mod phases;
 pub mod switch;
