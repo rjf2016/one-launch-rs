@@ -12,6 +12,7 @@ pub use battlenet::{BattlenetFolders, BattlenetKnobs, BattlenetScript, Battlenet
 pub use epic::{EpicKnobs, EpicSim};
 pub use riot::{
     RiotFolders, RiotKnobs, RiotSim, fake_id_token, fake_session_file, session_block_lines,
+    session_file_with,
 };
 pub use scenario::{
     FakeLaunchers, ScenarioError, Seed, SeedAccount, SeedSession, lay_down, materialize,

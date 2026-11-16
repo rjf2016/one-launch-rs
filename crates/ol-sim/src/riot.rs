@@ -207,6 +207,11 @@ fn with_block(text: &str, lines: Option<&[String]>) -> String {
         .expect("the simulated client's file has its session block")
 }
 
+// A session file with the given sign-in in the place of the one it holds. Every other line stays, the device cookie among them.
+pub fn session_file_with(text: &str, block: &[String]) -> String {
+    with_block(text, Some(block))
+}
+
 // A whole session file that holds a sign-in as `uid`: what One Launch stores for an account, and what a scenario saves for one.
 pub fn fake_session_file(uid: &str, refresh_token: &str) -> String {
     let id_token = fake_id_token(uid, "Placeholder", "0000");
