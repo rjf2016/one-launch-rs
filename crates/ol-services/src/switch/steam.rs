@@ -193,8 +193,6 @@ struct Switch<'a> {
     handed_over: bool,
     log_mark: u64,
     bootstrap_mark: u64,
-    plan_auto_login_user: Option<String>,
-    plan_remember: Option<u32>,
 }
 
 impl Switch<'_> {
@@ -228,8 +226,12 @@ impl Switch<'_> {
         Ok(self.steam.active_user()?)
     }
 
+    // The registry values are read here, beside the file's copy: Steam can change them as it exits.
     fn take_snapshot(&mut self) -> Result<(), Thrown> {
         self.mark(STEP.backup, JobStepStatus::Running, "");
+        let registry = &self.platform.registry;
+        let auto_login_user = registry.get_string(Hive::Hkcu, HKCU_KEY, AUTO_LOGIN_USER)?;
+        let remember = registry.get_dword(Hive::Hkcu, HKCU_KEY, REMEMBER_PASSWORD)?;
         let snapshot = self
             .backups
             .snapshot(&SnapshotRequest {
@@ -240,7 +242,7 @@ impl Switch<'_> {
                     relative: SNAPSHOT_RELATIVE,
                     sensitive: false,
                 }],
-                meta: snapshot_meta(self.plan_auto_login_user.as_deref(), self.plan_remember),
+                meta: snapshot_meta(auto_login_user.as_deref(), remember),
                 protect: None,
                 pinned: None,
             })
@@ -827,8 +829,6 @@ pub fn run_switch(
         modified: false,
         launcher_started: false,
         handed_over: false,
-        plan_auto_login_user: context.auto_login_user,
-        plan_remember: context.remember_dword,
     };
 
     let attempt = switch.attempt(plan.running, context.already_active, plan.strategy);

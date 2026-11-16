@@ -607,6 +607,40 @@ fn a_failed_switch_is_not_put_back_under_a_steam_that_will_not_close() {
 }
 
 #[test]
+fn a_snapshot_records_the_registry_as_it_is_when_the_snapshot_is_taken() {
+    let running = json!({ "knobs": { "steam": { "runningAs": "user_1" } } });
+    let fakes = fakes(Some(&running));
+    let registry = Arc::clone(&fakes.fake.registry);
+    fakes.fake.processes.on_start(move |_, args| {
+        if args.iter().any(|arg| arg == "-shutdown") {
+            registry.seed(
+                r"HKCU\Software\Valve\Steam\AutoLoginUser",
+                ol_platform_fake::RegistryValue::Text("user_4".to_owned()),
+            );
+        }
+    });
+    let switch = StartLaunch {
+        account_id: fakes.account("user_3"),
+        game_id: None,
+        confirm_close: true,
+    };
+    block_on(fakes.backend.start_launch(switch)).unwrap();
+    let job = fakes.finished();
+    assert!(job.state == JobState::Done, "{:?}", job.error);
+    let backup_id = job.backup_id.expect("the switch took a snapshot");
+    fakes.fake.processes.set_running("steam.exe", false);
+    let restored = block_on(fakes.backend.restore_backup(LauncherId::Steam, &backup_id)).unwrap();
+    assert!(
+        restored
+            .registry
+            .contains(&"AutoLoginUser = user_4".to_owned()),
+        "{:?}",
+        restored.registry
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn a_switch_the_last_run_did_not_finish_is_offered_and_put_back() {
     let fakes = fakes(None);
     block_on(fakes.backend.rescan()).unwrap();
