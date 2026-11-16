@@ -13,7 +13,7 @@ use ol_api::launchers::{
     SteamTiming,
 };
 use ol_api::{ApiError, Backend, StartLaunch};
-use ol_model::{JobState, LaunchJob, LauncherId, SwitchPlan};
+use ol_model::{JobState, JobStep, JobStepStatus, LaunchJob, LauncherId, SwitchPlan};
 use ol_platform_fake::RegistryValue;
 use ol_sim::FakeLaunchers;
 use ol_testkit::vectors::sha256_hex;
@@ -35,11 +35,34 @@ struct Fakes {
     fake: FakeLaunchers,
     backend: Backend,
     jobs: Receiver<LaunchJob>,
+    // The job as it was last reported, where the job's own thread can read it.
+    latest: Arc<Mutex<Option<LaunchJob>>>,
 }
 
 impl Fakes {
     fn config_file(&self) -> PathBuf {
         self.scratch.join("launchers").join(CONFIG)
+    }
+
+    // Stops the job the first time it waits while the named step runs, as the dialog's Stop does.
+    fn stop_at(&self, step: &'static str) {
+        let (backend, latest) = (self.backend.clone(), Arc::clone(&self.latest));
+        self.fake.clock.before_sleep(move || {
+            let job = latest.lock().unwrap().clone();
+            let at_the_step = |job: &LaunchJob| {
+                let running = |at: &JobStep| at.id == step && at.status == JobStepStatus::Running;
+                job.steps.iter().any(running)
+            };
+            if let Some(job) = job.filter(at_the_step) {
+                let _ = backend.cancel_launch(&job.id);
+            }
+        });
+    }
+
+    // The app quits and starts again on the same two folders, with a fake machine built afresh.
+    fn restart(self) -> Self {
+        self.backend.shut_down();
+        start(self.scratch)
     }
 
     fn account(&self, login: &str) -> ol_model::Account {
@@ -203,11 +226,14 @@ fn start(scratch: Scratch) -> Fakes {
     };
     let (changed, jobs) = channel();
     let changed = Mutex::new(changed);
+    let latest = Arc::new(Mutex::new(None));
+    let seen = Arc::clone(&latest);
     let backend = Backend::start_with(
         scratch.join("data"),
         VERSION,
         launchers,
         Some(Arc::new(move |job: &LaunchJob| {
+            *seen.lock().unwrap() = Some(job.clone());
             let _ = changed.lock().unwrap().send(job.clone());
         })),
     );
@@ -246,6 +272,7 @@ fn start(scratch: Scratch) -> Fakes {
         fake,
         backend,
         jobs,
+        latest,
     }
 }
 
@@ -692,5 +719,92 @@ fn a_snapshot_puts_the_token_and_the_list_back_once_the_client_is_closed() {
     let after = block_on(fakes.backend.backups(LauncherId::Battlenet)).unwrap();
     assert_eq!(after.len(), 2);
     assert_eq!(after[0].reason, format!("Before restoring {id}"));
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_stop_while_the_client_closes_changes_nothing_and_one_after_its_start_puts_nothing_back() {
+    let knobs = json!({ "knobs": { "battlenet": { "runningAs": account_id_of(MAIN) } } });
+    let fakes = fakes(Some(&knobs));
+    let before = fakes.tokens();
+    fakes.stop_at("close");
+    let states = fakes.play_with(ALT, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Cancelled && !last.switched);
+    assert!(last.restored.is_none() && last.backup_id.is_none());
+    assert_eq!(
+        last.error.as_deref(),
+        Some(
+            "Stopped before Battle.net was started as saved3@example.com. Nothing had been changed."
+        )
+    );
+    assert_eq!(detail(last, "close"), "Stopped.");
+    assert_eq!(fakes.tokens(), before);
+    assert!(fs::read(fakes.config_file()).unwrap() == fixture_config());
+    fakes.backend.shut_down();
+
+    // Once the client has been started again it reads what was written, so a stop leaves the writes standing.
+    let fakes = self::fakes(None);
+    fakes.stop_at("wait");
+    let states = fakes.play(ALT);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Cancelled && !last.switched);
+    assert!(last.restored.is_none() && last.backup_id.is_some());
+    assert_eq!(
+        last.error.as_deref(),
+        Some(
+            "Stopped while Battle.net was starting as saved3@example.com. Nothing was rolled back: the client carries on signing in on its own."
+        )
+    );
+    assert_eq!(fakes.tokens(), [seeded_token(ALT)]);
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_none());
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_switch_the_last_run_did_not_finish_is_offered_and_put_back() {
+    let fakes = fakes(None);
+    let states = fakes.play(ALT);
+    let job = states.last().unwrap();
+    assert!(job.state == JobState::Done);
+    let backup_id = job.backup_id.clone().expect("the switch took a snapshot");
+    assert!(fs::read(fakes.config_file()).unwrap() != fixture_config());
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_none());
+
+    // What a crash during the sign-in leaves: the journal of the fixtures, naming this run's launcher, account and snapshot.
+    let mut journal: Value = serde_json::from_str(
+        &fs::read_to_string(oracle("fixtures/journal/switch-signing-in.json")).unwrap(),
+    )
+    .unwrap();
+    journal["launcher"] = "battlenet".into();
+    journal["accountId"] = fakes.account(ALT).id.into();
+    journal["backupId"] = backup_id.clone().into();
+    let journal_file = fakes.scratch.join("data").join("switch.json");
+    fakes.backend.shut_down();
+    fs::write(&journal_file, journal.to_string()).unwrap();
+    let fakes = start(fakes.scratch);
+
+    let pending = block_on(fakes.backend.recovery())
+        .unwrap()
+        .expect("a recovery");
+    assert!(pending.backup_id == backup_id && pending.snapshot_available);
+    assert_eq!(pending.phase, ol_model::RecoveryPhase::SigningIn);
+    assert_eq!(pending.launcher, LauncherId::Battlenet);
+    assert_eq!(pending.account_name.as_deref(), Some("Alt"));
+
+    let restored = block_on(fakes.backend.restore_recovery()).unwrap();
+    assert!(restored.id == backup_id);
+    assert_eq!(restored.files.len(), 1);
+    assert_eq!(fakes.tokens(), [remembered_token()]);
+    assert!(fs::read(fakes.config_file()).unwrap() == fixture_config());
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_none());
+    assert!(!journal_file.exists());
+
+    fs::write(&journal_file, journal.to_string()).unwrap();
+    let fakes = fakes.restart();
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_some());
+    block_on(fakes.backend.dismiss_recovery()).unwrap();
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_none());
+    assert!(!journal_file.exists());
     fakes.backend.shut_down();
 }
