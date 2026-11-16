@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::sync::mpsc::sync_channel;
 
 use ol_adapters::{AccountRef, AdapterError, Directory};
+use ol_formats::battlenet::session as battlenet;
 use ol_formats::epic::session::{fingerprint_of, parse_blob};
 use ol_model::{Account, LauncherId, LauncherSession};
 use ol_platform_api::Clock;
@@ -131,6 +132,9 @@ pub fn seed(
     let fingerprint = match account.launcher {
         LauncherId::Epic => parse_blob(blob.expose())
             .map(|blob| fingerprint_of(&blob.data))
+            .map_err(|error| adapter(failed(error)))?,
+        LauncherId::Battlenet => battlenet::parse_blob(blob.expose())
+            .map(|blob| battlenet::fingerprint_of(&blob.unified_auth.hex))
             .map_err(|error| adapter(failed(error)))?,
         other => return Err(ServiceError::NotImplemented(other)),
     };

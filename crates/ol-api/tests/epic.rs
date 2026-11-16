@@ -8,7 +8,10 @@ use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, Mutex};
 
 use futures_lite::future::block_on;
-use ol_api::launchers::{EpicMachine, EpicTiming, Launchers, NewAccount, Secret, SteamTiming};
+use ol_api::launchers::{
+    BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, Launchers, NewAccount, Secret,
+    SteamTiming,
+};
 use ol_api::{ApiError, Backend, StartLaunch};
 use ol_model::{JobState, LaunchJob, LauncherId, SwitchPlan};
 use ol_sim::FakeLaunchers;
@@ -151,6 +154,13 @@ fn start(scratch: Scratch) -> Fakes {
     launchers.epic = EpicMachine {
         timing: EpicTiming::with(&fake.epic_timing),
         default_dir: fake.epic_default_dir.clone(),
+        local_app_data: fake.local_app_data.clone(),
+        program_data: fake.program_data.clone(),
+    };
+    launchers.battlenet = BattlenetMachine {
+        timing: BattlenetTiming::with(&fake.battlenet_timing),
+        default_dir: fake.battlenet_default_dir.clone(),
+        app_data: fake.app_data.clone(),
         local_app_data: fake.local_app_data.clone(),
         program_data: fake.program_data.clone(),
     };

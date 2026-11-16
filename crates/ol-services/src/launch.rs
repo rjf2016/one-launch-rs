@@ -482,7 +482,7 @@ pub fn run(
         sink.set_launch(JobStepStatus::Running);
         sink.publish();
         let command = adapter
-            .launch_game(&game.launcher_game_id)
+            .launch_game(game, &cancel)
             .map_err(ServiceError::adapter(launcher))?;
         if let Some(step) = &mut sink.launch_step {
             step.detail = format!("Sent {command}");

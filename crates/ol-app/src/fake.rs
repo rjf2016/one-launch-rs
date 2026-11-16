@@ -4,7 +4,9 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context as _, bail};
-use ol_api::launchers::{EpicMachine, EpicTiming, NewAccount, Secret, SteamTiming};
+use ol_api::launchers::{
+    BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, NewAccount, Secret, SteamTiming,
+};
 use ol_api::{ApiError, Backend};
 use ol_model::SettingKey;
 use ol_sim::Seed;
@@ -13,9 +15,11 @@ use crate::args::FakeMachine;
 
 const SCENARIO: &str = "scenario.json";
 // The launchers a fake machine starts and writes beside.
-const PROGRAMS: [&str; 2] = [
+const PROGRAMS: [&str; 4] = [
     r"steam\steam.exe",
     r"epic\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe",
+    r"battlenet\Battle.net.exe",
+    r"battlenet\Battle.net Launcher.exe",
 ];
 // What a laid-down scenario holds at its top: its two files, and the folders its launchers and their files live in.
 const SCENARIO_ENTRIES: [&str; 11] = [
@@ -83,6 +87,13 @@ pub fn start(
     launchers.epic = EpicMachine {
         timing: EpicTiming::with(&fake.epic_timing),
         default_dir: fake.epic_default_dir.clone(),
+        local_app_data: fake.local_app_data.clone(),
+        program_data: fake.program_data.clone(),
+    };
+    launchers.battlenet = BattlenetMachine {
+        timing: BattlenetTiming::with(&fake.battlenet_timing),
+        default_dir: fake.battlenet_default_dir.clone(),
+        app_data: fake.app_data.clone(),
         local_app_data: fake.local_app_data.clone(),
         program_data: fake.program_data.clone(),
     };

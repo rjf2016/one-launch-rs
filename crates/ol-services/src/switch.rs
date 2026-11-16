@@ -1,18 +1,21 @@
-// The only code in the app that writes a launcher-owned file or registry value: the seven functions from write_login_users to write_restored, each through a writer port. The two modules under switch/ read, wait and decide, and come here to write.
+// The only code in the app that writes a launcher-owned file or registry value: the eleven functions from write_login_users to write_restored, each through a writer port. The three modules under switch/ read, wait and decide, and come here to write.
 
+pub mod battlenet;
 pub mod epic;
 pub mod steam;
 
 use std::collections::HashMap;
 
+use ol_adapters::battlenet::BattlenetAdapter;
 use ol_adapters::epic::{EpicAdapter, SETTINGS_FOLDERS};
 use ol_adapters::steam::{HKCU_KEY, SteamAdapter};
 use ol_adapters::{AccountRef, AdapterError};
+use ol_formats::battlenet::session::{TokenValue, UNIFIED_AUTH_KEY, describe_token};
 use ol_model::{
     JobStep, JobStepStatus, LaunchAttention, LauncherId, PlanAccount, RestoreResult, SwitchPlan,
     SwitchStrategy,
 };
-use ol_platform_api::{CancelToken, FileWriter, Hive, Platform, RegistryWriter};
+use ol_platform_api::{CancelToken, FileWriter, Hive, Platform, RegistryError, RegistryWriter};
 use ol_runtime::Aborted;
 use ol_vault::Secret;
 use serde_json::{Map, Value};
@@ -108,7 +111,72 @@ fn restore_epic(
     })
 }
 
-// The files of a snapshot, each over the launcher file it was copied from, all or none. Only the two restore functions above call it.
+// Battle.net: one value under HKCU\Software\Blizzard Entertainment\Battle.net\UnifiedAuth, the token the client signs in from at its next start.
+fn set_unified_auth(
+    registry: &dyn RegistryWriter,
+    token: &TokenValue,
+) -> Result<(), RegistryError> {
+    registry.set_binary(Hive::Hkcu, UNIFIED_AUTH_KEY, &token.name, &token.hex)
+}
+
+// Battle.net: removes one value under UnifiedAuth, as the client's own logout does.
+fn delete_unified_auth(registry: &dyn RegistryWriter, name: &str) -> Result<(), RegistryError> {
+    registry.delete_value(Hive::Hkcu, UNIFIED_AUTH_KEY, name)
+}
+
+// Battle.net: Battle.net.config with the target login first in Client.SavedAccountNames and every other byte as it was.
+fn write_battlenet_config(files: &dyn FileWriter, path: &str, text: &str) -> Result<(), Thrown> {
+    files
+        .write_atomic(&[(path, text.as_bytes())])
+        .map_err(|error| Thrown::Failed(error.to_string()))
+}
+
+// Battle.net: puts a snapshot back. Battle.net.config goes over the client's own, then UnifiedAuth is made to hold exactly the values the snapshot recorded: each is set, and any other value there is removed. The recorded values are opened before anything is written, so a vault that cannot open them leaves everything as it is.
+fn restore_battlenet(
+    battlenet: &BattlenetAdapter<'_>,
+    platform: &Platform,
+    backups: &BackupService<'_>,
+    id: &str,
+) -> Result<RestoreResult, RestoreError> {
+    let target = battlenet.config_path();
+    let restorable = backups.read_for_restore(LauncherId::Battlenet, id, &[&target])?;
+    let wanted = match restorable.meta.get(battlenet::UNIFIED_AUTH_META) {
+        Some(recorded) => Some(battlenet::open_tokens(backups, recorded)?),
+        None => None,
+    };
+    write_restored(platform.files.as_ref(), &restorable)?;
+
+    let registry: &dyn RegistryWriter = platform.registry.as_ref();
+    let mut lines = Vec::new();
+    if let Some(wanted) = &wanted {
+        let existing = battlenet.read_tokens()?;
+        for token in wanted {
+            set_unified_auth(registry, token)?;
+            lines.push(format!(
+                "UnifiedAuth\\{} = {}",
+                token.name,
+                describe_token(Some(token))
+            ));
+        }
+        let kept = |name: &str| {
+            wanted
+                .iter()
+                .any(|token| token.name.to_lowercase() == name.to_lowercase())
+        };
+        for token in existing.iter().filter(|token| !kept(&token.name)) {
+            delete_unified_auth(registry, &token.name)?;
+            lines.push(format!("UnifiedAuth\\{} (removed)", token.name));
+        }
+    }
+    Ok(RestoreResult {
+        launcher: LauncherId::Battlenet,
+        id: id.to_owned(),
+        files: restorable.files.into_iter().map(|(path, _)| path).collect(),
+        registry: lines,
+    })
+}
+
+// The files of a snapshot, each over the launcher file it was copied from, all or none. Only the three restore functions above call it.
 fn write_restored(files: &dyn FileWriter, restorable: &Restorable) -> Result<(), RestoreError> {
     let copies: Vec<(&str, &[u8])> = restorable
         .files
@@ -248,6 +316,9 @@ pub fn run_switch(
             steam::run_switch(steam, platform, backups, account, options, sink)
         }
         Adapter::Epic(epic) => epic::run_switch(epic, platform, backups, account, options, sink),
+        Adapter::Battlenet(battlenet) => {
+            battlenet::run_switch(battlenet, platform, backups, account, options, sink)
+        }
     }
 }
 
@@ -261,6 +332,9 @@ pub fn restore_backup(
     match adapter {
         Adapter::Steam(steam) => steam::restore_backup(steam, platform, backups, id),
         Adapter::Epic(epic) => epic::restore_backup(epic, platform, backups, id),
+        Adapter::Battlenet(battlenet) => {
+            battlenet::restore_backup(battlenet, platform, backups, id)
+        }
     }
 }
 
