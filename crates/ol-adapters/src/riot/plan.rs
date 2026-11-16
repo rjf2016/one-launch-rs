@@ -5,11 +5,11 @@ use ol_formats::riot::products::{image_key, launch_args, parse_product_id};
 use ol_formats::riot::session::short_fingerprint;
 use ol_formats::winpath::join;
 use ol_model::{
-    LauncherId, LauncherInstall, LauncherSession, PlanAccount, RunningGame, SwitchChange,
-    SwitchPlan, SwitchPlanStep, SwitchStepKind, SwitchStrategy,
+    LauncherId, LauncherInstall, PlanAccount, RunningGame, SwitchChange, SwitchPlan,
+    SwitchPlanStep, SwitchStepKind, SwitchStrategy,
 };
 
-use super::{CurrentSession, EXE, RiotAdapter, SESSION_FILE, WINDOW_EXE, id_tail};
+use super::{EXE, RiotAdapter, SESSION_FILE, WINDOW_EXE, id_tail};
 use crate::steam::{SwitchPreflight, minutes, seconds, step};
 use crate::{AccountRef, AdapterError, GameRef};
 
@@ -46,8 +46,8 @@ const BLOCK: &str = "psl.authorization.riot-client";
 // What the plan learned, kept for the real switch so that it derives nothing twice.
 pub struct PlanContext {
     pub install: LauncherInstall,
-    pub current: CurrentSession,
-    pub stored: Option<LauncherSession>,
+    // The fingerprint of the sign-in the file holds. The file itself is not kept: it is wiped when the plan is made.
+    pub fingerprint: Option<String>,
     // The file already holds the target account's sign-in, so the client signs in as it at its next start.
     pub in_place: bool,
     // The client runs, signed in as the target account: the file names it and the log confirms a sign-in.
@@ -509,8 +509,7 @@ impl RiotAdapter<'_> {
             plan,
             PlanContext {
                 install,
-                current,
-                stored,
+                fingerprint: fingerprint.map(str::to_owned),
                 in_place,
                 already_active,
                 running,

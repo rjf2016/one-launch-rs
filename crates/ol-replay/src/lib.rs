@@ -287,13 +287,13 @@ impl<'a> Replay<'a> {
             local_app_data: fake.local_app_data.clone(),
             program_data: fake.program_data.clone(),
         };
-        launchers.riot = RiotMachine {
-            timing: RiotTiming::with(&fake.riot_timing),
-            default_dir: fake.riot_default_dir.clone(),
-            local_app_data: fake.local_app_data.clone(),
-            program_data: fake.program_data.clone(),
-            local_launch: Some(fake.riot_launch.clone()),
-        };
+        launchers.riot = RiotMachine::at(
+            RiotTiming::with(&fake.riot_timing),
+            fake.riot_default_dir.clone(),
+            fake.local_app_data.clone(),
+            fake.program_data.clone(),
+        )
+        .with_local_launch(fake.riot_launch.clone());
 
         let (log, gate) = (fake.log.clone(), self.gate.clone());
         let observer = move |job: &LaunchJob| {

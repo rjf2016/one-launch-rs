@@ -809,11 +809,7 @@ pub fn run_switch(
             .launcher_uid
             .as_ref()
             .map(|uid| uid.to_lowercase()),
-        written_fingerprint: context
-            .current
-            .session
-            .as_ref()
-            .map(|session| session.fingerprint.clone()),
+        written_fingerprint: context.fingerprint,
         install: context.install,
         session_path: riot.session_file_path(),
         strategy: plan.strategy,

@@ -79,20 +79,42 @@ pub struct RiotMachine {
     // %LOCALAPPDATA% and %ProgramData%.
     pub local_app_data: String,
     pub program_data: String,
-    // Sends the client's local server the launch request its Play button sends. None on a machine that has no such way: Play is then left to the user.
-    pub local_launch: Option<Arc<dyn RiotLocalLaunch>>,
+    // Sends the client's local server the launch request its Play button sends. None on a machine that has no such way: Play is then left to the user. Nothing reads it but `Launchers::adapter`, which hands it to the Riot adapter.
+    local_launch: Option<Arc<dyn RiotLocalLaunch>>,
+}
+
+impl RiotMachine {
+    pub fn at(
+        timing: riot::Timing,
+        default_dir: String,
+        local_app_data: String,
+        program_data: String,
+    ) -> Self {
+        Self {
+            timing,
+            default_dir,
+            local_app_data,
+            program_data,
+            local_launch: None,
+        }
+    }
+
+    // The same machine with a way to the client's own local server.
+    pub fn with_local_launch(mut self, channel: Arc<dyn RiotLocalLaunch>) -> Self {
+        self.local_launch = Some(channel);
+        self
+    }
 }
 
 // As for Epic: the folders where Windows has them when it names none, until whoever builds the machine puts the real ones in.
 impl Default for RiotMachine {
     fn default() -> Self {
-        Self {
-            timing: riot::Timing::default(),
-            default_dir: riot::DEFAULT_DIR.to_owned(),
-            local_app_data: r"C:\AppData\Local".to_owned(),
-            program_data: r"C:\ProgramData".to_owned(),
-            local_launch: None,
-        }
+        Self::at(
+            riot::Timing::default(),
+            riot::DEFAULT_DIR.to_owned(),
+            r"C:\AppData\Local".to_owned(),
+            r"C:\ProgramData".to_owned(),
+        )
     }
 }
 

@@ -159,7 +159,8 @@ pub fn launch_args(id: &RiotProductId) -> [String; 2] {
     ]
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+// No Debug: a path can run through the user's profile folder.
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct RiotProductSettings {
     pub install_path: Option<String>,
     pub install_root: Option<String>,
@@ -194,7 +195,8 @@ pub fn parse_product_settings(text: &str) -> RiotProductSettings {
     settings
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+// No Debug, as for a product's settings.
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct RiotInstalls {
     // The client program Riot's own games are tied to.
     pub rc_default: Option<String>,
