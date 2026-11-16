@@ -33,6 +33,7 @@ struct State {
     start_fails: BTreeSet<String>,
     elevated: BTreeSet<String>,
     reappears: BTreeMap<String, (u32, u32)>,
+    exits_once_seen: BTreeSet<String>,
     listing_fails: bool,
 }
 
@@ -69,6 +70,7 @@ impl FakeProcesses {
                     .into_iter()
                     .map(|(image, after)| (image.to_lowercase(), (after, 0)))
                     .collect(),
+                exits_once_seen: BTreeSet::new(),
                 listing_fails: false,
             }),
             listeners: Mutex::new(Vec::new()),
@@ -121,6 +123,18 @@ impl FakeProcesses {
         }
     }
 
+    // The image quits by itself right after the next look or listing that finds it running, as a launcher that exits on its own does.
+    pub fn exit_once_seen(&self, image: &str) {
+        self.state().exits_once_seen.insert(image.to_lowercase());
+    }
+
+    // A program that quits on its own goes the way it does when its window is closed: the simulators hear the same.
+    fn quit_by_itself(&self, image: &str) {
+        for listener in self.listeners() {
+            listener(image, &[CLOSE_ARGUMENT.to_owned()]);
+        }
+    }
+
     // From now on Windows refuses to list the processes: whether one image runs can still be asked, and who runs cannot.
     pub fn fail_listings(&self, fails: bool) {
         self.state().listing_fails = fails;
@@ -154,6 +168,11 @@ impl ProcessLister for FakeProcesses {
             }
         }
         if state.running.contains(&image) {
+            if state.exits_once_seen.remove(&image) {
+                state.running.remove(&image);
+                drop(state);
+                self.quit_by_itself(&image);
+            }
             return Ok(true);
         }
         let Some((after, stopped)) = state.reappears.get_mut(&image) else {
@@ -178,17 +197,30 @@ impl ProcessLister for FakeProcesses {
 
     // Both views of the fake machine, as on a real one: the images that run, and the table.
     fn running_names(&self) -> Result<Vec<String>, ProcessError> {
-        let state = self.state();
+        let mut state = self.state();
         if state.listing_fails {
             return Err(listing_refused());
         }
         let mut names = state.running.clone();
+        let seen: Vec<String> = state
+            .exits_once_seen
+            .intersection(&names)
+            .cloned()
+            .collect();
+        for image in &seen {
+            state.exits_once_seen.remove(image);
+            state.running.remove(image);
+        }
         names.extend(
             state
                 .table
                 .iter()
                 .map(|process| process.name.to_lowercase()),
         );
+        drop(state);
+        for image in &seen {
+            self.quit_by_itself(image);
+        }
         Ok(names.into_iter().collect())
     }
 }

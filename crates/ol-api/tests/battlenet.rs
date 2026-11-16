@@ -828,3 +828,19 @@ fn a_switch_the_last_run_did_not_finish_is_offered_and_put_back() {
     assert!(!journal_file.exists());
     fakes.backend.shut_down();
 }
+
+#[test]
+fn a_client_signed_in_as_the_account_that_exits_before_the_switch_reaches_it_is_started_and_its_sign_in_confirmed()
+ {
+    let knobs = json!({ "knobs": { "battlenet": { "runningAs": account_id_of(MAIN) } } });
+    let fakes = fakes(Some(&knobs));
+    fakes.fake.processes.exit_once_seen("Battle.net.exe");
+    let states = fakes.play_with(MAIN, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("start").status, JobStepStatus::Done);
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert!(asked_of_the_machine(&fakes).contains(&"proc.start".to_owned()));
+    fakes.backend.shut_down();
+}

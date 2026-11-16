@@ -13,7 +13,7 @@ use ol_api::launchers::{
     SteamTiming,
 };
 use ol_api::{ApiError, Backend, StartLaunch};
-use ol_model::{JobState, LaunchJob, LauncherId, SwitchPlan};
+use ol_model::{JobState, JobStepStatus, LaunchJob, LauncherId, SwitchPlan};
 use ol_sim::FakeLaunchers;
 use ol_testkit::vectors::sha256_hex;
 use ol_testkit::{Scratch, oracle, snapshot};
@@ -727,4 +727,20 @@ fn a_settings_file_that_is_not_utf8_text_is_never_rewritten_and_nothing_is_saved
 fn a_running_launcher_is_not_closed_for_a_settings_file_that_is_not_utf8_text() {
     let knobs = json!({ "knobs": { "epic": { "runningAs": account_id_of(MAIN) } } });
     refused_over_a_settings_file_that_is_not_text(Some(&knobs));
+}
+
+#[test]
+fn a_launcher_signed_in_as_the_account_that_exits_before_the_switch_reaches_it_is_started_and_its_sign_in_confirmed()
+ {
+    let knobs = json!({ "knobs": { "epic": { "runningAs": account_id_of(MAIN) } } });
+    let fakes = fakes(Some(&knobs));
+    fakes.fake.processes.exit_once_seen("EpicGamesLauncher.exe");
+    let states = fakes.play_with(MAIN, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("start").status, JobStepStatus::Done);
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert!(asked_of_the_machine(&fakes).contains(&"proc.start".to_owned()));
+    fakes.backend.shut_down();
 }

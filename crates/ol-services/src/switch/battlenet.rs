@@ -769,7 +769,7 @@ impl Switch<'_> {
             self.start_client()?;
         }
 
-        if self.already_active && running {
+        if self.already_active && running && !self.launcher_started {
             self.mark(
                 STEP.verify,
                 JobStepStatus::Skipped,
