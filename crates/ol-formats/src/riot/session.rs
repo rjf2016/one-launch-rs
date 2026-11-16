@@ -81,6 +81,23 @@ impl Drop for RiotSessionBlob {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[error("not UTF-8 text")]
+pub struct NotText;
+
+impl RiotSessionBlob {
+    // The file as the text it is. Bytes that are not UTF-8 are refused and wiped: read as text they would not come back as they were in a write.
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, NotText> {
+        match String::from_utf8(bytes) {
+            Ok(file) => Ok(Self { file }),
+            Err(refused) => {
+                refused.into_bytes().zeroize();
+                Err(NotText)
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
 pub enum BlobError {
     #[error("the stored Riot sign-in is not readable")]
     NotReadable,

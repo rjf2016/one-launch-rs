@@ -5,8 +5,9 @@ mod directory;
 pub mod epic;
 mod error;
 pub mod files;
+pub mod riot;
 mod running;
 pub mod steam;
 
-pub use directory::{AccountRef, Directory};
+pub use directory::{AccountRef, Directory, GameRef};
 pub use error::AdapterError;
