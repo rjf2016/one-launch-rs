@@ -933,3 +933,28 @@ fn a_login_put_first_by_the_client_as_it_closes_is_put_back_behind_the_target() 
     assert!(after.contains(&format!("\"SavedAccountNames\": \"{ALT},")));
     fakes.backend.shut_down();
 }
+
+#[test]
+fn a_sign_in_by_hand_seen_at_the_first_look_keeps_its_token() {
+    let signed_in_as = "0c3d4e5f";
+    let knobs = json!({
+        "knobs": { "battlenet": { "signInWhenAskedMs": 0, "signInAs": signed_in_as } },
+    });
+    let fakes = fakes(Some(&knobs));
+    let new = fakes.account(NEW);
+    let states = fakes.play(NEW);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    assert_eq!(
+        detail(last, "verify"),
+        format!("Signed in as {NEW}. Linked to Battle.net account …4e5f.")
+    );
+    assert!(detail(last, "recapture").starts_with("Stored New's session (fingerprint "));
+    let tokens = fakes.tokens();
+    assert_eq!(tokens.len(), 1);
+    let saved = block_on(fakes.backend.session(&new.id)).unwrap().session;
+    let saved = saved.expect("the sign-in by hand was saved");
+    assert_eq!(saved.fingerprint, sha256_hex(tokens[0].1.as_bytes()));
+    assert!(saved.verified_at.is_some());
+    fakes.backend.shut_down();
+}

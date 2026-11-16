@@ -744,3 +744,38 @@ fn a_launcher_signed_in_as_the_account_that_exits_before_the_switch_reaches_it_i
     assert!(asked_of_the_machine(&fakes).contains(&"proc.start".to_owned()));
     fakes.backend.shut_down();
 }
+
+#[test]
+fn a_sign_in_by_hand_seen_at_the_first_look_keeps_its_session() {
+    let signed_in_as = "55555555555555555555555555555555";
+    let fakes = fakes(None);
+    let new = fakes.account("new@example.com");
+    // The user signs in on the launcher's page as soon as it is up, before the switch first looks at its log.
+    let launcher = Arc::clone(fakes.fake.epic.as_ref().unwrap());
+    let processes = Arc::clone(&fakes.fake.platform.processes);
+    let done = std::sync::atomic::AtomicBool::new(false);
+    fakes.fake.clock.before_sleep(move || {
+        let up = processes.is_running("EpicGamesLauncher.exe").unwrap();
+        if up && !done.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            launcher.sign_in_by_hand(Some(signed_in_as));
+        }
+    });
+    let states = fakes.play("new@example.com");
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert!(
+        step("recapture")
+            .detail
+            .starts_with("Stored New's session (fingerprint ")
+    );
+    let saved = block_on(fakes.backend.session(&new.id)).unwrap().session;
+    assert!(
+        saved
+            .expect("the sign-in by hand was saved")
+            .verified_at
+            .is_some()
+    );
+    fakes.backend.shut_down();
+}

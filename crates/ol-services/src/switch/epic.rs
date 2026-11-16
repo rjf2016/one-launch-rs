@@ -709,6 +709,9 @@ impl Switch<'_> {
                     } else {
                         self.directory.mark_session_verified(&account_id)?;
                     }
+                } else if !remembered {
+                    // Without a saved session the launcher was signed in by hand, and writes the session after the log says so.
+                    self.capture_fresh(timing.capture)?;
                 }
             }
             unsettled => {

@@ -808,11 +808,12 @@ impl Switch<'_> {
             SignInWait::WrongAccount { account_id, owner } => {
                 return Err(self.wrong_account(&account_id, owner.as_ref()));
             }
-            SignInWait::SignedIn { .. } => {
-                if remembered {
-                    self.capture_fresh(Duration::ZERO)?;
-                }
-            }
+            // Without a token the client signed in by hand, and writes its token after the log says so.
+            SignInWait::SignedIn { .. } => self.capture_fresh(if remembered {
+                Duration::ZERO
+            } else {
+                timing.capture
+            })?,
             unsettled => {
                 // A refused token is stale only when the login was first in the list: otherwise the client refuses any token.
                 if let (SignInWait::Failed { reason }, true, true, Some(account_id)) = (
