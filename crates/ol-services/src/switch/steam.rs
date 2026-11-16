@@ -9,7 +9,8 @@ use ol_adapters::steam::{
 };
 use ol_formats::steam::login_log::{SignInCause, SignInOutcome};
 use ol_formats::steam::loginusers::{
-    SteamLoginUser, parse_login_users, plan_auto_login_rewrite, steam_id3,
+    SteamLoginUser, UNWRITABLE_LAYOUT, marks_most_recent, parse_login_users,
+    plan_auto_login_rewrite, steam_id3,
 };
 use ol_model::{
     JobStep, JobStepStatus, LaunchAttention, LauncherId, LauncherInstall, RestoreResult,
@@ -545,6 +546,9 @@ impl Switch<'_> {
                 plan_auto_login_rewrite(&String::from_utf8_lossy(&bytes), &target.steam_id64)
                     .map_err(|error| Thrown::Failed(error.to_string()))?;
             self.mark(STEP.file, JobStepStatus::Running, "");
+            if !marks_most_recent(&rewrite.text, &target.steam_id64) {
+                return Err(Thrown::Failed(UNWRITABLE_LAYOUT.to_owned()));
+            }
             if rewrite.noop {
                 self.mark(
                     STEP.file,

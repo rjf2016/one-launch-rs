@@ -595,3 +595,86 @@ fn a_snapshot_goes_back_byte_for_byte_once_the_launcher_is_closed() {
     assert_eq!(after[0].reason, format!("Before restoring {id}"));
     fakes.backend.shut_down();
 }
+
+// The fixture's settings file with a byte of Windows-1252 in it, as an editor that saves in the system's code page leaves one: the file is no longer UTF-8 text.
+fn settings_not_utf8() -> Vec<u8> {
+    let fixture = fixture_settings();
+    let header = b"[Launcher]\r\n";
+    let at = fixture
+        .windows(header.len())
+        .position(|window| window == header)
+        .expect("the fixture opens with [Launcher]")
+        + header.len();
+    [
+        &fixture[..at],
+        b"InstallFolder=Jeux \xe9pic\r\n",
+        &fixture[at..],
+    ]
+    .concat()
+}
+
+// A switch to Alt over a settings file that is not UTF-8 text: refused at the plan, with the launcher left as it is, the file's bytes as they were and no sign-in saved.
+fn refused_over_a_settings_file_that_is_not_text(knobs: Option<&Value>) {
+    let fakes = fakes(knobs);
+    let broken = settings_not_utf8();
+    fs::write(fakes.settings_file(), &broken).unwrap();
+    let (main, alt, game) = (fakes.account(MAIN), fakes.account(ALT), fakes.game());
+    assert!(!main.has_session);
+    let alt_saved = block_on(fakes.backend.session(&alt.id))
+        .unwrap()
+        .session
+        .expect("the scenario saved a sign-in for Alt");
+
+    let preflight = block_on(fakes.backend.launch_preflight(&alt.id, Some(&game.id)))
+        .err()
+        .expect("the preflight is refused");
+    assert_eq!(preflight.code, "LAUNCHER_FILE");
+    assert!(preflight.message.starts_with(
+        "Epic Games: GameUserSettings.ini holds bytes that are not UTF-8 text; One Launch will not rewrite it. Start Epic Games Launcher by hand and close it, so that it writes the file again, then try again: "
+    ));
+    let plan = block_on(fakes.backend.switch_plan(&alt.id))
+        .err()
+        .expect("the plan is refused");
+    assert_eq!(plan, preflight);
+    let refused = fakes
+        .play_with(ALT, false)
+        .err()
+        .expect("the switch is refused at its start");
+    assert_eq!(refused, preflight);
+    // With the close said yes to beforehand the switch starts as a job, and its plan stops it before the first step.
+    let states = fakes.play_with(ALT, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Failed && !last.switched);
+    assert!(last.backup_id.is_none() && last.restored.is_none());
+    assert_eq!(last.error.as_deref(), Some(preflight.message.as_str()));
+
+    assert!(asked_of_the_machine(&fakes).is_empty());
+    assert!(fs::read(fakes.settings_file()).unwrap() == broken);
+    assert!(
+        block_on(fakes.backend.backups(LauncherId::Epic))
+            .unwrap()
+            .is_empty()
+    );
+    let main_saved = block_on(fakes.backend.session(&main.id)).unwrap();
+    assert!(main_saved.session.is_none() && main_saved.state.is_none());
+    assert_eq!(main_saved.state_error, Some(preflight.message.clone()));
+    let alt_now = block_on(fakes.backend.session(&alt.id))
+        .unwrap()
+        .session
+        .unwrap();
+    assert_eq!(alt_now.fingerprint, alt_saved.fingerprint);
+    assert!(!fakes.account(MAIN).has_session);
+    fakes.backend.shut_down();
+    assert!(fs::read(fakes.settings_file()).unwrap() == broken);
+}
+
+#[test]
+fn a_settings_file_that_is_not_utf8_text_is_never_rewritten_and_nothing_is_saved_from_it() {
+    refused_over_a_settings_file_that_is_not_text(None);
+}
+
+#[test]
+fn a_running_launcher_is_not_closed_for_a_settings_file_that_is_not_utf8_text() {
+    let knobs = json!({ "knobs": { "epic": { "runningAs": account_id_of(MAIN) } } });
+    refused_over_a_settings_file_that_is_not_text(Some(&knobs));
+}

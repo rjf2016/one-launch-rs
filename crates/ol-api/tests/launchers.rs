@@ -282,6 +282,51 @@ fn a_scan_brings_steams_games_into_the_library_and_a_missing_steam_takes_them_ou
 }
 
 #[test]
+fn a_library_list_that_cannot_be_read_takes_no_game_out() {
+    let fakes = fakes(None);
+    let steamapps = fakes.launchers_dir().join("steam").join("steamapps");
+    let second = fakes.launchers_dir().join("library2");
+    let manifest = "appmanifest_252950.acf";
+    fs::create_dir_all(second.join("steamapps").join("common")).unwrap();
+    fs::rename(
+        steamapps.join(manifest),
+        second.join("steamapps").join(manifest),
+    )
+    .unwrap();
+    let vdf_path = |path: &std::path::Path| path.to_str().unwrap().replace('\\', "\\\\");
+    let folders = steamapps.join("libraryfolders.vdf");
+    fs::write(
+        &folders,
+        format!(
+            "\"libraryfolders\"\n{{\n\t\"0\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t}}\n\t\"1\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t}}\n}}\n",
+            vdf_path(&fakes.launchers_dir().join("steam")),
+            vdf_path(&second)
+        ),
+    )
+    .unwrap();
+    let scanned = &block_on(fakes.backend.rescan()).unwrap()[0];
+    assert_eq!((scanned.added, scanned.error.as_deref()), (1, None));
+
+    fs::write(&folders, "\"libraryfolders\"\n{\n\t\"0\"\n").unwrap();
+    let scanned = &block_on(fakes.backend.rescan()).unwrap()[0];
+    assert_eq!((scanned.added, scanned.removed), (0, 0));
+    assert!(
+        scanned
+            .error
+            .as_deref()
+            .is_some_and(|error| error.contains("libraryfolders.vdf"))
+    );
+    let library = block_on(fakes.backend.library()).unwrap();
+    assert!(
+        library
+            .games
+            .iter()
+            .any(|entry| entry.game.launcher == LauncherId::Steam && entry.game.installed)
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn the_accounts_steam_remembers_are_listed_and_imported_once() {
     let fakes = fakes(None);
     let recorded = recorded_login_users();

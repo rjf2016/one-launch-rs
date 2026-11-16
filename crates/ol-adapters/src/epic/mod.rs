@@ -159,6 +159,24 @@ pub fn id_tail(uid: Option<&str>, length: usize) -> String {
     }
 }
 
+// A settings file's bytes as text, or why One Launch will not rewrite it. Unreal turns a config file into UTF-16 once a character outside ASCII lands in it, and such a file reads as empty; any other byte that is not UTF-8 would be written back as U+FFFD, and the file holds the sign-in.
+pub fn settings_text<'b>(path: &str, bytes: &'b [u8]) -> Result<&'b str, AdapterError> {
+    let refused = |message: String| AdapterError::LauncherFile {
+        path: path.to_owned(),
+        message,
+    };
+    if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) || bytes.contains(&0) {
+        return Err(refused(format!(
+            "{SETTINGS_FILE} is not UTF-8 (UTF-16 or binary content); One Launch will not rewrite it"
+        )));
+    }
+    std::str::from_utf8(bytes).map_err(|_| {
+        refused(format!(
+            "{SETTINGS_FILE} holds bytes that are not UTF-8 text; One Launch will not rewrite it. Start Epic Games Launcher by hand and close it, so that it writes the file again, then try again"
+        ))
+    })
+}
+
 fn is_app_name(id: &str) -> bool {
     (1..=128).contains(&id.len())
         && id
@@ -386,32 +404,23 @@ impl<'a> EpicAdapter<'a> {
         Ok(games)
     }
 
-    // The settings file as text, or None when there is none. Unreal turns a config file into UTF-16 once a character outside ASCII lands in it; such a file would read as empty and a rewrite would break it, so it is refused.
+    // The settings file as text, or None when there is none. A file that is not UTF-8 text is refused (see `settings_text`).
     pub fn read_ini(&self) -> Result<Option<String>, AdapterError> {
         let files = self.platform.files.as_ref();
         let file = self.settings_path();
         if !files.exists(&file) {
             return Ok(None);
         }
-        let refused = |message: String| AdapterError::LauncherFile {
-            path: file.clone(),
-            message,
-        };
         let bytes = read_launcher_bytes(files, &file, MAX_LAUNCHER_FILE_BYTES).map_err(
             |error| match error {
                 AdapterError::LauncherFile { .. } => error,
-                other => refused(format!("Could not read {SETTINGS_FILE} ({other})")),
+                other => AdapterError::LauncherFile {
+                    path: file.clone(),
+                    message: format!("Could not read {SETTINGS_FILE} ({other})"),
+                },
             },
         )?;
-        if bytes.starts_with(&[0xff, 0xfe])
-            || bytes.starts_with(&[0xfe, 0xff])
-            || bytes.contains(&0)
-        {
-            return Err(refused(format!(
-                "{SETTINGS_FILE} is not UTF-8 (UTF-16 or binary content); One Launch will not rewrite it"
-            )));
-        }
-        Ok(Some(String::from_utf8_lossy(&bytes).into_owned()))
+        settings_text(&file, &bytes).map(|text| Some(text.to_owned()))
     }
 
     fn first_log_line(&self, path: &str) -> Option<String> {

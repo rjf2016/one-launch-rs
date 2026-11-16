@@ -444,6 +444,25 @@ fn a_scan_finds_riots_game_and_the_client_names_the_account_whose_sign_in_it_hol
 }
 
 #[test]
+fn a_metadata_folder_that_cannot_be_listed_takes_no_game_out() {
+    let fakes = fakes(None);
+    let metadata = Path::new(&fakes.fake.program_data)
+        .join("Riot Games")
+        .join("Metadata");
+    fs::rename(&metadata, metadata.with_extension("moved")).unwrap();
+    fs::write(&metadata, b"").unwrap();
+    let scanned = block_on(fakes.backend.rescan()).unwrap();
+    let riot = scanned
+        .iter()
+        .find(|scan| scan.launcher == LauncherId::Riot)
+        .unwrap();
+    assert_eq!((riot.added, riot.removed), (0, 0));
+    assert!(riot.error.is_some());
+    assert!(fakes.game().installed);
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn what_is_saved_of_a_sign_in_is_its_digest_and_whose_it_is() {
     let fakes = fakes(None);
     let (main, alt) = (fakes.account(MAIN), fakes.account(ALT));

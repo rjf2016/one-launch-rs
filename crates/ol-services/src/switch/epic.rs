@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use ol_adapters::epic::{
-    EXE, EpicAdapter, LogMark, STEP, UNOWNED_SESSION_PIN, close_message, id_tail,
+    EXE, EpicAdapter, LogMark, STEP, UNOWNED_SESSION_PIN, close_message, id_tail, settings_text,
 };
 use ol_adapters::steam::{minutes, plural, seconds};
 use ol_adapters::{AccountRef, AdapterError, Directory};
@@ -340,12 +340,13 @@ impl Switch<'_> {
             let before = files
                 .read(path)
                 .map_err(|error| Thrown::Failed(error.to_string()))?;
-            // Only the newest file was looked at when the plan read it. An older one that is not UTF-8 text is left as it is: a rewrite would break it, and the launcher does not read it.
-            let not_text = before.contains(&0) || std::str::from_utf8(&before).is_err();
-            if age > 0 && not_text {
-                continue;
-            }
-            let write = plan_session_write(&String::from_utf8_lossy(&before), blob.as_ref());
+            let text = match settings_text(path, &before) {
+                Ok(text) => text,
+                // Only the newest file was looked at when the plan read it. An older one that is not UTF-8 text is left as it is: a rewrite would break it, and the launcher does not read it.
+                Err(_) if age > 0 => continue,
+                Err(refused) => return Err(refused.into()),
+            };
+            let write = plan_session_write(text, blob.as_ref());
             if write.noop {
                 continue;
             }

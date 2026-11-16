@@ -94,10 +94,15 @@ impl JobBoard {
         }
     }
 
-    fn begin(&self, job: &LaunchJob, cancel: &CancelToken) {
+    // Under the same lock as `close`, so a quit that lands after the first look at the board still refuses the job.
+    fn begin(&self, job: &LaunchJob, cancel: &CancelToken) -> Result<(), ServiceError> {
         let mut board = self.board();
+        if board.closing || board.current.is_some() {
+            return Err(ServiceError::Busy);
+        }
         board.current = Some(job.clone());
         board.cancel = Some(cancel.clone());
+        Ok(())
     }
 
     // A job that was accepted and could not be run after all: the next one is not refused for it.
@@ -335,7 +340,7 @@ pub fn prepare(
     };
     let configs = launchers.configs(&store.settings()?, data_dir);
     let cancel = CancelToken::new();
-    board.begin(&job, &cancel);
+    board.begin(&job, &cancel)?;
     Ok(PreparedJob {
         job,
         account: account_ref(&account),

@@ -173,6 +173,16 @@ impl Adapter<'_> {
         }
     }
 
+    // The games, and why the list can be short of some that are installed.
+    fn scanned_games(&self) -> Result<(Vec<InstalledGame>, Option<String>), AdapterError> {
+        match self {
+            Self::Steam(steam) => steam.scan_installed_games(),
+            Self::Epic(epic) => Ok((epic.list_installed_games()?, None)),
+            Self::Battlenet(battlenet) => Ok((battlenet.list_installed_games()?, None)),
+            Self::Riot(riot) => riot.scan_installed_games(),
+        }
+    }
+
     pub fn remembered_accounts(&self) -> Result<Vec<RememberedAccount>, AdapterError> {
         match self {
             Self::Steam(steam) => steam.list_remembered_accounts(),
@@ -552,7 +562,7 @@ pub fn import_accounts(
     Ok(result)
 }
 
-// Reads every launcher this build knows again and brings the games table in line. A launcher that is not installed counts as having no games; any other failure is reported on its entry and leaves its rows alone.
+// Reads every launcher this build knows again and brings the games table in line. A launcher that is not installed counts as having no games; any other failure, and a list that could not be read whole, is reported on its entry and leaves its rows alone.
 pub fn scan_library(
     store: &Store,
     launchers: &Launchers,
@@ -581,9 +591,18 @@ pub fn scan_library(
             let directory = launchers.directory(store, launcher);
             let games = launchers
                 .adapter(launcher, configs, &directory)
-                .and_then(|adapter| installed_games(&adapter));
+                .and_then(|adapter| {
+                    adapter
+                        .scanned_games()
+                        .map_err(ServiceError::adapter(launcher))
+                });
             match games {
-                Ok(games) => sync(&games, true),
+                Ok((games, None)) => sync(&games, true),
+                // A short list would take out every game it misses, so the rows stay until a scan can read it all.
+                Ok((_, Some(unread))) => failed(
+                    launcher,
+                    format!("{unread}. Nothing in the Library was changed."),
+                ),
                 Err(error) if error.code() == "NOT_INSTALLED" => sync(&[], false),
                 Err(error) => failed(launcher, error.to_string()),
             }
