@@ -22,6 +22,30 @@ const V8_WORDING: &str =
     "refused by both; the reason is the JavaScript engine's wording of a JSON error";
 const TOO_DEEP: &str = "nested deeper than the 128 levels the JSON reader takes";
 const TOO_LARGE: &str = "a number past what the JSON reader takes";
+const LOST_CHARACTER: &str = "a file with CRLF that ends in a bare LF, where the Electron app drops the character before that LF; the port keeps it, because every other byte is left alone (plan/GAPS.md)";
+const LOSES_A_CHARACTER: [&str; 5] = [
+    "mixed-crlf-then-lf-end",
+    "mixed-crlf-then-lf-end-long",
+    "mixed-eol-set",
+    "mixed-eol-noop",
+    "corpus-3-23",
+];
+
+fn loses_a_character(case: &Case) -> bool {
+    LOSES_A_CHARACTER.contains(&case.id.as_str())
+}
+
+const SHOWN_WHOLE: &str = "a Data value of 8 characters or fewer, which the Electron app shows whole in a plan; the port shows its length, because a session value is never shown (plan/GAPS.md)";
+const SHOWS_A_SHORT_VALUE: [&str; 8] = [
+    "enable-lowercase",
+    "data-short-plain",
+    "describe-plain-at-8",
+    "describe-base64-short",
+    "adv-astral-length-over",
+    "adv-astral-length-at",
+    "adv-astral-length-straddle",
+    "adv-fingerprint-non-ascii",
+];
 
 fn eol(layout: &IniLayout) -> &'static str {
     layout.eol.as_str()
@@ -88,7 +112,14 @@ fn blob_json(blob: &EpicSessionBlob) -> Value {
 
 #[test]
 fn split_ini_cases() {
-    run("l1/epic/splitIni.json", &[], |case| {
+    let skipped = [
+        ("mixed-crlf-then-lf-end", LOST_CHARACTER),
+        ("mixed-crlf-then-lf-end-long", LOST_CHARACTER),
+    ];
+    run("l1/epic/splitIni.json", &skipped, |case| {
+        if loses_a_character(case) {
+            return Answer::Skip(LOST_CHARACTER);
+        }
         Answer::Out(layout_json(&split_ini(&text(&case.args[0]))))
     });
 }
@@ -106,7 +137,14 @@ fn join_ini_cases() {
 
 #[test]
 fn join_ini_round_trips() {
-    run("l1/epic/joinIni.roundtrip.json", &[], |case| {
+    let skipped = [
+        ("mixed-crlf-then-lf-end", LOST_CHARACTER),
+        ("mixed-crlf-then-lf-end-long", LOST_CHARACTER),
+    ];
+    run("l1/epic/joinIni.roundtrip.json", &skipped, |case| {
+        if loses_a_character(case) {
+            return Answer::Skip(LOST_CHARACTER);
+        }
         let before = text(&case.args[0]);
         let rejoined = join_ini(&split_ini(&before));
         Answer::Out(json!({ "rejoined": rejoined, "identical": rejoined == before }))
@@ -115,8 +153,16 @@ fn join_ini_round_trips() {
 
 #[test]
 fn rewrite_section_cases() {
-    let skipped = [("adv-lone-surrogate-value", UNPAIRED)];
+    let skipped = [
+        ("mixed-eol-set", LOST_CHARACTER),
+        ("mixed-eol-noop", LOST_CHARACTER),
+        ("adv-lone-surrogate-value", UNPAIRED),
+        ("corpus-3-23", LOST_CHARACTER),
+    ];
     run("l1/epic/rewriteSection.json", &skipped, |case| {
+        if loses_a_character(case) {
+            return Answer::Skip(LOST_CHARACTER);
+        }
         let (Value::String(name), Some(entries)) = (plain(&case.args[1]), case.args[2].as_object())
         else {
             return Answer::Skip(NOT_TEXT);
@@ -147,9 +193,63 @@ fn rewrite_section_cases() {
 }
 
 #[test]
+fn a_file_with_crlf_that_ends_in_a_bare_lf_keeps_every_character_of_its_last_line() {
+    let text = "[RememberMe]\r\nEnable=True\r\nData=old\r\n\r\n[Other]\r\nOther=42\n";
+    let rewrite = rewrite_section(text, "RememberMe", &[("Data", Some("new"))]);
+    assert_eq!(
+        rewrite.text,
+        "[RememberMe]\r\nEnable=True\r\nData=new\r\n\r\n[Other]\r\nOther=42\r\n"
+    );
+    assert_eq!(split_ini("[A]\r\nx=1\n").lines, ["[A]", "x=1"]);
+    assert_eq!(split_ini("[A]\r\nx=1\r\n\n").lines, ["[A]", "x=1", ""]);
+    assert_eq!(split_ini("[A]\r\nx=1\r\n").lines, ["[A]", "x=1"]);
+}
+
+#[test]
+fn a_short_data_value_is_shown_by_its_length_and_never_whole() {
+    let text = "[RememberMe]\r\nEnable=True\r\nData=abc\r\n\r\n[Offline]\r\nData=Zz9\r\n";
+    let blob = EpicSessionBlob {
+        enable: "True".to_owned(),
+        data: "QUJDREVG".to_owned(),
+        offline: Some("x1".to_owned()),
+    };
+    let shown = |write: ol_formats::epic::session::SessionWrite| {
+        write
+            .changes
+            .iter()
+            .map(|change| format!("{} -> {}", change.before, change.after))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        shown(plan_session_write(text, Some(&blob))),
+        [
+            "(3 characters) -> (8 characters)",
+            "(3 characters) -> (2 characters)"
+        ]
+    );
+    assert_eq!(
+        shown(plan_session_write(text, None)),
+        ["(3 characters) -> (removed)", "(3 characters) -> (removed)"]
+    );
+}
+
+#[test]
 fn plan_session_write_cases() {
-    let skipped = [("adv-lone-surrogate-data", UNPAIRED)];
+    let skipped = [
+        ("enable-lowercase", SHOWN_WHOLE),
+        ("data-short-plain", SHOWN_WHOLE),
+        ("describe-plain-at-8", SHOWN_WHOLE),
+        ("describe-base64-short", SHOWN_WHOLE),
+        ("adv-astral-length-over", SHOWN_WHOLE),
+        ("adv-astral-length-at", SHOWN_WHOLE),
+        ("adv-astral-length-straddle", SHOWN_WHOLE),
+        ("adv-lone-surrogate-data", UNPAIRED),
+        ("adv-fingerprint-non-ascii", SHOWN_WHOLE),
+    ];
     run("l1/epic/planSessionWrite.json", &skipped, |case| {
+        if SHOWS_A_SHORT_VALUE.contains(&case.id.as_str()) {
+            return Answer::Skip(SHOWN_WHOLE);
+        }
         let blob = match &case.args[1] {
             Value::Null => None,
             given => match blob_from(given) {

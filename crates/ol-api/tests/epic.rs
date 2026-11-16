@@ -13,7 +13,7 @@ use ol_api::launchers::{
     SteamTiming,
 };
 use ol_api::{ApiError, Backend, StartLaunch};
-use ol_model::{JobState, LaunchJob, LauncherId, SwitchPlan};
+use ol_model::{JobState, JobStepStatus, LaunchJob, LauncherId, SwitchPlan};
 use ol_sim::FakeLaunchers;
 use ol_testkit::vectors::sha256_hex;
 use ol_testkit::{Scratch, oracle, snapshot};
@@ -376,6 +376,36 @@ fn what_is_saved_of_a_sign_in_is_its_digest_and_whose_it_is() {
 }
 
 #[test]
+fn a_settings_file_older_than_the_last_sign_in_names_no_one_as_remembered() {
+    let fakes = fakes(None);
+    let main = fakes.account(MAIN);
+    assert!(!main.has_session);
+    let file = fs::File::options()
+        .write(true)
+        .open(fakes.settings_file())
+        .unwrap();
+    file.set_modified(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap();
+    drop(file);
+
+    let state = block_on(fakes.backend.session(&main.id))
+        .unwrap()
+        .state
+        .expect("Epic's files say what it remembers");
+    assert!(state.remembered && !state.launcher_running);
+    assert_eq!(state.linked_account_id, None);
+    assert_eq!(state.launcher_uid, None);
+    let remembered = block_on(fakes.backend.remembered_accounts(LauncherId::Epic)).unwrap();
+    assert!(!remembered.is_empty());
+    assert!(
+        remembered
+            .iter()
+            .all(|entry| !entry.most_recent && !entry.remember_password)
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn a_saved_sign_in_is_in_the_launchers_file_and_encrypted_in_the_data_folder_and_nowhere_else() {
     let fakes = fakes(None);
     let alt = fakes.account(ALT);
@@ -697,4 +727,95 @@ fn a_settings_file_that_is_not_utf8_text_is_never_rewritten_and_nothing_is_saved
 fn a_running_launcher_is_not_closed_for_a_settings_file_that_is_not_utf8_text() {
     let knobs = json!({ "knobs": { "epic": { "runningAs": account_id_of(MAIN) } } });
     refused_over_a_settings_file_that_is_not_text(Some(&knobs));
+}
+
+#[test]
+fn a_launcher_signed_in_as_the_account_that_exits_before_the_switch_reaches_it_is_started_and_its_sign_in_confirmed()
+ {
+    let knobs = json!({ "knobs": { "epic": { "runningAs": account_id_of(MAIN) } } });
+    let fakes = fakes(Some(&knobs));
+    fakes.fake.processes.exit_once_seen("EpicGamesLauncher.exe");
+    let states = fakes.play_with(MAIN, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("start").status, JobStepStatus::Done);
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert!(asked_of_the_machine(&fakes).contains(&"proc.start".to_owned()));
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_sign_in_by_hand_seen_at_the_first_look_keeps_its_session() {
+    let signed_in_as = "55555555555555555555555555555555";
+    let fakes = fakes(None);
+    let new = fakes.account("new@example.com");
+    // The user signs in on the launcher's page as soon as it is up, before the switch first looks at its log.
+    let launcher = Arc::clone(fakes.fake.epic.as_ref().unwrap());
+    let processes = Arc::clone(&fakes.fake.platform.processes);
+    let done = std::sync::atomic::AtomicBool::new(false);
+    fakes.fake.clock.before_sleep(move || {
+        let up = processes.is_running("EpicGamesLauncher.exe").unwrap();
+        if up && !done.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            launcher.sign_in_by_hand(Some(signed_in_as));
+        }
+    });
+    let states = fakes.play("new@example.com");
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert!(
+        step("recapture")
+            .detail
+            .starts_with("Stored New's session (fingerprint ")
+    );
+    let saved = block_on(fakes.backend.session(&new.id)).unwrap().session;
+    assert!(
+        saved
+            .expect("the sign-in by hand was saved")
+            .verified_at
+            .is_some()
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_sign_in_that_lands_while_the_launcher_closes_is_saved_before_the_switch_replaces_it() {
+    // The launcher runs on an account no One Launch account is linked to, so the plan has no outgoing sign-in to save.
+    let knobs = json!({ "knobs": { "epic": { "runningAs": "55555555555555555555555555555555" } } });
+    let fakes = fakes(Some(&knobs));
+    let main = fakes.account(MAIN);
+    assert!(
+        block_on(fakes.backend.session(&main.id))
+            .unwrap()
+            .session
+            .is_none()
+    );
+    // The user signs in as Main while the switch waits for the launcher to close: the first wait of the switch.
+    let launcher = Arc::clone(fakes.fake.epic.as_ref().unwrap());
+    let main_uid = account_id_of(MAIN);
+    let done = std::sync::atomic::AtomicBool::new(false);
+    fakes.fake.clock.before_sleep(move || {
+        if !done.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            launcher.sign_in_by_hand(Some(&main_uid));
+        }
+    });
+    let states = fakes.play_with(ALT, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("close").status, JobStepStatus::Done);
+    assert!(
+        step("capture")
+            .detail
+            .starts_with("Saved Main's session (fingerprint ")
+    );
+    assert!(
+        block_on(fakes.backend.session(&main.id))
+            .unwrap()
+            .session
+            .is_some()
+    );
+    fakes.backend.shut_down();
 }

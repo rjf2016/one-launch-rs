@@ -4,6 +4,7 @@
 
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, Mutex};
 
@@ -57,6 +58,35 @@ impl Fakes {
                 let _ = backend.cancel_launch(&job.id);
             }
         });
+    }
+
+    // The user signs in by hand as `uid` the first time the job waits while the named step runs. What that sign-in left under UnifiedAuth is kept for the test.
+    fn sign_in_at(&self, step: &'static str, uid: &str) -> Arc<Mutex<Option<String>>> {
+        let latest = Arc::clone(&self.latest);
+        let client = Arc::clone(self.fake.battlenet.as_ref().unwrap());
+        let registry = Arc::clone(&self.fake.registry);
+        let (uid, done) = (uid.to_owned(), AtomicBool::new(false));
+        let written = Arc::new(Mutex::new(None));
+        let kept = Arc::clone(&written);
+        self.fake.clock.before_sleep(move || {
+            let job = latest.lock().unwrap().clone();
+            let at_the_step = |job: &LaunchJob| {
+                let running = |at: &JobStep| at.id == step && at.status == JobStepStatus::Running;
+                job.steps.iter().any(running)
+            };
+            if job.is_some_and(|job| at_the_step(&job)) && !done.swap(true, Ordering::SeqCst) {
+                client.sign_in_by_hand(Some(&uid));
+                let token = registry
+                    .dump()
+                    .into_iter()
+                    .find_map(|(path, value)| match value {
+                        RegistryValue::Binary(hex) if path.starts_with(UNIFIED_AUTH) => Some(hex),
+                        _ => None,
+                    });
+                *kept.lock().unwrap() = token.map(|hex| hex.to_lowercase());
+            }
+        });
+        written
     }
 
     // The app quits and starts again on the same two folders, with a fake machine built afresh.
@@ -826,5 +856,105 @@ fn a_switch_the_last_run_did_not_finish_is_offered_and_put_back() {
     block_on(fakes.backend.dismiss_recovery()).unwrap();
     assert!(block_on(fakes.backend.recovery()).unwrap().is_none());
     assert!(!journal_file.exists());
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_client_signed_in_as_the_account_that_exits_before_the_switch_reaches_it_is_started_and_its_sign_in_confirmed()
+ {
+    let knobs = json!({ "knobs": { "battlenet": { "runningAs": account_id_of(MAIN) } } });
+    let fakes = fakes(Some(&knobs));
+    fakes.fake.processes.exit_once_seen("Battle.net.exe");
+    let states = fakes.play_with(MAIN, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("start").status, JobStepStatus::Done);
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert!(asked_of_the_machine(&fakes).contains(&"proc.start".to_owned()));
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_sign_in_that_lands_while_the_client_closes_is_saved_before_the_switch_takes_its_token_away() {
+    // The client runs on an account no One Launch account is linked to, so the plan has no outgoing sign-in to save.
+    let knobs = json!({ "knobs": { "battlenet": { "runningAs": "0f0f0f0f" } } });
+    let fakes = fakes(Some(&knobs));
+    let main = fakes.account(MAIN);
+    assert!(
+        block_on(fakes.backend.session(&main.id))
+            .unwrap()
+            .session
+            .is_none()
+    );
+    let written = fakes.sign_in_at("close", &account_id_of(MAIN));
+
+    let states = fakes.play_with(ALT, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    assert!(detail(last, "capture").starts_with("Saved Main's session (fingerprint "));
+    let token = written.lock().unwrap().clone().expect("the user signed in");
+    let saved = block_on(fakes.backend.session(&main.id)).unwrap().session;
+    let saved = saved.expect("the sign-in made during the close was saved");
+    assert_eq!(saved.fingerprint, sha256_hex(token.as_bytes()));
+    assert_eq!(fakes.tokens(), [seeded_token(ALT)]);
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_login_put_first_by_the_client_as_it_closes_is_put_back_behind_the_target() {
+    // The list on disk has the target first; the client signed in as Main writes Main first as it exits.
+    let fakes = fakes(Some(
+        &json!({ "knobs": { "battlenet": { "runningAs": account_id_of(MAIN) } } }),
+    ));
+    let config = String::from_utf8(fixture_config()).unwrap();
+    let logins = fixture_logins();
+    let mut alt_first = vec![ALT.to_owned()];
+    alt_first.extend(logins.iter().filter(|login| *login != ALT).cloned());
+    fs::write(
+        fakes.config_file(),
+        config.replace(&logins.join(","), &alt_first.join(",")),
+    )
+    .unwrap();
+    let plan = block_on(fakes.backend.switch_plan(&fakes.account(ALT).id)).unwrap();
+    let file = plan.steps.iter().find(|step| step.id == "file").unwrap();
+    assert!(file.skipped && file.detail.starts_with("No change:"));
+    fakes.sign_in_at("close", &account_id_of(MAIN));
+
+    let states = fakes.play_with(ALT, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    assert_eq!(
+        detail(last, "file"),
+        format!("{ALT} is now first of 5 saved accounts.")
+    );
+    assert!(detail(last, "verify").starts_with(&format!("Signed in as {ALT}.")));
+    let after = String::from_utf8(fs::read(fakes.config_file()).unwrap()).unwrap();
+    assert!(after.contains(&format!("\"SavedAccountNames\": \"{ALT},")));
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_sign_in_by_hand_seen_at_the_first_look_keeps_its_token() {
+    let signed_in_as = "0c3d4e5f";
+    let knobs = json!({
+        "knobs": { "battlenet": { "signInWhenAskedMs": 0, "signInAs": signed_in_as } },
+    });
+    let fakes = fakes(Some(&knobs));
+    let new = fakes.account(NEW);
+    let states = fakes.play(NEW);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    assert_eq!(
+        detail(last, "verify"),
+        format!("Signed in as {NEW}. Linked to Battle.net account …4e5f.")
+    );
+    assert!(detail(last, "recapture").starts_with("Stored New's session (fingerprint "));
+    let tokens = fakes.tokens();
+    assert_eq!(tokens.len(), 1);
+    let saved = block_on(fakes.backend.session(&new.id)).unwrap().session;
+    let saved = saved.expect("the sign-in by hand was saved");
+    assert_eq!(saved.fingerprint, sha256_hex(tokens[0].1.as_bytes()));
+    assert!(saved.verified_at.is_some());
     fakes.backend.shut_down();
 }

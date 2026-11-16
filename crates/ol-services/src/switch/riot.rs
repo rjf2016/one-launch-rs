@@ -687,7 +687,7 @@ impl Switch<'_> {
             self.start_launcher()?;
         }
 
-        if self.already_active {
+        if self.already_active && !self.launcher_started {
             self.mark(
                 STEP.verify,
                 JobStepStatus::Skipped,

@@ -244,27 +244,28 @@ fn unsealed_tokens(recorded: &Value, vault: &dyn Vault) -> Option<Value> {
     Some(shown.collect())
 }
 
-// Battle.net.config, and of what it says the client's settings as the app reads them.
+// Battle.net.config, and of what it says the client's settings as the app reads them. A file the app cannot read is still shown by its bytes.
 fn battlenet_config(launchers_dir: &Path) -> Option<Value> {
     let bytes = fs::read(launchers_dir.join(BATTLENET_CONFIG)).ok()?;
-    let (doc, _) = parse_config(&String::from_utf8_lossy(&bytes)).ok()?;
-    let client = read_client_settings(&doc);
-    Some(json!({
-        "bytes": bytes.len(),
-        "sha256": sha256_hex(&bytes),
-        "parsed": {
-            "autoLogin": client.auto_login,
-            "savedAccountNames": client.saved_account_names,
-            "version": client.version,
-        },
-    }))
+    let parsed = parse_config(&String::from_utf8_lossy(&bytes))
+        .ok()
+        .map(|(doc, _)| {
+            let client = read_client_settings(&doc);
+            json!({
+                "autoLogin": client.auto_login,
+                "savedAccountNames": client.saved_account_names,
+                "version": client.version,
+            })
+        });
+    Some(json!({ "bytes": bytes.len(), "sha256": sha256_hex(&bytes), "parsed": parsed }))
 }
 
 fn login_users(launchers_dir: &Path) -> Option<Value> {
     let bytes = fs::read(launchers_dir.join(STEAM_LOGIN_USERS)).ok()?;
-    let parsed: Vec<Value> = parse_login_users(&String::from_utf8_lossy(&bytes))
-        .ok()?
-        .iter()
+    let users = parse_login_users(&String::from_utf8_lossy(&bytes));
+    let parsed: Option<Vec<Value>> = users.ok().map(|users| {
+        users
+            .iter()
         .map(|user| {
             json!({
                 "steamId64": user.steam_id64,
@@ -276,7 +277,8 @@ fn login_users(launchers_dir: &Path) -> Option<Value> {
                 "mostRecentKeys": user.most_recent_keys.iter().map(|key| key.as_str()).collect::<Vec<_>>(),
             })
         })
-        .collect();
+        .collect()
+    });
     Some(json!({ "bytes": bytes.len(), "sha256": sha256_hex(&bytes), "parsed": parsed }))
 }
 
@@ -569,5 +571,26 @@ mod tests {
             without_folder(text, folder, "{data}"),
             r"İ {data}\onelaunch.db"
         );
+    }
+
+    // A launcher file the app cannot read is still told apart from a missing one and from another unreadable one.
+    #[test]
+    fn a_launcher_file_that_does_not_parse_is_reported_by_its_bytes() {
+        let scratch = ol_testkit::Scratch::new("replay-unparsed");
+        for (relative, read) in [
+            (
+                BATTLENET_CONFIG,
+                battlenet_config as fn(&Path) -> Option<Value>,
+            ),
+            (STEAM_LOGIN_USERS, login_users),
+        ] {
+            let file = scratch.join(relative);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(&file, b"{ not what the app reads").unwrap();
+            let reported = read(&scratch.join("")).expect("the file is reported");
+            assert_eq!(reported["bytes"], 24);
+            assert_eq!(reported["sha256"], sha256_hex(b"{ not what the app reads"));
+            assert!(reported["parsed"].is_null());
+        }
     }
 }

@@ -26,6 +26,8 @@ use crate::steam::{SteamKnobs, SteamSim};
 
 const SCENARIO_FILE: &str = "scenario.json";
 const KNOBS_FILE: &str = "knobs.json";
+// The sessions the scripted Epic launcher made up, by fingerprint, with the account each signs in as. None of their data.
+const ISSUED_SESSIONS_FILE: &str = "issued-sessions.json";
 const FIXTURE_PREFIX: &str = "@fixtures/";
 const UNIFIED_AUTH: &str = r"Software\Blizzard Entertainment\Battle.net\UnifiedAuth";
 const BINARY_PREFIX: &str = "binary:";
@@ -554,6 +556,7 @@ fn materialize_on(
         servers.extend(self::servers(&scenario, LauncherId::Epic));
         EpicSim::attach(
             &local_app_data,
+            dir.join("epic").join(ISSUED_SESSIONS_FILE),
             &processes,
             Arc::clone(&clock),
             servers,
@@ -697,5 +700,117 @@ mod tests {
         assert!(read.unwrap());
         assert!(written.unwrap());
         assert_eq!(kept, b"old");
+    }
+
+    #[test]
+    fn a_session_the_epic_launcher_made_up_signs_in_as_its_own_account_after_a_restart() {
+        let scratch = Scratch::new("sim-issued");
+        let (dir, data) = (scratch.join("launchers"), scratch.join("data"));
+        lay_down(
+            &oracle("fixtures/dev-only/fake-launchers/all-four"),
+            &oracle("fixtures/launchers"),
+            &dir,
+        )
+        .unwrap();
+        write_knobs(
+            &dir,
+            &serde_json::json!({ "knobs": { "epic": { "reactMs": 0 } } }),
+        )
+        .unwrap();
+        let scenario = read_json(&dir.join(SCENARIO_FILE), SCENARIO_FILE).unwrap();
+        let on_disk = scenario["onDisk"]["epic"].as_str().unwrap();
+        let accounts = scenario["seed"]["accounts"].as_array().unwrap();
+        let other = accounts
+            .iter()
+            .filter(|account| account["launcher"] == "epic")
+            .filter_map(|account| account["launcherUid"].as_str())
+            .find(|uid| *uid != on_disk)
+            .unwrap();
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &data, at).unwrap();
+        fake.epic.as_ref().unwrap().sign_in_by_hand(Some(other));
+        drop(fake);
+
+        let fake = materialize(&dir, &data, at).unwrap();
+        let exe = dir.join(r"epic\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe");
+        let exe = exe.to_string_lossy().into_owned();
+        fake.platform.processes.start(&exe, &[], "").unwrap();
+        let log = dir.join(r"localappdata\EpicGamesLauncher\Saved\Logs\EpicGamesLauncher.log");
+        let log = fs::read_to_string(log).unwrap();
+        assert!(log.contains(&format!("OnLoginComplete - 0 TRUE {other} ")));
+        assert!(!log.contains(&format!("OnLoginComplete - 0 TRUE {on_disk} ")));
+    }
+
+    const BATTLENET_EXE: &str = "Battle.net.exe";
+
+    fn battlenet_scenario(name: &str, knobs: &Value) -> (Scratch, std::path::PathBuf) {
+        let scratch = Scratch::new(name);
+        let dir = scratch.join("launchers");
+        lay_down(
+            &oracle("fixtures/dev-only/fake-launchers/all-four"),
+            &oracle("fixtures/launchers"),
+            &dir,
+        )
+        .unwrap();
+        write_knobs(&dir, knobs).unwrap();
+        (scratch, dir)
+    }
+
+    fn newest_battlenet_log(dir: &Path) -> String {
+        let logs = dir.join(r"localappdata\Battle.net\Logs");
+        let names = fs::read_dir(&logs).unwrap().flatten();
+        let newest = names.map(|entry| entry.file_name()).max().unwrap();
+        fs::read_to_string(logs.join(newest)).unwrap()
+    }
+
+    fn start_battlenet(fake: &FakeLaunchers, dir: &Path) {
+        let exe = dir.join("battlenet").join(BATTLENET_EXE);
+        let exe = exe.to_string_lossy().into_owned();
+        fake.platform.processes.start(&exe, &[], "").unwrap();
+    }
+
+    #[test]
+    fn the_newest_battlenet_log_is_that_of_the_client_already_running() {
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "runningAs": "0f0f0f0f" } } });
+        let (scratch, dir) = battlenet_scenario("sim-bnet-running", &knobs);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let _fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        assert!(newest_battlenet_log(&dir).contains("|bnet=1:0:0f0f0f0f|"));
+    }
+
+    #[test]
+    fn a_battlenet_client_closed_before_it_came_up_does_not_come_up_later() {
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "reactMs": 400 } } });
+        let (scratch, dir) = battlenet_scenario("sim-bnet-closed", &knobs);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        let config = fs::read(dir.join(r"appdata\Battle.net\Battle.net.config")).unwrap();
+        start_battlenet(&fake, &dir);
+        fake.platform.processes.close(BATTLENET_EXE).unwrap();
+        while fake.platform.processes.is_running(BATTLENET_EXE).unwrap() {}
+        fake.platform.clock.sleep(
+            std::time::Duration::from_secs(5),
+            &ol_platform_api::CancelToken::new(),
+        );
+        assert!(!fake.platform.processes.is_running(BATTLENET_EXE).unwrap());
+        assert!(fs::read(dir.join(r"appdata\Battle.net\Battle.net.config")).unwrap() == config);
+    }
+
+    #[test]
+    fn a_battlenet_client_started_after_a_restart_logs_after_the_runs_before_it() {
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "reactMs": 0 } } });
+        let (scratch, dir) = battlenet_scenario("sim-bnet-restart", &knobs);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        for _ in 0..3 {
+            start_battlenet(&fake, &dir);
+        }
+        drop(fake);
+
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "reactMs": 0, "updatesPending": ["prometheus"] } } });
+        write_knobs(&dir, &knobs).unwrap();
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        start_battlenet(&fake, &dir);
+        assert!(newest_battlenet_log(&dir).contains("(prometheus): currentOperation=Update"));
     }
 }

@@ -239,59 +239,79 @@ impl Switch<'_> {
         Ok(())
     }
 
-    // Runs once the launcher is closed: the file is then the last run's, and the launcher's log names the account. A session that cannot be saved costs one sign-in by hand later, never the switch.
-    fn save_outgoing(&mut self) {
+    // Runs once the launcher is closed: the file is then the last run's, and the launcher's log names the account. When the plan passed the step over, the launcher is looked at all the same if this switch closed it, because a sign-in can land while it closes; the step then shows only a session that was saved. A session that cannot be saved costs one sign-in by hand later, never the switch.
+    fn save_outgoing(&mut self, closed: bool) {
         let planned = self
             .index
             .get(STEP.capture)
             .is_some_and(|at| self.steps[*at].status != JobStepStatus::Skipped);
-        if !planned {
+        if !planned && !closed {
             return;
         }
-        self.mark(STEP.capture, JobStepStatus::Running, "");
-        let saved = (|| -> Result<String, AdapterError> {
+        if planned {
+            self.mark(STEP.capture, JobStepStatus::Running, "");
+        }
+        let saved = (|| -> Result<(bool, String), AdapterError> {
             let signed_out = "The launcher left no remembered session behind (signed out).";
             let Some(text) = self.epic.read_ini()? else {
-                return Ok(signed_out.to_owned());
+                return Ok((false, signed_out.to_owned()));
             };
             let fresh = self.epic.current_session(Some(&text), false)?;
             let Some(blob) = session_blob_from_ini(&text) else {
-                return Ok(signed_out.to_owned());
+                return Ok((false, signed_out.to_owned()));
             };
             let Some((owner, owner_id)) = fresh
                 .owner
                 .as_ref()
                 .and_then(|owner| Some((owner, owner.id.as_deref()?)))
             else {
-                return Ok(
-                    "The remembered session belongs to no One Launch account; left alone."
-                        .to_owned(),
-                );
+                let detail = "The remembered session belongs to no One Launch account; left alone.";
+                return Ok((false, detail.to_owned()));
             };
             let name = &owner.display_name;
             if !fresh.disk_current {
-                return Ok(format!(
-                    "The file predates the launcher's last sign-in, so it is not trusted as {name}'s session."
+                return Ok((
+                    false,
+                    format!(
+                        "The file predates the launcher's last sign-in, so it is not trusted as {name}'s session."
+                    ),
                 ));
             }
             let known = self.directory.session(owner_id)?;
             if known
                 .is_some_and(|known| Some(&known.fingerprint) == fresh.disk.fingerprint.as_ref())
             {
-                return Ok(format!("{name}'s stored session is already current."));
+                return Ok((
+                    false,
+                    format!("{name}'s stored session is already current."),
+                ));
+            }
+            if !planned {
+                self.mark(STEP.capture, JobStepStatus::Running, "");
             }
             let uid = owner
                 .launcher_uid
                 .as_deref()
                 .or(fresh.logged_uid.as_deref());
             self.store_session(owner, &blob, uid)?;
-            Ok(format!(
-                "Saved {name}'s session (fingerprint {}).",
-                short_fingerprint(fresh.disk.fingerprint.as_deref())
+            Ok((
+                true,
+                format!(
+                    "Saved {name}'s session (fingerprint {}).",
+                    short_fingerprint(fresh.disk.fingerprint.as_deref())
+                ),
             ))
         })();
-        let detail = saved.unwrap_or_else(|error| format!("Not saved: {error}"));
-        self.mark(STEP.capture, JobStepStatus::Done, detail);
+        let (shown, detail) = match saved {
+            Ok((stored, detail)) => (planned || stored, detail),
+            Err(error) => (
+                planned || self.current == Some(STEP.capture),
+                format!("Not saved: {error}"),
+            ),
+        };
+        if shown {
+            self.mark(STEP.capture, JobStepStatus::Done, detail);
+        }
     }
 
     fn take_snapshot(&mut self) -> Result<(), Thrown> {
@@ -669,7 +689,7 @@ impl Switch<'_> {
             return Err(self.started_meanwhile(STEP.close));
         }
 
-        self.save_outgoing();
+        self.save_outgoing(running && !self.already_active);
         if !self.already_active && !self.in_place {
             if self.epic.settings_paths().is_empty() {
                 return Err(self.missing_settings_file());
@@ -689,7 +709,7 @@ impl Switch<'_> {
             self.start_launcher()?;
         }
 
-        if self.already_active && running {
+        if self.already_active && running && !self.launcher_started {
             self.mark(
                 STEP.verify,
                 JobStepStatus::Skipped,
@@ -709,6 +729,9 @@ impl Switch<'_> {
                     } else {
                         self.directory.mark_session_verified(&account_id)?;
                     }
+                } else if !remembered {
+                    // Without a saved session the launcher was signed in by hand, and writes the session after the log says so.
+                    self.capture_fresh(timing.capture)?;
                 }
             }
             unsettled => {

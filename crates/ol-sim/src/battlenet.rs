@@ -30,6 +30,8 @@ const TOKEN_REFUSED_LINE: &str =
     "E 2026-09-13 03:20:54.000000 [BNLogin] {Main} Login failed. error=ERROR_AUTH_TOKEN_EXPIRED";
 // The products the simulated client knows: the two the registry of a scenario installs.
 const KNOWN_PRODUCTS: [&str; 2] = ["prometheus", "hs_beta"];
+const LOG_PREFIX: &str = "battle.net-20260913T0320";
+const LOG_SUFFIX: &str = ".000000.log";
 
 #[derive(Clone, Default)]
 pub struct BattlenetKnobs {
@@ -74,6 +76,8 @@ struct State {
     servers: HashMap<String, String>,
     runs: u32,
     tokens: u32,
+    // How many times the client was closed: what it was about to do in a run that has been closed since is not done.
+    closes: u32,
 }
 
 pub struct BattlenetSim {
@@ -161,23 +165,25 @@ impl BattlenetSim {
         clock: Arc<FakeClock>,
         script: BattlenetScript,
     ) -> Arc<Self> {
+        let logs_dir: PathBuf = [folders.local_app_data, "Battle.net", "Logs"]
+            .iter()
+            .collect();
         let sim = Arc::new(Self {
             knobs: script.knobs,
             logins: script.logins,
             config_path: [folders.app_data, "Battle.net", "Battle.net.config"]
                 .iter()
                 .collect(),
-            logs_dir: [folders.local_app_data, "Battle.net", "Logs"]
-                .iter()
-                .collect(),
+            state: Mutex::new(State {
+                servers: script.servers,
+                runs: Self::last_run(&logs_dir),
+                tokens: 0,
+                closes: 0,
+            }),
+            logs_dir,
             registry,
             processes: Arc::clone(processes),
             clock,
-            state: Mutex::new(State {
-                servers: script.servers,
-                runs: 0,
-                tokens: 0,
-            }),
         });
         for codename in &sim.knobs.games_running {
             let image = format!("{}.exe", product_name(codename));
@@ -185,6 +191,13 @@ impl BattlenetSim {
                 .iter()
                 .collect();
             processes.add_to_table(&image, &program.to_string_lossy());
+        }
+        // The simulator owns every log: one laid down by a scenario would sort after its own and hide them. This is the run of the account the client's token belongs to, older than that of a client already running.
+        if let Some(uid) = &script.on_disk {
+            let mut lines = vec![LOGGING_STARTED_LINE.to_owned()];
+            lines.extend(sim.install_state_lines());
+            lines.push(signed_in_line(uid));
+            sim.write_log(&lines);
         }
         if let Some(uid) = &sim.knobs.running_as {
             processes.set_running(EXE, true);
@@ -198,16 +211,23 @@ impl BattlenetSim {
         if !db.exists() {
             Self::write(&db, &Self::product_db());
         }
-        // The simulator owns every log: one laid down by a scenario would sort after its own and hide them. This is the run of the account the client's token belongs to.
-        if let Some(uid) = &script.on_disk {
-            let mut lines = vec![LOGGING_STARTED_LINE.to_owned()];
-            lines.extend(sim.install_state_lines());
-            lines.push(signed_in_line(uid));
-            sim.write_log(&lines);
-        }
         let hears = Arc::clone(&sim);
         processes.on_start(move |exe, args| hears.on_start(exe, args));
         sim
+    }
+
+    // The logs stay when the fake machine is built again, so a new run is numbered after the last one there.
+    fn last_run(logs_dir: &Path) -> u32 {
+        let runs = fs::read_dir(logs_dir).into_iter().flatten().flatten();
+        runs.filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            name.strip_prefix(LOG_PREFIX)?
+                .strip_suffix(LOG_SUFFIX)?
+                .parse()
+                .ok()
+        })
+        .max()
+        .unwrap_or(0)
     }
 
     fn write(file: &Path, bytes: &[u8]) {
@@ -228,7 +248,11 @@ impl BattlenetSim {
         let image = exe.rsplit(['\\', '/']).next().unwrap_or(exe);
         let first = args.first().map(String::as_str);
         let client = image.eq_ignore_ascii_case(EXE) || image.eq_ignore_ascii_case(LAUNCHER_EXE);
-        if !client || first == Some(CLOSE_ARGUMENT) {
+        if !client {
+            return;
+        }
+        if first == Some(CLOSE_ARGUMENT) {
+            self.state().closes += 1;
             return;
         }
         // A second Battle.net.exe hands its command to the running client, which logs what it does with it.
@@ -237,10 +261,12 @@ impl BattlenetSim {
             return;
         }
         if self.knobs.react_ms > 0 {
-            let sim = Arc::clone(self);
+            let (sim, run) = (Arc::clone(self), self.state().closes);
             self.clock
                 .schedule(Duration::from_millis(self.knobs.react_ms), move || {
-                    sim.react();
+                    if sim.state().closes == run {
+                        sim.react();
+                    }
                 });
         } else {
             self.react();
@@ -319,7 +345,7 @@ impl BattlenetSim {
         };
         let file = self
             .logs_dir
-            .join(format!("battle.net-20260913T0320{run:02}.000000.log"));
+            .join(format!("{LOG_PREFIX}{run:02}{LOG_SUFFIX}"));
         Self::write(&file, format!("{}\r\n", lines.join("\r\n")).as_bytes());
     }
 
@@ -490,9 +516,11 @@ impl BattlenetSim {
         }
         self.write_log(&lines);
         if !signed_in && let Some(after) = self.knobs.sign_in_when_asked_ms {
-            let sim = Arc::clone(self);
+            let (sim, run) = (Arc::clone(self), self.state().closes);
             self.clock.schedule(Duration::from_millis(after), move || {
-                sim.sign_in_by_hand(None);
+                if sim.state().closes == run {
+                    sim.sign_in_by_hand(None);
+                }
             });
         }
     }

@@ -1,4 +1,4 @@
-// Epic's remembered session: Enable and Data of [RememberMe] and Data of [Offline] in GameUserSettings.ini. The two Data values are opaque text the launcher signs in from, so whoever holds them is signed in: nothing here prints one, and what a user is shown of one is its length and the start of its SHA-256.
+// Epic's remembered session: Enable and Data of [RememberMe] and Data of [Offline] in GameUserSettings.ini. The two Data values are opaque text the launcher signs in from, so whoever holds them is signed in: nothing here prints one, and what a user is shown of one is its length and, when it is long, the start of its SHA-256.
 
 use ol_model::SwitchChange;
 use serde_json::{Value, json};
@@ -147,7 +147,7 @@ const fn is_base64_character(c: char) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, '+' | '/' | '=')
 }
 
-// A Data value as a user may see it.
+// A Data value as a user may see it, never the value itself. A short one gets no fingerprint: trying every short text would find it from one.
 fn describe(value: Option<&str>) -> String {
     let Some(value) = value else {
         return "(absent)".to_owned();
@@ -159,8 +159,8 @@ fn describe(value: Option<&str>) -> String {
             "({length} characters, fingerprint {})",
             short_fingerprint(Some(&fingerprint))
         )
-    } else if length <= 8 {
-        value.to_owned()
+    } else if length == 0 {
+        String::new()
     } else {
         format!("({length} characters)")
     }
