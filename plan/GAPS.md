@@ -118,6 +118,7 @@ None of those about stored values and launcher files is visible on data the app 
 - Artwork comes back as the stored relative path, not as an `onelaunch-art://` URL. The Library gets the file's path, joined only when the stored one has the shape `<game id>/<kind>.<ext>`.
 - `PRAGMA temp_store = MEMORY` on every open, so rows cannot spill into `%TEMP%`.
 - The backup copy just made is never pruned. The Electron app prunes by name alone, so after the clock is set back it deletes the copy it has just taken.
+- A launcher's snapshot just taken is never removed by its own clean-up either. The Electron app prunes snapshots by name alone, so after the clock is set back, or when a name freed in the same millisecond is taken again, it can delete the snapshot a switch has just taken, and a rollback then finds none.
 - The Library's sort is the row `library.sort` of the settings table (`name` or `lastPlayed`), as `triage.toml` X-01 decides. The Electron app keeps the choice in its page's storage and never reads that row; the choice made there is not taken over.
 - A last-played time that is not a full timestamp (`2026-01-02T03:04:05.678Z`) leaves the card's line without a time.
 - A blank character outside a string that is none of space, tab, carriage return, line feed and byte order mark (a form feed, a no-break space) is skipped in a VDF file. The Electron app never comes back from such a file.

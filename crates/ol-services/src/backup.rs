@@ -309,7 +309,7 @@ impl<'a> BackupService<'a> {
         self.files
             .write_atomic(&[(&manifest_path, text.as_bytes())])?;
 
-        self.prune(request.launcher, request.protect)?;
+        self.prune(request.launcher, &[Some(id.as_str()), request.protect])?;
         Ok(self.to_snapshot(request.launcher, &id, &folder, &manifest))
     }
 
@@ -365,8 +365,8 @@ impl<'a> BackupService<'a> {
         Ok((folder, manifest))
     }
 
-    // Removes the oldest ordinary snapshots beyond the number to keep and the oldest pinned ones beyond their own, never `protect`.
-    fn prune(&self, launcher: LauncherId, protect: Option<&str>) -> Result<(), BackupError> {
+    // Removes the oldest ordinary snapshots beyond the number to keep and the oldest pinned ones beyond their own, never one of `protect`. Ids sort by age only while the clock goes forward, so the snapshot just taken is always among `protect`.
+    fn prune(&self, launcher: LauncherId, protect: &[Option<&str>]) -> Result<(), BackupError> {
         let limit = usize::try_from(self.keep.max(1)).unwrap_or(1);
         let snapshots = self.list(launcher)?;
         let ordinary = snapshots
@@ -378,7 +378,7 @@ impl<'a> BackupService<'a> {
             .filter(|snapshot| snapshot.pinned.is_some())
             .skip(PINNED_BACKUPS_TO_KEEP);
         for snapshot in ordinary.chain(pinned) {
-            if Some(snapshot.id.as_str()) != protect {
+            if !protect.contains(&Some(snapshot.id.as_str())) {
                 let _ = fs::remove_dir_all(self.launcher_dir(launcher).join(&snapshot.id));
             }
         }
@@ -477,6 +477,46 @@ impl<'a> BackupService<'a> {
             bytes: manifest.files.iter().map(|file| file.bytes).sum(),
             pinned: manifest.pinned.clone(),
             path: folder.to_string_lossy().into_owned(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ol_platform_fake::{FakeClock, OpLog, ScratchFiles};
+    use ol_testkit::Scratch;
+    use ol_vault::FakeVault;
+    use time::macros::datetime;
+
+    use super::*;
+
+    #[test]
+    fn a_snapshot_is_never_removed_by_its_own_clean_up() {
+        let scratch = Scratch::new("backup-prune");
+        let source = scratch.join("loginusers.vdf");
+        fs::write(&source, "\"users\"\n{\n}\n").unwrap();
+        let source = source.to_string_lossy().into_owned();
+        let files = ScratchFiles::new(&[scratch.path()], OpLog::new());
+        let clock = FakeClock::starting_at(datetime!(2026-11-06 16:46:23 UTC));
+        let backups = BackupService::new(scratch.path(), 1, &files, &clock, &FakeVault);
+        let request = SnapshotRequest {
+            launcher: LauncherId::Steam,
+            reason: "Before switching",
+            files: &[BackupFile {
+                source: &source,
+                relative: "config/loginusers.vdf",
+                sensitive: false,
+            }],
+            meta: Map::new(),
+            protect: None,
+            pinned: None,
+        };
+        for _ in 0..3 {
+            let taken = backups.snapshot(&request).unwrap();
+            assert!(
+                backups.get(LauncherId::Steam, &taken.id).unwrap().is_some(),
+                "the snapshot just taken is there to restore"
+            );
         }
     }
 }
