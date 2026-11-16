@@ -22,6 +22,18 @@ const V8_WORDING: &str =
     "refused by both; the reason is the JavaScript engine's wording of a JSON error";
 const TOO_DEEP: &str = "nested deeper than the 128 levels the JSON reader takes";
 const TOO_LARGE: &str = "a number past what the JSON reader takes";
+const LOST_CHARACTER: &str = "a file with CRLF that ends in a bare LF, where the Electron app drops the character before that LF; the port keeps it, because every other byte is left alone (plan/GAPS.md)";
+const LOSES_A_CHARACTER: [&str; 5] = [
+    "mixed-crlf-then-lf-end",
+    "mixed-crlf-then-lf-end-long",
+    "mixed-eol-set",
+    "mixed-eol-noop",
+    "corpus-3-23",
+];
+
+fn loses_a_character(case: &Case) -> bool {
+    LOSES_A_CHARACTER.contains(&case.id.as_str())
+}
 
 fn eol(layout: &IniLayout) -> &'static str {
     layout.eol.as_str()
@@ -88,7 +100,14 @@ fn blob_json(blob: &EpicSessionBlob) -> Value {
 
 #[test]
 fn split_ini_cases() {
-    run("l1/epic/splitIni.json", &[], |case| {
+    let skipped = [
+        ("mixed-crlf-then-lf-end", LOST_CHARACTER),
+        ("mixed-crlf-then-lf-end-long", LOST_CHARACTER),
+    ];
+    run("l1/epic/splitIni.json", &skipped, |case| {
+        if loses_a_character(case) {
+            return Answer::Skip(LOST_CHARACTER);
+        }
         Answer::Out(layout_json(&split_ini(&text(&case.args[0]))))
     });
 }
@@ -106,7 +125,14 @@ fn join_ini_cases() {
 
 #[test]
 fn join_ini_round_trips() {
-    run("l1/epic/joinIni.roundtrip.json", &[], |case| {
+    let skipped = [
+        ("mixed-crlf-then-lf-end", LOST_CHARACTER),
+        ("mixed-crlf-then-lf-end-long", LOST_CHARACTER),
+    ];
+    run("l1/epic/joinIni.roundtrip.json", &skipped, |case| {
+        if loses_a_character(case) {
+            return Answer::Skip(LOST_CHARACTER);
+        }
         let before = text(&case.args[0]);
         let rejoined = join_ini(&split_ini(&before));
         Answer::Out(json!({ "rejoined": rejoined, "identical": rejoined == before }))
@@ -115,8 +141,16 @@ fn join_ini_round_trips() {
 
 #[test]
 fn rewrite_section_cases() {
-    let skipped = [("adv-lone-surrogate-value", UNPAIRED)];
+    let skipped = [
+        ("mixed-eol-set", LOST_CHARACTER),
+        ("mixed-eol-noop", LOST_CHARACTER),
+        ("adv-lone-surrogate-value", UNPAIRED),
+        ("corpus-3-23", LOST_CHARACTER),
+    ];
     run("l1/epic/rewriteSection.json", &skipped, |case| {
+        if loses_a_character(case) {
+            return Answer::Skip(LOST_CHARACTER);
+        }
         let (Value::String(name), Some(entries)) = (plain(&case.args[1]), case.args[2].as_object())
         else {
             return Answer::Skip(NOT_TEXT);
@@ -144,6 +178,19 @@ fn rewrite_section_cases() {
             "noop": rewrite.noop,
         }))
     });
+}
+
+#[test]
+fn a_file_with_crlf_that_ends_in_a_bare_lf_keeps_every_character_of_its_last_line() {
+    let text = "[RememberMe]\r\nEnable=True\r\nData=old\r\n\r\n[Other]\r\nOther=42\n";
+    let rewrite = rewrite_section(text, "RememberMe", &[("Data", Some("new"))]);
+    assert_eq!(
+        rewrite.text,
+        "[RememberMe]\r\nEnable=True\r\nData=new\r\n\r\n[Other]\r\nOther=42\r\n"
+    );
+    assert_eq!(split_ini("[A]\r\nx=1\n").lines, ["[A]", "x=1"]);
+    assert_eq!(split_ini("[A]\r\nx=1\r\n\n").lines, ["[A]", "x=1", ""]);
+    assert_eq!(split_ini("[A]\r\nx=1\r\n").lines, ["[A]", "x=1"]);
 }
 
 #[test]

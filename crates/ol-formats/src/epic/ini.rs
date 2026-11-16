@@ -34,12 +34,8 @@ pub fn split_ini(text: &str) -> IniLayout {
     let mut body = text.to_owned();
     if trailing_newline {
         body.pop();
-        // A file with CRLF somewhere that ends in a bare LF loses the character before it, as it does in the Electron app.
-        if eol == Eol::CrLf
-            && let Some(lost) = body.pop()
-            && lost.len_utf16() == 2
-        {
-            body.push(char::REPLACEMENT_CHARACTER);
+        if body.ends_with('\r') {
+            body.pop();
         }
     }
     let lines = if body.is_empty() {
