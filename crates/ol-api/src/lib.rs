@@ -2,7 +2,7 @@
 
 mod backend;
 
-pub use backend::{ApiError, Backend, JobObserver, Library, StartLaunch};
+pub use backend::{ApiError, Backend, JobObserver, Library, SavedSignIn, StartLaunch};
 
 pub mod library {
     pub use ol_services::library::{LibraryGame, caption, monogram, relative, visible};
@@ -19,9 +19,10 @@ pub mod launch {
 
 // What a launcher is reached through: the machine it runs on and the vault that keeps passwords.
 pub mod launchers {
+    pub use ol_adapters::epic::Timing as EpicTiming;
     pub use ol_adapters::steam::Timing as SteamTiming;
     pub use ol_services::accounts::NewAccount;
-    pub use ol_services::launchers::{ImportResult, Launchers};
+    pub use ol_services::launchers::{EpicMachine, ImportResult, Launchers};
     pub use ol_vault::Secret;
 
     // Only a build with the fake launchers can name the fixtures' stand-in vault, which protects nothing.

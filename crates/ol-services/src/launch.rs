@@ -1,15 +1,15 @@
-// A launch job: switch the launcher to an account, then start a game. One job at a time. `prepare` and `settle` run where the database lives; `run` needs no database, so it can wait for a launcher on a thread of its own.
+// A launch job: switch the launcher to an account, then start a game. One job at a time. `prepare` and `settle` run where the database lives; `run` has no database, so it can wait for a launcher on a thread of its own, and asks the database's thread for what a switch needs of the accounts and their saved sign-ins.
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
-use ol_adapters::AdapterError;
-use ol_adapters::steam::{AccountRef, SteamConfig, SwitchPreflight};
+use ol_adapters::steam::SwitchPreflight;
+use ol_adapters::{AccountRef, AdapterError};
 use ol_model::{
     Account, Ciphertext, Game, JobAccount, JobGame, JobState, JobStep, JobStepStatus,
-    LaunchAttention, LaunchJob, LaunchPreflight, LaunchResult, LauncherId, SettingKey,
+    LaunchAttention, LaunchJob, LaunchPreflight, LaunchResult, SettingKey,
 };
 use ol_platform_api::CancelToken;
 use ol_store::Store;
@@ -18,9 +18,10 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::accounts;
-use crate::backup::BackupService;
 use crate::journal::SwitchJournal;
-use crate::launchers::{Launchers, ServiceError, require_implemented};
+use crate::launchers::{Adapter, Configs, Launchers, ServiceError, require_implemented};
+pub use crate::sessions::account_ref;
+use crate::sessions::{RemoteDirectory, StoreThread};
 use crate::switch::{SwitchOptions, SwitchSink, run_switch};
 
 const FINISHED_JOBS_KEPT: usize = 20;
@@ -36,16 +37,6 @@ pub struct StartInput {
     pub game_id: Option<String>,
     // The user has said that the launcher, and any game running under it, may be closed.
     pub confirm_close: bool,
-}
-
-pub fn account_ref(account: &Account) -> AccountRef {
-    AccountRef {
-        id: Some(account.id.clone()),
-        display_name: account.display_name.clone(),
-        login: account.login.clone(),
-        launcher_uid: account.launcher_uid.clone(),
-        has_secret: account.has_secret,
-    }
 }
 
 #[derive(Default)]
@@ -166,10 +157,10 @@ fn take_preflight(
     data_dir: &Path,
     account: &Account,
 ) -> Result<SwitchPreflight, ServiceError> {
-    require_implemented(account.launcher)?;
-    let config = launchers.steam_config(&store.settings()?, data_dir);
+    let configs = launchers.configs(&store.settings()?, data_dir);
+    let directory = launchers.directory(store, account.launcher);
     launchers
-        .steam(&config)
+        .adapter(account.launcher, &configs, &directory)?
         .preflight(&account_ref(account))
         .map_err(ServiceError::adapter(account.launcher))
 }
@@ -214,7 +205,7 @@ pub struct PreparedJob {
     account: AccountRef,
     confirm_close: bool,
     password: Option<Ciphertext>,
-    config: SteamConfig,
+    configs: Configs,
     data_dir: PathBuf,
     launchers: Launchers,
     cancel: CancelToken,
@@ -342,7 +333,7 @@ pub fn prepare(
         } else {
             None
         },
-        config: launchers.steam_config(&store.settings()?, data_dir),
+        configs: launchers.configs(&store.settings()?, data_dir),
         data_dir: data_dir.to_path_buf(),
         launchers: launchers.clone(),
         cancel,
@@ -434,20 +425,30 @@ impl SwitchSink for JobSink<'_> {
     }
 }
 
-// Runs an accepted job to its end: the switch, then the game. `changed` hears the job each time it changes, except the last time, which `settle` reports once the database has it.
-pub fn run(prepared: PreparedJob, changed: &dyn Fn(&LaunchJob)) -> FinishedJob {
+// Runs an accepted job to its end: the switch, then the game. `database` is where the switch asks about accounts and saved sign-ins. `changed` hears the job each time it changes, except the last time, which `settle` reports once the database has it.
+pub fn run(
+    prepared: PreparedJob,
+    database: Arc<dyn StoreThread>,
+    changed: &dyn Fn(&LaunchJob),
+) -> FinishedJob {
     let PreparedJob {
         mut job,
         account,
         confirm_close,
         password,
-        config,
+        configs,
         data_dir,
         launchers,
         cancel,
         board,
     } = prepared;
-    let steam = launchers.steam(&config);
+    let launcher = job.launcher;
+    let directory = RemoteDirectory {
+        thread: database,
+        vault: Arc::clone(&launchers.vault),
+        clock: Arc::clone(&launchers.platform.clock),
+        launcher,
+    };
     let clock = launchers.platform.clock.as_ref();
     let now = || ol_store::iso_timestamp(clock.now());
     let mut journal = SwitchJournal::new(&data_dir);
@@ -471,12 +472,15 @@ pub fn run(prepared: PreparedJob, changed: &dyn Fn(&LaunchJob)) -> FinishedJob {
     let mut touch_last_used = false;
     let mut result = LaunchResult::Failed;
 
-    let launch = |sink: &mut JobSink<'_>, game: &JobGame| -> Result<(), ServiceError> {
+    let launch = |sink: &mut JobSink<'_>,
+                  adapter: &Adapter<'_>,
+                  game: &JobGame|
+     -> Result<(), ServiceError> {
         sink.set_launch(JobStepStatus::Running);
         sink.publish();
-        let command = steam
+        let command = adapter
             .launch_game(&game.launcher_game_id)
-            .map_err(ServiceError::adapter(LauncherId::Steam))?;
+            .map_err(ServiceError::adapter(launcher))?;
         if let Some(step) = &mut sink.launch_step {
             step.detail = format!("Sent {command}");
         }
@@ -485,29 +489,24 @@ pub fn run(prepared: PreparedJob, changed: &dyn Fn(&LaunchJob)) -> FinishedJob {
     };
 
     let ran: Result<(), ServiceError> = (|| {
+        let adapter = launchers.adapter(launcher, &configs, &directory)?;
         if direct && let Some(game) = &game {
             sink.job.switched = true;
-            launch(&mut sink, game)?;
+            launch(&mut sink, &adapter, game)?;
             touch_last_used = true;
             result = LaunchResult::Ok;
             sink.job.state = JobState::Done;
             return Ok(());
         }
         let account_id = account.id.clone().unwrap_or_default();
-        sink.journal
-            .begin(&job_id, LauncherId::Steam, &account_id, &now());
-        let backups = BackupService::new(
-            &data_dir,
-            config.backups_to_keep,
-            launchers.platform.files.as_ref(),
-            clock,
-        );
+        sink.journal.begin(&job_id, launcher, &account_id, &now());
+        let backups = launchers.backups(&data_dir, &configs);
         let options = SwitchOptions {
             confirm_close,
             cancel: &cancel,
         };
         let switched = match run_switch(
-            &steam,
+            &adapter,
             &launchers.platform,
             &backups,
             &account,
@@ -552,6 +551,16 @@ pub fn run(prepared: PreparedJob, changed: &dyn Fn(&LaunchJob)) -> FinishedJob {
         }
         sink.job.switched = true;
         if let Some(game) = &game {
+            // A launcher the switch has just started takes a game only from `ready_at` on.
+            let ready_in = switched
+                .ready_at
+                .map(|ready_at| ready_at - clock.now())
+                .filter(|wait| wait.is_positive() && !cancel.is_cancelled());
+            if let Some(wait) = ready_in {
+                sink.set_launch(JobStepStatus::Running);
+                sink.publish();
+                clock.sleep(wait.unsigned_abs(), &cancel);
+            }
             if cancel.is_cancelled() {
                 sink.set_launch(JobStepStatus::Skipped);
                 sink.job.error = Some(format!("Stopped before launching {}.", game.name));
@@ -560,7 +569,7 @@ pub fn run(prepared: PreparedJob, changed: &dyn Fn(&LaunchJob)) -> FinishedJob {
                 touch_last_used = true;
                 return Ok(());
             }
-            launch(&mut sink, game)?;
+            launch(&mut sink, &adapter, game)?;
         }
         touch_last_used = true;
         result = LaunchResult::Ok;

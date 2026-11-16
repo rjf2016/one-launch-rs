@@ -1,8 +1,9 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
+use ol_formats::epic::session::{parse_blob, serialize_blob, session_blob_from_ini};
 use ol_formats::winpath::join;
 use ol_model::LauncherId;
 use ol_platform_api::{Platform, ProcessInfo};
@@ -15,6 +16,7 @@ use serde_json::{Map, Value};
 use thiserror::Error;
 use time::OffsetDateTime;
 
+use crate::epic::{EpicKnobs, EpicSim};
 use crate::steam::{SteamKnobs, SteamSim};
 
 const SCENARIO_FILE: &str = "scenario.json";
@@ -22,11 +24,15 @@ const KNOBS_FILE: &str = "knobs.json";
 const FIXTURE_PREFIX: &str = "@fixtures/";
 
 // Waits short enough that a fake switch is over in a few seconds of its own clock.
-const SIM_TIMING: [(&str, u64); 10] = [
+const SIM_TIMING: [(&str, u64); 14] = [
     ("pollMs", 100),
     ("logPollMs", 100),
     ("shutdownMs", 3_000),
     ("killGraceMs", 1_000),
+    ("restartWatchMs", 500),
+    ("cleanExitWatchMs", 200),
+    ("restartSettleMs", 2_000),
+    ("captureMs", 3_000),
     ("startupMs", 5_000),
     ("signInMs", 8_000),
     ("guardMs", 8_000),
@@ -55,10 +61,20 @@ pub struct SeedAccount {
     pub password: Option<String>,
 }
 
+// A sign-in a scenario saves for one of its accounts, a made-up one. No Debug: `blob` is what would be encrypted and stored.
+#[derive(Clone)]
+pub struct SeedSession {
+    pub launcher: LauncherId,
+    pub login: String,
+    pub launcher_uid: String,
+    pub blob: String,
+}
+
 #[derive(Clone, Default)]
 pub struct Seed {
     pub settings: Vec<(String, String)>,
     pub accounts: Vec<SeedAccount>,
+    pub sessions: Vec<SeedSession>,
 }
 
 // A scenario folder turned into the machine the adapters run on.
@@ -72,6 +88,12 @@ pub struct FakeLaunchers {
     pub steam_timing: TimingOverrides,
     // Where Steam is looked for last: a folder of the scenario that holds nothing.
     pub steam_default_dir: String,
+    pub epic: Option<Arc<EpicSim>>,
+    pub epic_timing: TimingOverrides,
+    pub epic_default_dir: String,
+    // The scenario's stand-ins for %LOCALAPPDATA% and %ProgramData%.
+    pub local_app_data: String,
+    pub program_data: String,
     pub seed: Seed,
 }
 
@@ -223,6 +245,53 @@ fn steam_knobs(fields: &Map<String, Value>) -> SteamKnobs {
     }
 }
 
+fn epic_knobs(fields: &Map<String, Value>) -> EpicKnobs {
+    let text = |name: &str| fields.get(name).and_then(Value::as_str).map(str::to_owned);
+    EpicKnobs {
+        expired: strings(fields.get("expired")),
+        rotate_on_start: fields.get("rotateOnStart").and_then(Value::as_bool) == Some(true),
+        sign_in_error: text("signInError"),
+        react_ms: fields.get("reactMs").and_then(Value::as_u64).unwrap_or(0),
+        sign_in_when_asked_ms: fields.get("signInWhenAskedMs").and_then(Value::as_u64),
+        sign_in_as: text("signInAs"),
+        running_as: text("runningAs"),
+    }
+}
+
+// A seeded Epic sign-in: the account id it signs in as, and the data the launcher would hold for it.
+fn epic_sessions(scenario: &Value) -> Vec<(String, String, SeedSession)> {
+    let sessions = scenario["seed"]["sessions"].as_array();
+    sessions
+        .into_iter()
+        .flatten()
+        .filter(|session| session["launcher"] == "epic")
+        .filter_map(|session| {
+            let text = |name: &str| session[name].as_str().map(str::to_owned);
+            let blob = parse_blob(&session["blob"].to_string()).ok()?;
+            let seeded = SeedSession {
+                launcher: LauncherId::Epic,
+                login: text("login")?,
+                launcher_uid: text("launcherUid")?,
+                blob: serialize_blob(&blob),
+            };
+            Some((blob.data.clone(), seeded.launcher_uid.clone(), seeded))
+        })
+        .collect()
+}
+
+fn timing(scenario: &Value, overrides: &Value, launcher: &str) -> TimingOverrides {
+    let mut timing = TimingOverrides::default();
+    for (name, milliseconds) in SIM_TIMING {
+        timing.set(name, milliseconds);
+    }
+    for (name, value) in merged(scenario, overrides, &["timing", launcher]) {
+        if let Some(milliseconds) = value.as_u64() {
+            timing.set(&name, milliseconds);
+        }
+    }
+    timing
+}
+
 fn seed(scenario: &Value) -> Seed {
     let seed = &scenario["seed"];
     let settings = seed["settings"]
@@ -252,10 +321,17 @@ fn seed(scenario: &Value) -> Seed {
                 .collect()
         })
         .unwrap_or_default();
-    Seed { settings, accounts }
+    Seed {
+        settings,
+        accounts,
+        sessions: epic_sessions(scenario)
+            .into_iter()
+            .map(|(_, _, session)| session)
+            .collect(),
+    }
 }
 
-// Builds the fake machine for a folder `lay_down` made: an in-memory registry and process table with the Steam simulator, a file port that sees only `dir` and the snapshots under `data_dir`, and a clock that starts at `now`.
+// Builds the fake machine for a folder `lay_down` made: an in-memory registry and process table with the launcher simulators, a file port that sees only `dir` and the snapshots under `data_dir`, and a clock that starts at `now`.
 pub fn materialize(
     dir: &Path,
     data_dir: &Path,
@@ -298,10 +374,15 @@ fn materialize_on(
 
     let root = text_path(dir)?;
     let steam_dir = join(&[&root, "steam"]);
+    let local_app_data = join(&[&root, "localappdata"]);
+    let program_data = join(&[&root, "programdata"]);
     let log = OpLog::new();
     let registry = Arc::new(FakeRegistry::new(log.clone()));
     if installed.contains(&LauncherId::Steam) {
         SteamSim::seed_registry(&registry, &steam_dir);
+    }
+    if installed.contains(&LauncherId::Epic) {
+        EpicSim::seed_registry(&registry, &join(&[&root, "epic"]), &program_data);
     }
     if let Some(values) = scenario["registry"].as_object() {
         for (path, value) in values {
@@ -334,15 +415,26 @@ fn materialize_on(
         )
     });
 
-    let mut steam_timing = TimingOverrides::default();
-    for (name, milliseconds) in SIM_TIMING {
-        steam_timing.set(name, milliseconds);
-    }
-    for (name, value) in merged(&scenario, &overrides, &["timing", "steam"]) {
-        if let Some(milliseconds) = value.as_u64() {
-            steam_timing.set(&name, milliseconds);
+    let epic = installed.contains(&LauncherId::Epic).then(|| {
+        // The session the settings file holds signs in as the account the scenario names; each seeded one as its own.
+        let mut servers = HashMap::new();
+        let on_disk = fs::read(EpicSim::settings_file(&local_app_data))
+            .ok()
+            .and_then(|bytes| session_blob_from_ini(&String::from_utf8_lossy(&bytes)));
+        if let (Some(uid), Some(blob)) = (scenario["onDisk"]["epic"].as_str(), on_disk) {
+            servers.insert(blob.data.clone(), uid.to_owned());
         }
-    }
+        for (data, uid, _) in epic_sessions(&scenario) {
+            servers.insert(data, uid);
+        }
+        EpicSim::attach(
+            &local_app_data,
+            &processes,
+            Arc::clone(&clock),
+            servers,
+            epic_knobs(&merged(&scenario, &overrides, &["knobs", "epic"])),
+        )
+    });
 
     // Of the data folder only the snapshots: a folder a setting names beside them, such as a real launcher's, stays out of reach.
     let snapshots = data_dir.join("backups");
@@ -361,8 +453,13 @@ fn materialize_on(
         clock,
         log,
         steam,
-        steam_timing,
+        steam_timing: timing(&scenario, &overrides, "steam"),
         steam_default_dir: join(&[&root, "nowhere"]),
+        epic,
+        epic_timing: timing(&scenario, &overrides, "epic"),
+        epic_default_dir: join(&[&root, "nowhere"]),
+        local_app_data,
+        program_data,
         seed: seed(&scenario),
     })
 }

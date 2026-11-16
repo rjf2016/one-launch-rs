@@ -5,18 +5,21 @@ use std::thread::{self, JoinHandle};
 use async_channel::{Receiver, Sender, WeakSender};
 use ol_model::{
     Account, BackupSnapshot, InstalledGame, LaunchJob, LaunchPreflight, LauncherId,
-    LibraryScanResult, LibrarySort, RecentLaunch, RememberedAccount, RestoreResult, SettingKey,
-    SwitchPlan, SwitchRecovery,
+    LauncherSession, LauncherSessionState, LibraryScanResult, LibrarySort, RecentLaunch,
+    RememberedAccount, RestoreResult, SettingKey, SwitchPlan, SwitchRecovery,
 };
 use ol_services::accounts::{self, AccountError, NewAccount};
-use ol_services::backup::BackupService;
 use ol_services::data_folder::{self, OpenError};
 use ol_services::journal::Recovery;
 use ol_services::launch::{self, FinishedJob, JobBoard, LastPreflight, StartInput};
-use ol_services::launchers::{self, ImportResult, Launchers, ServiceError, require_implemented};
+use ol_services::launchers::{
+    self, Adapter, Configs, ImportResult, Launchers, ServiceError, require_implemented,
+};
 use ol_services::library::{self, LibraryGame};
+use ol_services::sessions::{self, StoreThread, StoreWork};
 use ol_services::switch;
 use ol_store::{Store, StoreError};
+use ol_vault::Secret;
 use thiserror::Error;
 
 const RECENT_LAUNCHES_MOST: u32 = 50;
@@ -87,6 +90,14 @@ pub struct StartLaunch {
     pub confirm_close: bool,
 }
 
+// What One Launch has saved of an account's sign-in, and what the launcher's own files say now. Never the sign-in itself.
+pub struct SavedSignIn {
+    pub session: Option<LauncherSession>,
+    // None for a launcher that keeps a list of accounts and no session to save, and when its files could not be read.
+    pub state: Option<LauncherSessionState>,
+    pub state_error: Option<String>,
+}
+
 // Hears the launch job each time it changes, on the thread that changed it.
 pub type JobObserver = Arc<dyn Fn(&LaunchJob) + Send + Sync>;
 
@@ -112,12 +123,27 @@ enum Command {
     Recovery(Reply<Option<SwitchRecovery>>),
     RestoreRecovery(Reply<RestoreResult>),
     DismissRecovery(Reply<()>),
+    Session(String, Reply<SavedSignIn>),
+    SeedSession(String, Option<String>, Secret, Reply<()>),
+    // Work a switch hands over from its own thread: a question about accounts or saved sign-ins.
+    OnStore(StoreWork),
     Settle(Box<FinishedJob>),
+}
+
+// The database's thread as a switch reaches it.
+struct DatabaseThread(Option<Sender<Command>>);
+
+impl StoreThread for DatabaseThread {
+    fn run(&self, work: StoreWork) -> bool {
+        self.0
+            .as_ref()
+            .is_some_and(|commands| commands.send_blocking(Command::OnStore(work)).is_ok())
+    }
 }
 
 type Thread = Arc<Mutex<Option<JoinHandle<()>>>>;
 
-// The database lives on one thread of its own. A handle only sends that thread a request and waits for the answer, so it can be held and cloned anywhere. A switch waits for a launcher on a second thread, which never touches the database.
+// The database lives on one thread of its own. A handle only sends that thread a request and waits for the answer, so it can be held and cloned anywhere. A switch waits for a launcher on a second thread, which has no database: what it needs of the accounts and their saved sign-ins it asks of the first.
 #[derive(Clone)]
 pub struct Backend {
     commands: Sender<Command>,
@@ -321,6 +347,24 @@ impl Backend {
         self.ask(Command::DismissRecovery).await
     }
 
+    // The sign-in saved for an account and what its launcher remembers now. A launcher whose files cannot be read never hides what is saved.
+    pub async fn session(&self, account_id: &str) -> Result<SavedSignIn, ApiError> {
+        let account_id = account_id.to_owned();
+        self.ask(|reply| Command::Session(account_id, reply)).await
+    }
+
+    // Stores a sign-in for an account as it is given, encrypted like any other. The fake launchers' seed is its only caller: the app itself saves a sign-in only from the launcher's own file.
+    pub async fn seed_session(
+        &self,
+        account_id: &str,
+        launcher_uid: Option<String>,
+        blob: Secret,
+    ) -> Result<(), ApiError> {
+        let account_id = account_id.to_owned();
+        self.ask(|reply| Command::SeedSession(account_id, launcher_uid, blob, reply))
+            .await
+    }
+
     // Stops a running switch and waits for it, then waits for the request in hand and for the database to close, which folds its journal back into the one file.
     pub fn shut_down(&self) {
         self.jobs.close();
@@ -405,42 +449,42 @@ impl Serving {
             Command::InstalledGames(launcher, reply) => answer(
                 &reply,
                 store.and_then(|store| {
-                    let (launchers, config) = self.steam(store, launcher)?;
-                    Ok(launchers::installed_games(&launchers.steam(&config))?)
+                    self.with_adapter(store, launcher, |_, _, adapter| {
+                        Ok(launchers::installed_games(adapter)?)
+                    })
                 }),
             ),
             Command::RememberedAccounts(launcher, reply) => answer(
                 &reply,
                 store.and_then(|store| {
-                    let (launchers, config) = self.steam(store, launcher)?;
-                    Ok(launchers::remembered_accounts(
-                        store,
-                        &launchers.steam(&config),
-                    )?)
+                    self.with_adapter(store, launcher, |_, _, adapter| {
+                        Ok(launchers::remembered_accounts(store, adapter)?)
+                    })
                 }),
             ),
             Command::ImportAccounts(launcher, keys, reply) => answer(
                 &reply,
                 store.and_then(|store| {
-                    let (launchers, config) = self.steam(store, launcher)?;
-                    Ok(launchers::import_accounts(
-                        store,
-                        launchers.vault.as_ref(),
-                        &launchers.steam(&config),
-                        &keys,
-                        &self.now(launchers),
-                    )?)
+                    self.with_adapter(store, launcher, |launchers, _, adapter| {
+                        Ok(launchers::import_accounts(
+                            store,
+                            launchers.vault.as_ref(),
+                            adapter,
+                            &keys,
+                            &self.now(launchers),
+                        )?)
+                    })
                 }),
             ),
             Command::SwitchPlan(account_id, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     let account = accounts::require(store, &account_id)?;
-                    let (launchers, config) = self.steam(store, account.launcher)?;
-                    Ok(launchers
-                        .steam(&config)
-                        .plan_switch(&launch::account_ref(&account))
-                        .map_err(ServiceError::adapter(account.launcher))?)
+                    self.with_adapter(store, account.launcher, |_, _, adapter| {
+                        Ok(adapter
+                            .plan_switch(&launch::account_ref(&account))
+                            .map_err(ServiceError::adapter(account.launcher))?)
+                    })
                 }),
             ),
             Command::LaunchPreflight(account_id, game_id, reply) => answer(
@@ -470,11 +514,12 @@ impl Serving {
             Command::Backups(launcher, reply) => answer(
                 &reply,
                 store.and_then(|store| {
-                    let (launchers, config) = self.steam(store, launcher)?;
-                    let backups = self.backup_service(launchers, &config);
-                    Ok(backups
-                        .list(launcher)
-                        .map_err(ServiceError::backup(launcher))?)
+                    self.with_adapter(store, launcher, |launchers, configs, _| {
+                        Ok(launchers
+                            .backups(&self.data_dir, configs)
+                            .list(launcher)
+                            .map_err(ServiceError::backup(launcher))?)
+                    })
                 }),
             ),
             Command::RestoreBackup(launcher, id, reply) => {
@@ -511,6 +556,29 @@ impl Serving {
                 self.recovery.settle(&self.data_dir);
                 answer(&reply, Ok(()));
             }
+            Command::Session(account_id, reply) => answer(
+                &reply,
+                store.and_then(|store| self.saved_sign_in(store, &account_id)),
+            ),
+            Command::SeedSession(account_id, launcher_uid, blob, reply) => answer(
+                &reply,
+                store.and_then(|store| {
+                    let account = accounts::require(store, &account_id)?;
+                    let launchers = self.launchers.as_ref().ok_or_else(no_launchers)?;
+                    let directory = launchers.directory(store, account.launcher);
+                    Ok(sessions::seed(
+                        &directory,
+                        &account,
+                        launcher_uid.as_deref(),
+                        &blob,
+                    )?)
+                }),
+            ),
+            Command::OnStore(work) => {
+                if let Ok(store) = store {
+                    work(store);
+                }
+            }
             Command::Settle(finished) => {
                 let on_job = Arc::clone(&self.on_job);
                 match (store, &self.launchers) {
@@ -527,29 +595,41 @@ impl Serving {
         ol_store::iso_timestamp(launchers.platform.clock.now())
     }
 
-    // The launchers of this build with Steam's settings as they are now. Another launcher has no adapter yet.
-    fn steam(
+    // Asks the adapter of one launcher, with the settings as they are now. A launcher without an adapter is refused before anything is read.
+    fn with_adapter<T>(
         &self,
         store: &Store,
         launcher: LauncherId,
-    ) -> Result<(&Launchers, ol_adapters::steam::SteamConfig), ApiError> {
+        ask: impl FnOnce(&Launchers, &Configs, &Adapter<'_>) -> Result<T, ApiError>,
+    ) -> Result<T, ApiError> {
         require_implemented(launcher)?;
         let launchers = self.launchers.as_ref().ok_or_else(no_launchers)?;
-        let config = launchers.steam_config(&store.settings()?, &self.data_dir);
-        Ok((launchers, config))
+        let configs = launchers.configs(&store.settings()?, &self.data_dir);
+        let directory = launchers.directory(store, launcher);
+        let adapter = launchers.adapter(launcher, &configs, &directory)?;
+        ask(launchers, &configs, &adapter)
     }
 
-    fn backup_service<'a>(
-        &self,
-        launchers: &'a Launchers,
-        config: &ol_adapters::steam::SteamConfig,
-    ) -> BackupService<'a> {
-        BackupService::new(
-            &self.data_dir,
-            config.backups_to_keep,
-            launchers.platform.files.as_ref(),
-            launchers.platform.clock.as_ref(),
-        )
+    fn saved_sign_in(&self, store: &Store, account_id: &str) -> Result<SavedSignIn, ApiError> {
+        let account = accounts::require(store, account_id)?;
+        let launcher = account.launcher;
+        let state = self
+            .with_adapter(store, launcher, |_, _, adapter| Ok(adapter.session_state()))
+            .ok()
+            .flatten();
+        let (state, state_error) = match state {
+            Some(Ok(state)) => (Some(state), None),
+            Some(Err(error)) => (
+                None,
+                Some(ServiceError::adapter(launcher)(error).to_string()),
+            ),
+            None => (None, None),
+        };
+        Ok(SavedSignIn {
+            session: store.session(&account.id)?,
+            state,
+            state_error,
+        })
     }
 
     fn create_account(&self, store: &Store, account: &NewAccount) -> Result<Account, ApiError> {
@@ -566,10 +646,11 @@ impl Serving {
         let Some(launchers) = &self.launchers else {
             return Ok(Vec::new());
         };
-        let config = launchers.steam_config(&store.settings()?, &self.data_dir);
+        let configs = launchers.configs(&store.settings()?, &self.data_dir);
         Ok(launchers::scan_library(
             store,
-            &launchers.steam(&config),
+            launchers,
+            &configs,
             &self.now(launchers),
         ))
     }
@@ -591,8 +672,9 @@ impl Serving {
         let job = prepared.job().clone();
         let on_job = Arc::clone(&self.on_job);
         let commands = self.commands.upgrade();
+        let database: Arc<dyn StoreThread> = Arc::new(DatabaseThread(commands.clone()));
         let run = move || {
-            let finished = launch::run(prepared, &*on_job);
+            let finished = launch::run(prepared, database, &*on_job);
             // Without the database thread nobody can record the launch; the job still ends for whoever watches it.
             let undelivered = match commands {
                 Some(commands) => commands
@@ -637,22 +719,23 @@ impl Serving {
         if self.jobs.is_busy() {
             return Err(ServiceError::Busy.into());
         }
-        let (launchers, config) = self.steam(store, launcher)?;
-        let backups = self.backup_service(launchers, &config);
-        if must_be_listed
-            && backups
-                .get(launcher, id)
-                .map_err(ServiceError::backup(launcher))?
-                .is_none()
-        {
-            return Err(ServiceError::SnapshotGone.into());
-        }
-        Ok(switch::restore_backup(
-            &launchers.steam(&config),
-            &launchers.platform,
-            &backups,
-            id,
-        )?)
+        self.with_adapter(store, launcher, |launchers, configs, adapter| {
+            let backups = launchers.backups(&self.data_dir, configs);
+            if must_be_listed
+                && backups
+                    .get(launcher, id)
+                    .map_err(ServiceError::backup(launcher))?
+                    .is_none()
+            {
+                return Err(ServiceError::SnapshotGone.into());
+            }
+            Ok(switch::restore_backup(
+                adapter,
+                &launchers.platform,
+                &backups,
+                id,
+            )?)
+        })
     }
 
     fn pending_recovery(&self, store: &Store) -> Result<Option<SwitchRecovery>, ApiError> {
@@ -662,13 +745,14 @@ impl Serving {
         let Some(backup_id) = entry.backup_id.clone() else {
             return Ok(None);
         };
-        let snapshot_available = match self.steam(store, entry.launcher) {
-            Ok((launchers, config)) => self
-                .backup_service(launchers, &config)
-                .get(entry.launcher, &backup_id)
-                .is_ok_and(|snapshot| snapshot.is_some()),
-            Err(_) => false,
-        };
+        let snapshot_available = self
+            .with_adapter(store, entry.launcher, |launchers, configs, _| {
+                Ok(launchers
+                    .backups(&self.data_dir, configs)
+                    .get(entry.launcher, &backup_id)
+                    .is_ok_and(|snapshot| snapshot.is_some()))
+            })
+            .unwrap_or(false);
         Ok(Some(SwitchRecovery {
             job_id: entry.job_id.clone(),
             launcher: entry.launcher,
