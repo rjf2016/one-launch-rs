@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use ol_adapters::epic::{
-    EXE, EpicAdapter, LogMark, STEP, UNOWNED_SESSION_PIN, close_message, id_tail,
+    EXE, EpicAdapter, LogMark, STEP, UNOWNED_SESSION_PIN, close_message, id_tail, settings_text,
 };
 use ol_adapters::steam::{minutes, plural, seconds};
 use ol_adapters::{AccountRef, AdapterError, Directory};
@@ -103,6 +103,16 @@ enum SignInWait {
     },
     Timeout,
     Cancelled,
+}
+
+// What the log says after a confirmed sign-in, when it no longer names that sign-in's account.
+enum Elsewhere {
+    WrongAccount {
+        account_id: String,
+        owner: Option<AccountRef>,
+        detail: String,
+    },
+    Unclear(String),
 }
 
 // How the switch ended, short of a step failing.
@@ -239,59 +249,79 @@ impl Switch<'_> {
         Ok(())
     }
 
-    // Runs once the launcher is closed: the file is then the last run's, and the launcher's log names the account. A session that cannot be saved costs one sign-in by hand later, never the switch.
-    fn save_outgoing(&mut self) {
+    // Runs once the launcher is closed: the file is then the last run's, and the launcher's log names the account. When the plan passed the step over, the launcher is looked at all the same if this switch closed it, because a sign-in can land while it closes; the step then shows only a session that was saved. A session that cannot be saved costs one sign-in by hand later, never the switch.
+    fn save_outgoing(&mut self, closed: bool) {
         let planned = self
             .index
             .get(STEP.capture)
             .is_some_and(|at| self.steps[*at].status != JobStepStatus::Skipped);
-        if !planned {
+        if !planned && !closed {
             return;
         }
-        self.mark(STEP.capture, JobStepStatus::Running, "");
-        let saved = (|| -> Result<String, AdapterError> {
+        if planned {
+            self.mark(STEP.capture, JobStepStatus::Running, "");
+        }
+        let saved = (|| -> Result<(bool, String), AdapterError> {
             let signed_out = "The launcher left no remembered session behind (signed out).";
             let Some(text) = self.epic.read_ini()? else {
-                return Ok(signed_out.to_owned());
+                return Ok((false, signed_out.to_owned()));
             };
             let fresh = self.epic.current_session(Some(&text), false)?;
             let Some(blob) = session_blob_from_ini(&text) else {
-                return Ok(signed_out.to_owned());
+                return Ok((false, signed_out.to_owned()));
             };
             let Some((owner, owner_id)) = fresh
                 .owner
                 .as_ref()
                 .and_then(|owner| Some((owner, owner.id.as_deref()?)))
             else {
-                return Ok(
-                    "The remembered session belongs to no One Launch account; left alone."
-                        .to_owned(),
-                );
+                let detail = "The remembered session belongs to no One Launch account; left alone.";
+                return Ok((false, detail.to_owned()));
             };
             let name = &owner.display_name;
             if !fresh.disk_current {
-                return Ok(format!(
-                    "The file predates the launcher's last sign-in, so it is not trusted as {name}'s session."
+                return Ok((
+                    false,
+                    format!(
+                        "The file predates the launcher's last sign-in, so it is not trusted as {name}'s session."
+                    ),
                 ));
             }
             let known = self.directory.session(owner_id)?;
             if known
                 .is_some_and(|known| Some(&known.fingerprint) == fresh.disk.fingerprint.as_ref())
             {
-                return Ok(format!("{name}'s stored session is already current."));
+                return Ok((
+                    false,
+                    format!("{name}'s stored session is already current."),
+                ));
+            }
+            if !planned {
+                self.mark(STEP.capture, JobStepStatus::Running, "");
             }
             let uid = owner
                 .launcher_uid
                 .as_deref()
                 .or(fresh.logged_uid.as_deref());
             self.store_session(owner, &blob, uid)?;
-            Ok(format!(
-                "Saved {name}'s session (fingerprint {}).",
-                short_fingerprint(fresh.disk.fingerprint.as_deref())
+            Ok((
+                true,
+                format!(
+                    "Saved {name}'s session (fingerprint {}).",
+                    short_fingerprint(fresh.disk.fingerprint.as_deref())
+                ),
             ))
         })();
-        let detail = saved.unwrap_or_else(|error| format!("Not saved: {error}"));
-        self.mark(STEP.capture, JobStepStatus::Done, detail);
+        let (shown, detail) = match saved {
+            Ok((stored, detail)) => (planned || stored, detail),
+            Err(error) => (
+                planned || self.current == Some(STEP.capture),
+                format!("Not saved: {error}"),
+            ),
+        };
+        if shown {
+            self.mark(STEP.capture, JobStepStatus::Done, detail);
+        }
     }
 
     fn take_snapshot(&mut self) -> Result<(), Thrown> {
@@ -340,12 +370,13 @@ impl Switch<'_> {
             let before = files
                 .read(path)
                 .map_err(|error| Thrown::Failed(error.to_string()))?;
-            // Only the newest file was looked at when the plan read it. An older one that is not UTF-8 text is left as it is: a rewrite would break it, and the launcher does not read it.
-            let not_text = before.contains(&0) || std::str::from_utf8(&before).is_err();
-            if age > 0 && not_text {
-                continue;
-            }
-            let write = plan_session_write(&String::from_utf8_lossy(&before), blob.as_ref());
+            let text = match settings_text(path, &before) {
+                Ok(text) => text,
+                // Only the newest file was looked at when the plan read it. An older one that is not UTF-8 text is left as it is: a rewrite would break it, and the launcher does not read it.
+                Err(_) if age > 0 => continue,
+                Err(refused) => return Err(refused.into()),
+            };
+            let write = plan_session_write(text, blob.as_ref());
             if write.noop {
                 continue;
             }
@@ -600,8 +631,46 @@ impl Switch<'_> {
         waited
     }
 
-    // After a confirmed sign-in: stores the session the launcher has written, when it differs from what was there. A sign-in by hand writes it moments later; one from a remembered session may not write it at all.
-    fn capture_fresh(&mut self, wait: Duration) -> Result<(), Thrown> {
+    // What the log says now, when it no longer names the account whose sign-in was confirmed: the session in the file may then be another account's. A sign-in as an account that is not this one, by the rule the sign-in was confirmed by, is a wrong account; one that cannot be told apart from this account's only stops the save.
+    fn signed_in_elsewhere(&self, signed_in_as: &str) -> Result<Option<Elsewhere>, Thrown> {
+        match last_sign_in(&self.epic.events_since(&self.log_at)) {
+            Some(SignInOutcome::SignedIn { account_id, .. }) if account_id == signed_in_as => {
+                Ok(None)
+            }
+            Some(SignInOutcome::SignedIn { account_id, .. }) => {
+                let detail = format!(
+                    "Not saved: the launcher signed in as account {} meanwhile.",
+                    id_tail(Some(&account_id), 6)
+                );
+                let owner = if account_id.is_empty() {
+                    None
+                } else {
+                    self.directory.account_by_launcher_uid(&account_id)?
+                };
+                let another = owner
+                    .as_ref()
+                    .is_some_and(|owner| owner.id != self.account.id);
+                Ok(Some(
+                    if !account_id.is_empty() && (self.expected_uid.is_some() || another) {
+                        Elsewhere::WrongAccount {
+                            account_id,
+                            owner,
+                            detail,
+                        }
+                    } else {
+                        Elsewhere::Unclear(detail)
+                    },
+                ))
+            }
+            _ => Ok(Some(Elsewhere::Unclear(format!(
+                "Not saved: the launcher no longer reports the sign-in as {}.",
+                self.account.login
+            )))),
+        }
+    }
+
+    // After a confirmed sign-in: stores the session the launcher has written, when it differs from what was there, for as long as the log names the account that signed in. A sign-in by hand writes it moments later; one from a remembered session may not write it at all. A sign-in as another account meanwhile ends the switch as a wrong account.
+    fn capture_fresh(&mut self, signed_in_as: &str, wait: Duration) -> Result<(), Thrown> {
         let Some(account_id) = self.account.id.clone() else {
             return Ok(());
         };
@@ -610,6 +679,22 @@ impl Switch<'_> {
         let deadline = self.now() + wait;
         loop {
             let text = self.epic.read_ini()?;
+            // The log is read after the file, so a sign-in that is logged before its session is written is seen before what it wrote is stored.
+            match self.signed_in_elsewhere(signed_in_as)? {
+                None => {}
+                Some(Elsewhere::Unclear(detail)) => {
+                    self.mark(STEP.recapture, JobStepStatus::Done, detail);
+                    return Ok(());
+                }
+                Some(Elsewhere::WrongAccount {
+                    account_id,
+                    owner,
+                    detail,
+                }) => {
+                    self.mark(STEP.recapture, JobStepStatus::Failed, detail);
+                    return Err(self.wrong_account(&account_id, owner.as_ref()));
+                }
+            }
             let disk = text.as_deref().map(read_session_from_ini);
             let blob = text.as_deref().and_then(session_blob_from_ini);
             let remembered = disk.as_ref().filter(|disk| disk.remembered);
@@ -668,7 +753,7 @@ impl Switch<'_> {
             return Err(self.started_meanwhile(STEP.close));
         }
 
-        self.save_outgoing();
+        self.save_outgoing(running && !self.already_active);
         if !self.already_active && !self.in_place {
             if self.epic.settings_paths().is_empty() {
                 return Err(self.missing_settings_file());
@@ -688,7 +773,7 @@ impl Switch<'_> {
             self.start_launcher()?;
         }
 
-        if self.already_active && running {
+        if self.already_active && running && !self.launcher_started {
             self.mark(
                 STEP.verify,
                 JobStepStatus::Skipped,
@@ -701,13 +786,18 @@ impl Switch<'_> {
             SignInWait::WrongAccount { account_id, owner } => {
                 return Err(self.wrong_account(&account_id, owner.as_ref()));
             }
-            SignInWait::SignedIn { .. } => {
+            SignInWait::SignedIn {
+                account_id: signed_in_as,
+            } => {
                 if let (true, Some(account_id)) = (remembered, self.account.id.clone()) {
                     if self.in_place {
-                        self.capture_fresh(Duration::ZERO)?;
+                        self.capture_fresh(&signed_in_as, Duration::ZERO)?;
                     } else {
                         self.directory.mark_session_verified(&account_id)?;
                     }
+                } else if !remembered {
+                    // Without a saved session the launcher was signed in by hand, and writes the session after the log says so.
+                    self.capture_fresh(&signed_in_as, timing.capture)?;
                 }
             }
             unsettled => {
@@ -723,7 +813,9 @@ impl Switch<'_> {
                     SignInWait::WrongAccount { account_id, owner } => {
                         return Err(self.wrong_account(&account_id, owner.as_ref()));
                     }
-                    SignInWait::SignedIn { .. } => self.capture_fresh(timing.capture)?,
+                    SignInWait::SignedIn { account_id } => {
+                        self.capture_fresh(&account_id, timing.capture)?;
+                    }
                     _ => return Ok(Ending::NeedsSignIn),
                 }
             }
@@ -733,13 +825,21 @@ impl Switch<'_> {
     }
 
     // The launcher rewrites its settings file when its state changes and when it exits, so it is closed before the file goes back. Nothing stops this once it has begun.
+    // A launcher that will not close keeps the snapshot for the next start: it would write its own sign-in over the one put back.
     fn roll_back(&self, backup_id: &str) -> Result<(), String> {
-        if self.epic.is_running().map_err(|error| error.to_string())? {
-            let _ = self.epic.shutdown(None, &CancelToken::new());
+        let text = |error: AdapterError| error.to_string();
+        if self.epic.is_running().map_err(text)? {
+            let closed = self.epic.shutdown(None, &CancelToken::new());
+            if self.epic.is_running().map_err(text)? {
+                return Err(closed.err().map_or_else(
+                    || "Epic Games Launcher is still running, and it rewrites GameUserSettings.ini while it runs".to_owned(),
+                    text,
+                ));
+            }
         }
         restore_epic(self.epic, self.platform, self.backups, backup_id)
             .map(|_| ())
-            .map_err(|error| error.message())
+            .map_err(|error| error.to_string())
     }
 }
 
@@ -905,5 +1005,6 @@ pub fn run_switch(
         started_at,
         finished_at: ol_store::iso_timestamp(platform.clock.now()),
         ready_at: switch.ready_at.filter(|_| ok),
+        started_with_game: None,
     })
 }

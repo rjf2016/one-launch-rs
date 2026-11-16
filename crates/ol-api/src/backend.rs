@@ -16,10 +16,9 @@ use ol_services::launchers::{
     self, Adapter, Configs, ImportResult, Launchers, ServiceError, require_implemented,
 };
 use ol_services::library::{self, LibraryGame};
-use ol_services::sessions::{self, StoreThread, StoreWork};
+use ol_services::sessions::{StoreThread, StoreWork};
 use ol_services::switch;
 use ol_store::{Store, StoreError};
-use ol_vault::Secret;
 use thiserror::Error;
 
 const RECENT_LAUNCHES_MOST: u32 = 50;
@@ -124,10 +123,13 @@ enum Command {
     RestoreRecovery(Reply<RestoreResult>),
     DismissRecovery(Reply<()>),
     Session(String, Reply<SavedSignIn>),
-    SeedSession(String, Option<String>, Secret, Reply<()>),
+    #[cfg(feature = "fake")]
+    SeedSession(String, Option<String>, ol_vault::Secret, Reply<()>),
     // Work a switch hands over from its own thread: a question about accounts or saved sign-ins.
     OnStore(StoreWork),
     Settle(Box<FinishedJob>),
+    // Answered once every request sent before it is handled.
+    Drain(Reply<()>),
 }
 
 // The database's thread as a switch reaches it.
@@ -353,12 +355,13 @@ impl Backend {
         self.ask(|reply| Command::Session(account_id, reply)).await
     }
 
-    // Stores a sign-in for an account as it is given, encrypted like any other. The fake launchers' seed is its only caller: the app itself saves a sign-in only from the launcher's own file.
+    // Stores a sign-in for an account as it is given, encrypted like any other. Only a build with the fake launchers has it: the app itself saves a sign-in only from the launcher's own file.
+    #[cfg(feature = "fake")]
     pub async fn seed_session(
         &self,
         account_id: &str,
         launcher_uid: Option<String>,
-        blob: Secret,
+        blob: ol_vault::Secret,
     ) -> Result<(), ApiError> {
         let account_id = account_id.to_owned();
         self.ask(|reply| Command::SeedSession(account_id, launcher_uid, blob, reply))
@@ -368,6 +371,11 @@ impl Backend {
     // Stops a running switch and waits for it, then waits for the request in hand and for the database to close, which folds its journal back into the one file.
     pub fn shut_down(&self) {
         self.jobs.close();
+        // A start the database's thread had in hand when the board closed has its thread in the slot once this is answered.
+        let (reply, drained) = async_channel::bounded(1);
+        if self.commands.send_blocking(Command::Drain(reply)).is_ok() {
+            let _ = drained.recv_blocking();
+        }
         if let Some(job) = take(&self.job_thread) {
             let _ = job.join();
         }
@@ -571,13 +579,14 @@ impl Serving {
                 &reply,
                 store.and_then(|store| self.saved_sign_in(store, &account_id)),
             ),
+            #[cfg(feature = "fake")]
             Command::SeedSession(account_id, launcher_uid, blob, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     let account = accounts::require(store, &account_id)?;
                     let launchers = self.launchers.as_ref().ok_or_else(no_launchers)?;
                     let directory = launchers.directory(store, account.launcher);
-                    Ok(sessions::seed(
+                    Ok(ol_services::sessions::seed(
                         &directory,
                         &account,
                         launcher_uid.as_deref(),
@@ -590,6 +599,7 @@ impl Serving {
                     work(store);
                 }
             }
+            Command::Drain(reply) => answer(&reply, Ok(())),
             Command::Settle(finished) => {
                 let on_job = Arc::clone(&self.on_job);
                 match (store, &self.launchers) {
@@ -705,9 +715,10 @@ impl Serving {
         let spawned = thread::Builder::new().name("switch".to_owned()).spawn(run);
         match spawned {
             Ok(thread) => {
-                if let Ok(mut slot) = self.job_thread.lock() {
-                    *slot = Some(thread);
-                }
+                *self
+                    .job_thread
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(thread);
                 Ok(job)
             }
             Err(_) => {
@@ -795,4 +806,89 @@ fn read_library(store: &Store, data_dir: &Path) -> Result<Library, ApiError> {
 fn answer<T>(reply: &Reply<T>, result: Result<T, ApiError>) {
     // Whoever asked may have gone away meanwhile, and then nobody is left to tell.
     let _ = reply.send_blocking(result);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+    use std::time::Duration;
+
+    use futures_lite::future::block_on;
+    use ol_model::LauncherId;
+    use ol_platform_api::{CancelToken, Clock, Platform};
+    use ol_platform_fake::{
+        FakeClock, FakeProcesses, FakeRegistry, FakeShell, OpLog, ProcessKnobs, ScratchFiles,
+    };
+    use ol_testkit::Scratch;
+    use ol_vault::FakeVault;
+    use time::OffsetDateTime;
+    use time::macros::datetime;
+
+    use super::*;
+
+    type Trip = Box<dyn FnOnce() + Send>;
+
+    // A clock that runs something once, the next time it is read.
+    struct Tripwire {
+        clock: FakeClock,
+        trip: Mutex<Option<Trip>>,
+    }
+
+    impl Clock for Tripwire {
+        fn now(&self) -> OffsetDateTime {
+            let trip = self.trip.lock().unwrap().take();
+            if let Some(trip) = trip {
+                trip();
+            }
+            self.clock.now()
+        }
+
+        fn sleep(&self, duration: Duration, cancel: &CancelToken) {
+            self.clock.sleep(duration, cancel);
+        }
+    }
+
+    #[test]
+    fn a_quit_that_lands_while_a_start_is_prepared_refuses_that_start() {
+        let scratch = Scratch::new("api-quit");
+        let log = OpLog::new();
+        let clock = Arc::new(Tripwire {
+            clock: FakeClock::starting_at(datetime!(2026-11-06 16:46:23 UTC)),
+            trip: Mutex::new(None),
+        });
+        let platform = Platform {
+            registry: Arc::new(FakeRegistry::new(log.clone())),
+            processes: Arc::new(FakeProcesses::new(log.clone(), ProcessKnobs::default())),
+            files: Arc::new(ScratchFiles::new(&[scratch.path()], log.clone())),
+            shell: Arc::new(FakeShell::new(log)),
+            clock: Arc::clone(&clock) as Arc<dyn Clock>,
+        };
+        let backend = Backend::start_with(
+            scratch.join("data"),
+            "9.8.7",
+            Launchers::on(platform, Arc::new(FakeVault)),
+            None,
+        );
+        let account = block_on(backend.create_account(NewAccount {
+            launcher: LauncherId::Steam,
+            display_name: "Main".to_owned(),
+            login: "user_main".to_owned(),
+            launcher_uid: None,
+            password: None,
+            tags: Vec::new(),
+            notes: String::new(),
+        }))
+        .unwrap();
+        let jobs = backend.jobs.clone();
+        *clock.trip.lock().unwrap() = Some(Box::new(move || jobs.close()));
+
+        let started = block_on(backend.start_launch(StartLaunch {
+            account_id: account.id,
+            game_id: None,
+            confirm_close: true,
+        }));
+        assert_eq!(started.err().map(|refused| refused.code), Some("BUSY"));
+        assert!(!backend.jobs.is_busy());
+        backend.shut_down();
+    }
 }

@@ -18,6 +18,9 @@ pub enum AdapterError {
         message: String,
         running_game: Option<RunningGame>,
     },
+    // A game runs that the switch must not disturb. There is no yes to give: the user closes the game.
+    #[error("{message}")]
+    GameRunning { message: String, game: RunningGame },
     #[error("{0}")]
     LauncherRunning(String),
     #[error("{0}")]
@@ -41,6 +44,7 @@ impl AdapterError {
             Self::NotInstalled(_) => "NOT_INSTALLED",
             Self::LauncherFile { .. } => "LAUNCHER_FILE",
             Self::ConfirmationRequired { .. } => "CONFIRM_REQUIRED",
+            Self::GameRunning { .. } => "GAME_RUNNING",
             Self::LauncherRunning(_) => "LAUNCHER_RUNNING",
             Self::SwitchBlocked(_) => "SWITCH_BLOCKED",
             Self::GameNotPlayable(_) => "GAME_NOT_PLAYABLE",
@@ -57,6 +61,7 @@ impl AdapterError {
             self.code(),
             "CONFIRM_REQUIRED"
                 | "GAME_NOT_PLAYABLE"
+                | "GAME_RUNNING"
                 | "LAUNCHER_RUNNING"
                 | "NOT_INSTALLED"
                 | "PROCESS_ACCESS_DENIED"

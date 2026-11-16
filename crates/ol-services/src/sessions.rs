@@ -4,15 +4,12 @@ use std::sync::Arc;
 use std::sync::mpsc::sync_channel;
 
 use ol_adapters::{AccountRef, AdapterError, Directory};
-use ol_formats::battlenet::session as battlenet;
-use ol_formats::epic::session::{fingerprint_of, parse_blob};
 use ol_model::{Account, LauncherId, LauncherSession};
 use ol_platform_api::Clock;
 use ol_store::{NewSession, Store};
 use ol_vault::{Secret, Vault};
 
 use crate::accounts;
-use crate::launchers::ServiceError;
 
 pub fn account_ref(account: &Account) -> AccountRef {
     AccountRef {
@@ -121,13 +118,19 @@ impl Directory for StoreDirectory<'_> {
     }
 }
 
-// Stores a sign-in for an account as it is given, once its shape has been checked. The fake launchers' seed is its only caller: the app itself saves a sign-in only from the launcher's own file.
+// Stores a sign-in for an account as it is given, once its shape has been checked. Only a build with the fake launchers has it: the app itself saves a sign-in only from the launcher's own file.
+#[cfg(feature = "fake")]
 pub fn seed(
     directory: &StoreDirectory<'_>,
     account: &Account,
     launcher_uid: Option<&str>,
     blob: &Secret,
-) -> Result<(), ServiceError> {
+) -> Result<(), crate::launchers::ServiceError> {
+    use crate::launchers::ServiceError;
+    use ol_formats::battlenet::session as battlenet;
+    use ol_formats::epic::session::{fingerprint_of, parse_blob};
+    use ol_formats::riot::session as riot;
+
     let adapter = ServiceError::adapter(account.launcher);
     let fingerprint = match account.launcher {
         LauncherId::Epic => parse_blob(blob.expose())
@@ -136,7 +139,11 @@ pub fn seed(
         LauncherId::Battlenet => battlenet::parse_blob(blob.expose())
             .map(|blob| battlenet::fingerprint_of(&blob.unified_auth.hex))
             .map_err(|error| adapter(failed(error)))?,
-        other => return Err(ServiceError::NotImplemented(other)),
+        LauncherId::Riot => riot::parse_blob(blob.expose())
+            .and_then(|blob| riot::session_of_blob(&blob))
+            .map(|session| session.fingerprint)
+            .map_err(|error| adapter(failed(error)))?,
+        LauncherId::Steam => return Err(ServiceError::NotImplemented(LauncherId::Steam)),
     };
     directory
         .save_session(&account.id, launcher_uid, &fingerprint, blob)

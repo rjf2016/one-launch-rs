@@ -6,7 +6,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [features]
-fake = []
+fake = ["ol-services/fake"]
 
 [dependencies]
 async-channel.workspace = true

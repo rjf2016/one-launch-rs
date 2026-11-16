@@ -5,7 +5,8 @@ mod ports;
 pub use ports::{
     CancelToken, Clock, FileReader, FileWriter, Files, Hive, Platform, ProcessArg, ProcessError,
     ProcessInfo, ProcessLister, ProcessRunner, Processes, Registry, RegistryData, RegistryError,
-    RegistryNamedValue, RegistryReader, RegistryWriter, Shell, ShellError,
+    RegistryNamedValue, RegistryReader, RegistryWriter, RiotLaunchError, RiotLaunchRequest,
+    RiotLocalLaunch, Shell, ShellError,
 };
 
 use thiserror::Error;

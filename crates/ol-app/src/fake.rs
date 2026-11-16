@@ -5,7 +5,8 @@ use std::path::Path;
 
 use anyhow::{Context as _, bail};
 use ol_api::launchers::{
-    BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, NewAccount, Secret, SteamTiming,
+    BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, NewAccount, RiotMachine,
+    RiotTiming, Secret, SteamTiming,
 };
 use ol_api::{ApiError, Backend};
 use ol_model::SettingKey;
@@ -15,11 +16,12 @@ use crate::args::FakeMachine;
 
 const SCENARIO: &str = "scenario.json";
 // The launchers a fake machine starts and writes beside.
-const PROGRAMS: [&str; 4] = [
+const PROGRAMS: [&str; 5] = [
     r"steam\steam.exe",
     r"epic\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe",
     r"battlenet\Battle.net.exe",
     r"battlenet\Battle.net Launcher.exe",
+    r"riot\RiotClientServices.exe",
 ];
 // What a laid-down scenario holds at its top: its two files, and the folders its launchers and their files live in.
 const SCENARIO_ENTRIES: [&str; 11] = [
@@ -97,6 +99,13 @@ pub fn start(
         local_app_data: fake.local_app_data.clone(),
         program_data: fake.program_data.clone(),
     };
+    launchers.riot = RiotMachine::at(
+        RiotTiming::with(&fake.riot_timing),
+        fake.riot_default_dir.clone(),
+        fake.local_app_data.clone(),
+        fake.program_data.clone(),
+    )
+    .with_local_launch(fake.riot_launch.clone());
     let backend = Backend::start_with(data_dir.to_path_buf(), version, launchers, None);
     Ok((backend, fake.seed))
 }

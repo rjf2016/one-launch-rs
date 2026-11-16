@@ -1,21 +1,25 @@
-// The only code in the app that writes a launcher-owned file or registry value: the eleven functions from write_login_users to write_restored, each through a writer port. The three modules under switch/ read, wait and decide, and come here to write.
+// The only code in the app that writes a launcher-owned file or registry value: the thirteen functions from write_login_users to write_restored, each through a writer port. The four modules under switch/ read, wait and decide, and come here to write.
 
 pub mod battlenet;
 pub mod epic;
+pub mod riot;
 pub mod steam;
 
 use std::collections::HashMap;
 
 use ol_adapters::battlenet::BattlenetAdapter;
 use ol_adapters::epic::{EpicAdapter, SETTINGS_FOLDERS};
+use ol_adapters::riot::RiotAdapter;
 use ol_adapters::steam::{HKCU_KEY, SteamAdapter};
-use ol_adapters::{AccountRef, AdapterError};
+use ol_adapters::{AccountRef, AdapterError, GameRef};
 use ol_formats::battlenet::session::{TokenValue, UNIFIED_AUTH_KEY, describe_token};
 use ol_model::{
     JobStep, JobStepStatus, LaunchAttention, LauncherId, PlanAccount, RestoreResult, SwitchPlan,
     SwitchStrategy,
 };
-use ol_platform_api::{CancelToken, FileWriter, Hive, Platform, RegistryError, RegistryWriter};
+use ol_platform_api::{
+    CancelToken, FileWriter, Files, Hive, Platform, RegistryError, RegistryWriter,
+};
 use ol_runtime::Aborted;
 use ol_vault::Secret;
 use serde_json::{Map, Value};
@@ -176,7 +180,52 @@ fn restore_battlenet(
     })
 }
 
-// The files of a snapshot, each over the launcher file it was copied from, all or none. Only the three restore functions above call it.
+// Riot: RiotGamesPrivateSettings.yaml, whole: the account's saved copy of the file as the client left it, the file with its session block set to null, or a snapshot's copy of it. It is the one launcher file a Riot switch writes, and it is never made where there is none: the client writes it at its first start, with the mark Riot knows this PC by. `ready` is used up here: it shows that a look taken just before found no Riot game, the client still closed and the file as it was when the sign-in it held was handed to the store for its owner.
+fn write_riot_session(
+    files: &dyn Files,
+    path: &str,
+    content: &[u8],
+    _ready: riot::ReadyToWrite,
+) -> std::io::Result<()> {
+    if !files.exists(path) {
+        return Err(missing_riot_session(path));
+    }
+    files.write_atomic(&[(path, content)])
+}
+
+fn missing_riot_session(path: &str) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!(
+            "{path} is missing. Start the Riot Client once by hand so it writes its settings file, then try again."
+        ),
+    )
+}
+
+// Riot: puts a snapshot back: its copy of the session file over the client's own, and nothing else. Riot keeps nothing of a sign-in in the registry. The look the write rests on is taken once the copy is read, directly before the write, and refuses it when the file is no longer the one whose sign-in was handed to the store.
+fn restore_riot(
+    riot: &RiotAdapter<'_>,
+    platform: &Platform,
+    backups: &BackupService<'_>,
+    id: &str,
+    saved: &riot::Saved,
+) -> Result<RestoreResult, RestoreError> {
+    let target = riot.session_file_path();
+    let restorable = backups.read_for_restore(LauncherId::Riot, id, &[&target])?;
+    for (path, content) in &restorable.files {
+        let ready = riot::look_before_write(riot, saved, "restore")?;
+        write_riot_session(platform.files.as_ref(), path, content, ready)
+            .map_err(BackupError::Io)?;
+    }
+    Ok(RestoreResult {
+        launcher: LauncherId::Riot,
+        id: id.to_owned(),
+        files: restorable.files.into_iter().map(|(path, _)| path).collect(),
+        registry: Vec::new(),
+    })
+}
+
+// The files of a snapshot, each over the launcher file it was copied from, all or none. Only the restore functions of Steam, Epic and Battle.net call it.
 fn write_restored(files: &dyn FileWriter, restorable: &Restorable) -> Result<(), RestoreError> {
     let copies: Vec<(&str, &[u8])> = restorable
         .files
@@ -186,21 +235,12 @@ fn write_restored(files: &dyn FileWriter, restorable: &Restorable) -> Result<(),
     Ok(files.write_atomic(&copies).map_err(BackupError::Io)?)
 }
 
+#[derive(Debug, thiserror::Error)]
 enum RestoreError {
-    Adapter(AdapterError),
-    Backup(BackupError),
-}
-
-impl From<AdapterError> for RestoreError {
-    fn from(error: AdapterError) -> Self {
-        Self::Adapter(error)
-    }
-}
-
-impl From<BackupError> for RestoreError {
-    fn from(error: BackupError) -> Self {
-        Self::Backup(error)
-    }
+    #[error(transparent)]
+    Adapter(#[from] AdapterError),
+    #[error(transparent)]
+    Backup(#[from] BackupError),
 }
 
 impl From<ol_platform_api::RegistryError> for RestoreError {
@@ -210,13 +250,6 @@ impl From<ol_platform_api::RegistryError> for RestoreError {
 }
 
 impl RestoreError {
-    fn message(&self) -> String {
-        match self {
-            Self::Adapter(error) => error.to_string(),
-            Self::Backup(error) => error.to_string(),
-        }
-    }
-
     fn into_service(self, launcher: LauncherId) -> ServiceError {
         match self {
             Self::Adapter(source) => ServiceError::adapter(launcher)(source),
@@ -248,6 +281,8 @@ pub struct SwitchOptions<'a> {
     // The user has said that the launcher, and any game running under it, may be closed.
     pub confirm_close: bool,
     pub cancel: &'a CancelToken,
+    // The game a launch follows the switch with. Only Riot's client is started differently for one.
+    pub game: Option<GameRef<'a>>,
 }
 
 // No Debug: it names the account.
@@ -267,6 +302,8 @@ pub struct SwitchResult {
     pub finished_at: String,
     // From when the launcher the switch started takes a game. Only a job that goes on to a game waits for it.
     pub ready_at: Option<OffsetDateTime>,
+    // The game whose launch arguments the launcher was started with, by the launcher's id for it: the launch that follows sends nothing more.
+    pub started_with_game: Option<String>,
 }
 
 // Why a step of the switch stopped it.
@@ -319,6 +356,7 @@ pub fn run_switch(
         Adapter::Battlenet(battlenet) => {
             battlenet::run_switch(battlenet, platform, backups, account, options, sink)
         }
+        Adapter::Riot(riot) => riot::run_switch(riot, platform, backups, account, options, sink),
     }
 }
 
@@ -335,6 +373,7 @@ pub fn restore_backup(
         Adapter::Battlenet(battlenet) => {
             battlenet::restore_backup(battlenet, platform, backups, id)
         }
+        Adapter::Riot(riot) => riot::restore_backup(riot, platform, backups, id),
     }
 }
 

@@ -87,8 +87,15 @@ fn users_block(root: &VdfObject) -> Result<&VdfObject, LoginUsersError> {
 // A block without a SteamID64 for a key or without an account name is left out, never guessed at.
 pub fn parse_login_users(text: &str) -> Result<Vec<SteamLoginUser>, LoginUsersError> {
     let root = vdf::parse(text)?;
+    Ok(read_users(&root)?
+        .into_iter()
+        .map(|(user, _)| user)
+        .collect())
+}
+
+fn read_users(root: &VdfObject) -> Result<Vec<(SteamLoginUser, &VdfObject)>, LoginUsersError> {
     let mut out = Vec::new();
-    for (id, entry) in users_block(&root)?.entries() {
+    for (id, entry) in users_block(root)?.entries() {
         let VdfValue::Block(entry) = entry else {
             continue;
         };
@@ -102,7 +109,7 @@ pub fn parse_login_users(text: &str) -> Result<Vec<SteamLoginUser>, LoginUsersEr
         else {
             continue;
         };
-        out.push(SteamLoginUser {
+        let user = SteamLoginUser {
             steam_id64: id,
             account_name: account_name.to_owned(),
             persona_name: entry
@@ -119,7 +126,8 @@ pub fn parse_login_users(text: &str) -> Result<Vec<SteamLoginUser>, LoginUsersEr
                 .into_iter()
                 .filter(|key| entry.string(key.as_str()).is_some())
                 .collect(),
-        });
+        };
+        out.push((user, entry));
     }
     Ok(out)
 }
@@ -165,6 +173,8 @@ static MOST_RECENT_LINE: LazyLock<Regex> = LazyLock::new(|| {
     ))
     .expect("a fixed pattern")
 });
+static KEY_ONLY_LINE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(&format!(r#"^{WS}*"([^"]*)"{WS}*$"#)).expect("a fixed pattern"));
 static ANY_KEY_LINE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&format!(r#"^({WS}*)"[^"]*"({WS}+)"[^"]*"{WS}*$"#)).expect("a fixed pattern")
 });
@@ -185,6 +195,9 @@ pub fn plan_auto_login_rewrite(
     let mut out: Vec<String> = Vec::new();
     let mut changes = Vec::new();
     let mut depth = 0_i64;
+    // The reader takes the accounts from the top-level users block alone, so only its children are accounts here.
+    let mut top_key: Option<String> = None;
+    let mut in_users = false;
     let mut current_user: Option<String> = None;
     let mut saw_key_in_block = false;
     let mut indent = "\t\t".to_owned();
@@ -193,6 +206,11 @@ pub fn plan_auto_login_rewrite(
     for (index, raw) in js::lines(text).enumerate() {
         let trimmed = js::trim(raw);
         if trimmed == "{" {
+            if depth == 0 {
+                in_users = top_key
+                    .take()
+                    .is_some_and(|key| key.eq_ignore_ascii_case("users"));
+            }
             depth += 1;
             out.push(raw.to_owned());
             continue;
@@ -215,8 +233,13 @@ pub fn plan_auto_login_rewrite(
             out.push(raw.to_owned());
             continue;
         }
+        if depth == 0 && !trimmed.is_empty() {
+            top_key = KEY_ONLY_LINE.captures(raw).map(|found| found[1].to_owned());
+        }
         if depth == 1 {
-            if let Some(found) = USER_KEY_LINE.captures(raw) {
+            if !in_users {
+                current_user = None;
+            } else if let Some(found) = USER_KEY_LINE.captures(raw) {
                 current_user = Some(found[1].to_owned());
                 saw_key_in_block = false;
             }
@@ -256,4 +279,82 @@ pub fn plan_auto_login_rewrite(
         changes,
         noop,
     })
+}
+
+pub const UNWRITABLE_LAYOUT: &str = "loginusers.vdf is laid out in a way One Launch cannot rewrite. Start Steam and close it, so that it writes the file again, then try again.";
+
+// Whether `text` reads as the rewrite promises: the target holds "1" in every AutoLogin or MostRecent it has, and at least one, while no other account holds "1" in either. The rewrite cannot say: on a layout the reader takes and the rewrite does not, such as a brace on the key's line or a comment after a flag, it leaves the line as it was, as the recorded cases hold.
+pub fn marks_only(text: &str, target: &str) -> bool {
+    let Ok(root) = vdf::parse(text) else {
+        return false;
+    };
+    let Ok(users) = read_users(&root) else {
+        return false;
+    };
+    users.iter().any(|(user, _)| user.steam_id64 == target)
+        && users.iter().all(|(user, entry)| {
+            if user.steam_id64 == target {
+                !user.most_recent_keys.is_empty()
+                    && user
+                        .most_recent_keys
+                        .iter()
+                        .all(|key| entry.flag(key.as_str()))
+            } else {
+                !user.most_recent
+            }
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_account_shaped_key_outside_the_users_block_is_left_alone() {
+        let text = "\"users\"\n{\n\t\"111111111111111\"\n\t{\n\t\t\"AccountName\"\t\t\"a\"\n\t\t\"AutoLogin\"\t\t\"0\"\n\t}\n}\n\"other\"\n{\n\t\"222222222222222\"\n\t{\n\t\t\"AutoLogin\"\t\t\"1\"\n\t}\n\t\"333333333333333\"\n\t{\n\t\t\"Name\"\t\t\"c\"\n\t}\n}\n";
+        let rewrite = plan_auto_login_rewrite(text, "111111111111111").unwrap();
+        assert_eq!(rewrite.changes.len(), 1);
+        assert_eq!(
+            rewrite.text,
+            text.replacen("\"AutoLogin\"\t\t\"0\"", "\"AutoLogin\"\t\t\"1\"", 1)
+        );
+    }
+
+    fn two_accounts(a: &str, b: &str) -> String {
+        format!(
+            "\"users\"\n{{\n\t\"111111111111111\"\n\t{{\n\t\t\"AccountName\"\t\t\"a\"\n{a}\t}}\n\t\"222222222222222\"\n\t{{\n\t\t\"AccountName\"\t\t\"b\"\n{b}\t}}\n}}\n"
+        )
+    }
+
+    fn flags(auto_login: &str, most_recent: &str) -> String {
+        format!("\t\t\"AutoLogin\"\t\t{auto_login}\n\t\t\"MostRecent\"\t\t{most_recent}\n")
+    }
+
+    fn guard_after_rewrite(text: &str) -> bool {
+        let rewrite = plan_auto_login_rewrite(text, "222222222222222").unwrap();
+        marks_only(&rewrite.text, "222222222222222")
+    }
+
+    #[test]
+    fn a_flag_the_rewrite_leaves_on_either_side_fails_the_guard() {
+        let off = flags("\"0\"", "\"0\"");
+        for stuck in [flags("\"1\" // a", "\"0\""), flags("\"0\"", "\"1\" // a")] {
+            assert!(!guard_after_rewrite(&two_accounts(&stuck, &off)));
+        }
+        for stuck in [flags("\"0\" // b", "\"0\""), flags("\"0\"", "\"0\" // b")] {
+            assert!(!guard_after_rewrite(&two_accounts(&off, &stuck)));
+        }
+    }
+
+    #[test]
+    fn a_file_the_rewrite_handles_passes_the_guard_whatever_its_values() {
+        let a = "\t\t\"autologin\"\t\t\" 1 \"\n\t\t\"MostRecent\"\t\t\"yes\"\n";
+        let b = "\t\t\"AutoLogin\"\t\t\"\"\n";
+        assert!(guard_after_rewrite(&two_accounts(a, b)));
+        assert!(guard_after_rewrite(&two_accounts("", "")));
+        assert!(guard_after_rewrite(&two_accounts(
+            &flags("\"2\" // a", "\"0\""),
+            b
+        )));
+    }
 }

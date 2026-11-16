@@ -21,9 +21,12 @@ pub mod launch {
 pub mod launchers {
     pub use ol_adapters::battlenet::Timing as BattlenetTiming;
     pub use ol_adapters::epic::Timing as EpicTiming;
+    pub use ol_adapters::riot::Timing as RiotTiming;
     pub use ol_adapters::steam::Timing as SteamTiming;
     pub use ol_services::accounts::NewAccount;
-    pub use ol_services::launchers::{BattlenetMachine, EpicMachine, ImportResult, Launchers};
+    pub use ol_services::launchers::{
+        BattlenetMachine, EpicMachine, ImportResult, Launchers, RiotMachine,
+    };
     pub use ol_vault::Secret;
 
     // Only a build with the fake launchers can name the fixtures' stand-in vault, which protects nothing.

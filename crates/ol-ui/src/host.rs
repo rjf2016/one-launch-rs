@@ -212,6 +212,14 @@ impl LaunchHost {
         instant: bool,
         cx: &mut Context<Self>,
     ) {
+        // The start under way reports to the request that asked for it.
+        if self
+            .request
+            .as_ref()
+            .is_some_and(|request| request.starting)
+        {
+            return;
+        }
         self.serial += 1;
         let mut request = Request {
             key: self.serial,
@@ -475,9 +483,14 @@ impl LaunchHost {
 
     // Preview mode goes off and the switch that was shown runs.
     fn switch_now(&mut self, cx: &mut Context<Self>) {
-        let Some(request) = &self.request else {
+        let Some(request) = &mut self.request else {
             return;
         };
+        if request.starting || !matches!(request.stage, Stage::Preview(_)) {
+            return;
+        }
+        // Until the setting is written the dialog stays on this account: no Back, no Escape.
+        request.starting = true;
         let (key, backend) = (request.key, self.backend.clone());
         cx.spawn(async move |this, cx| {
             let saved = backend
@@ -487,8 +500,12 @@ impl LaunchHost {
                 let Some(request) = this.request_mut(key) else {
                     return;
                 };
+                request.starting = false;
                 if let Err(error) = saved {
                     request.stage = Stage::Error(error.message.into());
+                    return this.changed(cx);
+                }
+                if !matches!(request.stage, Stage::Preview(_)) {
                     return this.changed(cx);
                 }
                 this.check(cx);
@@ -496,6 +513,7 @@ impl LaunchHost {
             .ok();
         })
         .detach();
+        self.changed(cx);
     }
 
     fn back_to_pick(&mut self, cx: &mut Context<Self>) {

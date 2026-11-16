@@ -11,8 +11,8 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
 use futures_lite::future::block_on;
 use ol_api::launchers::{
-    BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, Launchers, NewAccount, Secret,
-    SteamTiming,
+    BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, Launchers, NewAccount, RiotMachine,
+    RiotTiming, Secret, SteamTiming,
 };
 use ol_api::{ApiError, Backend, StartLaunch};
 use ol_model::{JobState, LaunchJob, LauncherId, SettingKey};
@@ -203,10 +203,9 @@ pub struct Replay<'a> {
     now: OffsetDateTime,
     gate: Gate,
     events: Vec<Value>,
-    // The id of each job in the order they were started. Empty for one a call that was left out would have started.
+    // The id of each job in the order they were started.
     jobs: Vec<String>,
     registry: Vec<Value>,
-    without: Option<LauncherId>,
 }
 
 fn job_event(job: &LaunchJob) -> Value {
@@ -262,7 +261,6 @@ impl<'a> Replay<'a> {
             events: Vec::new(),
             jobs: Vec::new(),
             registry: Vec::new(),
-            without: None,
         };
         replay.start()?;
         Ok(replay)
@@ -289,6 +287,13 @@ impl<'a> Replay<'a> {
             local_app_data: fake.local_app_data.clone(),
             program_data: fake.program_data.clone(),
         };
+        launchers.riot = RiotMachine::at(
+            RiotTiming::with(&fake.riot_timing),
+            fake.riot_default_dir.clone(),
+            fake.local_app_data.clone(),
+            fake.program_data.clone(),
+        )
+        .with_local_launch(fake.riot_launch.clone());
 
         let (log, gate) = (fake.log.clone(), self.gate.clone());
         let observer = move |job: &LaunchJob| {
@@ -354,6 +359,7 @@ impl<'a> Replay<'a> {
     fn crash(&mut self) {
         if let Some(running) = self.running.take() {
             self.events.extend(running.fake.log.snapshot());
+            self.registry = state::registry(&running.fake.registry);
             self.now = running.fake.clock.now();
             self.gate.hold_for_good();
             self.gate = Gate::default();
@@ -533,19 +539,6 @@ impl<'a> Replay<'a> {
         Ok(())
     }
 
-    // Whether a call is about the launcher this replay leaves out: it names one of its accounts, games or snapshots.
-    fn left_out(&self, request: &Value) -> bool {
-        let Some(launcher) = self.without else {
-            return false;
-        };
-        let name = launcher.as_str();
-        let aliased = |field: &str| {
-            let alias = request[field].as_str();
-            alias.is_some_and(|alias| alias.split(':').nth(1) == Some(name))
-        };
-        aliased("accountId") || aliased("gameId") || request["launcher"] == name
-    }
-
     fn step(&mut self, step: &Value) -> Result<(), ReplayError> {
         match step["op"].as_str() {
             Some("invoke") => {
@@ -553,20 +546,10 @@ impl<'a> Replay<'a> {
                     .as_str()
                     .ok_or_else(|| script_error("an invoke without a channel"))?;
                 let request = step.get("req").unwrap_or(&Value::Null);
-                if self.left_out(request) {
-                    // The job such a call would have started keeps its number, so the later ones keep theirs.
-                    if channel == "launch:start" {
-                        self.jobs.push(String::new());
-                    }
-                    return Ok(());
-                }
                 self.invoke(channel, request)
             }
             Some("awaitJob") => {
                 let job = self.job_id(step["job"].as_str().unwrap_or_default())?;
-                if job.is_empty() {
-                    return Ok(());
-                }
                 let until = &step["until"];
                 let text = |name: &str| until[name].as_str().map(str::to_owned);
                 self.gate.wait_for(Until {
@@ -603,27 +586,7 @@ impl<'a> Replay<'a> {
 
     // Runs every step and answers with what the app did: `events` and `final`, with ids as aliases, the two folders as {launchers} and {data}, and times as the normalisation rules of the script say.
     pub fn run(setup: &'a Setup<'a>, script: &Value, rules: &Value) -> Result<Value, ReplayError> {
-        Self::run_steps(setup, script, rules, None)
-    }
-
-    // As `run`, with every call left out that names an account, a game or a snapshot of `launcher`, and every wait for a job such a call would have started: what a script does around a launcher this build has no adapter for.
-    pub fn run_without(
-        setup: &'a Setup<'a>,
-        script: &Value,
-        rules: &Value,
-        launcher: LauncherId,
-    ) -> Result<Value, ReplayError> {
-        Self::run_steps(setup, script, rules, Some(launcher))
-    }
-
-    fn run_steps(
-        setup: &'a Setup<'a>,
-        script: &Value,
-        rules: &Value,
-        without: Option<LauncherId>,
-    ) -> Result<Value, ReplayError> {
         let mut replay = Self::begin(setup, script)?;
-        replay.without = without;
         let steps = script["steps"]
             .as_array()
             .ok_or_else(|| script_error("no steps"))?;

@@ -221,10 +221,7 @@ fn a_scan_brings_steams_games_into_the_library_and_a_missing_steam_takes_them_ou
 
     let scanned = block_on(fakes.backend.rescan()).unwrap();
     let scanned_launchers: Vec<LauncherId> = scanned.iter().map(|scan| scan.launcher).collect();
-    assert_eq!(
-        scanned_launchers,
-        [LauncherId::Steam, LauncherId::Epic, LauncherId::Battlenet]
-    );
+    assert_eq!(scanned_launchers, LauncherId::ALL);
     let steam = &scanned[0];
     assert_eq!(
         (
@@ -280,6 +277,51 @@ fn a_scan_brings_steams_games_into_the_library_and_a_missing_steam_takes_them_ou
             "NOT_INSTALLED",
             "Steam: steam is not installed on this PC".to_owned()
         )
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_library_list_that_cannot_be_read_takes_no_game_out() {
+    let fakes = fakes(None);
+    let steamapps = fakes.launchers_dir().join("steam").join("steamapps");
+    let second = fakes.launchers_dir().join("library2");
+    let manifest = "appmanifest_252950.acf";
+    fs::create_dir_all(second.join("steamapps").join("common")).unwrap();
+    fs::rename(
+        steamapps.join(manifest),
+        second.join("steamapps").join(manifest),
+    )
+    .unwrap();
+    let vdf_path = |path: &std::path::Path| path.to_str().unwrap().replace('\\', "\\\\");
+    let folders = steamapps.join("libraryfolders.vdf");
+    fs::write(
+        &folders,
+        format!(
+            "\"libraryfolders\"\n{{\n\t\"0\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t}}\n\t\"1\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t}}\n}}\n",
+            vdf_path(&fakes.launchers_dir().join("steam")),
+            vdf_path(&second)
+        ),
+    )
+    .unwrap();
+    let scanned = &block_on(fakes.backend.rescan()).unwrap()[0];
+    assert_eq!((scanned.added, scanned.error.as_deref()), (1, None));
+
+    fs::write(&folders, "\"libraryfolders\"\n{\n\t\"0\"\n").unwrap();
+    let scanned = &block_on(fakes.backend.rescan()).unwrap()[0];
+    assert_eq!((scanned.added, scanned.removed), (0, 0));
+    assert!(
+        scanned
+            .error
+            .as_deref()
+            .is_some_and(|error| error.contains("libraryfolders.vdf"))
+    );
+    let library = block_on(fakes.backend.library()).unwrap();
+    assert!(
+        library
+            .games
+            .iter()
+            .any(|entry| entry.game.launcher == LauncherId::Steam && entry.game.installed)
     );
     fakes.backend.shut_down();
 }
@@ -360,16 +402,6 @@ fn the_accounts_steam_remembers_are_listed_and_imported_once() {
             .all(|(_, reason)| *reason == "already in One Launch")
     );
     assert_eq!(again.skipped.len(), new.len());
-
-    assert_eq!(
-        refusal(block_on(
-            fakes.backend.remembered_accounts(LauncherId::Riot)
-        )),
-        (
-            "NOT_IMPLEMENTED",
-            "The Riot Games adapter is not available yet".to_owned()
-        )
-    );
     fakes.backend.shut_down();
 }
 
@@ -422,6 +454,43 @@ fn a_switch_that_would_close_steam_asks_first_and_preview_mode_refuses_any() {
     assert_eq!(
         refusal(fakes.backend.launch_status("no-such-job")).0,
         "NOT_FOUND"
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_first_sign_in_as_another_account_steam_knows_is_not_taken_for_the_account() {
+    let other = recorded_login_users()
+        .iter()
+        .find(|user| user["accountName"] == "user_2")
+        .and_then(|user| user["steamId64"].as_str())
+        .and_then(|id| id.parse::<u64>().ok())
+        // The account id Steam keeps in ActiveUser is the low half of the SteamID64.
+        .map(|id| id & 0xffff_ffff)
+        .unwrap();
+    let by_hand = json!({ "knobs": { "steam": { "signInWhenAskedMs": 500, "signInAs": other } } });
+    let fakes = fakes(Some(&by_hand));
+    let account = block_on(fakes.backend.create_account(NewAccount {
+        launcher: LauncherId::Steam,
+        display_name: "Newcomer".to_owned(),
+        login: "new_user".to_owned(),
+        launcher_uid: None,
+        password: None,
+        tags: Vec::new(),
+        notes: String::new(),
+    }))
+    .unwrap();
+    let start = StartLaunch {
+        account_id: account.id,
+        game_id: None,
+        confirm_close: true,
+    };
+    block_on(fakes.backend.start_launch(start)).unwrap();
+    let job = fakes.finished();
+    assert_eq!(job.state, JobState::Failed);
+    assert_eq!(
+        job.error.as_deref(),
+        Some("Steam signed in as user_2 instead of new_user.")
     );
     fakes.backend.shut_down();
 }
@@ -491,6 +560,84 @@ fn a_stored_password_goes_to_steams_command_line_and_nowhere_else() {
             "{name} holds the password"
         );
     }
+}
+
+#[test]
+fn a_failed_switch_is_not_put_back_under_a_steam_that_will_not_close() {
+    let stuck = json!({
+        "processes": { "elevated": ["steam.exe"], "shutdownPolls": 100_000 },
+        "knobs": { "steam": { "expiredSessions": ["user_3"] } },
+        "timing": { "steam": { "shutdownMs": 1000, "killGraceMs": 500 } }
+    });
+    let fakes = fakes(Some(&stuck));
+    block_on(
+        fakes
+            .backend
+            .set_setting(SettingKey::SteamAutoLogin, "true".to_owned()),
+    )
+    .unwrap();
+    let login_users = fakes
+        .launchers_dir()
+        .join("steam")
+        .join("config")
+        .join("loginusers.vdf");
+    let switch = StartLaunch {
+        account_id: fakes.account("user_3"),
+        game_id: None,
+        confirm_close: false,
+    };
+    block_on(fakes.backend.start_launch(switch)).unwrap();
+    let job = fakes.finished();
+    assert_eq!(job.state, JobState::Failed);
+    assert_eq!(job.restored, Some(false), "{:?}", job.error);
+    let written = fs::read(&login_users).unwrap();
+    assert!(
+        job.error
+            .as_deref()
+            .is_some_and(|error| error.contains("Windows would not let One Launch close steam.exe"))
+    );
+
+    let fakes = fakes.restart();
+    let pending = block_on(fakes.backend.recovery())
+        .unwrap()
+        .expect("the snapshot is offered at the next start");
+    assert_eq!(Some(pending.backup_id), job.backup_id);
+    assert_eq!(fs::read(&login_users).unwrap(), written);
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_snapshot_records_the_registry_as_it_is_when_the_snapshot_is_taken() {
+    let running = json!({ "knobs": { "steam": { "runningAs": "user_1" } } });
+    let fakes = fakes(Some(&running));
+    let registry = Arc::clone(&fakes.fake.registry);
+    fakes.fake.processes.on_start(move |_, args| {
+        if args.iter().any(|arg| arg == "-shutdown") {
+            registry.seed(
+                r"HKCU\Software\Valve\Steam\AutoLoginUser",
+                ol_platform_fake::RegistryValue::Text("user_4".to_owned()),
+            );
+        }
+    });
+    let switch = StartLaunch {
+        account_id: fakes.account("user_3"),
+        game_id: None,
+        confirm_close: true,
+    };
+    block_on(fakes.backend.start_launch(switch)).unwrap();
+    let job = fakes.finished();
+    assert!(job.state == JobState::Done, "{:?}", job.error);
+    let backup_id = job.backup_id.expect("the switch took a snapshot");
+    fakes.fake.processes.set_running("steam.exe", false);
+    let restored = block_on(fakes.backend.restore_backup(LauncherId::Steam, &backup_id)).unwrap();
+    assert!(
+        restored
+            .registry
+            .contains(&"AutoLoginUser = user_4".to_owned()),
+        "{:?}",
+        restored.registry
+    );
+    fakes.backend.shut_down();
 }
 
 #[test]

@@ -5,12 +5,13 @@ use std::sync::Arc;
 
 use ol_formats::battlenet::session as battlenet_session;
 use ol_formats::epic::session::{parse_blob, serialize_blob, session_blob_from_ini};
+use ol_formats::riot::session::{self as riot_session, RiotSessionBlob};
 use ol_formats::winpath::join;
 use ol_model::LauncherId;
 use ol_platform_api::{Platform, ProcessInfo};
 use ol_platform_fake::{
-    FakeClock, FakeProcesses, FakeRegistry, FakeShell, OpLog, ProcessKnobs, RegistryValue,
-    ScratchFiles,
+    FakeClock, FakeProcesses, FakeRegistry, FakeRiotLaunch, FakeShell, OpLog, ProcessKnobs,
+    RegistryValue,
 };
 use ol_runtime::TimingOverrides;
 use serde_json::{Map, Value};
@@ -19,18 +20,23 @@ use time::OffsetDateTime;
 
 use crate::battlenet::{BattlenetFolders, BattlenetKnobs, BattlenetScript, BattlenetSim};
 use crate::epic::{EpicKnobs, EpicSim};
+use crate::files::ContainedFiles;
+use crate::riot::{RiotFolders, RiotKnobs, RiotSim, fake_session_file};
 use crate::steam::{SteamKnobs, SteamSim};
 
 const SCENARIO_FILE: &str = "scenario.json";
 const KNOBS_FILE: &str = "knobs.json";
+// The sessions the scripted Epic launcher made up, by fingerprint, with the account each signs in as. None of their data.
+const ISSUED_SESSIONS_FILE: &str = "issued-sessions.json";
 const FIXTURE_PREFIX: &str = "@fixtures/";
 const UNIFIED_AUTH: &str = r"Software\Blizzard Entertainment\Battle.net\UnifiedAuth";
 const BINARY_PREFIX: &str = "binary:";
 
 // Waits short enough that a fake switch is over in a few seconds of its own clock.
-const SIM_TIMING: [(&str, u64); 15] = [
+const SIM_TIMING: [(&str, u64); 17] = [
     ("pollMs", 100),
     ("logPollMs", 100),
+    ("processPollMs", 100),
     ("shutdownMs", 3_000),
     ("killGraceMs", 1_000),
     ("restartWatchMs", 500),
@@ -44,6 +50,7 @@ const SIM_TIMING: [(&str, u64); 15] = [
     ("manualSignInMs", 30_000),
     ("readyGraceMs", 300),
     ("launchConfirmMs", 2_000),
+    ("playConfirmMs", 2_000),
 ];
 
 #[derive(Debug, Error)]
@@ -99,6 +106,11 @@ pub struct FakeLaunchers {
     pub battlenet: Option<Arc<BattlenetSim>>,
     pub battlenet_timing: TimingOverrides,
     pub battlenet_default_dir: String,
+    pub riot: Option<Arc<RiotSim>>,
+    pub riot_timing: TimingOverrides,
+    pub riot_default_dir: String,
+    // Where a launch request for the Riot Client goes on this machine: to the scripted client, as a press of its Play button.
+    pub riot_launch: Arc<FakeRiotLaunch>,
     // The scenario's stand-ins for %APPDATA%, %LOCALAPPDATA% and %ProgramData%.
     pub app_data: String,
     pub local_app_data: String,
@@ -281,7 +293,26 @@ fn battlenet_knobs(fields: &Map<String, Value>) -> BattlenetKnobs {
     }
 }
 
-// The sign-ins a scenario saves for Epic and Battle.net accounts, each with what its launcher's servers know it by: Epic's session data, Battle.net's token.
+fn riot_knobs(fields: &Map<String, Value>) -> RiotKnobs {
+    let text = |name: &str| fields.get(name).and_then(Value::as_str).map(str::to_owned);
+    let flag = |name: &str| fields.get(name).and_then(Value::as_bool);
+    let default = RiotKnobs::default();
+    RiotKnobs {
+        rejected: strings(fields.get("rejected")),
+        rotate_on_start: flag("rotateOnStart").unwrap_or(default.rotate_on_start),
+        auth_error: text("authError"),
+        react_ms: fields.get("reactMs").and_then(Value::as_u64).unwrap_or(0),
+        sign_in_when_asked_ms: fields.get("signInWhenAskedMs").and_then(Value::as_u64),
+        sign_in_as: text("signInAs"),
+        stay_signed_in: flag("staySignedIn").unwrap_or(default.stay_signed_in),
+        running_as: text("runningAs"),
+        updates_pending: strings(fields.get("updatesPending")),
+        direct_launch: flag("directLaunch") == Some(true),
+        press_play_fails: flag("pressPlayFails") == Some(true),
+    }
+}
+
+// The sign-ins a scenario saves for its accounts, each with what its launcher's servers know it by: Epic's session data, Battle.net's token. Riot's is a whole session file, built around the account id and the refresh token the scenario gives; the scripted client reads the account off the file itself.
 fn seeded_sessions(scenario: &Value) -> Vec<(String, SeedSession)> {
     let sessions = scenario["seed"]["sessions"].as_array();
     sessions
@@ -301,7 +332,13 @@ fn seeded_sessions(scenario: &Value) -> Vec<(String, SeedSession)> {
                     let token = blob.unified_auth.hex.clone();
                     (token, battlenet_session::serialize_blob(&blob))
                 }
-                _ => return None,
+                LauncherId::Riot => {
+                    let refresh_token = session["refreshToken"].as_str()?;
+                    let file = fake_session_file(&text("launcherUid")?, refresh_token);
+                    let blob = riot_session::serialize_blob(&RiotSessionBlob { file });
+                    (refresh_token.to_owned(), blob)
+                }
+                LauncherId::Steam => return None,
             };
             let seeded = SeedSession {
                 launcher,
@@ -466,6 +503,16 @@ fn materialize_on(
     if installed.contains(&LauncherId::Battlenet) {
         BattlenetSim::seed_registry(&registry, &join(&[&root, "battlenet"]), &games_dir);
     }
+    let riot_dir = join(&[&root, "riot"]);
+    let riot_folders = RiotFolders {
+        local_app_data: &local_app_data,
+        program_data: &program_data,
+        install_dir: &riot_dir,
+        games: &games_dir,
+    };
+    if installed.contains(&LauncherId::Riot) {
+        RiotSim::seed_registry(&registry, &riot_folders);
+    }
     if let Some(values) = scenario["registry"].as_object() {
         for (path, value) in values {
             let value = match (value.as_str(), value.as_u64()) {
@@ -509,6 +556,7 @@ fn materialize_on(
         servers.extend(self::servers(&scenario, LauncherId::Epic));
         EpicSim::attach(
             &local_app_data,
+            dir.join("epic").join(ISSUED_SESSIONS_FILE),
             &processes,
             Arc::clone(&clock),
             servers,
@@ -532,13 +580,26 @@ fn materialize_on(
         )
     });
 
+    let riot_launch = Arc::new(FakeRiotLaunch::new(log.clone()));
+    let riot = installed.contains(&LauncherId::Riot).then(|| {
+        let sim = RiotSim::attach(
+            &riot_folders,
+            &processes,
+            Arc::clone(&clock),
+            riot_knobs(&merged(&scenario, &overrides, &["knobs", "riot"])),
+        );
+        let plays = Arc::clone(&sim);
+        riot_launch.on_launch(move |id| plays.press_play(id));
+        sim
+    });
+
     // Of the data folder only the snapshots: a folder a setting names beside them, such as a real launcher's, stays out of reach.
     let snapshots = data_dir.join("backups");
     let roots: [&Path; 2] = [dir, &snapshots];
     let platform = Platform {
         registry: Arc::clone(&registry) as _,
         processes: Arc::clone(&processes) as _,
-        files: Arc::new(ScratchFiles::new(&roots, log.clone())),
+        files: Arc::new(ContainedFiles::new(&roots, log.clone())),
         shell: Arc::new(FakeShell::new(log.clone())),
         clock: Arc::clone(&clock) as _,
     };
@@ -557,6 +618,10 @@ fn materialize_on(
         battlenet,
         battlenet_timing: timing(&scenario, &overrides, "battlenet"),
         battlenet_default_dir: join(&[&root, "nowhere"]),
+        riot,
+        riot_timing: timing(&scenario, &overrides, "riot"),
+        riot_default_dir: join(&[&root, "nowhere"]),
+        riot_launch,
         app_data,
         local_app_data,
         program_data,
@@ -597,5 +662,155 @@ mod tests {
         let login_users = text(&data.join("Steam").join("config").join("loginusers.vdf"));
         assert!(files.write_atomic(&[(&login_users, b"x")]).is_err());
         assert!(!Path::new(&login_users).exists());
+    }
+
+    #[test]
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "std makes no junction, and a junction is what a test of a junction needs"
+    )]
+    fn a_junction_in_the_scenario_folder_does_not_lead_the_file_port_out_of_it() {
+        let scratch = Scratch::new("sim-junction");
+        let (dir, data) = (scratch.join("launchers"), scratch.join("data"));
+        lay_down(
+            &oracle("fixtures/dev-only/fake-launchers/all-four"),
+            &oracle("fixtures/launchers"),
+            &dir,
+        )
+        .unwrap();
+        let beside = data.join("Steam").join("config");
+        fs::create_dir_all(&beside).unwrap();
+        fs::write(beside.join("loginusers.vdf"), b"old").unwrap();
+        let link = dir.join("linked");
+        let made = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&link)
+            .arg(&beside)
+            .output()
+            .unwrap();
+        assert!(made.status.success(), "mklink /J failed");
+        let fake = materialize(&dir, &data, datetime!(2026-11-06 16:46:23 UTC));
+        let files = fake.as_ref().map(|fake| &fake.platform.files);
+        let through = link.join("loginusers.vdf").to_string_lossy().into_owned();
+        let read = files.map(|files| files.read(&through).is_err());
+        let written = files.map(|files| files.write_atomic(&[(&through, b"new")]).is_err());
+        let kept = fs::read(beside.join("loginusers.vdf")).unwrap();
+        fs::remove_dir(&link).unwrap();
+
+        assert!(read.unwrap());
+        assert!(written.unwrap());
+        assert_eq!(kept, b"old");
+    }
+
+    #[test]
+    fn a_session_the_epic_launcher_made_up_signs_in_as_its_own_account_after_a_restart() {
+        let scratch = Scratch::new("sim-issued");
+        let (dir, data) = (scratch.join("launchers"), scratch.join("data"));
+        lay_down(
+            &oracle("fixtures/dev-only/fake-launchers/all-four"),
+            &oracle("fixtures/launchers"),
+            &dir,
+        )
+        .unwrap();
+        write_knobs(
+            &dir,
+            &serde_json::json!({ "knobs": { "epic": { "reactMs": 0 } } }),
+        )
+        .unwrap();
+        let scenario = read_json(&dir.join(SCENARIO_FILE), SCENARIO_FILE).unwrap();
+        let on_disk = scenario["onDisk"]["epic"].as_str().unwrap();
+        let accounts = scenario["seed"]["accounts"].as_array().unwrap();
+        let other = accounts
+            .iter()
+            .filter(|account| account["launcher"] == "epic")
+            .filter_map(|account| account["launcherUid"].as_str())
+            .find(|uid| *uid != on_disk)
+            .unwrap();
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &data, at).unwrap();
+        fake.epic.as_ref().unwrap().sign_in_by_hand(Some(other));
+        drop(fake);
+
+        let fake = materialize(&dir, &data, at).unwrap();
+        let exe = dir.join(r"epic\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe");
+        let exe = exe.to_string_lossy().into_owned();
+        fake.platform.processes.start(&exe, &[], "").unwrap();
+        let log = dir.join(r"localappdata\EpicGamesLauncher\Saved\Logs\EpicGamesLauncher.log");
+        let log = fs::read_to_string(log).unwrap();
+        assert!(log.contains(&format!("OnLoginComplete - 0 TRUE {other} ")));
+        assert!(!log.contains(&format!("OnLoginComplete - 0 TRUE {on_disk} ")));
+    }
+
+    const BATTLENET_EXE: &str = "Battle.net.exe";
+
+    fn battlenet_scenario(name: &str, knobs: &Value) -> (Scratch, std::path::PathBuf) {
+        let scratch = Scratch::new(name);
+        let dir = scratch.join("launchers");
+        lay_down(
+            &oracle("fixtures/dev-only/fake-launchers/all-four"),
+            &oracle("fixtures/launchers"),
+            &dir,
+        )
+        .unwrap();
+        write_knobs(&dir, knobs).unwrap();
+        (scratch, dir)
+    }
+
+    fn newest_battlenet_log(dir: &Path) -> String {
+        let logs = dir.join(r"localappdata\Battle.net\Logs");
+        let names = fs::read_dir(&logs).unwrap().flatten();
+        let newest = names.map(|entry| entry.file_name()).max().unwrap();
+        fs::read_to_string(logs.join(newest)).unwrap()
+    }
+
+    fn start_battlenet(fake: &FakeLaunchers, dir: &Path) {
+        let exe = dir.join("battlenet").join(BATTLENET_EXE);
+        let exe = exe.to_string_lossy().into_owned();
+        fake.platform.processes.start(&exe, &[], "").unwrap();
+    }
+
+    #[test]
+    fn the_newest_battlenet_log_is_that_of_the_client_already_running() {
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "runningAs": "0f0f0f0f" } } });
+        let (scratch, dir) = battlenet_scenario("sim-bnet-running", &knobs);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let _fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        assert!(newest_battlenet_log(&dir).contains("|bnet=1:0:0f0f0f0f|"));
+    }
+
+    #[test]
+    fn a_battlenet_client_closed_before_it_came_up_does_not_come_up_later() {
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "reactMs": 400 } } });
+        let (scratch, dir) = battlenet_scenario("sim-bnet-closed", &knobs);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        let config = fs::read(dir.join(r"appdata\Battle.net\Battle.net.config")).unwrap();
+        start_battlenet(&fake, &dir);
+        fake.platform.processes.close(BATTLENET_EXE).unwrap();
+        while fake.platform.processes.is_running(BATTLENET_EXE).unwrap() {}
+        fake.platform.clock.sleep(
+            std::time::Duration::from_secs(5),
+            &ol_platform_api::CancelToken::new(),
+        );
+        assert!(!fake.platform.processes.is_running(BATTLENET_EXE).unwrap());
+        assert!(fs::read(dir.join(r"appdata\Battle.net\Battle.net.config")).unwrap() == config);
+    }
+
+    #[test]
+    fn a_battlenet_client_started_after_a_restart_logs_after_the_runs_before_it() {
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "reactMs": 0 } } });
+        let (scratch, dir) = battlenet_scenario("sim-bnet-restart", &knobs);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        for _ in 0..3 {
+            start_battlenet(&fake, &dir);
+        }
+        drop(fake);
+
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "reactMs": 0, "updatesPending": ["prometheus"] } } });
+        write_knobs(&dir, &knobs).unwrap();
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        start_battlenet(&fake, &dir);
+        assert!(newest_battlenet_log(&dir).contains("(prometheus): currentOperation=Update"));
     }
 }

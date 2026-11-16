@@ -13,7 +13,7 @@ use ol_api::launchers::{
     SteamTiming,
 };
 use ol_api::{ApiError, Backend, StartLaunch};
-use ol_model::{JobState, LaunchJob, LauncherId, SwitchPlan};
+use ol_model::{JobState, JobStepStatus, LaunchJob, LauncherId, SwitchPlan};
 use ol_sim::FakeLaunchers;
 use ol_testkit::vectors::sha256_hex;
 use ol_testkit::{Scratch, oracle, snapshot};
@@ -376,6 +376,36 @@ fn what_is_saved_of_a_sign_in_is_its_digest_and_whose_it_is() {
 }
 
 #[test]
+fn a_settings_file_older_than_the_last_sign_in_names_no_one_as_remembered() {
+    let fakes = fakes(None);
+    let main = fakes.account(MAIN);
+    assert!(!main.has_session);
+    let file = fs::File::options()
+        .write(true)
+        .open(fakes.settings_file())
+        .unwrap();
+    file.set_modified(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap();
+    drop(file);
+
+    let state = block_on(fakes.backend.session(&main.id))
+        .unwrap()
+        .state
+        .expect("Epic's files say what it remembers");
+    assert!(state.remembered && !state.launcher_running);
+    assert_eq!(state.linked_account_id, None);
+    assert_eq!(state.launcher_uid, None);
+    let remembered = block_on(fakes.backend.remembered_accounts(LauncherId::Epic)).unwrap();
+    assert!(!remembered.is_empty());
+    assert!(
+        remembered
+            .iter()
+            .all(|entry| !entry.most_recent && !entry.remember_password)
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn a_saved_sign_in_is_in_the_launchers_file_and_encrypted_in_the_data_folder_and_nowhere_else() {
     let fakes = fakes(None);
     let alt = fakes.account(ALT);
@@ -478,6 +508,26 @@ fn a_switch_that_fails_after_its_write_puts_the_file_back_from_its_encrypted_cop
     }
     assert!(fs::read(fakes.settings_file()).unwrap() == fixture_settings());
     assert!(block_on(fakes.backend.recovery()).unwrap().is_none());
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_failed_switch_is_not_put_back_under_a_launcher_that_will_not_close() {
+    let probe = fakes(None);
+    let main_uid = probe.account(MAIN).launcher_uid.unwrap();
+    probe.backend.shut_down();
+    let knobs = json!({
+        "processes": { "elevated": ["EpicGamesLauncher.exe"], "shutdownPolls": 100_000 },
+        "knobs": { "epic": { "signInWhenAskedMs": 2000, "signInAs": main_uid } },
+        "timing": { "epic": { "shutdownMs": 1000, "killGraceMs": 500 } },
+    });
+    let fakes = fakes(Some(&knobs));
+    let states = fakes.play("new@example.com");
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Failed);
+    assert_eq!(last.restored, Some(false), "{:?}", last.error);
+    let fakes = fakes.restart();
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_some());
     fakes.backend.shut_down();
 }
 
@@ -593,5 +643,301 @@ fn a_snapshot_goes_back_byte_for_byte_once_the_launcher_is_closed() {
     let after = block_on(fakes.backend.backups(LauncherId::Epic)).unwrap();
     assert_eq!(after.len(), 2);
     assert_eq!(after[0].reason, format!("Before restoring {id}"));
+    fakes.backend.shut_down();
+}
+
+// The fixture's settings file with a byte of Windows-1252 in it, as an editor that saves in the system's code page leaves one: the file is no longer UTF-8 text.
+fn settings_not_utf8() -> Vec<u8> {
+    let fixture = fixture_settings();
+    let header = b"[Launcher]\r\n";
+    let at = fixture
+        .windows(header.len())
+        .position(|window| window == header)
+        .expect("the fixture opens with [Launcher]")
+        + header.len();
+    [
+        &fixture[..at],
+        b"InstallFolder=Jeux \xe9pic\r\n",
+        &fixture[at..],
+    ]
+    .concat()
+}
+
+// A switch to Alt over a settings file that is not UTF-8 text: refused at the plan, with the launcher left as it is, the file's bytes as they were and no sign-in saved.
+fn refused_over_a_settings_file_that_is_not_text(knobs: Option<&Value>) {
+    let fakes = fakes(knobs);
+    let broken = settings_not_utf8();
+    fs::write(fakes.settings_file(), &broken).unwrap();
+    let (main, alt, game) = (fakes.account(MAIN), fakes.account(ALT), fakes.game());
+    assert!(!main.has_session);
+    let alt_saved = block_on(fakes.backend.session(&alt.id))
+        .unwrap()
+        .session
+        .expect("the scenario saved a sign-in for Alt");
+
+    let preflight = block_on(fakes.backend.launch_preflight(&alt.id, Some(&game.id)))
+        .err()
+        .expect("the preflight is refused");
+    assert_eq!(preflight.code, "LAUNCHER_FILE");
+    assert!(preflight.message.starts_with(
+        "Epic Games: GameUserSettings.ini holds bytes that are not UTF-8 text; One Launch will not rewrite it. Start Epic Games Launcher by hand and close it, so that it writes the file again, then try again: "
+    ));
+    let plan = block_on(fakes.backend.switch_plan(&alt.id))
+        .err()
+        .expect("the plan is refused");
+    assert_eq!(plan, preflight);
+    let refused = fakes
+        .play_with(ALT, false)
+        .err()
+        .expect("the switch is refused at its start");
+    assert_eq!(refused, preflight);
+    // With the close said yes to beforehand the switch starts as a job, and its plan stops it before the first step.
+    let states = fakes.play_with(ALT, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Failed && !last.switched);
+    assert!(last.backup_id.is_none() && last.restored.is_none());
+    assert_eq!(last.error.as_deref(), Some(preflight.message.as_str()));
+
+    assert!(asked_of_the_machine(&fakes).is_empty());
+    assert!(fs::read(fakes.settings_file()).unwrap() == broken);
+    assert!(
+        block_on(fakes.backend.backups(LauncherId::Epic))
+            .unwrap()
+            .is_empty()
+    );
+    let main_saved = block_on(fakes.backend.session(&main.id)).unwrap();
+    assert!(main_saved.session.is_none() && main_saved.state.is_none());
+    assert_eq!(main_saved.state_error, Some(preflight.message.clone()));
+    let alt_now = block_on(fakes.backend.session(&alt.id))
+        .unwrap()
+        .session
+        .unwrap();
+    assert_eq!(alt_now.fingerprint, alt_saved.fingerprint);
+    assert!(!fakes.account(MAIN).has_session);
+    fakes.backend.shut_down();
+    assert!(fs::read(fakes.settings_file()).unwrap() == broken);
+}
+
+#[test]
+fn a_settings_file_that_is_not_utf8_text_is_never_rewritten_and_nothing_is_saved_from_it() {
+    refused_over_a_settings_file_that_is_not_text(None);
+}
+
+#[test]
+fn a_running_launcher_is_not_closed_for_a_settings_file_that_is_not_utf8_text() {
+    let knobs = json!({ "knobs": { "epic": { "runningAs": account_id_of(MAIN) } } });
+    refused_over_a_settings_file_that_is_not_text(Some(&knobs));
+}
+
+#[test]
+fn a_launcher_signed_in_as_the_account_that_exits_before_the_switch_reaches_it_is_started_and_its_sign_in_confirmed()
+ {
+    let knobs = json!({ "knobs": { "epic": { "runningAs": account_id_of(MAIN) } } });
+    let fakes = fakes(Some(&knobs));
+    fakes.fake.processes.exit_once_seen("EpicGamesLauncher.exe");
+    let states = fakes.play_with(MAIN, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("start").status, JobStepStatus::Done);
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert!(asked_of_the_machine(&fakes).contains(&"proc.start".to_owned()));
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_sign_in_by_hand_seen_at_the_first_look_keeps_its_session() {
+    let signed_in_as = "55555555555555555555555555555555";
+    let fakes = fakes(None);
+    let new = fakes.account("new@example.com");
+    // The user signs in on the launcher's page as soon as it is up, before the switch first looks at its log.
+    let launcher = Arc::clone(fakes.fake.epic.as_ref().unwrap());
+    let processes = Arc::clone(&fakes.fake.platform.processes);
+    let done = std::sync::atomic::AtomicBool::new(false);
+    fakes.fake.clock.before_sleep(move || {
+        let up = processes.is_running("EpicGamesLauncher.exe").unwrap();
+        if up && !done.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            launcher.sign_in_by_hand(Some(signed_in_as));
+        }
+    });
+    let states = fakes.play("new@example.com");
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert!(
+        step("recapture")
+            .detail
+            .starts_with("Stored New's session (fingerprint ")
+    );
+    let saved = block_on(fakes.backend.session(&new.id)).unwrap().session;
+    assert!(
+        saved
+            .expect("the sign-in by hand was saved")
+            .verified_at
+            .is_some()
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_sign_in_that_lands_while_the_launcher_closes_is_saved_before_the_switch_replaces_it() {
+    // The launcher runs on an account no One Launch account is linked to, so the plan has no outgoing sign-in to save.
+    let knobs = json!({ "knobs": { "epic": { "runningAs": "55555555555555555555555555555555" } } });
+    let fakes = fakes(Some(&knobs));
+    let main = fakes.account(MAIN);
+    assert!(
+        block_on(fakes.backend.session(&main.id))
+            .unwrap()
+            .session
+            .is_none()
+    );
+    // The user signs in as Main while the switch waits for the launcher to close: the first wait of the switch.
+    let launcher = Arc::clone(fakes.fake.epic.as_ref().unwrap());
+    let main_uid = account_id_of(MAIN);
+    let done = std::sync::atomic::AtomicBool::new(false);
+    fakes.fake.clock.before_sleep(move || {
+        if !done.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            launcher.sign_in_by_hand(Some(&main_uid));
+        }
+    });
+    let states = fakes.play_with(ALT, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("close").status, JobStepStatus::Done);
+    assert!(
+        step("capture")
+            .detail
+            .starts_with("Saved Main's session (fingerprint ")
+    );
+    assert!(
+        block_on(fakes.backend.session(&main.id))
+            .unwrap()
+            .session
+            .is_some()
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_sign_in_as_another_account_while_the_session_is_awaited_is_not_saved_for_the_first() {
+    let first = "55555555555555555555555555555555";
+    let fakes = fakes(None);
+    let new = fakes.account("new@example.com");
+    // The launcher logs a sign-in by hand as soon as it is up, and has not written its session yet; at the next look the user signs in as Main.
+    let launcher = Arc::clone(fakes.fake.epic.as_ref().unwrap());
+    let processes = Arc::clone(&fakes.fake.platform.processes);
+    let log = fakes
+        .scratch
+        .join("launchers")
+        .join("localappdata/EpicGamesLauncher/Saved/Logs/EpicGamesLauncher.log");
+    let main_uid = account_id_of(MAIN);
+    let looks = std::sync::atomic::AtomicU32::new(0);
+    fakes.fake.clock.before_sleep(move || {
+        if !processes.is_running("EpicGamesLauncher.exe").unwrap() {
+            return;
+        }
+        match looks.fetch_add(1, std::sync::atomic::Ordering::SeqCst) {
+            0 => {
+                let mut text = fs::read_to_string(&log).unwrap();
+                text.push_str(&format!(
+                    "[..]FAccountService::OnLoginComplete - 0 TRUE {first} \r\n"
+                ));
+                fs::write(&log, text).unwrap();
+            }
+            1 => launcher.sign_in_by_hand(Some(&main_uid)),
+            _ => {}
+        }
+    });
+    let states = fakes.play("new@example.com");
+    let last = states.last().unwrap();
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert!(
+        step("recapture")
+            .detail
+            .starts_with("Not saved: the launcher signed in as account "),
+        "{}",
+        step("recapture").detail
+    );
+    assert!(
+        block_on(fakes.backend.session(&new.id))
+            .unwrap()
+            .session
+            .is_none()
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_sign_in_as_another_account_while_the_session_is_awaited_ends_the_switch_as_a_wrong_account_and_starts_no_game()
+ {
+    let first = "55555555555555555555555555555555";
+    let fakes = fakes(None);
+    let new = fakes.account("new@example.com");
+    // As above: a sign-in by hand is logged as soon as the launcher is up, and at the next look the user signs in as Main. The hook never panics, so a failure here cannot strand the job.
+    let launcher = Arc::clone(fakes.fake.epic.as_ref().unwrap());
+    let processes = Arc::clone(&fakes.fake.platform.processes);
+    let log = fakes
+        .scratch
+        .join("launchers")
+        .join("localappdata/EpicGamesLauncher/Saved/Logs/EpicGamesLauncher.log");
+    let main_uid = account_id_of(MAIN);
+    let looks = std::sync::atomic::AtomicU32::new(0);
+    fakes.fake.clock.before_sleep(move || {
+        if !processes
+            .is_running("EpicGamesLauncher.exe")
+            .unwrap_or(false)
+        {
+            return;
+        }
+        match looks.fetch_add(1, std::sync::atomic::Ordering::SeqCst) {
+            0 => {
+                if let Ok(mut text) = fs::read_to_string(&log) {
+                    text.push_str(&format!(
+                        "[..]FAccountService::OnLoginComplete - 0 TRUE {first} \r\n"
+                    ));
+                    let _ = fs::write(&log, text);
+                }
+            }
+            1 => launcher.sign_in_by_hand(Some(&main_uid)),
+            _ => {}
+        }
+    });
+    let states = fakes.play("new@example.com");
+    let last = states.last().unwrap();
+    assert!(
+        last.state == JobState::Failed && !last.switched,
+        "{:?}",
+        last.error
+    );
+    assert_eq!(
+        last.error.as_deref(),
+        Some(
+            "Epic Games Launcher signed in as Main (account …333333) instead of New (…555555). Sign in to the launcher as new@example.com, or fix the launcher account ID on the account page."
+        )
+    );
+    let step = |id: &str| last.steps.iter().find(|step| step.id == id).unwrap();
+    assert_eq!(step("verify").status, JobStepStatus::Done);
+    assert_eq!(step("recapture").status, JobStepStatus::Failed);
+    assert!(
+        step("recapture")
+            .detail
+            .starts_with("Not saved: the launcher signed in as account …333333"),
+        "{}",
+        step("recapture").detail
+    );
+    assert_ne!(step("launch").status, JobStepStatus::Done);
+    // The snapshot went back, as for a wrong account seen at the sign-in, and no game was started.
+    assert_eq!(last.restored, Some(true));
+    assert!(fs::read(fakes.settings_file()).unwrap() == fixture_settings());
+    assert!(!asked_of_the_machine(&fakes).contains(&"shell.open".to_owned()));
+    assert!(
+        block_on(fakes.backend.session(&new.id))
+            .unwrap()
+            .session
+            .is_none()
+    );
     fakes.backend.shut_down();
 }

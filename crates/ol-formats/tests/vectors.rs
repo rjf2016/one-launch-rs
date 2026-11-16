@@ -7,7 +7,7 @@ use ol_formats::steam::login_log::{
     LoginStateEvent, SignInOutcome, classify_reason, latest_outcome, parse_login_states,
 };
 use ol_formats::steam::loginusers::{
-    LoginUsersError, MostRecentKey, SteamLoginUser, find_login_user, parse_login_users,
+    LoginUsersError, MostRecentKey, SteamLoginUser, find_login_user, marks_only, parse_login_users,
     plan_auto_login_rewrite,
 };
 use ol_formats::steam::manifests::{
@@ -15,7 +15,7 @@ use ol_formats::steam::manifests::{
 };
 use ol_formats::vdf::{self, VdfObject, VdfParseError, VdfValue};
 use ol_formats::winpath::{normalize_launcher_path, path_key};
-use ol_testkit::vectors::{Answer, UNPAIRED, plain, run, text};
+use ol_testkit::vectors::{Answer, UNPAIRED, Vectors, plain, run, text};
 use serde_json::{Value, json};
 
 const NOT_TEXT: &str = "not text, which the Rust type rules out";
@@ -244,6 +244,37 @@ fn plan_auto_login_rewrite_cases() {
             Err(error) => login_users_error(&error),
         }
     });
+}
+
+// The four leave the target unmarked: the rewrite changes no line of them, as the cases record.
+#[test]
+fn the_guard_blocks_only_the_recorded_rewrites_that_leave_the_target_unmarked() {
+    let mut checked = 0;
+    let mut blocked = Vec::new();
+    for case in Vectors::load("l1/steam/planAutoLoginRewrite.json").cases {
+        let Value::String(target) = plain(&case.args[1]) else {
+            continue;
+        };
+        if case.has_unpaired_surrogate() {
+            continue;
+        }
+        if let Ok(rewrite) = plan_auto_login_rewrite(&text(&case.args[0]), &target) {
+            checked += 1;
+            if !marks_only(&rewrite.text, &target) {
+                blocked.push(case.id);
+            }
+        }
+    }
+    println!("planAutoLoginRewrite: {checked} rewrites checked");
+    assert_eq!(
+        blocked,
+        [
+            "brace-with-comment",
+            "one-line-file",
+            "brace-on-key-line",
+            "cr-only-eol"
+        ]
+    );
 }
 
 #[test]

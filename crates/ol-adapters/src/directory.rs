@@ -15,6 +15,13 @@ pub struct AccountRef {
     pub has_secret: bool,
 }
 
+// The game a launch follows a switch with. Only Riot's client is started differently for one.
+#[derive(Clone, Copy)]
+pub struct GameRef<'a> {
+    pub launcher_game_id: &'a str,
+    pub name: &'a str,
+}
+
 // The accounts and saved sign-ins of one launcher.
 pub trait Directory {
     fn account_by_launcher_uid(&self, uid: &str) -> Result<Option<AccountRef>, AdapterError>;

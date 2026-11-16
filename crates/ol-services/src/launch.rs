@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
 use ol_adapters::steam::SwitchPreflight;
-use ol_adapters::{AccountRef, AdapterError};
+use ol_adapters::{AccountRef, AdapterError, GameRef};
 use ol_model::{
     Account, Ciphertext, Game, JobAccount, JobGame, JobState, JobStep, JobStepStatus,
     LaunchAttention, LaunchJob, LaunchPreflight, LaunchResult, SettingKey,
@@ -94,10 +94,15 @@ impl JobBoard {
         }
     }
 
-    fn begin(&self, job: &LaunchJob, cancel: &CancelToken) {
+    // Under the same lock as `close`, so a quit that lands after the first look at the board still refuses the job.
+    fn begin(&self, job: &LaunchJob, cancel: &CancelToken) -> Result<(), ServiceError> {
         let mut board = self.board();
+        if board.closing || board.current.is_some() {
+            return Err(ServiceError::Busy);
+        }
         board.current = Some(job.clone());
         board.cancel = Some(cancel.clone());
+        Ok(())
     }
 
     // A job that was accepted and could not be run after all: the next one is not refused for it.
@@ -156,12 +161,17 @@ fn take_preflight(
     launchers: &Launchers,
     data_dir: &Path,
     account: &Account,
+    game: Option<&Game>,
 ) -> Result<SwitchPreflight, ServiceError> {
     let configs = launchers.configs(&store.settings()?, data_dir);
     let directory = launchers.directory(store, account.launcher);
+    let game = game.map(|game| GameRef {
+        launcher_game_id: &game.launcher_game_id,
+        name: &game.name,
+    });
     launchers
         .adapter(account.launcher, &configs, &directory)?
-        .preflight(&account_ref(account))
+        .preflight(&account_ref(account), game)
         .map_err(ServiceError::adapter(account.launcher))
 }
 
@@ -175,8 +185,8 @@ pub fn preflight(
     game_id: Option<&str>,
 ) -> Result<LaunchPreflight, ServiceError> {
     let account = accounts::require(store, account_id)?;
-    game_for(store, &account, game_id)?;
-    let taken = take_preflight(store, launchers, data_dir, &account)?;
+    let game = game_for(store, &account, game_id)?;
+    let taken = take_preflight(store, launchers, data_dir, &account, game.as_ref())?;
     let needs_confirmation = taken.launcher_running && !taken.already_active;
     let answer = LaunchPreflight {
         plan: taken.plan.clone(),
@@ -254,7 +264,7 @@ pub fn prepare(
         };
         let preflight = match reused {
             Some((age, preflight)) if !stale_for_direct(age, &preflight) => preflight,
-            _ => take_preflight(store, launchers, data_dir, &account)?,
+            _ => take_preflight(store, launchers, data_dir, &account, game.as_ref())?,
         };
         if preflight.launcher_running && !preflight.already_active {
             return Err(ServiceError::adapter(account.launcher)(
@@ -330,7 +340,7 @@ pub fn prepare(
     };
     let configs = launchers.configs(&store.settings()?, data_dir);
     let cancel = CancelToken::new();
-    board.begin(&job, &cancel);
+    board.begin(&job, &cancel)?;
     Ok(PreparedJob {
         job,
         account: account_ref(&account),
@@ -477,25 +487,34 @@ pub fn run(
 
     let launch = |sink: &mut JobSink<'_>,
                   adapter: &Adapter<'_>,
-                  game: &JobGame|
+                  game: &JobGame,
+                  started_by_switch: bool|
      -> Result<(), ServiceError> {
         sink.set_launch(JobStepStatus::Running);
         sink.publish();
-        let command = adapter
-            .launch_game(game, &cancel)
+        let launched = adapter
+            .launch_game(game, started_by_switch, &cancel)
             .map_err(ServiceError::adapter(launcher))?;
         if let Some(step) = &mut sink.launch_step {
-            step.detail = format!("Sent {command}");
+            step.detail = format!("Sent {}", launched.command);
         }
         sink.set_launch(JobStepStatus::Done);
+        sink.job.hand_off = launched.hand_off;
         Ok(())
     };
 
     let ran: Result<(), ServiceError> = (|| {
         let adapter = launchers.adapter(launcher, &configs, &directory)?;
         if direct && let Some(game) = &game {
+            if cancel.is_cancelled() {
+                sink.set_launch(JobStepStatus::Skipped);
+                sink.job.error = Some(format!("Stopped before launching {}.", game.name));
+                sink.job.state = JobState::Cancelled;
+                result = LaunchResult::Cancelled;
+                return Ok(());
+            }
             sink.job.switched = true;
-            launch(&mut sink, &adapter, game)?;
+            launch(&mut sink, &adapter, game, false)?;
             touch_last_used = true;
             result = LaunchResult::Ok;
             sink.job.state = JobState::Done;
@@ -507,6 +526,10 @@ pub fn run(
         let options = SwitchOptions {
             confirm_close,
             cancel: &cancel,
+            game: game.as_ref().map(|game| GameRef {
+                launcher_game_id: &game.launcher_game_id,
+                name: &game.name,
+            }),
         };
         let switched = match run_switch(
             &adapter,
@@ -572,7 +595,9 @@ pub fn run(
                 touch_last_used = true;
                 return Ok(());
             }
-            launch(&mut sink, &adapter, game)?;
+            let started_by_switch =
+                switched.started_with_game.as_deref() == Some(game.launcher_game_id.as_str());
+            launch(&mut sink, &adapter, game, started_by_switch)?;
         }
         touch_last_used = true;
         result = LaunchResult::Ok;
@@ -631,4 +656,107 @@ pub fn settle(store: &Store, finished: FinishedJob, now: &str, changed: &dyn Fn(
 pub fn abandon(finished: FinishedJob, changed: &dyn Fn(&LaunchJob)) {
     finished.board.finish(&finished.job);
     changed(&finished.job);
+}
+
+#[cfg(test)]
+mod tests {
+    use ol_model::LauncherId;
+    use ol_testkit::{Scratch, oracle};
+    use ol_vault::FakeVault;
+    use time::macros::datetime;
+
+    use super::*;
+    use crate::accounts::NewAccount;
+    use crate::sessions::StoreWork;
+
+    struct NoDatabase;
+
+    impl StoreThread for NoDatabase {
+        fn run(&self, _: StoreWork) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn a_job_stopped_before_it_runs_starts_no_game() {
+        let scratch = Scratch::new("launch-direct");
+        let launchers_dir = scratch.join("launchers");
+        let data_dir = scratch.join("data");
+        ol_sim::lay_down(
+            &oracle("fixtures/dev-only/fake-launchers/all-four"),
+            &oracle("fixtures/launchers"),
+            &launchers_dir,
+        )
+        .unwrap();
+        let running = serde_json::json!({ "knobs": { "steam": { "runningAs": "user_1" } } });
+        ol_sim::write_knobs(&launchers_dir, &running).unwrap();
+        let fake = ol_sim::materialize(
+            &launchers_dir,
+            &data_dir,
+            datetime!(2026-11-06 16:46:23 UTC),
+        )
+        .unwrap();
+        let mut launchers = Launchers::on(fake.platform.clone(), Arc::new(FakeVault));
+        launchers.steam_timing = ol_adapters::steam::Timing::with(&fake.steam_timing);
+        launchers
+            .steam_default_dir
+            .clone_from(&fake.steam_default_dir);
+        let (store, _) = crate::data_folder::open(&data_dir, "9.8.7").unwrap();
+        let seeded = fake
+            .seed
+            .accounts
+            .iter()
+            .find(|account| account.login == "user_1")
+            .unwrap();
+        let now = "2026-11-06T16:46:23.000Z";
+        let account = accounts::create(
+            &store,
+            &FakeVault,
+            &NewAccount {
+                launcher: LauncherId::Steam,
+                display_name: seeded.display_name.clone(),
+                login: seeded.login.clone(),
+                launcher_uid: seeded.launcher_uid.clone(),
+                password: None,
+                tags: Vec::new(),
+                notes: String::new(),
+            },
+            now,
+        )
+        .unwrap();
+        let configs = launchers.configs(&store.settings().unwrap(), &data_dir);
+        crate::launchers::scan_library(&store, &launchers, &configs, now);
+        let game = store
+            .installed_games()
+            .unwrap()
+            .into_iter()
+            .find(|game| game.launcher == LauncherId::Steam)
+            .unwrap();
+
+        let board = JobBoard::default();
+        let prepared = prepare(
+            &store,
+            &launchers,
+            &data_dir,
+            &board,
+            &mut LastPreflight::default(),
+            &StartInput {
+                account_id: account.id,
+                game_id: Some(game.id),
+                confirm_close: false,
+            },
+        )
+        .unwrap();
+        assert!(prepared.job().direct);
+        board.cancel(&prepared.job().id).unwrap();
+        let finished = run(prepared, Arc::new(NoDatabase), &|_| {});
+        assert_eq!(finished.job.state, JobState::Cancelled);
+        assert_eq!(finished.result, LaunchResult::Cancelled);
+        let opened = fake.log.snapshot().iter().any(|event| {
+            event["op"]
+                .as_str()
+                .is_some_and(|op| op.starts_with("shell"))
+        });
+        assert!(!opened, "no launch request was sent");
+    }
 }
