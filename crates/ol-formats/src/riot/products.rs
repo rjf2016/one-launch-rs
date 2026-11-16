@@ -125,6 +125,11 @@ impl RiotProductId {
     pub fn patchline(&self) -> &str {
         &self.patchline
     }
+
+    // `<product>.<patchline>` in lower case, as the client's log and settings name the product.
+    pub fn key(&self) -> String {
+        format!("{}.{}", self.product, self.patchline)
+    }
 }
 
 // `valorant.live` gives its parts. `Riot Client` and `league_of_legends.live.game_patch` are not products.
