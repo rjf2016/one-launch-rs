@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use futures_lite::future::block_on;
 use ol_api::launchers::{EpicMachine, EpicTiming, Launchers, NewAccount, Secret, SteamTiming};
-use ol_api::{Backend, StartLaunch};
+use ol_api::{ApiError, Backend, StartLaunch};
 use ol_model::{JobState, LaunchJob, LauncherId, SwitchPlan};
 use ol_sim::FakeLaunchers;
 use ol_testkit::vectors::sha256_hex;
@@ -51,14 +51,19 @@ impl Fakes {
         epics.next().expect("the scan found Epic's game")
     }
 
-    // Every state the job went through, the last one last.
     fn play(&self, login: &str) -> Vec<LaunchJob> {
+        self.play_with(login, false)
+            .expect("the switch is accepted")
+    }
+
+    // Every state the job went through, the last one last; or why the switch was not accepted.
+    fn play_with(&self, login: &str, confirm_close: bool) -> Result<Vec<LaunchJob>, ApiError> {
         let start = StartLaunch {
             account_id: self.account(login).id,
             game_id: Some(self.game().id),
-            confirm_close: false,
+            confirm_close,
         };
-        block_on(self.backend.start_launch(start)).expect("the switch is accepted");
+        block_on(self.backend.start_launch(start))?;
         let mut states = Vec::new();
         loop {
             let job = self
@@ -68,7 +73,7 @@ impl Fakes {
             let ended = job.state != JobState::Running;
             states.push(job);
             if ended {
-                return states;
+                return Ok(states);
             }
         }
     }
@@ -463,6 +468,91 @@ fn a_switch_that_fails_after_its_write_puts_the_file_back_from_its_encrypted_cop
     }
     assert!(fs::read(fakes.settings_file()).unwrap() == fixture_settings());
     assert!(block_on(fakes.backend.recovery()).unwrap().is_none());
+    fakes.backend.shut_down();
+}
+
+// What the fake machine was asked to do to a process or to a launcher's file, in order.
+fn asked_of_the_machine(fakes: &Fakes) -> Vec<String> {
+    let events = fakes.fake.log.snapshot();
+    let named = events.iter().filter_map(|event| {
+        let op = event["op"].as_str()?;
+        let file = event["path"].as_str().unwrap_or_default();
+        let manifest = file.ends_with("manifest.json");
+        (!manifest).then(|| op.to_owned())
+    });
+    named.collect()
+}
+
+fn account_id_of(login: &str) -> String {
+    let scenario = scenario();
+    let accounts = scenario["seed"]["accounts"].as_array().unwrap();
+    let account = accounts
+        .iter()
+        .find(|account| account["launcher"] == "epic" && account["login"] == login)
+        .unwrap();
+    account["launcherUid"].as_str().unwrap().to_owned()
+}
+
+#[test]
+fn a_running_launcher_is_closed_by_its_window_once_the_user_has_said_yes() {
+    let knobs = json!({ "knobs": { "epic": { "runningAs": account_id_of(MAIN) } } });
+    let fakes = fakes(Some(&knobs));
+    let (alt, game) = (fakes.account(ALT), fakes.game());
+    let preflight = block_on(fakes.backend.launch_preflight(&alt.id, Some(&game.id))).unwrap();
+    assert!(
+        preflight.launcher_running && preflight.needs_confirmation && !preflight.already_active
+    );
+    assert_eq!(
+        preflight.close_message.as_deref(),
+        Some("Epic Games Launcher is running. Switching closes it.")
+    );
+
+    let unconfirmed = fakes.play_with(ALT, false).err().expect("a refusal");
+    assert_eq!(unconfirmed.code, "CONFIRM_REQUIRED");
+    assert!(asked_of_the_machine(&fakes).is_empty());
+
+    let states = fakes.play_with(ALT, true).unwrap();
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done && last.switched);
+    let detail = |id: &str| {
+        let step = last.steps.iter().find(|step| step.id == id).unwrap();
+        step.detail.clone()
+    };
+    assert_eq!(detail("close"), "Launcher closed.");
+    assert!(detail("capture").starts_with("Saved Main's session (fingerprint "));
+    assert_eq!(
+        asked_of_the_machine(&fakes),
+        ["proc.close", "file.write", "proc.start", "shell.open"]
+    );
+    assert!(
+        block_on(fakes.backend.session(&fakes.account(MAIN).id))
+            .unwrap()
+            .session
+            .is_some()
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_launcher_that_runs_as_the_account_is_left_alone_and_the_game_starts_at_once() {
+    let knobs = json!({ "knobs": { "epic": { "runningAs": account_id_of(ALT) } } });
+    let fakes = fakes(Some(&knobs));
+    let (alt, game) = (fakes.account(ALT), fakes.game());
+    let preflight = block_on(fakes.backend.launch_preflight(&alt.id, Some(&game.id))).unwrap();
+    assert!(
+        preflight.launcher_running && preflight.already_active && !preflight.needs_confirmation
+    );
+
+    let states = fakes.play(ALT);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done && last.direct && last.backup_id.is_none());
+    assert_eq!(asked_of_the_machine(&fakes), ["shell.open"]);
+    assert!(fs::read(fakes.settings_file()).unwrap() == fixture_settings());
+    assert!(
+        block_on(fakes.backend.backups(LauncherId::Epic))
+            .unwrap()
+            .is_empty()
+    );
     fakes.backend.shut_down();
 }
 

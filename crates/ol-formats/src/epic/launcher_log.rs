@@ -7,7 +7,8 @@ use regex::Regex;
 use crate::js::{self, WHITESPACE_CLASS as WS};
 use crate::steam::login_log::MAX_LOG_LINE_LENGTH;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+// No Debug: an event can hold an account id.
+#[derive(Clone, PartialEq, Eq)]
 pub enum LogEvent {
     AutoSignIn,
     ManualSignIn,
@@ -112,7 +113,7 @@ pub fn parse_log_events(text: &str) -> Vec<LogEvent> {
     events
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum SignInOutcome {
     SignedIn {
         account_id: String,

@@ -20,9 +20,10 @@ What is known to be missing, unchecked or unlike the Electron app, and the slice
 
 ## Launch dialog, banner and recovery dialog (slices 3 to 5)
 
-What is there: a click on a card or on an entry of the Recent strip opens the Play flow (the account list, the check, the confirm stage with the plan behind "Details", preview mode, the running job with its phases and steps, the hand-over panel, every end of a job), the banner stands for the job while the dialog is closed, and a start asks about a switch the last run did not finish. All of it on fake launchers only: see Steam below.
+What is there: a click on a card or on an entry of the Recent strip opens the Play flow (the account list, the check, the confirm stage with the plan behind "Details", preview mode, the running job with its phases and steps, the hand-over panel, every end of a job), the banner stands for the job while the dialog is closed, and a start asks about a switch the last run did not finish. All of it on fake launchers only: see Steam and Epic below.
 
-- Epic Games, Battle.net and Riot Games have no adapter. A game of theirs opens the dialog, which says that the launcher is not available in this build yet. In the app without the feature `fake` every game does, because that build reaches no launcher at all.
+- Battle.net and Riot Games have no adapter. A game of theirs opens the dialog, which says that the launcher is not available in this build yet. In the app without the feature `fake` every game does, because that build reaches no launcher at all.
+- The Play flow of an Epic game was not run in the window. `ol-ui` was not changed for Epic: it asks the backend the same questions as for Steam, and the backend's answers are what the replays and the tests of `ol-api` hold. The owner's check is to play Rocket League® as Alt on fake launchers.
 - Without a way to reach the launcher of an unfinished switch, nothing is asked at start and the journal stays where it is. The app without the feature `fake` therefore never asks.
 - The hand-over panel has no "Copy login" and no "Copy password": the copy to the clipboard is not built (`accounts:copy`).
 - An empty account list says "No Steam accounts yet." and offers Close. "Import Steam accounts" and "Add … account" wait for the import dialog and the Accounts screen, and so does the sentence that points to them.
@@ -53,19 +54,32 @@ What is there: a click on a card or on an entry of the Recent strip opens the Pl
 What is there: on fake launchers the backend finds Steam, scans its games into the Library, lists and imports the accounts it remembers, plans and runs a switch (snapshot, journal, the writes, rollback, restore, recovery of an interrupted switch) and starts a game. Proven against the oracle: the 21 files of `oracle/l1/steam` and the two path files of `oracle/l1/core` (1,468 of 1,482 cases; the 14 others hold half a surrogate pair, a fraction or a number where the Rust type takes only text or a whole number); nine scripts of `oracle/l2` and the Steam half of a tenth; five of the Steam adapter's goldens in `oracle/tests`.
 
 - Nothing reaches a real launcher. The registry, process, shell and clock ports have only their fakes (`ol-platform-fake`), and the file port only `ScratchFiles`, which refuses every path outside the folders it was given. `Backend::start`, which the app uses, has no launchers: every launcher command answers `NOT_IMPLEMENTED` and a scan finds nothing. The real ports in `ol-platform-win` wait for the owner's go-ahead, and the first real switch is the owner's.
-- The app reaches the fakes only when built with the feature `fake` and started with `--fake-launchers=<folder>`. The fake machine's file port reaches that folder and `backups\` of the data folder, and nothing else. The folder is held to the plain-path rule of the data folder, and a scenario is laid down only in an empty or a new folder. Refused are a folder that holds anything but a scenario's own files and folders, and one whose `steam\steam.exe` is not an empty file. A folder that passes both is taken at its word.
+- The app reaches the fakes only when built with the feature `fake` and started with `--fake-launchers=<folder>`. The fake machine's file port reaches that folder and `backups\` of the data folder, and nothing else. The folder is held to the plain-path rule of the data folder, and a scenario is laid down only in an empty or a new folder. Refused are a folder that holds anything but a scenario's own files and folders, and one whose `steam\steam.exe` or `EpicGamesLauncher.exe` is not an empty file. A folder that passes both is taken at its word.
 - A fake machine in the app keeps real time (`FakeClock::following_the_system`), so the age of a remembered session is counted from today: from 2026-11-10 on, `user_1` of the fixtures is past 60 days and every plan for it carries the warning about an expired session, which the Electron app's shots of 2026-11-06 do not show.
-- Of a scenario's seed the accounts and the settings are applied. Its saved sign-ins (`sessions`) are not: no launcher that has them is built.
+- Of a scenario's seed the accounts, the settings and Epic's saved sign-ins are applied. Battle.net's and Riot's saved sign-ins are not: neither launcher is built.
 - Still without an interface: the account import and the Backups tab.
-- The replay compares the Steam part of a recorded run: every platform event, the job events, and of the final state the accounts, Steam's games, the launch history, the settings, the journal, the backups, `loginusers.vdf` and Steam's registry values. Not compared, because nothing builds them yet: the other launchers' games, files, registry values and saved sign-ins, artwork, the vault probe and the log lines.
-- Not replayed: `play-all`, `play-epic`, `play-battlenet`, `play-riot`, `game-running`, `needs-update`, `riot-stay-signed-in`, `unowned`, `wrong-account`, `recovery` and `quit-during-switch` (another launcher's), `first-run` (launcher status), and the Epic half of `handover`. The replay has no `crash` step: a thread cannot be ended the way a process can.
+- The replay compares the Steam and Epic parts of a recorded run: every platform event, the job events, and of the final state the accounts, the two launchers' games and saved sign-ins (each by the digest of what the vault sealed), the launch history, the settings, the journal, the backups, `loginusers.vdf`, `GameUserSettings.ini` and the two launchers' registry values. Not compared, because nothing builds them yet: Battle.net's and Riot's games, files, registry values and saved sign-ins, artwork, the vault probe, the log lines and the copies to the clipboard.
+- Not replayed: `play-battlenet`, `play-riot`, `game-running`, `needs-update` and `riot-stay-signed-in` (another launcher's), `first-run` (launcher status), and of `play-all` and `unowned` everything from their first Battle.net step on, their final state included.
+- A `crash` step of the replay does not end a process: it leaves the switch's thread standing at the wait it is in, for good, and starts the app again beside it. What is on disk is what a crash would leave; the first database connection stays open until the test ends.
 - `oracle/tests/goldens`: of the 74 Steam adapter goldens only the five dry-run plans are checked. The 69 others (real switches, preflights, restores, health checks) and the pipeline goldens need the set-up of each Electron test rebuilt.
 - Not built of the Steam adapter: `installFromExe` (Locate), the health check and `launchers:status`.
 - Not built around it: the rules of `settings:set` (`Backend::set_setting` stores what it is given), changing or deleting an account and its password, the copy to the clipboard (`accounts:copy`), the artwork queue after a scan, the `instant` flag of `launch:start` that lets the window hide, and the prompt when the app quits during a switch (`Backend::shut_down` stops the switch and waits for it).
 - Nothing is logged: the Electron app writes a line for each start, refusal, failure and rollback of a switch, with account names masked.
-- A snapshot file is always stored as it is. The encrypted form (`<relative>.enc`, for Epic's and Riot's files) and pinned snapshots are neither written nor read.
-- The launch job runs on a thread of its own and the adapter is plain blocking code over the ports, where `architecture.md` planned one thread and an executor. The owner has not decided whether to keep it.
-- Launcher-owned writes are the four functions at the top of `crates/ol-services/src/switch.rs`. Nothing but review keeps another module from asking a writer port for the same.
+- The launch job runs on a thread of its own and the adapter is plain blocking code over the ports, where `architecture.md` planned one thread and an executor. The owner has not decided whether to keep it. Since Epic, that thread asks the database's thread for what a switch needs of the accounts and their saved sign-ins (`StoreThread`), and waits for the answer.
+- Launcher-owned writes are the seven functions at the top of `crates/ol-services/src/switch.rs`: Steam's file and its two registry values, Epic's file, the restore of each launcher, and the one write of a snapshot's files that both restores share. Nothing but review keeps another module from asking a writer port for the same.
+
+## Epic (slice 4)
+
+What is there: on fake launchers the backend finds the Epic Games Launcher, scans its games into the Library, lists the accounts that signed in on the PC, says what is saved of an account's sign-in and whose session the launcher holds now (`Backend::session`), plans and runs a switch (the window close, the outgoing session saved, the encrypted snapshot, the write of `GameUserSettings.ini`, the sign-in read from the launcher's log, the hand-over, the new session saved, a wrong account, rollback, restore, recovery) and starts a game. Proven against the oracle: the 13 files of `oracle/l1/epic` (1,010 of 1,044 cases; of the 34 others 10 hold half a surrogate pair, 18 are refusals of text that is not JSON, worded by the JavaScript engine, 4 are nested deeper than 128 levels, 1 holds a number past the largest float and 1 is a session with its keys in another order than the Rust type's); of `oracle/l2`, `play-epic`, `handover`, `wrong-account`, `quit-during-switch` and `recovery` in full, and `play-all` and `unowned` up to their first Battle.net step.
+
+- A saved sign-in rests in two places: the column `blob_enc` of `launcher_sessions`, sealed by the vault, and a snapshot's copy of `GameUserSettings.ini`, sealed the same way as `<relative>.enc`. In memory it is wiped after use where it is a value of its own (`Secret`, `EpicSessionBlob`, the JSON around it). The text of the settings file, which holds it once it is written, is not wiped.
+- `Backend::seed_session` stores a sign-in as it is given. Only the fake launchers' seed calls it, but it is in every build: the feature `fake` does not gate it.
+- Not built: saving the launcher's current session from an account's page (`sessions:capture`), forgetting one (`sessions:forget`), `installFromExe` (Locate), the health check and `launchers:status`.
+- The 48 Epic adapter goldens of `oracle/tests/goldens` are not checked.
+- The folders `%LOCALAPPDATA%` and `%ProgramData%` come from whoever builds `Launchers` (`EpicMachine`). The fakes put the scenario's in. The default is where the Electron app falls back to when Windows names none, because only `ol-platform-win` reads the environment: the real ports have to put the real ones in.
+- Not exercised by any test or recorded run: a launcher that starts itself again after it was closed (the three tries of the shutdown), two settings files at once (`Config\Windows` and `Config\WindowsEditor`), a session that changes at every start (`rotateOnStart`), and a sign-in that fails for a reason other than a refused token.
+- Whether a snapshot is pinned (it holds a sign-in no account owns) is decided and written; the end of `unowned`, which restores such a snapshot, is not replayed.
+
 ## Differences from the Electron app, on purpose
 
 None of those about stored values and launcher files is visible on data the app wrote itself. The last four are about the window and the fake launchers.
@@ -93,6 +107,17 @@ None of those about stored values and launcher files is visible on data the app 
 - A fake run writes no `fake-platform.json` into the data folder. The Electron app's report of what its fake platform was asked to do is a development file.
 - The fake launchers are named by the arguments `--fake-launchers`, `--fake-scenario` and `--fake-fixtures`, and the app itself lays the scenario down. The Electron app reads `ONELAUNCH_FAKE_LAUNCHERS` and leaves the laying down to its driver script.
 
+Since Epic. The first is the one a user could meet, and is the owner's to confirm.
+
+- When the vault cannot encrypt, a snapshot of `GameUserSettings.ini` fails and the switch with it, before anything is written. The Electron app stores the copy in the clear and writes a warning to its log.
+- A saved sign-in that is not JSON is refused with "Stored Epic session has an unexpected shape", and a manifest that is not JSON with the Rust JSON reader's reason. The Electron app gives the JavaScript engine's reason in both.
+- A saved sign-in, an `.item` file or `LauncherInstalled.dat` nested deeper than 128 levels, or holding a number past the largest float, does not read. The Electron app reads them.
+- Epic's games are ordered by their lower-cased names, and its `.item` files are read in the order of their lower-cased names, so of two manifests for one app the first by name counts. The Electron app takes the order the folder lists them in.
+- An `InstallSize` that is not a whole number counts as no size. Nothing stores or shows a size yet.
+- A relative program path in the command of the `com.epicgames.launcher` link is not resolved against the folder the app runs in: it finds no launcher.
+- `epic.path` and `epic.launchUri` are read when the job starts, like the settings of a Steam switch.
+- The scripted Epic launcher stamps its log with the fake machine's clock. The Electron app's stamps it with the system's.
+
 ## Tray (slice 5)
 
 - The tray listens for raw mouse messages. Listen for `NIN_SELECT` and `NIN_KEYSELECT` instead, and change the probe to match.
@@ -114,4 +139,5 @@ None of those about stored values and launcher files is visible on data the app 
 - The snap flyout, mouse drags and resizes, real tray clicks, the clipboard keys, another display scale.
 - With the mouse, which the capture steps cannot stand in for: the wheel over a long plan in the launch dialog and over the Recent strip, and a double-click on a card.
 - `--doctor` on a copy of the real data folder.
-- One real Steam switch, once the real ports exist.
+- One real Steam switch and one real Epic switch, once the real ports exist.
+- The Play flow of an Epic game in the window, on fake launchers.

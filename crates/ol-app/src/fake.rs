@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context as _, bail};
-use ol_api::launchers::{NewAccount, Secret, SteamTiming};
+use ol_api::launchers::{EpicMachine, EpicTiming, NewAccount, Secret, SteamTiming};
 use ol_api::{ApiError, Backend};
 use ol_model::SettingKey;
 use ol_sim::Seed;
@@ -12,7 +12,11 @@ use ol_sim::Seed;
 use crate::args::FakeMachine;
 
 const SCENARIO: &str = "scenario.json";
-const STEAM_PROGRAM: &str = r"steam\steam.exe";
+// The launchers a fake machine starts and writes beside.
+const PROGRAMS: [&str; 2] = [
+    r"steam\steam.exe",
+    r"epic\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe",
+];
 // What a laid-down scenario holds at its top: its two files, and the folders its launchers and their files live in.
 const SCENARIO_ENTRIES: [&str; 11] = [
     SCENARIO,
@@ -63,11 +67,11 @@ pub fn start(
             );
         }
     }
-    // The fake machine writes beside this program. A scenario's is an empty file; one with content is a real launcher's.
-    let real_program =
-        fs::metadata(folder.join(STEAM_PROGRAM)).is_ok_and(|program| program.len() > 0);
-    if real_program {
-        bail!("--fake-launchers names a folder with a real {STEAM_PROGRAM} in it");
+    // The fake machine writes beside these programs. A scenario's is an empty file; one with content is a real launcher's.
+    for program in PROGRAMS {
+        if fs::metadata(folder.join(program)).is_ok_and(|program| program.len() > 0) {
+            bail!("--fake-launchers names a folder with a real {program} in it");
+        }
     }
     let fake = ol_sim::materialize_in_real_time(folder, data_dir)
         .context("--fake-launchers does not hold a scenario that reads")?;
@@ -76,11 +80,17 @@ pub fn start(
     launchers
         .steam_default_dir
         .clone_from(&fake.steam_default_dir);
+    launchers.epic = EpicMachine {
+        timing: EpicTiming::with(&fake.epic_timing),
+        default_dir: fake.epic_default_dir.clone(),
+        local_app_data: fake.local_app_data.clone(),
+        program_data: fake.program_data.clone(),
+    };
     let backend = Backend::start_with(data_dir.to_path_buf(), version, launchers, None);
     Ok((backend, fake.seed))
 }
 
-// What the Electron app does once for a data folder that holds no account: the scenario's accounts and settings.
+// What the Electron app does once for a data folder that holds no account: the scenario's accounts, the sign-ins it saves for them, made-up ones, and its settings.
 pub async fn seed(backend: &Backend, seed: Seed) -> Result<(), ApiError> {
     if !backend.accounts().await?.is_empty() {
         return Ok(());
@@ -97,6 +107,21 @@ pub async fn seed(backend: &Backend, seed: Seed) -> Result<(), ApiError> {
                 notes: String::new(),
             })
             .await?;
+    }
+    let accounts = backend.accounts().await?;
+    for session in seed.sessions {
+        let owner = accounts
+            .iter()
+            .find(|account| account.launcher == session.launcher && account.login == session.login);
+        if let Some(owner) = owner {
+            backend
+                .seed_session(
+                    &owner.id,
+                    Some(session.launcher_uid),
+                    Secret::new(session.blob),
+                )
+                .await?;
+        }
     }
     for (key, value) in seed.settings {
         if let Some(key) = SettingKey::parse(&key) {
