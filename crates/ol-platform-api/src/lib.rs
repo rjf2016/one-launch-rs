@@ -1,5 +1,13 @@
 #![forbid(unsafe_code)]
 
+mod ports;
+
+pub use ports::{
+    CancelToken, Clock, FileReader, FileWriter, Files, Hive, Platform, ProcessArg, ProcessError,
+    ProcessInfo, ProcessLister, ProcessRunner, Processes, Registry, RegistryError, RegistryReader,
+    RegistryWriter, Shell, ShellError,
+};
+
 use thiserror::Error;
 use zeroize::Zeroizing;
 

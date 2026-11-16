@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+pub mod vectors;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};

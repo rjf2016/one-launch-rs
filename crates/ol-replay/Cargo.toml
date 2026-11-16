@@ -6,16 +6,21 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+futures-lite.workspace = true
 ol-api.workspace = true
+ol-formats.workspace = true
 ol-model.workspace = true
 ol-platform-api.workspace = true
 ol-platform-fake.workspace = true
 ol-runtime.workspace = true
 ol-sim.workspace = true
 ol-testkit.workspace = true
+ol-vault.workspace = true
+rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+time.workspace = true
 
 [lints]
 workspace = true

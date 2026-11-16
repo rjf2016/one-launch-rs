@@ -2,6 +2,7 @@
 
 mod backup;
 mod error;
+mod launchers;
 mod migrations;
 mod open;
 mod read;
@@ -16,6 +17,7 @@ use time::OffsetDateTime;
 use time::macros::format_description;
 
 pub use error::StoreError;
+pub use launchers::{GameSync, NewAccount};
 pub use open::{MigrationReport, Snapshot};
 pub use read::{Ciphertexts, RowCounts};
 

@@ -1,0 +1,364 @@
+// What a run left behind, read from the disk and the fake registry, and the rules that make two runs comparable: ids become aliases, the two folders become {launchers} and {data}, and a time becomes <ts> where the script's normalisation says so.
+
+use std::fs;
+use std::path::Path;
+
+use ol_formats::steam::loginusers::parse_login_users;
+use ol_model::{Ciphertext, LauncherId};
+use ol_platform_fake::{FakeRegistry, RegistryValue};
+use ol_testkit::vectors::sha256_hex;
+use ol_vault::Vault;
+use rusqlite::types::ValueRef;
+use rusqlite::{Connection, OpenFlags};
+use serde_json::{Map, Value, json};
+
+use crate::ReplayError;
+
+const STEAM_LOGIN_USERS: &str = "steam/config/loginusers.vdf";
+
+pub struct Read {
+    pub state: Value,
+    // Every id the run made, with its alias.
+    pub ids: Vec<(String, String)>,
+}
+
+pub struct Aliases<'a> {
+    pub launchers_dir: &'a Path,
+    pub data_dir: &'a Path,
+    pub jobs: &'a [String],
+    pub ids: Vec<(String, String)>,
+}
+
+// Every value of the fake registry, ordered by path, as the fake holds it.
+pub fn registry(registry: &FakeRegistry) -> Vec<Value> {
+    let mut values = registry.dump();
+    values.sort_by(|a, b| a.0.cmp(&b.0));
+    values
+        .into_iter()
+        .map(|(path, value)| {
+            let (kind, data) = match value {
+                RegistryValue::Text(text) => ("REG_SZ", text),
+                RegistryValue::Dword(number) => ("REG_DWORD", format!("{number:#x}")),
+                RegistryValue::Binary(hex) => ("REG_BINARY", hex),
+            };
+            json!({ "path": path, "type": kind, "data": data })
+        })
+        .collect()
+}
+
+// A launcher's snapshots in the order they were taken.
+pub fn snapshot_ids(data_dir: &Path, launcher: LauncherId) -> Vec<String> {
+    let folder = data_dir.join("backups").join(launcher.as_str());
+    let mut ids: Vec<String> = fs::read_dir(folder)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|entry| entry.path().join("manifest.json").is_file())
+                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                .collect()
+        })
+        .unwrap_or_default();
+    ids.sort();
+    ids
+}
+
+fn sealed(value: ValueRef<'_>, vault: &dyn Vault) -> Value {
+    let plain = match value {
+        ValueRef::Blob(bytes) => vault
+            .decrypt(&Ciphertext::new(bytes.to_vec()))
+            .ok()
+            .map(|secret| sha256_hex(secret.expose().as_bytes())),
+        _ => None,
+    };
+    json!({ "present": !matches!(value, ValueRef::Null), "plaintextSha256": plain })
+}
+
+fn rows(
+    database: &Connection,
+    sql: &str,
+    vault: &dyn Vault,
+) -> Result<Vec<Map<String, Value>>, ReplayError> {
+    let mut statement = database.prepare(sql)?;
+    let names: Vec<String> = statement.column_names().map(str::to_owned).collect();
+    let mut found = statement.query([])?;
+    let mut out = Vec::new();
+    while let Some(row) = found.next()? {
+        let mut fields = Map::new();
+        for (index, name) in names.iter().enumerate() {
+            let value = row.get_ref(index)?;
+            let shown = if name.ends_with("_enc") {
+                sealed(value, vault)
+            } else {
+                match value {
+                    ValueRef::Null => Value::Null,
+                    ValueRef::Integer(number) => number.into(),
+                    ValueRef::Real(number) => number.into(),
+                    ValueRef::Text(text) => String::from_utf8_lossy(text).into_owned().into(),
+                    ValueRef::Blob(bytes) => sha256_hex(bytes).into(),
+                }
+            };
+            fields.insert(name.clone(), shown);
+        }
+        out.push(fields);
+    }
+    Ok(out)
+}
+
+fn text(row: &Map<String, Value>, column: &str) -> String {
+    row[column].as_str().unwrap_or_default().to_owned()
+}
+
+fn backups(data_dir: &Path, launcher: LauncherId) -> Vec<Value> {
+    snapshot_ids(data_dir, launcher)
+        .into_iter()
+        .filter_map(|id| {
+            let folder = data_dir.join("backups").join(launcher.as_str()).join(&id);
+            let manifest: Value =
+                serde_json::from_slice(&fs::read(folder.join("manifest.json")).ok()?).ok()?;
+            let files: Vec<Value> = manifest["files"]
+                .as_array()?
+                .iter()
+                .map(|file| {
+                    let relative = file["relative"].as_str().unwrap_or_default();
+                    let stored = fs::read(folder.join(relative)).ok();
+                    json!({
+                        "relative": relative,
+                        "source": file["source"],
+                        "existed": file["existed"],
+                        "bytes": file["bytes"],
+                        "encrypted": file["encrypted"] == true,
+                        "sha256": stored.map(|bytes| sha256_hex(&bytes)),
+                    })
+                })
+                .collect();
+            Some(json!({
+                "id": id,
+                "createdAt": manifest["createdAt"],
+                "reason": manifest["reason"],
+                "pinned": manifest.get("pinned").cloned().unwrap_or(Value::Null),
+                "meta": manifest["meta"],
+                "files": files,
+            }))
+        })
+        .collect()
+}
+
+fn login_users(launchers_dir: &Path) -> Option<Value> {
+    let bytes = fs::read(launchers_dir.join(STEAM_LOGIN_USERS)).ok()?;
+    let parsed: Vec<Value> = parse_login_users(&String::from_utf8_lossy(&bytes))
+        .ok()?
+        .iter()
+        .map(|user| {
+            json!({
+                "steamId64": user.steam_id64,
+                "accountName": user.account_name,
+                "personaName": user.persona_name,
+                "rememberPassword": user.remember_password,
+                "mostRecent": user.most_recent,
+                "timestamp": user.timestamp,
+                "mostRecentKeys": user.most_recent_keys.iter().map(|key| key.as_str()).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    Some(json!({ "bytes": bytes.len(), "sha256": sha256_hex(&bytes), "parsed": parsed }))
+}
+
+// The final state, as the app left it once it had quit.
+pub fn read(
+    data_dir: &Path,
+    launchers_dir: &Path,
+    vault: &dyn Vault,
+    registry: &[Value],
+) -> Result<Read, ReplayError> {
+    let database = Connection::open_with_flags(
+        data_dir.join("onelaunch.db"),
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )?;
+    let version: i64 = database.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    let table = |sql: &str| rows(&database, sql, vault);
+    let accounts = table(
+        "SELECT id, launcher, display_name, login, secret_enc, launcher_uid, tags, notes, last_used_at, created_at, updated_at
+         FROM accounts ORDER BY launcher, login",
+    )?;
+    let games = table(
+        "SELECT id, launcher, launcher_game_id, name, install_path, installed, last_seen_at, needs_update, last_played_at
+         FROM games ORDER BY launcher, launcher_game_id",
+    )?;
+    let history = table(
+        "SELECT id, game_id, account_id, launched_at, result FROM launch_history ORDER BY rowid",
+    )?;
+    let settings =
+        table("SELECT key, value FROM settings WHERE key <> 'window.bounds' ORDER BY key")?;
+
+    let mut ids = Vec::new();
+    for account in &accounts {
+        ids.push((
+            text(account, "id"),
+            format!(
+                "@acct:{}:{}",
+                text(account, "launcher"),
+                text(account, "login")
+            ),
+        ));
+    }
+    for game in &games {
+        ids.push((
+            text(game, "id"),
+            format!(
+                "@game:{}:{}",
+                text(game, "launcher"),
+                text(game, "launcher_game_id")
+            ),
+        ));
+    }
+    for (index, launch) in history.iter().enumerate() {
+        ids.push((text(launch, "id"), format!("@history:{}", index + 1)));
+    }
+    let mut snapshots = Map::new();
+    let copies = fs::read_dir(data_dir.join("backups").join("db"))
+        .map(Iterator::count)
+        .unwrap_or(0);
+    snapshots.insert("db".to_owned(), json!({ "copies": copies }));
+    for launcher in LauncherId::ALL {
+        for (index, id) in snapshot_ids(data_dir, launcher).into_iter().enumerate() {
+            ids.push((id, format!("@backup:{}:{}", launcher.as_str(), index + 1)));
+        }
+        snapshots.insert(
+            launcher.as_str().to_owned(),
+            backups(data_dir, launcher).into(),
+        );
+    }
+
+    let journal = fs::read(data_dir.join("switch.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .unwrap_or(Value::Null);
+    let mut launcher_files = Map::new();
+    if let Some(file) = login_users(launchers_dir) {
+        launcher_files.insert(STEAM_LOGIN_USERS.to_owned(), file);
+    }
+    let as_values = |rows: Vec<Map<String, Value>>| -> Value {
+        rows.into_iter()
+            .map(Value::Object)
+            .collect::<Vec<_>>()
+            .into()
+    };
+    let state = json!({
+        "db": {
+            "user_version": version,
+            "tables": {
+                "accounts": as_values(accounts),
+                "games": as_values(games),
+                "launch_history": as_values(history),
+                "settings": as_values(settings),
+            },
+        },
+        "journal": journal,
+        "backups": snapshots,
+        "launcherFiles": launcher_files,
+        "registry": registry,
+    });
+    Ok(Read { state, ids })
+}
+
+// A folder as text can be written three ways in what the app leaves behind: as it is, with forward slashes, and with every backslash doubled. Launchers also write it in lower case.
+fn without_folder(text: &str, folder: &Path, name: &str) -> String {
+    let plain = folder.to_string_lossy().into_owned();
+    let mut out = text.to_owned();
+    for spelling in [
+        plain.replace('\\', "\\\\"),
+        plain.clone(),
+        plain.replace('\\', "/"),
+    ] {
+        let lower = spelling.to_lowercase();
+        let mut replaced = String::with_capacity(out.len());
+        let mut rest = out.as_str();
+        while let Some(at) = rest.to_lowercase().find(&lower) {
+            // Lower-casing keeps the length of everything a scratch path is made of, so the place is the same in both.
+            replaced.push_str(&rest[..at]);
+            replaced.push_str(name);
+            rest = &rest[at + spelling.len()..];
+        }
+        replaced.push_str(rest);
+        out = replaced;
+    }
+    out
+}
+
+fn rewrite(value: &mut Value, change: &dyn Fn(&str) -> String) {
+    match value {
+        Value::String(text) => *text = change(text),
+        Value::Array(items) => items.iter_mut().for_each(|item| rewrite(item, change)),
+        Value::Object(fields) => fields.values_mut().for_each(|field| rewrite(field, change)),
+        _ => {}
+    }
+}
+
+fn at_path(value: &mut Value, path: &[&str], change: &dyn Fn(&mut Value)) {
+    let Some((first, rest)) = path.split_first() else {
+        change(value);
+        return;
+    };
+    match value {
+        Value::Array(items) if *first == "*" => {
+            items
+                .iter_mut()
+                .for_each(|item| at_path(item, rest, change));
+        }
+        Value::Object(fields) if *first == "*" => {
+            fields
+                .values_mut()
+                .for_each(|field| at_path(field, rest, change));
+        }
+        Value::Object(fields) => {
+            if let Some(field) = fields.get_mut(*first) {
+                at_path(field, rest, change);
+            }
+        }
+        _ => {}
+    }
+}
+
+// Applies the oracle's rules to a report: every id and both folders wherever they appear, and <ts> at the places the script's normalisation file lists under the rule "ts". The write of a snapshot's manifest loses its digest, because a manifest holds its own time.
+pub fn normalise(report: &mut Value, aliases: &Aliases<'_>, rules: &Value) {
+    let mut ids = aliases.ids.clone();
+    for (index, job) in aliases.jobs.iter().enumerate() {
+        ids.push((job.clone(), format!("@job:{}", index + 1)));
+    }
+    ids.sort_by_key(|(id, _)| std::cmp::Reverse(id.len()));
+    rewrite(report, &|text| {
+        let mut out = text.to_owned();
+        for (id, alias) in &ids {
+            if !id.is_empty() {
+                out = out.replace(id.as_str(), alias);
+            }
+        }
+        let out = without_folder(&out, aliases.launchers_dir, "{launchers}");
+        without_folder(&out, aliases.data_dir, "{data}")
+    });
+    if let Some(events) = report["events"].as_array_mut() {
+        for event in events {
+            let manifest = event["op"] == "file.write"
+                && event["path"]
+                    .as_str()
+                    .is_some_and(|path| path.ends_with("\\manifest.json"));
+            if manifest && let Some(fields) = event.as_object_mut() {
+                fields.remove("sha256");
+            }
+        }
+    }
+    let timed = rules["normalised"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|rule| rule["rule"] == "ts")
+        .filter_map(|rule| rule["path"].as_str());
+    for path in timed {
+        let parts: Vec<&str> = path.split('/').skip(1).collect();
+        at_path(report, &parts, &|value| {
+            if value.is_string() {
+                *value = "<ts>".into();
+            }
+        });
+    }
+}
