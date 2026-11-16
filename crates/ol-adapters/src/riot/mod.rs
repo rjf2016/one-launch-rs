@@ -415,7 +415,7 @@ impl<'a> RiotAdapter<'a> {
         self.listed_products().0
     }
 
-    // The products, and why the list can be short: a metadata folder that could not be listed gives none.
+    // The products, and why the list can be short: a metadata folder that could not be listed gives none, and a product's settings file that could not be read gives no install folder for it.
     fn listed_products(&self) -> (Vec<ProductRecord>, Option<String>) {
         let dir = self.metadata_dir();
         if !self.files.exists(&dir) {
@@ -425,20 +425,26 @@ impl<'a> RiotAdapter<'a> {
             Ok(names) => names,
             Err(error) => return (Vec::new(), Some(format!("Could not list {dir}: {error}"))),
         };
+        let mut unread = None;
         let mut records: Vec<ProductRecord> = names
             .iter()
             .filter_map(|name| {
                 let id = parse_product_id(name)?;
                 let folder = join(&[&dir, name]);
                 let settings_path = join(&[&folder, &format!("{name}.product_settings.yaml")]);
-                let settings = self
-                    .files
-                    .exists(&settings_path)
-                    .then(|| {
-                        read_launcher_text(self.files, &settings_path, MAX_LAUNCHER_FILE_BYTES).ok()
-                    })
-                    .flatten()
-                    .map(|text| parse_product_settings(&text));
+                let settings = if self.files.exists(&settings_path) {
+                    match read_launcher_text(self.files, &settings_path, MAX_LAUNCHER_FILE_BYTES) {
+                        Ok(text) => Some(parse_product_settings(&text)),
+                        Err(error) => {
+                            unread.get_or_insert_with(|| {
+                                format!("Could not read {settings_path}: {error}")
+                            });
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
                 Some(ProductRecord {
                     ok: self.files.exists(&join(&[&folder, &format!("{name}.ok")])),
                     install_path: settings
@@ -451,7 +457,7 @@ impl<'a> RiotAdapter<'a> {
             })
             .collect();
         records.sort_by(|a, b| a.id.id().cmp(b.id.id()));
-        (records, None)
+        (records, unread)
     }
 
     // What Windows' list of apps calls the product, from its uninstall entry.

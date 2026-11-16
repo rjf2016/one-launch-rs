@@ -136,7 +136,7 @@ None of those about stored values and launcher files is visible on data the app 
 - The rewrite of `loginusers.vdf` changes the accounts of the top-level `users` block alone. The Electron app also changes a block with an account-shaped key under any other top-level key, which its reader never takes for an account.
 - A log tail cut short where a line starts keeps that line. The Electron app drops the first line of every tail it cuts.
 - A job stopped before its thread runs starts no game, on the way straight to the game too. The Electron app sends the launch.
-- A scan that could not read Steam's `libraryfolders.vdf`, or list Riot's metadata folder, changes nothing in the Library and says so on that launcher's entry. The Electron app keeps what it could read and marks every other game of that launcher as not installed until a later scan.
+- A scan that could not read Steam's `libraryfolders.vdf`, list Riot's metadata folder or read one of Riot's product settings files changes nothing in the Library and says so on that launcher's entry. The Electron app keeps what it could read and marks every other game of that launcher as not installed until a later scan.
 - A journal whose `startedAt` is not a full timestamp is unreadable and moved aside. The Electron app takes any text its date parser takes.
 - A snapshot manifest whose `bytes` is not a whole number from 0 up is unreadable.
 - A job is reported as finished once its launch is in `launch_history` and the account's last use is stored. The Electron app reports it first.

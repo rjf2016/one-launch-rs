@@ -487,6 +487,31 @@ fn a_metadata_folder_that_cannot_be_listed_takes_no_game_out() {
 }
 
 #[test]
+fn a_product_settings_file_that_cannot_be_read_takes_no_game_out() {
+    let fakes = fakes(None);
+    let settings = Path::new(&fakes.fake.program_data)
+        .join("Riot Games")
+        .join("Metadata")
+        .join("valorant.live")
+        .join("valorant.live.product_settings.yaml");
+    fs::remove_file(&settings).unwrap();
+    fs::create_dir(&settings).unwrap();
+    let scanned = block_on(fakes.backend.rescan()).unwrap();
+    let riot = scanned
+        .iter()
+        .find(|scan| scan.launcher == LauncherId::Riot)
+        .unwrap();
+    assert_eq!((riot.added, riot.removed), (0, 0));
+    let error = riot.error.as_deref().expect("the scan says why");
+    assert!(
+        error.contains("valorant.live.product_settings.yaml"),
+        "{error}"
+    );
+    assert!(fakes.game().installed);
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn what_is_saved_of_a_sign_in_is_its_digest_and_whose_it_is() {
     let fakes = fakes(None);
     let (main, alt) = (fakes.account(MAIN), fakes.account(ALT));
