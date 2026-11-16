@@ -9,6 +9,9 @@ use ol_platform_api::{CancelToken, Clock};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Aborted;
 
+// A poll of nothing would never move a clock that moves only when something sleeps.
+const LEAST_POLL: Duration = Duration::from_millis(1);
+
 // Looks every `poll` until `cond` holds (true) or `timeout` has passed (false). The order is the Electron app's: stopped, condition, deadline, sleep.
 pub fn wait_until<E: From<Aborted>>(
     clock: &dyn Clock,
@@ -18,6 +21,7 @@ pub fn wait_until<E: From<Aborted>>(
     mut cond: impl FnMut() -> Result<bool, E>,
 ) -> Result<bool, E> {
     let deadline = clock.now() + timeout;
+    let poll = poll.max(LEAST_POLL);
     loop {
         if cancel.is_cancelled() {
             return Err(Aborted.into());
@@ -42,7 +46,13 @@ impl TimingOverrides {
     }
 
     pub fn get(&self, name: &str) -> Option<Duration> {
-        self.0.get(name).copied().map(Duration::from_millis)
+        let duration = Duration::from_millis(*self.0.get(name)?);
+        let is_poll = name.to_ascii_lowercase().ends_with("pollms");
+        Some(if is_poll {
+            duration.max(LEAST_POLL)
+        } else {
+            duration
+        })
     }
 
     // A finer poll is never slower than the coarse one: shortening pollMs alone brings a poll that was not named down to it.
@@ -114,6 +124,34 @@ mod tests {
             Ok(false)
         });
         assert_eq!((held, looks), (Err(Aborted), 1));
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct Spun;
+
+    impl From<Aborted> for Spun {
+        fn from(_: Aborted) -> Self {
+            Self
+        }
+    }
+
+    #[test]
+    fn a_poll_of_nothing_still_reaches_the_deadline_on_a_clock_that_moves_only_in_sleeps() {
+        let clock = clock();
+        let mut looks = 0;
+        let held = wait_until(&clock, &CancelToken::new(), SECOND, Duration::ZERO, || {
+            looks += 1;
+            if looks > 5_000 { Err(Spun) } else { Ok(false) }
+        });
+        assert_eq!(held, Ok(false));
+
+        let mut overrides = TimingOverrides::default();
+        overrides.set("pollMs", 0);
+        overrides.set("logPollMs", 0);
+        overrides.set("readyGraceMs", 0);
+        assert_eq!(overrides.get("pollMs"), Some(Duration::from_millis(1)));
+        assert_eq!(overrides.get("logPollMs"), Some(Duration::from_millis(1)));
+        assert_eq!(overrides.get("readyGraceMs"), Some(Duration::ZERO));
     }
 
     #[test]
