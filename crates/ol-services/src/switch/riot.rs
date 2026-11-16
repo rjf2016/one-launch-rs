@@ -1,4 +1,4 @@
-// Riot's switch: refuse while a Riot game runs, close the client, save the sign-in it leaves behind for its owner, copy RiotGamesPrivateSettings.yaml, put the target account's saved copy of the whole file in its place (or the client's own signed-out state, so that the client asks), start the client as its shortcut does and read its log and the file for the sign-in. It reads, waits and decides; every write goes through the two functions for Riot at the top of switch.rs, and neither takes a write that cannot show a `ReadyToWrite`: the client was seen closed, and what the file held was handed to the store for its owner. A saved sign-in is decrypted in one place, `write_session`, and goes nowhere but into the client's own file.
+// Riot's switch: refuse while a Riot game runs, close the client, save the sign-in it leaves behind for its owner, copy RiotGamesPrivateSettings.yaml, put the target account's saved copy of the whole file in its place (or the client's own signed-out state, so that the client asks), start the client as its shortcut does and read its log and the file for the sign-in. It reads, waits and decides; every write goes through the two functions for Riot at the top of switch.rs, and neither takes a write that cannot hand over a `ReadyToWrite`: the client was seen closed, what the file held was handed to the store for its owner, and a look directly before the write found no Riot game, the client still closed and the file still the one the store read. A saved sign-in is decrypted in one place, `write_session`, and goes nowhere but into the client's own file.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -12,8 +12,8 @@ use ol_adapters::{AccountRef, AdapterError, Directory, GameRef};
 use ol_formats::riot::client_log::{FailReason, SignInOutcome, last_sign_in};
 use ol_formats::riot::products::{RiotProductId, parse_product_id};
 use ol_formats::riot::session::{
-    RiotSession, RiotSessionBlob, SessionRead, parse_blob, plan_sign_out, serialize_blob,
-    session_of_blob, short_fingerprint,
+    RiotSession, RiotSessionBlob, SessionRead, fingerprint_of, parse_blob, plan_sign_out,
+    serialize_blob, session_of_blob, short_fingerprint,
 };
 use ol_model::{
     BackupSnapshot, JobStep, JobStepStatus, LaunchAttention, LauncherId, LauncherInstall,
@@ -26,7 +26,8 @@ use serde_json::Map;
 use time::OffsetDateTime;
 
 use super::{
-    SwitchOptions, SwitchResult, SwitchSink, Thrown, job_steps, restore_riot, write_riot_session,
+    RestoreError, SwitchOptions, SwitchResult, SwitchSink, Thrown, job_steps, missing_riot_session,
+    restore_riot, write_riot_session,
 };
 use crate::backup::{BackupError, BackupFile, BackupService, SnapshotRequest};
 use crate::launchers::ServiceError;
@@ -34,11 +35,42 @@ use crate::launchers::ServiceError;
 // The client was seen closed a moment ago. Only `seen_closed` makes one.
 struct Closed(());
 
-// What every write of the session file has to show: the client was seen closed, and the sign-in the file held was read and handed to the store for the account it belongs to, because the client replaces the token at every start and an older copy must never be the one that is kept. It shows that the store was asked, not that it kept the copy: a store that fails does not stop the write, as in the Electron app. Only `save_what_the_file_holds` makes one, here, in this module.
+// The client was seen closed, and the sign-in the file held was then read and handed to the store for the account it belongs to, because the client replaces the token at every start and an older copy must never be the one that is kept. It shows that the store was asked, not that it kept the copy: a store that fails does not stop the write, as in the Electron app. It carries the fingerprint of the file's text as that read found it, also when there was nothing to store, so that the last look can tell whether the file is still the one the store was asked about. Only `save_what_the_file_holds` makes one.
+pub(super) struct Saved {
+    // None when there was no file, or it could not be read: no file the last look finds then matches.
+    looked_at: Option<String>,
+}
+
+// What every write of the session file takes, and uses up: on top of `Saved`, a look taken directly before the write found no Riot game running, the client still closed and the file as the store read it. Only `look_before_write` makes one, here, in this module, so no write rests on a look taken before the snapshot or the store.
 pub(super) struct ReadyToWrite(());
 
 fn seen_closed(riot: &RiotAdapter<'_>) -> Result<Option<Closed>, AdapterError> {
     Ok((!riot.is_running()?).then_some(Closed(())))
+}
+
+// The last look before a write: one listing of the processes, then one read of the file. A Riot game, or a listing that cannot be read, refuses the write, named as the `action` refused; a client that runs again refuses it as a running launcher. A file that is gone, cannot be read, or is not the one whose sign-in was handed to the store, because the client ran and exited since, refuses it too: nothing is written over a sign-in that was never stored.
+pub(super) fn look_before_write(
+    riot: &RiotAdapter<'_>,
+    saved: &Saved,
+    action: &str,
+) -> Result<ReadyToWrite, RestoreError> {
+    if riot.client_runs_beside_no_game(action)? {
+        return Err(AdapterError::LauncherRunning(format!(
+            "The Riot Client is running again, and it rewrites {SESSION_FILE} while it runs, so nothing was written. Exit it from its tray icon, then {action}."
+        ))
+        .into());
+    }
+    let Some(on_disk) = riot.read_session_file()? else {
+        let missing = missing_riot_session(&riot.session_file_path());
+        return Err(BackupError::Io(missing).into());
+    };
+    if saved.looked_at.as_deref() != Some(fingerprint_of(&on_disk.file.file).as_str()) {
+        return Err(AdapterError::SwitchBlocked(format!(
+            "{SESSION_FILE} changed after One Launch saved the sign-in it held, so nothing was written: the Riot Client may have run meanwhile. Keep it closed, then {action}."
+        ))
+        .into());
+    }
+    Ok(ReadyToWrite(()))
 }
 
 // Records the Riot account id on the account, then encrypts and stores the file for it. The id comes first and is refused when another account holds it, so no sign-in is ever stored under an id the account was not given.
@@ -65,9 +97,14 @@ fn store_session(
 }
 
 // Stores the sign-in the file holds for the One Launch account it belongs to, when it changed since it was last stored, and says in one sentence what came of it. A sign-in that cannot be saved costs one sign-in by hand later, never the switch; one that nobody owns is left alone.
-fn save_what_the_file_holds(riot: &RiotAdapter<'_>, _closed: &Closed) -> (ReadyToWrite, String) {
+fn save_what_the_file_holds(riot: &RiotAdapter<'_>, _closed: &Closed) -> (Saved, String) {
+    let read = riot.read_session_file();
+    let looked_at = match &read {
+        Ok(Some(on_disk)) => Some(fingerprint_of(&on_disk.file.file)),
+        _ => None,
+    };
     let saved = (|| -> Result<String, AdapterError> {
-        let current = riot.current_session()?;
+        let current = riot.session_in(read?)?;
         let (Some(session), Some(file)) = (&current.session, &current.file) else {
             return Ok("The client left no saved sign-in behind (signed out).".to_owned());
         };
@@ -92,7 +129,7 @@ fn save_what_the_file_holds(riot: &RiotAdapter<'_>, _closed: &Closed) -> (ReadyT
         ))
     })();
     let detail = saved.unwrap_or_else(|error| format!("Not saved: {error}"));
-    (ReadyToWrite(()), detail)
+    (Saved { looked_at }, detail)
 }
 
 // The session file as a snapshot takes it: encrypted, because it is a sign-in.
@@ -144,16 +181,17 @@ pub fn restore_backup(
         unowned,
     )
     .map_err(ServiceError::backup(LauncherId::Riot))?;
-    let (ready, _) = save_what_the_file_holds(riot, &closed);
-    restore_riot(riot, platform, backups, id, &ready)
+    let (saved, _) = save_what_the_file_holds(riot, &closed);
+    restore_riot(riot, platform, backups, id, &saved)
         .map_err(|error| error.into_service(LauncherId::Riot))
 }
 
 enum SignInWait {
-    // The account id is None when the client has not written the file yet.
     SignedIn {
-        account_id: Option<String>,
+        account_id: String,
     },
+    // The log reports a sign-in, and the file named no account for as long as the client gets to write it: the log never names the account, so who signed in is not known.
+    Unconfirmed,
     WrongAccount {
         account_id: String,
         owner: Option<AccountRef>,
@@ -171,6 +209,8 @@ enum Ending {
     Done,
     Cancelled,
     NeedsSignIn,
+    // A sign-in the file did not name: it is neither taken as the account's nor put back.
+    Unconfirmed,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -270,7 +310,7 @@ impl Switch<'_> {
     }
 
     // Runs once the client is closed: the file then holds what the last run left. The step shows what came of it when the plan had it; when the plan passed it over the file is looked at all the same, so that nothing the client wrote since is lost to the write that follows.
-    fn save_outgoing(&mut self, closed: &Closed) -> ReadyToWrite {
+    fn save_outgoing(&mut self, closed: &Closed) -> Saved {
         let planned = self
             .index
             .get(STEP.capture)
@@ -278,11 +318,23 @@ impl Switch<'_> {
         if planned {
             self.mark(STEP.capture, JobStepStatus::Running, "");
         }
-        let (ready, detail) = save_what_the_file_holds(self.riot, closed);
+        let (saved, detail) = save_what_the_file_holds(self.riot, closed);
         if planned {
             self.mark(STEP.capture, JobStepStatus::Done, detail);
         }
-        ready
+        saved
+    }
+
+    // The look taken directly before the write. A client that runs again was started by something else.
+    fn ready_to_write(&mut self, saved: &Saved) -> Result<ReadyToWrite, Thrown> {
+        match look_before_write(self.riot, saved, "switch") {
+            Ok(ready) => Ok(ready),
+            Err(RestoreError::Adapter(AdapterError::LauncherRunning(_))) => {
+                Err(self.started_meanwhile(STEP.file))
+            }
+            Err(RestoreError::Adapter(other)) => Err(other.into()),
+            Err(RestoreError::Backup(other)) => Err(Thrown::Failed(other.to_string())),
+        }
     }
 
     fn take_snapshot(&mut self) -> Result<(), Thrown> {
@@ -304,7 +356,7 @@ impl Switch<'_> {
     }
 
     // The stored copy is decrypted here and nowhere else, written once, and wiped.
-    fn write_session(&mut self, ready: &ReadyToWrite) -> Result<(), Thrown> {
+    fn write_session(&mut self, saved: &Saved) -> Result<(), Thrown> {
         self.mark(STEP.file, JobStepStatus::Running, "");
         let name = &self.account.display_name;
         // The client's file is never made up: it carries the mark Riot knows this PC by.
@@ -314,7 +366,8 @@ impl Switch<'_> {
                 self.session_path
             )));
         };
-        let files = self.platform.files.as_ref();
+        let platform = self.platform;
+        let files = platform.files.as_ref();
         if self.strategy == SwitchStrategy::Remembered {
             let none_saved = || Thrown::Failed(format!("No sign-in is saved for {name}."));
             let account_id = self.account.id.as_deref().ok_or_else(none_saved)?;
@@ -331,6 +384,7 @@ impl Switch<'_> {
                 self.mark(STEP.file, JobStepStatus::Skipped, "Already in place.");
                 return Ok(());
             }
+            let ready = self.ready_to_write(saved)?;
             self.modified = true;
             write_riot_session(files, &self.session_path, blob.file.as_bytes(), ready)
                 .map_err(|error| Thrown::Failed(error.to_string()))?;
@@ -351,6 +405,7 @@ impl Switch<'_> {
             self.mark(STEP.file, JobStepStatus::Skipped, "Already signed out.");
             return Ok(());
         }
+        let ready = self.ready_to_write(saved)?;
         self.modified = true;
         write_riot_session(files, &self.session_path, signed_out.file.as_bytes(), ready)
             .map_err(|error| Thrown::Failed(error.to_string()))?;
@@ -445,14 +500,12 @@ impl Switch<'_> {
                             Some(expected) if *expected != account_id => {
                                 SignInWait::WrongAccount { account_id, owner }
                             }
-                            _ => SignInWait::SignedIn {
-                                account_id: Some(account_id),
-                            },
+                            _ => SignInWait::SignedIn { account_id },
                         });
                     }
                     let now = self.now();
                     if now >= *file_deadline.get_or_insert(now + timing.capture) {
-                        return Ok(SignInWait::SignedIn { account_id: None });
+                        return Ok(SignInWait::Unconfirmed);
                     }
                 }
                 Some(SignInOutcome::Failed { reason, detail }) if !manual => {
@@ -486,13 +539,8 @@ impl Switch<'_> {
     }
 
     // The first sign-in that is confirmed is where the account's Riot id comes from. Refused when another account holds it.
-    fn signed_in_detail(&mut self, signed_in_as: Option<&str>) -> Result<String, Thrown> {
+    fn signed_in_detail(&mut self, signed_in_as: &str) -> Result<String, Thrown> {
         let login = &self.account.login;
-        let Some(signed_in_as) = signed_in_as else {
-            return Ok(format!(
-                "Signed in as {login} (the client has not written {SESSION_FILE} yet, so the account id is unconfirmed)."
-            ));
-        };
         let (Some(account_id), None) = (self.account.id.as_deref(), &self.expected_uid) else {
             return Ok(format!("Signed in as {login}."));
         };
@@ -502,6 +550,13 @@ impl Switch<'_> {
             "Signed in as {login}. Linked to Riot account {}.",
             id_tail(Some(signed_in_as), 4)
         ))
+    }
+
+    fn unconfirmed_detail(&self) -> String {
+        format!(
+            "The client reported a sign-in, but {SESSION_FILE} named no account within {} s.",
+            seconds(self.riot.timing().capture)
+        )
     }
 
     fn confirm_sign_in(&mut self) -> Result<SignInWait, Thrown> {
@@ -515,10 +570,10 @@ impl Switch<'_> {
         };
         let waited = self.wait_for_sign_in(timeout, false)?;
         let (status, detail) = match &waited {
-            SignInWait::SignedIn { account_id } => (
-                JobStepStatus::Done,
-                self.signed_in_detail(account_id.as_deref())?,
-            ),
+            SignInWait::SignedIn { account_id } => {
+                (JobStepStatus::Done, self.signed_in_detail(account_id)?)
+            }
+            SignInWait::Unconfirmed => (JobStepStatus::Failed, self.unconfirmed_detail()),
             SignInWait::WrongAccount { .. } => (
                 JobStepStatus::Failed,
                 "Signed in as a different account.".to_owned(),
@@ -567,8 +622,11 @@ impl Switch<'_> {
         let waited = self.wait_for_sign_in(timing.manual_sign_in, true);
         let settled = match &waited {
             Ok(SignInWait::SignedIn { account_id }) => self
-                .signed_in_detail(account_id.as_deref())
+                .signed_in_detail(account_id)
                 .map(|detail| Some((JobStepStatus::Done, detail))),
+            Ok(SignInWait::Unconfirmed) => {
+                Ok(Some((JobStepStatus::Failed, self.unconfirmed_detail())))
+            }
             Ok(SignInWait::WrongAccount { .. }) => Ok(Some((
                 JobStepStatus::Failed,
                 "Signed in as a different account.".to_owned(),
@@ -590,7 +648,7 @@ impl Switch<'_> {
         waited
     }
 
-    // After a confirmed sign-in by hand: stores the file once the client has written a sign-in that differs from what the switch left there. The file names the account, so one that names another, because the user changed accounts in the client meanwhile, is not stored.
+    // After a confirmed sign-in by hand: stores the file once the client has written a sign-in that differs from what the switch left there. The file names the account, so one that names another, because the user changed accounts in the client meanwhile, is not stored and ends the switch as a wrong account.
     fn capture_fresh(&mut self, wait: Duration) -> Result<(), Thrown> {
         let Some(account_id) = self.account.id.clone() else {
             return Ok(());
@@ -616,8 +674,12 @@ impl Switch<'_> {
                         "Not saved: {SESSION_FILE} names Riot account {}, not this account's.",
                         id_tail(Some(&session.account_id), 4)
                     );
-                    self.mark(STEP.recapture, JobStepStatus::Done, detail);
-                    return Ok(());
+                    let owner = self
+                        .directory
+                        .account_by_launcher_uid(&session.account_id)?;
+                    let wrong = self.wrong_account(&session.account_id, owner.as_ref());
+                    self.mark(STEP.recapture, JobStepStatus::Failed, detail);
+                    return Err(wrong);
                 }
                 store_session(self.directory, self.account, session, file)?;
                 self.directory.mark_session_verified(&account_id)?;
@@ -669,10 +731,10 @@ impl Switch<'_> {
             let Some(closed) = seen_closed(self.riot)? else {
                 return Err(self.started_meanwhile(STEP.close));
             };
-            let ready = self.save_outgoing(&closed);
+            let saved = self.save_outgoing(&closed);
             if !self.in_place {
                 self.take_snapshot()?;
-                self.write_session(&ready)?;
+                self.write_session(&saved)?;
             }
         }
 
@@ -697,6 +759,7 @@ impl Switch<'_> {
         }
         match self.confirm_sign_in()? {
             SignInWait::Cancelled => return Ok(Ending::Cancelled),
+            SignInWait::Unconfirmed => return Ok(Ending::Unconfirmed),
             SignInWait::WrongAccount { account_id, owner } => {
                 return Err(self.wrong_account(&account_id, owner.as_ref()));
             }
@@ -722,6 +785,7 @@ impl Switch<'_> {
                 }
                 match self.wait_for_manual_sign_in(&unsettled)? {
                     SignInWait::Cancelled => return Ok(Ending::Cancelled),
+                    SignInWait::Unconfirmed => return Ok(Ending::Unconfirmed),
                     SignInWait::WrongAccount { account_id, owner } => {
                         return Err(self.wrong_account(&account_id, owner.as_ref()));
                     }
@@ -754,8 +818,8 @@ impl Switch<'_> {
                 "the Riot Client is still running, and it rewrites {SESSION_FILE} while it runs"
             ));
         };
-        let (ready, _) = save_what_the_file_holds(self.riot, &closed);
-        restore_riot(self.riot, self.platform, self.backups, backup_id, &ready)
+        let (saved, _) = save_what_the_file_holds(self.riot, &closed);
+        restore_riot(self.riot, self.platform, self.backups, backup_id, &saved)
             .map(|_| ())
             .map_err(|error| error.to_string())
     }
@@ -832,6 +896,7 @@ pub fn run_switch(
     let attempt = switch.attempt(context.running);
     let login = account.login.clone();
     let manual_minutes = minutes(riot.timing().manual_sign_in);
+    let capture_seconds = seconds(riot.timing().capture);
     let cancelled_after_start = |handed_over: bool| {
         if handed_over {
             format!(
@@ -860,6 +925,15 @@ pub fn run_switch(
             None,
             Some(format!(
                 "One Launch waited {manual_minutes} min for the sign-in as {login} and gave up. The Riot Client is still on its login page: sign in there with “Stay signed in” ticked, and the sign-in is saved at the next switch."
+            )),
+        ),
+        Ok(Ending::Unconfirmed) => (
+            false,
+            true,
+            false,
+            None,
+            Some(format!(
+                "The Riot Client reported a sign-in, but {SESSION_FILE} did not name the account within {capture_seconds} s, so One Launch cannot tell whether it is {login} and stopped there: nothing was put back and no game was started. The client was left running; look at its window to see who is signed in."
             )),
         ),
         Err(thrown) => {

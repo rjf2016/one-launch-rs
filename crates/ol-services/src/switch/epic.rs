@@ -105,6 +105,16 @@ enum SignInWait {
     Cancelled,
 }
 
+// What the log says after a confirmed sign-in, when it no longer names that sign-in's account.
+enum Elsewhere {
+    WrongAccount {
+        account_id: String,
+        owner: Option<AccountRef>,
+        detail: String,
+    },
+    Unclear(String),
+}
+
 // How the switch ended, short of a step failing.
 enum Ending {
     Done,
@@ -621,8 +631,46 @@ impl Switch<'_> {
         waited
     }
 
-    // After a confirmed sign-in: stores the session the launcher has written, when it differs from what was there. A sign-in by hand writes it moments later; one from a remembered session may not write it at all.
-    fn capture_fresh(&mut self, wait: Duration) -> Result<(), Thrown> {
+    // What the log says now, when it no longer names the account whose sign-in was confirmed: the session in the file may then be another account's. A sign-in as an account that is not this one, by the rule the sign-in was confirmed by, is a wrong account; one that cannot be told apart from this account's only stops the save.
+    fn signed_in_elsewhere(&self, signed_in_as: &str) -> Result<Option<Elsewhere>, Thrown> {
+        match last_sign_in(&self.epic.events_since(&self.log_at)) {
+            Some(SignInOutcome::SignedIn { account_id, .. }) if account_id == signed_in_as => {
+                Ok(None)
+            }
+            Some(SignInOutcome::SignedIn { account_id, .. }) => {
+                let detail = format!(
+                    "Not saved: the launcher signed in as account {} meanwhile.",
+                    id_tail(Some(&account_id), 6)
+                );
+                let owner = if account_id.is_empty() {
+                    None
+                } else {
+                    self.directory.account_by_launcher_uid(&account_id)?
+                };
+                let another = owner
+                    .as_ref()
+                    .is_some_and(|owner| owner.id != self.account.id);
+                Ok(Some(
+                    if !account_id.is_empty() && (self.expected_uid.is_some() || another) {
+                        Elsewhere::WrongAccount {
+                            account_id,
+                            owner,
+                            detail,
+                        }
+                    } else {
+                        Elsewhere::Unclear(detail)
+                    },
+                ))
+            }
+            _ => Ok(Some(Elsewhere::Unclear(format!(
+                "Not saved: the launcher no longer reports the sign-in as {}.",
+                self.account.login
+            )))),
+        }
+    }
+
+    // After a confirmed sign-in: stores the session the launcher has written, when it differs from what was there, for as long as the log names the account that signed in. A sign-in by hand writes it moments later; one from a remembered session may not write it at all. A sign-in as another account meanwhile ends the switch as a wrong account.
+    fn capture_fresh(&mut self, signed_in_as: &str, wait: Duration) -> Result<(), Thrown> {
         let Some(account_id) = self.account.id.clone() else {
             return Ok(());
         };
@@ -631,6 +679,22 @@ impl Switch<'_> {
         let deadline = self.now() + wait;
         loop {
             let text = self.epic.read_ini()?;
+            // The log is read after the file, so a sign-in that is logged before its session is written is seen before what it wrote is stored.
+            match self.signed_in_elsewhere(signed_in_as)? {
+                None => {}
+                Some(Elsewhere::Unclear(detail)) => {
+                    self.mark(STEP.recapture, JobStepStatus::Done, detail);
+                    return Ok(());
+                }
+                Some(Elsewhere::WrongAccount {
+                    account_id,
+                    owner,
+                    detail,
+                }) => {
+                    self.mark(STEP.recapture, JobStepStatus::Failed, detail);
+                    return Err(self.wrong_account(&account_id, owner.as_ref()));
+                }
+            }
             let disk = text.as_deref().map(read_session_from_ini);
             let blob = text.as_deref().and_then(session_blob_from_ini);
             let remembered = disk.as_ref().filter(|disk| disk.remembered);
@@ -722,16 +786,18 @@ impl Switch<'_> {
             SignInWait::WrongAccount { account_id, owner } => {
                 return Err(self.wrong_account(&account_id, owner.as_ref()));
             }
-            SignInWait::SignedIn { .. } => {
+            SignInWait::SignedIn {
+                account_id: signed_in_as,
+            } => {
                 if let (true, Some(account_id)) = (remembered, self.account.id.clone()) {
                     if self.in_place {
-                        self.capture_fresh(Duration::ZERO)?;
+                        self.capture_fresh(&signed_in_as, Duration::ZERO)?;
                     } else {
                         self.directory.mark_session_verified(&account_id)?;
                     }
                 } else if !remembered {
                     // Without a saved session the launcher was signed in by hand, and writes the session after the log says so.
-                    self.capture_fresh(timing.capture)?;
+                    self.capture_fresh(&signed_in_as, timing.capture)?;
                 }
             }
             unsettled => {
@@ -747,7 +813,9 @@ impl Switch<'_> {
                     SignInWait::WrongAccount { account_id, owner } => {
                         return Err(self.wrong_account(&account_id, owner.as_ref()));
                     }
-                    SignInWait::SignedIn { .. } => self.capture_fresh(timing.capture)?,
+                    SignInWait::SignedIn { account_id } => {
+                        self.capture_fresh(&account_id, timing.capture)?;
+                    }
                     _ => return Ok(Ending::NeedsSignIn),
                 }
             }

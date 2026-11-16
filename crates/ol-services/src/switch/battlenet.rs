@@ -141,6 +141,16 @@ enum SignInWait {
     Cancelled,
 }
 
+// What the log says after a confirmed sign-in, when it no longer names that sign-in's account.
+enum Elsewhere {
+    WrongAccount {
+        account_id: String,
+        owner: Option<AccountRef>,
+        detail: String,
+    },
+    Unclear(String),
+}
+
 // How the switch ended, short of a step failing.
 enum Ending {
     Done,
@@ -219,6 +229,8 @@ struct Switch<'a> {
     expected_uid: Option<String>,
     // The fingerprint of what the switch left under UnifiedAuth, so that a token the client writes afterwards is told from the switch's own.
     written_fingerprint: Option<String>,
+    // The fingerprints of every value under UnifiedAuth when the switch started the client: a token among them was not written at the sign-in that follows.
+    before_start: Vec<String>,
     // The target login is first in the saved-accounts list, so a token the client refuses is a bad token.
     list_ready: bool,
     log_at: LogMark,
@@ -496,6 +508,12 @@ impl Switch<'_> {
         self.mark(STEP.start, JobStepStatus::Running, "");
         self.stop_if_aborted()?;
         self.log_at = self.battlenet.log_mark();
+        self.before_start = self
+            .battlenet
+            .read_tokens()?
+            .iter()
+            .map(|token| fingerprint_of(&token.hex))
+            .collect();
         self.launcher_started = true;
         self.platform
             .processes
@@ -712,8 +730,46 @@ impl Switch<'_> {
         waited
     }
 
-    // After a confirmed sign-in: stores the token the client wrote at that sign-in, when it is not the one the switch put there. The client writes a new one at every sign-in by hand, and may at any other.
-    fn capture_fresh(&mut self, wait: Duration) -> Result<(), Thrown> {
+    // What the log says now, when it no longer names the account whose sign-in was confirmed: a token under UnifiedAuth may then be another account's. A sign-in as an account that is not this one, by the rule the sign-in was confirmed by, is a wrong account; one that cannot be told apart from this account's only stops the save.
+    fn signed_in_elsewhere(&self, signed_in_as: &str) -> Result<Option<Elsewhere>, Thrown> {
+        match last_sign_in(&self.battlenet.events_since(&self.log_at)) {
+            Some(SignInOutcome::SignedIn { account_id, .. }) if account_id == signed_in_as => {
+                Ok(None)
+            }
+            Some(SignInOutcome::SignedIn { account_id, .. }) => {
+                let detail = format!(
+                    "Not saved: the client signed in as account {} meanwhile.",
+                    id_tail(Some(&account_id), 4)
+                );
+                let owner = if account_id.is_empty() {
+                    None
+                } else {
+                    self.directory.account_by_launcher_uid(&account_id)?
+                };
+                let another = owner
+                    .as_ref()
+                    .is_some_and(|owner| owner.id != self.account.id);
+                Ok(Some(
+                    if !account_id.is_empty() && (self.expected_uid.is_some() || another) {
+                        Elsewhere::WrongAccount {
+                            account_id,
+                            owner,
+                            detail,
+                        }
+                    } else {
+                        Elsewhere::Unclear(detail)
+                    },
+                ))
+            }
+            _ => Ok(Some(Elsewhere::Unclear(format!(
+                "Not saved: the client no longer reports the sign-in as {}.",
+                self.account.login
+            )))),
+        }
+    }
+
+    // After a confirmed sign-in: stores the token the client wrote at that sign-in. It is the one value under UnifiedAuth that was not there when the client was started, read while the log still names the account that signed in; a value that was there before or two new ones store nothing, and a sign-in as another account meanwhile ends the switch as a wrong account. The client writes a new token at every sign-in by hand, and may at any other.
+    fn capture_fresh(&mut self, signed_in_as: &str, wait: Duration) -> Result<(), Thrown> {
         let Some(account_id) = self.account.id.clone() else {
             return Ok(());
         };
@@ -722,11 +778,35 @@ impl Switch<'_> {
         let deadline = self.now() + wait;
         loop {
             let tokens = self.battlenet.read_tokens()?;
-            let written = self.written_fingerprint.as_deref();
-            let fresh = tokens
+            // The log is read after the values, so a sign-in that is logged before its token is written is seen before what it wrote is stored.
+            match self.signed_in_elsewhere(signed_in_as)? {
+                None => {}
+                Some(Elsewhere::Unclear(detail)) => {
+                    self.mark(STEP.recapture, JobStepStatus::Done, detail);
+                    return Ok(());
+                }
+                Some(Elsewhere::WrongAccount {
+                    account_id,
+                    owner,
+                    detail,
+                }) => {
+                    self.mark(STEP.recapture, JobStepStatus::Failed, detail);
+                    return Err(self.wrong_account(&account_id, owner.as_ref()));
+                }
+            }
+            let new: Vec<&TokenValue> = tokens
                 .iter()
-                .find(|token| Some(fingerprint_of(&token.hex).as_str()) != written);
-            if let Some(fresh) = fresh {
+                .filter(|token| !self.before_start.contains(&fingerprint_of(&token.hex)))
+                .collect();
+            if new.len() > 1 {
+                let detail = format!(
+                    "Not saved: the client wrote {} values under UnifiedAuth since it started, and none of them can be told to be this sign-in's.",
+                    new.len()
+                );
+                self.mark(STEP.recapture, JobStepStatus::Done, detail);
+                return Ok(());
+            }
+            if let Some(fresh) = new.first().copied() {
                 self.store_session(self.account, fresh, self.expected_uid.as_deref())?;
                 self.directory.mark_session_verified(&account_id)?;
                 let detail = format!(
@@ -809,11 +889,14 @@ impl Switch<'_> {
                 return Err(self.wrong_account(&account_id, owner.as_ref()));
             }
             // Without a token the client signed in by hand, and writes its token after the log says so.
-            SignInWait::SignedIn { .. } => self.capture_fresh(if remembered {
-                Duration::ZERO
-            } else {
-                timing.capture
-            })?,
+            SignInWait::SignedIn { account_id } => self.capture_fresh(
+                &account_id,
+                if remembered {
+                    Duration::ZERO
+                } else {
+                    timing.capture
+                },
+            )?,
             unsettled => {
                 // A refused token is stale only when the login was first in the list: otherwise the client refuses any token.
                 if let (SignInWait::Failed { reason }, true, true, Some(account_id)) = (
@@ -834,7 +917,9 @@ impl Switch<'_> {
                     SignInWait::WrongAccount { account_id, owner } => {
                         return Err(self.wrong_account(&account_id, owner.as_ref()));
                     }
-                    SignInWait::SignedIn { .. } => self.capture_fresh(timing.capture)?,
+                    SignInWait::SignedIn { account_id } => {
+                        self.capture_fresh(&account_id, timing.capture)?;
+                    }
                     _ => return Ok(Ending::NeedsSignIn),
                 }
             }
@@ -898,6 +983,12 @@ pub fn run_switch(
             .as_ref()
             .map(|uid| uid.to_lowercase()),
         written_fingerprint: context.current.fingerprint.clone(),
+        before_start: context
+            .current
+            .tokens
+            .iter()
+            .map(|token| fingerprint_of(&token.hex))
+            .collect(),
         install: context.install,
         start_exe: context.start_exe,
         config_path: context.config_path,

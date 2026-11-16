@@ -118,6 +118,8 @@ struct State {
     // The client runs, as the simulator sees it: an end of the process is not heard, as it sends nothing.
     core_running: bool,
     signed_in: bool,
+    // How often the client was closed: what was scheduled for a run that has been closed since does nothing.
+    closes: u32,
 }
 
 pub struct RiotSim {
@@ -354,6 +356,7 @@ impl RiotSim {
                 forget_at_exit: false,
                 core_running: false,
                 signed_in: false,
+                closes: 0,
             }),
         });
         if let Some(uid) = &sim.knobs.running_as {
@@ -406,10 +409,12 @@ impl RiotSim {
         }
         let launch = launch_of(args);
         if self.knobs.react_ms > 0 {
-            let sim = Arc::clone(self);
+            let (sim, run) = (Arc::clone(self), self.state().closes);
             self.clock
                 .schedule(Duration::from_millis(self.knobs.react_ms), move || {
-                    sim.run(launch.as_ref());
+                    if sim.state().closes == run {
+                        sim.run(launch.as_ref());
+                    }
                 });
         } else {
             self.run(launch.as_ref());
@@ -687,6 +692,12 @@ impl RiotSim {
         let Some(launch) = parse_product_id(id).filter(|_| ready) else {
             return Err(RiotLaunchError::NoLockfile);
         };
+        // The page of a product that waits for an update offers Update, not Play: nothing starts.
+        if self.knobs.updates_pending.contains(&launch.key()) {
+            let lines = [self.patch_line(&launch)];
+            self.append_log(&lines);
+            return Ok(());
+        }
         let lines = self.game_start_lines(&launch);
         self.append_log(&lines);
         Ok(())
@@ -759,9 +770,11 @@ impl RiotSim {
         }
         self.write_log(&lines);
         if !signed_in && let Some(after) = self.knobs.sign_in_when_asked_ms {
-            let sim = Arc::clone(self);
+            let (sim, run) = (Arc::clone(self), self.state().closes);
             self.clock.schedule(Duration::from_millis(after), move || {
-                sim.sign_in_by_hand(None);
+                if sim.state().closes == run {
+                    sim.sign_in_by_hand(None);
+                }
             });
         }
     }
@@ -793,6 +806,7 @@ impl RiotSim {
     fn core_closed(&self) {
         let forget = {
             let mut state = self.state();
+            state.closes += 1;
             state.core_running = false;
             state.signed_in = false;
             if state.log_file.is_none() {
@@ -824,6 +838,70 @@ mod tests {
     use serde_json::Value;
 
     use super::*;
+
+    fn client(
+        scratch: &ol_testkit::Scratch,
+        knobs: RiotKnobs,
+    ) -> (Arc<RiotSim>, Arc<FakeProcesses>, Arc<FakeClock>) {
+        let folder = |name: &str| scratch.join(name).to_string_lossy().into_owned();
+        let (local, program, install, games) = (
+            folder("local"),
+            folder("program"),
+            folder("install"),
+            folder("games"),
+        );
+        let folders = RiotFolders {
+            local_app_data: &local,
+            program_data: &program,
+            install_dir: &install,
+            games: &games,
+        };
+        let processes = Arc::new(FakeProcesses::new(
+            ol_platform_fake::OpLog::new(),
+            ol_platform_fake::ProcessKnobs::default(),
+        ));
+        let clock = Arc::new(FakeClock::starting_at(OffsetDateTime::UNIX_EPOCH));
+        let sim = RiotSim::attach(&folders, &processes, Arc::clone(&clock), knobs);
+        (sim, processes, clock)
+    }
+
+    #[test]
+    fn a_start_or_a_sign_in_scheduled_for_a_run_that_was_closed_since_does_nothing() {
+        use ol_platform_api::{CancelToken, ProcessLister, ProcessRunner};
+        let scratch = ol_testkit::Scratch::new("sim-riot-closed");
+        let knobs = RiotKnobs {
+            react_ms: 400,
+            ..RiotKnobs::default()
+        };
+        let (_sim, processes, clock) = client(&scratch, knobs);
+        processes.start(EXE, &[], "").unwrap();
+        processes.close(EXE).unwrap();
+        clock.sleep(Duration::from_secs(1), &CancelToken::new());
+        assert!(!processes.is_running(WINDOW_EXE).unwrap());
+        assert!(
+            !scratch
+                .join("local")
+                .join("Riot Games")
+                .join("Riot Client")
+                .join("Logs")
+                .exists()
+        );
+    }
+
+    #[test]
+    fn play_on_the_page_of_a_product_that_waits_for_an_update_starts_no_game() {
+        use ol_platform_api::ProcessLister;
+        let scratch = ol_testkit::Scratch::new("sim-riot-update");
+        let knobs = RiotKnobs {
+            running_as: Some("11111111-1111-4111-8111-111111111111".to_owned()),
+            updates_pending: vec!["valorant.live".to_owned()],
+            ..RiotKnobs::default()
+        };
+        let (sim, processes, _clock) = client(&scratch, knobs);
+        sim.press_play("valorant.live").unwrap();
+        let image = game_images_of("valorant")[0];
+        assert!(!processes.is_running(image).unwrap());
+    }
 
     fn recorded(relative: &str) -> Value {
         serde_json::from_str(&fs::read_to_string(oracle(relative)).unwrap()).unwrap()

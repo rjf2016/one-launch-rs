@@ -415,7 +415,7 @@ impl<'a> RiotAdapter<'a> {
         self.listed_products().0
     }
 
-    // The products, and why the list can be short: a metadata folder that could not be listed gives none.
+    // The products, and why the list can be short: a metadata folder that could not be listed gives none, and a product's settings file that could not be read gives no install folder for it.
     fn listed_products(&self) -> (Vec<ProductRecord>, Option<String>) {
         let dir = self.metadata_dir();
         if !self.files.exists(&dir) {
@@ -425,20 +425,26 @@ impl<'a> RiotAdapter<'a> {
             Ok(names) => names,
             Err(error) => return (Vec::new(), Some(format!("Could not list {dir}: {error}"))),
         };
+        let mut unread = None;
         let mut records: Vec<ProductRecord> = names
             .iter()
             .filter_map(|name| {
                 let id = parse_product_id(name)?;
                 let folder = join(&[&dir, name]);
                 let settings_path = join(&[&folder, &format!("{name}.product_settings.yaml")]);
-                let settings = self
-                    .files
-                    .exists(&settings_path)
-                    .then(|| {
-                        read_launcher_text(self.files, &settings_path, MAX_LAUNCHER_FILE_BYTES).ok()
-                    })
-                    .flatten()
-                    .map(|text| parse_product_settings(&text));
+                let settings = if self.files.exists(&settings_path) {
+                    match read_launcher_text(self.files, &settings_path, MAX_LAUNCHER_FILE_BYTES) {
+                        Ok(text) => Some(parse_product_settings(&text)),
+                        Err(error) => {
+                            unread.get_or_insert_with(|| {
+                                format!("Could not read {settings_path}: {error}")
+                            });
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
                 Some(ProductRecord {
                     ok: self.files.exists(&join(&[&folder, &format!("{name}.ok")])),
                     install_path: settings
@@ -451,7 +457,7 @@ impl<'a> RiotAdapter<'a> {
             })
             .collect();
         records.sort_by(|a, b| a.id.id().cmp(b.id.id()));
-        (records, None)
+        (records, unread)
     }
 
     // What Windows' list of apps calls the product, from its uninstall entry.
@@ -604,7 +610,12 @@ impl<'a> RiotAdapter<'a> {
 
     // What the session file holds now and whose sign-in it is. Reads the file only. A file in a shape the reader does not know is an error, not a sign-out.
     pub fn current_session(&self) -> Result<CurrentSession, AdapterError> {
-        let Some(SessionFile { file, read }) = self.read_session_file()? else {
+        self.session_in(self.read_session_file()?)
+    }
+
+    // What a read of the session file holds and whose sign-in it is, for a caller that needs to know which read it was.
+    pub fn session_in(&self, read: Option<SessionFile>) -> Result<CurrentSession, AdapterError> {
+        let Some(SessionFile { file, read }) = read else {
             return Ok(CurrentSession {
                 file: None,
                 session: None,
@@ -761,11 +772,13 @@ impl<'a> RiotAdapter<'a> {
     ) -> Result<bool, AdapterError> {
         let timing = self.timing();
         let gone = || Ok::<_, AdapterError>(!self.processes.is_running(image)?);
+        self.no_game_runs()?;
         self.processes.close(image)?;
         if wait_until(self.clock, cancel, timeout, timing.poll, gone)? {
             return Ok(false);
         }
-        // A window close that was ignored is followed by the end of the image's own processes, never of what they started: a running game is the client's child.
+        // A window close that was ignored is followed by the end of the image's own processes, never of what they started: a running game is the client's child. A game can have started during the wait.
+        self.no_game_runs()?;
         self.processes.end(image)?;
         if !wait_until(self.clock, cancel, timing.kill_grace, timing.poll, gone)? {
             return Err(AdapterError::Failed(format!(
@@ -815,6 +828,15 @@ impl<'a> RiotAdapter<'a> {
         }
     }
 
+    // The look a write of the session file rests on, both answers from one listing: a Riot game that runs is an error, and so is a listing that cannot be read; otherwise whether the client runs.
+    pub fn client_runs_beside_no_game(&self, action: &str) -> Result<bool, AdapterError> {
+        let names = self.processes.names()?;
+        if let Some(game) = self.find_running_game(Some(&names))? {
+            return Err(Self::game_running_error(game, action));
+        }
+        Ok(names.contains(&image_key(EXE)))
+    }
+
     fn no_game_runs(&self) -> Result<(), AdapterError> {
         match self.find_running_game(None)? {
             Some(game) => Err(Self::game_running_error(game, "try again")),
@@ -822,7 +844,7 @@ impl<'a> RiotAdapter<'a> {
         }
     }
 
-    // Closes the client's own processes and nothing else: a window close for the client, which is ended alone when it ignores the close, then the same for the window processes it leaves behind. A client that comes back by itself is given time to finish starting and is closed again, three times at most. A Riot game is looked for before every close, the later ones included, because a client that came back may have started one: beside a game nothing is closed.
+    // Closes the client's own processes and nothing else: a window close for the client, which is ended alone when it ignores the close, then the same for the window processes it leaves behind. A client that comes back by itself is given time to finish starting and is closed again, three times at most. A Riot game is looked for directly before every close and every end, the later ones included, because a game can start while a close is waited for: beside a game nothing is closed or ended.
     pub fn shutdown(
         &self,
         timeout: Option<Duration>,
@@ -835,7 +857,6 @@ impl<'a> RiotAdapter<'a> {
         }
         let timing = self.timing();
         for attempt in 1.. {
-            self.no_game_runs()?;
             let mark = self.log_mark();
             let ended = self.close_and_wait(
                 ClientImage::Core,
