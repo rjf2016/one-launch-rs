@@ -32,6 +32,21 @@ impl RegistryError {
     pub const CODE: &'static str = "REGISTRY";
 }
 
+// What a registry value holds. No Debug: a binary value can be a launcher's sign-in.
+#[derive(Clone, PartialEq, Eq)]
+pub enum RegistryData {
+    Text(String),
+    Dword(u32),
+    // The bytes as hex digits.
+    Binary(String),
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct RegistryNamedValue {
+    pub name: String,
+    pub data: RegistryData,
+}
+
 pub trait RegistryReader: Send + Sync {
     fn get_string(
         &self,
@@ -40,6 +55,11 @@ pub trait RegistryReader: Send + Sync {
         name: &str,
     ) -> Result<Option<String>, RegistryError>;
     fn get_dword(&self, hive: Hive, key: &str, name: &str) -> Result<Option<u32>, RegistryError>;
+    // Every value directly under a key. A key that is not there has none.
+    fn list_values(&self, hive: Hive, key: &str) -> Result<Vec<RegistryNamedValue>, RegistryError>;
+    // The keys below `key`, at any depth, with a text value that holds `text` in any case, each by its path below `key`. The whole tree is never listed: under Uninstall that takes seconds.
+    fn keys_holding(&self, hive: Hive, key: &str, text: &str)
+    -> Result<Vec<String>, RegistryError>;
 }
 
 // Only the switch pipeline is handed one of these.
@@ -52,6 +72,9 @@ pub trait RegistryWriter: Send + Sync {
         value: &str,
     ) -> Result<(), RegistryError>;
     fn set_dword(&self, hive: Hive, key: &str, name: &str, value: u32)
+    -> Result<(), RegistryError>;
+    // `hex` is the value's bytes as hex digits. An error never repeats them.
+    fn set_binary(&self, hive: Hive, key: &str, name: &str, hex: &str)
     -> Result<(), RegistryError>;
     // A value that is not there counts as removed.
     fn delete_value(&self, hive: Hive, key: &str, name: &str) -> Result<(), RegistryError>;

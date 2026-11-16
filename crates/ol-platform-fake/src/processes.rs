@@ -87,6 +87,20 @@ impl FakeProcesses {
         }
     }
 
+    // A program that runs beside the launchers, such as a game: it is listed with its path, once.
+    pub fn add_to_table(&self, name: &str, path: &str) {
+        let mut state = self.state();
+        let listed = |process: &ProcessInfo| process.name.eq_ignore_ascii_case(name);
+        if !state.table.iter().any(listed) {
+            let pid = 15_412 + u32::try_from(state.table.len()).unwrap_or(0);
+            state.table.push(ProcessInfo {
+                name: name.to_owned(),
+                pid,
+                path: Some(path.to_owned()),
+            });
+        }
+    }
+
     fn listeners(&self) -> Vec<StartListener> {
         self.listeners
             .lock()
