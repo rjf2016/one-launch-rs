@@ -280,6 +280,22 @@ fn refused(image: &str) -> ProcessError {
     ))
 }
 
+// On a lettered drive or a share: Windows looks for any other path in folders of its own choosing.
+fn full_path(exe: &str) -> bool {
+    let separator = |byte: u8| byte == b'\\' || byte == b'/';
+    if let [letter, b':', after, rest @ ..] = exe.as_bytes() {
+        return letter.is_ascii_alphabetic() && separator(*after) && !rest.is_empty();
+    }
+    let Some(share) = exe.strip_prefix(r"\\") else {
+        return false;
+    };
+    let mut parts = share.splitn(3, '\\');
+    let (Some(server), Some(name), Some(file)) = (parts.next(), parts.next(), parts.next()) else {
+        return false;
+    };
+    !matches!(server, "" | "." | "?") && !name.is_empty() && !file.is_empty()
+}
+
 fn image_of(exe: &str) -> &str {
     exe.rsplit(['\\', '/']).next().unwrap_or(exe)
 }
@@ -409,7 +425,19 @@ impl<S: System> ProcessLister for Port<S> {
 
 impl<S: System> ProcessRunner for Port<S> {
     fn start(&self, exe: &str, args: &[ProcessArg<'_>], cwd: &str) -> Result<(), ProcessError> {
+        // Windows reads a path only up to a NUL, and the name checks below would read past it.
+        if exe.contains('\0') || cwd.contains('\0') {
+            return Err(ProcessError::Failed(
+                "One Launch was asked to start a program by a path or a folder that holds a NUL"
+                    .to_owned(),
+            ));
+        }
         let image = image_of(exe);
+        if !full_path(exe) {
+            return Err(ProcessError::Failed(format!(
+                "Could not start {image}: One Launch starts a program only by its full path"
+            )));
+        }
         if start_refused(exe) {
             return Err(refused(image));
         }
@@ -1024,6 +1052,60 @@ mod tests {
         }
         let calls = processes.system.calls();
         assert!(calls.ended.is_empty() && calls.posted.is_empty() && calls.created.is_empty());
+    }
+
+    #[test]
+    fn a_start_with_a_nul_or_without_a_full_path_is_refused_before_anything_else() {
+        let processes = Port {
+            system: MadeUp::new(table()),
+        };
+        for (exe, cwd) in [
+            (
+                "D:\\Riot Games\\VALORANT\\live\\VALORANT.exe\0\\steam.exe",
+                "",
+            ),
+            ("D:\\Steam\\steam.exe\0", ""),
+            (r"D:\Steam\steam.exe", "D:\\Steam\0"),
+        ] {
+            let refused = processes.start(exe, &[], cwd).unwrap_err().to_string();
+            assert_eq!(
+                refused,
+                "One Launch was asked to start a program by a path or a folder that holds a NUL"
+            );
+        }
+        for exe in [
+            "steam.exe",
+            r"Steam\steam.exe",
+            r"\Steam\steam.exe",
+            "D:steam.exe",
+            r"\\?\D:\Steam\steam.exe",
+            r"\\.\D:\Steam\steam.exe",
+            r"\\server",
+            r"\\server\\steam.exe",
+            "",
+        ] {
+            let refused = processes.start(exe, &[], "").unwrap_err().to_string();
+            assert!(
+                refused.ends_with("One Launch starts a program only by its full path"),
+                "{exe}: {refused}"
+            );
+        }
+        for exe in [
+            r"D:\Steam\steam.exe",
+            "d:/steam/steam.exe",
+            r"\\server\share\steam.exe",
+        ] {
+            let failed = processes.start(exe, &[], "").unwrap_err().to_string();
+            assert!(failed.contains("Windows error 2"), "{exe}: {failed}");
+        }
+        assert_eq!(
+            processes.system.calls().created,
+            [
+                r"D:\Steam\steam.exe",
+                "d:/steam/steam.exe",
+                r"\\server\share\steam.exe"
+            ]
+        );
     }
 
     #[test]
