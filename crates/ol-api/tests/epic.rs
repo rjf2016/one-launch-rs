@@ -376,6 +376,36 @@ fn what_is_saved_of_a_sign_in_is_its_digest_and_whose_it_is() {
 }
 
 #[test]
+fn a_settings_file_older_than_the_last_sign_in_names_no_one_as_remembered() {
+    let fakes = fakes(None);
+    let main = fakes.account(MAIN);
+    assert!(!main.has_session);
+    let file = fs::File::options()
+        .write(true)
+        .open(fakes.settings_file())
+        .unwrap();
+    file.set_modified(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap();
+    drop(file);
+
+    let state = block_on(fakes.backend.session(&main.id))
+        .unwrap()
+        .state
+        .expect("Epic's files say what it remembers");
+    assert!(state.remembered && !state.launcher_running);
+    assert_eq!(state.linked_account_id, None);
+    assert_eq!(state.launcher_uid, None);
+    let remembered = block_on(fakes.backend.remembered_accounts(LauncherId::Epic)).unwrap();
+    assert!(!remembered.is_empty());
+    assert!(
+        remembered
+            .iter()
+            .all(|entry| !entry.most_recent && !entry.remember_password)
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn a_saved_sign_in_is_in_the_launchers_file_and_encrypted_in_the_data_folder_and_nowhere_else() {
     let fakes = fakes(None);
     let alt = fakes.account(ALT);

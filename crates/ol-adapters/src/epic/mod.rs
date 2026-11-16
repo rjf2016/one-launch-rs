@@ -148,6 +148,15 @@ pub struct CurrentSession {
     pub disk_current: bool,
 }
 
+impl CurrentSession {
+    // The account the log names, when the file on disk is that sign-in's: a closed launcher's file older than the sign-in may be someone else's.
+    fn uid_of_the_file(&self, running: bool) -> Option<String> {
+        self.logged_uid
+            .clone()
+            .filter(|_| running || self.disk_current)
+    }
+}
+
 // The end of an account id, enough to tell two apart in a sentence without spelling one out.
 pub fn id_tail(uid: Option<&str>, length: usize) -> String {
     match uid.filter(|uid| !uid.is_empty()) {
@@ -533,7 +542,7 @@ impl<'a> EpicAdapter<'a> {
             launcher_uid: if running {
                 current.logged_uid.clone()
             } else if current.disk.remembered {
-                owner_uid().or_else(|| current.logged_uid.clone())
+                owner_uid().or_else(|| current.uid_of_the_file(running))
             } else {
                 None
             },
@@ -567,7 +576,8 @@ impl<'a> EpicAdapter<'a> {
                 ids.push(id);
             }
         }
-        let current = self.current_session(Some(&text), self.is_running()?)?;
+        let running = self.is_running()?;
+        let current = self.current_session(Some(&text), running)?;
         let active = current
             .disk
             .remembered
@@ -576,7 +586,7 @@ impl<'a> EpicAdapter<'a> {
                     .owner
                     .as_ref()
                     .and_then(|owner| owner.launcher_uid.clone())
-                    .or_else(|| current.logged_uid.clone())
+                    .or_else(|| current.uid_of_the_file(running))
             })
             .flatten()
             .map(|uid| uid.to_lowercase());
