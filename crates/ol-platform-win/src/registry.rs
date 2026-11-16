@@ -129,11 +129,10 @@ fn data(kind: REG_VALUE_TYPE, bytes: &[u8]) -> Option<RegistryData> {
     }
 }
 
+type Value = (REG_VALUE_TYPE, Zeroizing<Vec<u8>>);
+
 // A value's bytes can be a launcher's sign-in: every buffer that held them is wiped when it goes.
-fn query(
-    key: &Key,
-    name: &str,
-) -> Result<Option<(REG_VALUE_TYPE, Zeroizing<Vec<u8>>)>, WIN32_ERROR> {
+fn query(key: &Key, name: &str) -> Result<Option<Value>, WIN32_ERROR> {
     let name = wide(name);
     let mut bytes = Zeroizing::new(vec![0_u8; 512]);
     for _ in 0..ATTEMPTS {

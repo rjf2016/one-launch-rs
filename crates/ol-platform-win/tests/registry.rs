@@ -144,7 +144,7 @@ fn a_value_is_never_listed_or_written_under_a_name_other_than_its_own() {
     let scratch = ScratchKey::new();
     let half_pair = [u16::from(b'A'), 0xD800, 0];
     scratch.plant_named(&half_pair, REG_SZ, &[0, 0]);
-    scratch.plant("A", REG_SZ, &[u8::from(b'x'), 0, 0, 0]);
+    scratch.plant("A", REG_SZ, &[b'x', 0, 0, 0]);
     let listed = WindowsRegistry.list_values(Hive::Hkcu, &scratch.0).unwrap();
     let names: Vec<&str> = listed.iter().map(|value| value.name.as_str()).collect();
     assert_eq!(names, ["A"]);
