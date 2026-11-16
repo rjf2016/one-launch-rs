@@ -35,6 +35,12 @@ impl TextField {
         Self { state }
     }
 
+    pub fn clearing_on_escape(self, cx: &mut App) -> Self {
+        self.state
+            .update(cx, |state, _| state.set_clean_on_escape(true));
+        self
+    }
+
     pub fn text(&self, cx: &App) -> SharedString {
         self.state.read(cx).value()
     }
@@ -56,14 +62,36 @@ impl TextField {
         self.state.update(cx, |state, cx| state.focus(window, cx));
     }
 
+    pub fn focus_and_select(&self, window: &mut Window, cx: &mut App) {
+        self.state.update(cx, |state, cx| {
+            state.focus(window, cx);
+            state.select_all(window, cx);
+        });
+    }
+
+    pub fn clear(&self, window: &mut Window, cx: &mut App) {
+        self.state.update(cx, |state, cx| state.clean(window, cx));
+    }
+
+    pub fn is_disabled(&self, cx: &App) -> bool {
+        self.state.read(cx).presentation().is_disabled()
+    }
+
+    pub fn set_disabled(&self, disabled: bool, cx: &mut App) {
+        self.state
+            .update(cx, |state, cx| state.set_disabled(disabled, cx));
+    }
+
     pub fn frame(
         &self,
         id: impl Into<ElementId>,
         leading: Option<AnyElement>,
+        trailing: Option<AnyElement>,
         window: &Window,
         cx: &App,
     ) -> Stateful<Div> {
-        let focused = self.state.read(cx).focus_handle(cx).is_focused(window);
+        let disabled = self.is_disabled(cx);
+        let focused = !disabled && self.state.read(cx).focus_handle(cx).is_focused(window);
         let field = self.clone();
         div()
             .id(id)
@@ -81,13 +109,17 @@ impl TextField {
             }))
             .bg(color(theme::SURFACE))
             .line_height(px(20.))
-            .when(!focused, |frame| {
+            .when(disabled, |frame| frame.opacity(0.6))
+            .when(!focused && !disabled, |frame| {
                 frame.hover(|style| style.border_color(color(theme::BORDER_STRONG)))
             })
-            .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                field.focus(window, cx);
+            .when(!disabled, |frame| {
+                frame.on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                    field.focus(window, cx);
+                })
             })
             .children(leading)
             .child(Input::new(&self.state))
+            .children(trailing)
     }
 }

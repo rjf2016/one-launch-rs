@@ -3,6 +3,7 @@ use gpui::{
     Context, Div, Entity, FontWeight, Pixels, Stateful, Svg, Window, WindowControlArea, div, px,
     svg,
 };
+use ol_api::Backend;
 use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::assets;
@@ -25,9 +26,9 @@ pub fn sidebar_width(viewport: Pixels) -> Pixels {
 }
 
 impl Shell {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(backend: Backend, window: &mut Window, cx: &mut Context<Self>) -> Self {
         Self {
-            library: cx.new(|cx| LibraryView::new(window, cx)),
+            library: cx.new(|cx| LibraryView::new(backend, window, cx)),
         }
     }
 

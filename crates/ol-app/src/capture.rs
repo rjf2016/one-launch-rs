@@ -1,7 +1,10 @@
 use std::time::Duration;
 
 use anyhow::Context as _;
-use gpui::{AnyWindowHandle, AsyncApp, Keystroke, WindowHandle};
+use gpui::{
+    AnyWindowHandle, App, AsyncApp, Keystroke, Modifiers, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, Pixels, PlatformInput, Point, Window, WindowHandle, point, px,
+};
 use ol_platform_win::own_process;
 use ol_platform_win::probe::{self, OuterRect};
 use ol_platform_win::window::AppWindow;
@@ -66,12 +69,6 @@ pub async fn run(
 
     if let Some(text) = &plan.text {
         in_library(window, cx, |library, window, cx| {
-            library.focus_secret(window, cx);
-        })?;
-        pause(STEP, cx).await;
-        native.post_text(text);
-        pause(STEP, cx).await;
-        in_library(window, cx, |library, window, cx| {
             library.focus_search(window, cx);
         })?;
         pause(STEP, cx).await;
@@ -79,13 +76,10 @@ pub async fn run(
         pause(STEP, cx).await;
     }
 
-    for keys in &plan.keys {
-        let keystroke = Keystroke::parse(keys.clone().leak())
-            .with_context(|| format!("{keys} is not a keystroke"))?;
+    for step in &plan.keys {
+        let step = Step::parse(step)?;
         // Through the untyped handle: a key press can redraw the window, and the typed one holds the root view meanwhile.
-        AnyWindowHandle::from(window).update(cx, |_, window, cx| {
-            window.dispatch_keystroke(keystroke, cx);
-        })?;
+        AnyWindowHandle::from(window).update(cx, |_, window, cx| step.take(window, cx))?;
         pause(STEP, cx).await;
     }
 
@@ -112,6 +106,77 @@ pub async fn run(
         );
     }
     Ok(())
+}
+
+// A step of --capture-keys: a key press, or the pointer at a place of the client area, moved there or clicked.
+enum Step {
+    Key(Keystroke),
+    Move(Point<Pixels>),
+    Click(Point<Pixels>),
+}
+
+impl Step {
+    fn parse(text: &str) -> anyhow::Result<Self> {
+        let (pointer, spot) = match text.split_once(':') {
+            Some(pointer @ ("move" | "click", _)) => pointer,
+            _ => {
+                return Keystroke::parse(text.to_owned().leak())
+                    .map(Self::Key)
+                    .with_context(|| format!("{text} is not a keystroke"));
+            }
+        };
+        let position = spot
+            .split_once('x')
+            .and_then(|(x, y)| Some(point(px(x.parse().ok()?), px(y.parse().ok()?))))
+            .with_context(|| format!("{text} is not {pointer}:<x>x<y>"))?;
+        Ok(if pointer == "click" {
+            Self::Click(position)
+        } else {
+            Self::Move(position)
+        })
+    }
+
+    fn take(self, window: &mut Window, cx: &mut App) {
+        let (position, click) = match self {
+            Self::Key(keystroke) => {
+                window.dispatch_keystroke(keystroke, cx);
+                return;
+            }
+            Self::Move(position) => (position, false),
+            Self::Click(position) => (position, true),
+        };
+        let modifiers = Modifiers::default();
+        window.dispatch_event(
+            PlatformInput::MouseMove(MouseMoveEvent {
+                position,
+                pressed_button: None,
+                modifiers,
+            }),
+            cx,
+        );
+        if !click {
+            return;
+        }
+        window.dispatch_event(
+            PlatformInput::MouseDown(MouseDownEvent {
+                button: MouseButton::Left,
+                position,
+                modifiers,
+                click_count: 1,
+                first_mouse: false,
+            }),
+            cx,
+        );
+        window.dispatch_event(
+            PlatformInput::MouseUp(MouseUpEvent {
+                button: MouseButton::Left,
+                position,
+                modifiers,
+                click_count: 1,
+            }),
+            cx,
+        );
+    }
 }
 
 pub async fn pause(duration: Duration, cx: &AsyncApp) {
