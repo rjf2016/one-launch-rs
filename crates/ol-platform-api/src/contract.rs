@@ -185,4 +185,34 @@ pub fn files(files: &dyn Files, folder: &str) {
     assert_eq!(files.read(&first).unwrap(), b"abc");
     assert_eq!(files.list(folder).unwrap(), ["b.txt", "blocker", "sub"]);
     assert_eq!(files.list(&path("sub")).unwrap(), ["a.txt"]);
+
+    // The folders a write that failed made are gone again; one that was there stays.
+    assert!(
+        files
+            .write_atomic(&[
+                (&path(r"made\deeper\c.txt"), b"x"),
+                (&path(r"sub\new\d.txt"), b"y"),
+                (&path(r"blocker\e.txt"), b"z"),
+            ])
+            .is_err()
+    );
+    assert_eq!(files.list(folder).unwrap(), ["b.txt", "blocker", "sub"]);
+    assert_eq!(files.list(&path("sub")).unwrap(), ["a.txt"]);
+
+    // A file that already has a name the write could pick for itself is neither followed, emptied nor moved.
+    let planted = |suffix: &str| format!("{second}.onelaunch-{}.{suffix}", std::process::id());
+    for suffix in ["tmp", "old"] {
+        std::fs::write(planted(suffix), b"planted").unwrap();
+    }
+    files.write_atomic(&[(&second, b"newest")]).unwrap();
+    assert_eq!(files.read(&second).unwrap(), b"newest");
+    for suffix in ["tmp", "old"] {
+        assert_eq!(
+            files.read(&planted(suffix)).unwrap(),
+            b"planted",
+            "{suffix}"
+        );
+        std::fs::remove_file(planted(suffix)).unwrap();
+    }
+    assert_eq!(files.list(folder).unwrap(), ["b.txt", "blocker", "sub"]);
 }
