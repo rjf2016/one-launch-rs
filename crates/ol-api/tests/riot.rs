@@ -13,13 +13,14 @@ use ol_api::launchers::{
     RiotTiming, Secret, SteamTiming,
 };
 use ol_api::{ApiError, Backend, StartLaunch};
+use ol_model::Ciphertext;
 use ol_model::{
     JobState, JobStep, JobStepStatus, LaunchJob, LauncherId, SettingKey, SwitchPlan, SwitchStrategy,
 };
 use ol_sim::FakeLaunchers;
 use ol_testkit::vectors::sha256_hex;
 use ol_testkit::{Scratch, oracle, snapshot};
-use ol_vault::FakeVault;
+use ol_vault::{FakeVault, Vault, VaultError};
 use serde_json::{Value, json};
 use time::macros::datetime;
 
@@ -47,6 +48,26 @@ struct Fakes {
     jobs: Receiver<LaunchJob>,
     // The job as it was last reported, where the job's own thread can read it.
     latest: Arc<Mutex<Option<LaunchJob>>>,
+    // Shown each value the vault seals, before it seals it.
+    watch: Watch,
+}
+
+type Watch = Arc<Mutex<Option<Box<dyn Fn(&str) + Send>>>>;
+
+// The fixtures' stand-in vault, which first shows what it seals to the test: a switch, a rollback and a restore seal what the file held and the snapshot after the client was seen closed and before the file is written.
+struct WatchedVault(Watch);
+
+impl Vault for WatchedVault {
+    fn encrypt(&self, plaintext: &ol_vault::Secret) -> Result<Ciphertext, VaultError> {
+        if let Some(watch) = self.0.lock().unwrap().as_ref() {
+            watch(plaintext.expose());
+        }
+        FakeVault.encrypt(plaintext)
+    }
+
+    fn decrypt(&self, ciphertext: &Ciphertext) -> Result<ol_vault::Secret, VaultError> {
+        FakeVault.decrypt(ciphertext)
+    }
 }
 
 impl Fakes {
@@ -210,7 +231,9 @@ fn start(scratch: Scratch) -> Fakes {
         datetime!(2026-11-06 16:46:23 UTC),
     )
     .unwrap();
-    let mut launchers = Launchers::on(fake.platform.clone(), Arc::new(FakeVault));
+    let watch: Watch = Arc::new(Mutex::new(None));
+    let vault = WatchedVault(Arc::clone(&watch));
+    let mut launchers = Launchers::on(fake.platform.clone(), Arc::new(vault));
     launchers.steam_timing = SteamTiming::with(&fake.steam_timing);
     launchers
         .steam_default_dir
@@ -284,6 +307,7 @@ fn start(scratch: Scratch) -> Fakes {
         backend,
         jobs,
         latest,
+        watch,
     }
 }
 
@@ -709,6 +733,125 @@ fn game_starts_at(fakes: &Fakes, step: &'static str, image: &'static str) {
             processes.add_name_to_table(image);
         }
     });
+}
+
+// Runs `then` once, when the vault is first asked to seal a value that holds `text`.
+fn when_sealed(fakes: &Fakes, text: String, then: impl Fn() + Send + 'static) {
+    let done = std::sync::atomic::AtomicBool::new(false);
+    let watch = move |sealed: &str| {
+        if sealed.contains(&text) && !done.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            then();
+        }
+    };
+    *fakes.watch.lock().unwrap() = Some(Box::new(watch));
+}
+
+#[test]
+fn a_riot_game_or_the_client_that_starts_after_the_close_and_before_the_write_stops_the_switch_with_nothing_written()
+ {
+    // Main's sign-in is stored for Main once the client is closed, and before the file is written a game starts.
+    let fakes = fakes(None);
+    let processes = Arc::clone(&fakes.fake.processes);
+    when_sealed(&fakes, mains_token(), move || {
+        processes.add_name_to_table("VALORANT.exe");
+    });
+    let states = fakes.play(ALT);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Failed && !last.switched && last.restored.is_none());
+    assert_eq!(
+        last.error.as_deref(),
+        Some("VALORANT is running. Close it, then switch: One Launch never closes a Riot game.")
+    );
+    assert!(fakes.on_disk() == planted_file());
+    assert!(asked_of_the_machine(&fakes).is_empty());
+    assert_eq!(
+        fakes.saved(MAIN),
+        Some(sha256_hex(mains_token().as_bytes()))
+    );
+    fakes.backend.shut_down();
+
+    // The same moment, and something else starts the client.
+    let fakes = self::fakes(None);
+    let processes = Arc::clone(&fakes.fake.processes);
+    when_sealed(&fakes, mains_token(), move || {
+        processes.set_running(EXE, true);
+    });
+    let states = fakes.play(ALT);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Failed && !last.switched && last.restored.is_none());
+    assert_eq!(
+        last.error.as_deref(),
+        Some(
+            "The Riot Client was started by something else while One Launch was switching accounts, so the switch stopped before changing anything. Try again."
+        )
+    );
+    assert!(fakes.on_disk() == planted_file());
+    assert!(asked_of_the_machine(&fakes).is_empty());
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_riot_game_that_starts_after_a_rollback_or_a_restore_has_closed_the_client_keeps_the_file_as_it_is()
+ {
+    // New signs in by hand as Main, which fails the switch; the rollback closes the client and stores Main's fresh sign-in, and then a game starts.
+    let knobs = json!({
+        "knobs": { "riot": { "signInWhenAskedMs": 600, "signInAs": MAIN_UID } },
+    });
+    let fakes = fakes(Some(&knobs));
+    let processes = Arc::clone(&fakes.fake.processes);
+    when_sealed(&fakes, clients_token(1), move || {
+        processes.add_name_to_table("VALORANT.exe");
+    });
+    let states = fakes.play(NEW);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Failed);
+    assert_eq!(last.restored, Some(false));
+    let backup_id = last.backup_id.clone().expect("the switch took a snapshot");
+    assert_eq!(
+        last.error,
+        Some(format!(
+            "The Riot Client signed in as Riot Main (Riot account …1111), which is another One Launch account, instead of Riot New. Sign in to the client as riot_new.. Restoring backup {backup_id} also failed: VALORANT is running. Close it, then restore: One Launch never closes a Riot game."
+        ))
+    );
+    assert_eq!(
+        asked_of_the_machine(&fakes),
+        ["file.write", "proc.start", "proc.close", "proc.close"]
+    );
+    assert!(fakes.on_disk().contains(&clients_token(1)));
+    assert_eq!(
+        fakes.saved(MAIN),
+        Some(sha256_hex(clients_token(1).as_bytes()))
+    );
+    fakes.backend.shut_down();
+
+    // A restore from Settings, with the client exited: what the file holds goes to Alt, and then a game starts.
+    let fakes = self::fakes(None).without_the_press();
+    assert!(fakes.play(ALT).last().unwrap().state == JobState::Done);
+    let id = block_on(fakes.backend.backups(LauncherId::Riot)).unwrap()[0]
+        .id
+        .clone();
+    fakes.client_exits();
+    let processes = Arc::clone(&fakes.fake.processes);
+    when_sealed(&fakes, clients_token(1), move || {
+        processes.add_name_to_table("LeagueClientUx.exe");
+    });
+    let (asked, on_disk) = (asked_of_the_machine(&fakes), fakes.on_disk());
+    let refused = block_on(fakes.backend.restore_backup(LauncherId::Riot, &id));
+    assert_eq!(
+        refusal(refused),
+        (
+            "GAME_RUNNING",
+            "Riot Games: League of Legends is running. Close it, then restore: One Launch never closes a Riot game."
+                .to_owned()
+        )
+    );
+    assert_eq!(asked_of_the_machine(&fakes), asked);
+    assert!(fakes.on_disk() == on_disk);
+    assert_eq!(
+        fakes.saved(ALT),
+        Some(sha256_hex(clients_token(1).as_bytes()))
+    );
+    fakes.backend.shut_down();
 }
 
 #[test]

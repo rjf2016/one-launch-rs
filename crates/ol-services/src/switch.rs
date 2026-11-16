@@ -180,12 +180,12 @@ fn restore_battlenet(
     })
 }
 
-// Riot: RiotGamesPrivateSettings.yaml, whole: the account's saved copy of the file as the client left it, the file with its session block set to null, or a snapshot's copy of it. It is the one launcher file a Riot switch writes, and it is never made where there is none: the client writes it at its first start, with the mark Riot knows this PC by. `ready` shows that the client was seen closed and that the sign-in the file held was handed to the store for its owner first.
+// Riot: RiotGamesPrivateSettings.yaml, whole: the account's saved copy of the file as the client left it, the file with its session block set to null, or a snapshot's copy of it. It is the one launcher file a Riot switch writes, and it is never made where there is none: the client writes it at its first start, with the mark Riot knows this PC by. `ready` is used up here: it shows that a look taken just before found no Riot game and the client still closed, after the sign-in the file held was handed to the store for its owner.
 fn write_riot_session(
     files: &dyn Files,
     path: &str,
     content: &[u8],
-    _ready: &riot::ReadyToWrite,
+    _ready: riot::ReadyToWrite,
 ) -> std::io::Result<()> {
     if !files.exists(path) {
         return Err(std::io::Error::new(
@@ -198,17 +198,18 @@ fn write_riot_session(
     files.write_atomic(&[(path, content)])
 }
 
-// Riot: puts a snapshot back: its copy of the session file over the client's own, and nothing else. Riot keeps nothing of a sign-in in the registry.
+// Riot: puts a snapshot back: its copy of the session file over the client's own, and nothing else. Riot keeps nothing of a sign-in in the registry. The look the write rests on is taken once the copy is read, directly before the write.
 fn restore_riot(
     riot: &RiotAdapter<'_>,
     platform: &Platform,
     backups: &BackupService<'_>,
     id: &str,
-    ready: &riot::ReadyToWrite,
+    saved: &riot::Saved,
 ) -> Result<RestoreResult, RestoreError> {
     let target = riot.session_file_path();
     let restorable = backups.read_for_restore(LauncherId::Riot, id, &[&target])?;
     for (path, content) in &restorable.files {
+        let ready = riot::look_before_write(riot, saved, "restore")?;
         write_riot_session(platform.files.as_ref(), path, content, ready)
             .map_err(BackupError::Io)?;
     }

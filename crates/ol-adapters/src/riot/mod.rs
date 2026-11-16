@@ -817,6 +817,15 @@ impl<'a> RiotAdapter<'a> {
         }
     }
 
+    // The look a write of the session file rests on, both answers from one listing: a Riot game that runs is an error, and so is a listing that cannot be read; otherwise whether the client runs.
+    pub fn client_runs_beside_no_game(&self, action: &str) -> Result<bool, AdapterError> {
+        let names = self.processes.names()?;
+        if let Some(game) = self.find_running_game(Some(&names))? {
+            return Err(Self::game_running_error(game, action));
+        }
+        Ok(names.contains(&image_key(EXE)))
+    }
+
     fn no_game_runs(&self) -> Result<(), AdapterError> {
         match self.find_running_game(None)? {
             Some(game) => Err(Self::game_running_error(game, "try again")),
