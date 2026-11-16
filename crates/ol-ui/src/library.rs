@@ -292,6 +292,13 @@ impl LibraryView {
     fn loaded(&mut self, library: Loaded, cx: &mut Context<Self>) {
         let (library, recent) = match library {
             Ok(read) => read,
+            Err(error) if matches!(self.load, Load::Ready) => {
+                return self.say(
+                    format!("Could not load the library: {}", error.message),
+                    true,
+                    cx,
+                );
+            }
             Err(error) => {
                 self.load = Load::Failed(error.message.into());
                 return cx.notify();
