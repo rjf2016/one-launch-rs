@@ -180,7 +180,7 @@ fn restore_battlenet(
     })
 }
 
-// Riot: RiotGamesPrivateSettings.yaml, whole: the account's saved copy of the file as the client left it, the file with its session block set to null, or a snapshot's copy of it. It is the one launcher file a Riot switch writes, and it is never made where there is none: the client writes it at its first start, with the mark Riot knows this PC by. `ready` is used up here: it shows that a look taken just before found no Riot game and the client still closed, after the sign-in the file held was handed to the store for its owner.
+// Riot: RiotGamesPrivateSettings.yaml, whole: the account's saved copy of the file as the client left it, the file with its session block set to null, or a snapshot's copy of it. It is the one launcher file a Riot switch writes, and it is never made where there is none: the client writes it at its first start, with the mark Riot knows this PC by. `ready` is used up here: it shows that a look taken just before found no Riot game, the client still closed and the file as it was when the sign-in it held was handed to the store for its owner.
 fn write_riot_session(
     files: &dyn Files,
     path: &str,
@@ -188,17 +188,21 @@ fn write_riot_session(
     _ready: riot::ReadyToWrite,
 ) -> std::io::Result<()> {
     if !files.exists(path) {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!(
-                "{path} is missing. Start the Riot Client once by hand so it writes its settings file, then try again."
-            ),
-        ));
+        return Err(missing_riot_session(path));
     }
     files.write_atomic(&[(path, content)])
 }
 
-// Riot: puts a snapshot back: its copy of the session file over the client's own, and nothing else. Riot keeps nothing of a sign-in in the registry. The look the write rests on is taken once the copy is read, directly before the write.
+fn missing_riot_session(path: &str) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!(
+            "{path} is missing. Start the Riot Client once by hand so it writes its settings file, then try again."
+        ),
+    )
+}
+
+// Riot: puts a snapshot back: its copy of the session file over the client's own, and nothing else. Riot keeps nothing of a sign-in in the registry. The look the write rests on is taken once the copy is read, directly before the write, and refuses it when the file is no longer the one whose sign-in was handed to the store.
 fn restore_riot(
     riot: &RiotAdapter<'_>,
     platform: &Platform,

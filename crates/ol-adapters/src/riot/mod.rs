@@ -610,7 +610,12 @@ impl<'a> RiotAdapter<'a> {
 
     // What the session file holds now and whose sign-in it is. Reads the file only. A file in a shape the reader does not know is an error, not a sign-out.
     pub fn current_session(&self) -> Result<CurrentSession, AdapterError> {
-        let Some(SessionFile { file, read }) = self.read_session_file()? else {
+        self.session_in(self.read_session_file()?)
+    }
+
+    // What a read of the session file holds and whose sign-in it is, for a caller that needs to know which read it was.
+    pub fn session_in(&self, read: Option<SessionFile>) -> Result<CurrentSession, AdapterError> {
+        let Some(SessionFile { file, read }) = read else {
             return Ok(CurrentSession {
                 file: None,
                 session: None,

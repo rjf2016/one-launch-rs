@@ -1,4 +1,4 @@
-// Riot's switch: refuse while a Riot game runs, close the client, save the sign-in it leaves behind for its owner, copy RiotGamesPrivateSettings.yaml, put the target account's saved copy of the whole file in its place (or the client's own signed-out state, so that the client asks), start the client as its shortcut does and read its log and the file for the sign-in. It reads, waits and decides; every write goes through the two functions for Riot at the top of switch.rs, and neither takes a write that cannot hand over a `ReadyToWrite`: the client was seen closed, what the file held was handed to the store for its owner, and a look directly before the write found no Riot game and the client still closed. A saved sign-in is decrypted in one place, `write_session`, and goes nowhere but into the client's own file.
+// Riot's switch: refuse while a Riot game runs, close the client, save the sign-in it leaves behind for its owner, copy RiotGamesPrivateSettings.yaml, put the target account's saved copy of the whole file in its place (or the client's own signed-out state, so that the client asks), start the client as its shortcut does and read its log and the file for the sign-in. It reads, waits and decides; every write goes through the two functions for Riot at the top of switch.rs, and neither takes a write that cannot hand over a `ReadyToWrite`: the client was seen closed, what the file held was handed to the store for its owner, and a look directly before the write found no Riot game, the client still closed and the file still the one the store read. A saved sign-in is decrypted in one place, `write_session`, and goes nowhere but into the client's own file.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -12,8 +12,8 @@ use ol_adapters::{AccountRef, AdapterError, Directory, GameRef};
 use ol_formats::riot::client_log::{FailReason, SignInOutcome, last_sign_in};
 use ol_formats::riot::products::{RiotProductId, parse_product_id};
 use ol_formats::riot::session::{
-    RiotSession, RiotSessionBlob, SessionRead, parse_blob, plan_sign_out, serialize_blob,
-    session_of_blob, short_fingerprint,
+    RiotSession, RiotSessionBlob, SessionRead, fingerprint_of, parse_blob, plan_sign_out,
+    serialize_blob, session_of_blob, short_fingerprint,
 };
 use ol_model::{
     BackupSnapshot, JobStep, JobStepStatus, LaunchAttention, LauncherId, LauncherInstall,
@@ -26,7 +26,8 @@ use serde_json::Map;
 use time::OffsetDateTime;
 
 use super::{
-    SwitchOptions, SwitchResult, SwitchSink, Thrown, job_steps, restore_riot, write_riot_session,
+    RestoreError, SwitchOptions, SwitchResult, SwitchSink, Thrown, job_steps, missing_riot_session,
+    restore_riot, write_riot_session,
 };
 use crate::backup::{BackupError, BackupFile, BackupService, SnapshotRequest};
 use crate::launchers::ServiceError;
@@ -34,26 +35,40 @@ use crate::launchers::ServiceError;
 // The client was seen closed a moment ago. Only `seen_closed` makes one.
 struct Closed(());
 
-// The client was seen closed, and the sign-in the file held was then read and handed to the store for the account it belongs to, because the client replaces the token at every start and an older copy must never be the one that is kept. It shows that the store was asked, not that it kept the copy: a store that fails does not stop the write, as in the Electron app. Only `save_what_the_file_holds` makes one.
-pub(super) struct Saved(());
+// The client was seen closed, and the sign-in the file held was then read and handed to the store for the account it belongs to, because the client replaces the token at every start and an older copy must never be the one that is kept. It shows that the store was asked, not that it kept the copy: a store that fails does not stop the write, as in the Electron app. It carries the fingerprint of the file's text as that read found it, also when there was nothing to store, so that the last look can tell whether the file is still the one the store was asked about. Only `save_what_the_file_holds` makes one.
+pub(super) struct Saved {
+    // None when there was no file, or it could not be read: no file the last look finds then matches.
+    looked_at: Option<String>,
+}
 
-// What every write of the session file takes, and uses up: on top of `Saved`, a look taken directly before the write found no Riot game running and the client still closed. Only `look_before_write` makes one, here, in this module, so no write rests on a look taken before the snapshot or the store.
+// What every write of the session file takes, and uses up: on top of `Saved`, a look taken directly before the write found no Riot game running, the client still closed and the file as the store read it. Only `look_before_write` makes one, here, in this module, so no write rests on a look taken before the snapshot or the store.
 pub(super) struct ReadyToWrite(());
 
 fn seen_closed(riot: &RiotAdapter<'_>) -> Result<Option<Closed>, AdapterError> {
     Ok((!riot.is_running()?).then_some(Closed(())))
 }
 
-// The last look before a write, one listing of the processes: a Riot game, or a listing that cannot be read, refuses the write, named as the `action` refused; a client that runs again refuses it as a running launcher.
+// The last look before a write: one listing of the processes, then one read of the file. A Riot game, or a listing that cannot be read, refuses the write, named as the `action` refused; a client that runs again refuses it as a running launcher. A file that is gone, cannot be read, or is not the one whose sign-in was handed to the store, because the client ran and exited since, refuses it too: nothing is written over a sign-in that was never stored.
 pub(super) fn look_before_write(
     riot: &RiotAdapter<'_>,
-    _saved: &Saved,
+    saved: &Saved,
     action: &str,
-) -> Result<ReadyToWrite, AdapterError> {
+) -> Result<ReadyToWrite, RestoreError> {
     if riot.client_runs_beside_no_game(action)? {
         return Err(AdapterError::LauncherRunning(format!(
             "The Riot Client is running again, and it rewrites {SESSION_FILE} while it runs, so nothing was written. Exit it from its tray icon, then {action}."
-        )));
+        ))
+        .into());
+    }
+    let Some(on_disk) = riot.read_session_file()? else {
+        let missing = missing_riot_session(&riot.session_file_path());
+        return Err(BackupError::Io(missing).into());
+    };
+    if saved.looked_at.as_deref() != Some(fingerprint_of(&on_disk.file.file).as_str()) {
+        return Err(AdapterError::SwitchBlocked(format!(
+            "{SESSION_FILE} changed after One Launch saved the sign-in it held, so nothing was written: the Riot Client may have run meanwhile. Keep it closed, then {action}."
+        ))
+        .into());
     }
     Ok(ReadyToWrite(()))
 }
@@ -83,8 +98,13 @@ fn store_session(
 
 // Stores the sign-in the file holds for the One Launch account it belongs to, when it changed since it was last stored, and says in one sentence what came of it. A sign-in that cannot be saved costs one sign-in by hand later, never the switch; one that nobody owns is left alone.
 fn save_what_the_file_holds(riot: &RiotAdapter<'_>, _closed: &Closed) -> (Saved, String) {
+    let read = riot.read_session_file();
+    let looked_at = match &read {
+        Ok(Some(on_disk)) => Some(fingerprint_of(&on_disk.file.file)),
+        _ => None,
+    };
     let saved = (|| -> Result<String, AdapterError> {
-        let current = riot.current_session()?;
+        let current = riot.session_in(read?)?;
         let (Some(session), Some(file)) = (&current.session, &current.file) else {
             return Ok("The client left no saved sign-in behind (signed out).".to_owned());
         };
@@ -109,7 +129,7 @@ fn save_what_the_file_holds(riot: &RiotAdapter<'_>, _closed: &Closed) -> (Saved,
         ))
     })();
     let detail = saved.unwrap_or_else(|error| format!("Not saved: {error}"));
-    (Saved(()), detail)
+    (Saved { looked_at }, detail)
 }
 
 // The session file as a snapshot takes it: encrypted, because it is a sign-in.
@@ -309,8 +329,11 @@ impl Switch<'_> {
     fn ready_to_write(&mut self, saved: &Saved) -> Result<ReadyToWrite, Thrown> {
         match look_before_write(self.riot, saved, "switch") {
             Ok(ready) => Ok(ready),
-            Err(AdapterError::LauncherRunning(_)) => Err(self.started_meanwhile(STEP.file)),
-            Err(other) => Err(other.into()),
+            Err(RestoreError::Adapter(AdapterError::LauncherRunning(_))) => {
+                Err(self.started_meanwhile(STEP.file))
+            }
+            Err(RestoreError::Adapter(other)) => Err(other.into()),
+            Err(RestoreError::Backup(other)) => Err(Thrown::Failed(other.to_string())),
         }
     }
 
