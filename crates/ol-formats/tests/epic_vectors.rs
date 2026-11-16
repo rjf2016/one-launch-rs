@@ -35,6 +35,18 @@ fn loses_a_character(case: &Case) -> bool {
     LOSES_A_CHARACTER.contains(&case.id.as_str())
 }
 
+const SHOWN_WHOLE: &str = "a Data value of 8 characters or fewer, which the Electron app shows whole in a plan; the port shows its length, because a session value is never shown (plan/GAPS.md)";
+const SHOWS_A_SHORT_VALUE: [&str; 8] = [
+    "enable-lowercase",
+    "data-short-plain",
+    "describe-plain-at-8",
+    "describe-base64-short",
+    "adv-astral-length-over",
+    "adv-astral-length-at",
+    "adv-astral-length-straddle",
+    "adv-fingerprint-non-ascii",
+];
+
 fn eol(layout: &IniLayout) -> &'static str {
     layout.eol.as_str()
 }
@@ -194,9 +206,50 @@ fn a_file_with_crlf_that_ends_in_a_bare_lf_keeps_every_character_of_its_last_lin
 }
 
 #[test]
+fn a_short_data_value_is_shown_by_its_length_and_never_whole() {
+    let text = "[RememberMe]\r\nEnable=True\r\nData=abc\r\n\r\n[Offline]\r\nData=Zz9\r\n";
+    let blob = EpicSessionBlob {
+        enable: "True".to_owned(),
+        data: "QUJDREVG".to_owned(),
+        offline: Some("x1".to_owned()),
+    };
+    let shown = |write: ol_formats::epic::session::SessionWrite| {
+        write
+            .changes
+            .iter()
+            .map(|change| format!("{} -> {}", change.before, change.after))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        shown(plan_session_write(text, Some(&blob))),
+        [
+            "(3 characters) -> (8 characters)",
+            "(3 characters) -> (2 characters)"
+        ]
+    );
+    assert_eq!(
+        shown(plan_session_write(text, None)),
+        ["(3 characters) -> (removed)", "(3 characters) -> (removed)"]
+    );
+}
+
+#[test]
 fn plan_session_write_cases() {
-    let skipped = [("adv-lone-surrogate-data", UNPAIRED)];
+    let skipped = [
+        ("enable-lowercase", SHOWN_WHOLE),
+        ("data-short-plain", SHOWN_WHOLE),
+        ("describe-plain-at-8", SHOWN_WHOLE),
+        ("describe-base64-short", SHOWN_WHOLE),
+        ("adv-astral-length-over", SHOWN_WHOLE),
+        ("adv-astral-length-at", SHOWN_WHOLE),
+        ("adv-astral-length-straddle", SHOWN_WHOLE),
+        ("adv-lone-surrogate-data", UNPAIRED),
+        ("adv-fingerprint-non-ascii", SHOWN_WHOLE),
+    ];
     run("l1/epic/planSessionWrite.json", &skipped, |case| {
+        if SHOWS_A_SHORT_VALUE.contains(&case.id.as_str()) {
+            return Answer::Skip(SHOWN_WHOLE);
+        }
         let blob = match &case.args[1] {
             Value::Null => None,
             given => match blob_from(given) {
