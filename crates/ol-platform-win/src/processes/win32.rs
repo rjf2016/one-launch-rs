@@ -10,6 +10,7 @@ use windows::Win32::Foundation::{
     STATUS_INFO_LENGTH_MISMATCH, UNICODE_STRING, WAIT_OBJECT_0, WIN32_ERROR, WPARAM,
 };
 use windows::Win32::Storage::FileSystem::{GetLogicalDrives, QueryDosDeviceW};
+use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows::Win32::System::Threading::{
     CREATE_NEW_PROCESS_GROUP, CreateProcessW, DETACHED_PROCESS, GetCurrentProcess,
     GetCurrentProcessId, GetProcessTimes, OpenProcess, PROCESS_INFORMATION,
@@ -30,7 +31,7 @@ const FIRST_TABLE_BYTES: usize = 1 << 20;
 const ATTEMPTS: usize = 8;
 const NETWORK: &str = r"\Device\Mup\";
 
-// The head of each row SystemProcessInformation writes, as winternl.h and every reader of the table since Windows XP lay it out, up to the parent's id. ToolHelp reads this same table and drops the start time, which is what tells a parent from a process that took its id later.
+// The head of each row SystemProcessInformation writes, as winternl.h and every reader of the table since Windows XP lay it out, up to the session's id. ToolHelp reads this same table and drops the start time, which is what tells a parent from a process that took its id later.
 #[repr(C)]
 struct ProcessRow {
     next_entry_offset: u32,
@@ -46,6 +47,8 @@ struct ProcessRow {
     base_priority: i32,
     unique_process_id: HANDLE,
     inherited_from_unique_process_id: HANDLE,
+    handle_count: u32,
+    session_id: u32,
 }
 
 #[repr(C)]
@@ -111,6 +114,7 @@ fn rows(table: &[u8]) -> Option<Vec<Entry>> {
             row,
             offset_of!(ProcessRow, inherited_from_unique_process_id),
         )?;
+        let session = u32::from_ne_bytes(read(row, offset_of!(ProcessRow, session_id))?);
         let name = if pointer == 0 {
             String::new()
         } else {
@@ -128,6 +132,7 @@ fn rows(table: &[u8]) -> Option<Vec<Entry>> {
             pid: u32::try_from(pid).ok()?,
             parent: u32::try_from(parent).unwrap_or(0),
             created: u64::try_from(started).ok()?,
+            session,
             name,
         });
         if next == 0 {
@@ -137,10 +142,17 @@ fn rows(table: &[u8]) -> Option<Vec<Entry>> {
     }
 }
 
-// A table read with the wrong layout must not choose what is ended: it has to name this very process, under its own file name, started when Windows says it started.
+fn own_session(pid: u32) -> Option<u32> {
+    let mut session = 0_u32;
+    unsafe { ProcessIdToSessionId(pid, &raw mut session) }.ok()?;
+    Some(session)
+}
+
+// A table read with the wrong layout must not choose what is ended: it has to name this very process, under its own file name, started when Windows says it started, in the session Windows says it runs in.
 fn agrees_on_this_process(entries: &[Entry]) -> bool {
     let own = unsafe { GetCurrentProcessId() };
     let started = created(unsafe { GetCurrentProcess() });
+    let session = own_session(own);
     let name = std::env::current_exe().ok().and_then(|exe| {
         exe.file_name()
             .map(|name| name.to_string_lossy().to_lowercase())
@@ -148,6 +160,7 @@ fn agrees_on_this_process(entries: &[Entry]) -> bool {
     entries.iter().any(|entry| {
         entry.pid == own
             && Some(entry.created) == started
+            && Some(entry.session) == session
             && name
                 .as_ref()
                 .is_none_or(|name| entry.name.to_lowercase() == *name)
@@ -399,6 +412,7 @@ mod tests {
         assert_eq!(offset_of!(ProcessRow, image_name), 56);
         assert_eq!(offset_of!(ProcessRow, unique_process_id), 80);
         assert_eq!(offset_of!(ProcessRow, inherited_from_unique_process_id), 88);
+        assert_eq!(offset_of!(ProcessRow, session_id), 100);
     }
 
     #[test]
@@ -437,6 +451,7 @@ mod tests {
         let own = unsafe { GetCurrentProcessId() };
         let mine = entries.iter().find(|entry| entry.pid == own).unwrap();
         assert!(entries.iter().any(|entry| entry.pid == mine.parent));
+        assert_eq!(Some(mine.session), own_session(own));
         let paths = Win32.image_paths(&[own]);
         let exe = std::env::current_exe().unwrap();
         assert!(

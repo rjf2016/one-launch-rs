@@ -18,6 +18,8 @@ pub(crate) struct Entry {
     pub parent: u32,
     // When it started, in 100 ns ticks since 1601: with the id, it names one process, as an id alone does not once Windows hands it out again.
     pub created: u64,
+    // The Windows sign-in it runs in: another user's processes are in the table too.
+    pub session: u32,
     pub name: String,
 }
 
@@ -138,14 +140,40 @@ fn named(entry: &Entry, image: &str) -> bool {
     image_key(&entry.name) == image_key(image)
 }
 
-// The processes a kill ends, the ones they started first. Never a protected process or one of its descendants, never this app or what it descends from, and below the named image nothing with a protected process under it, nor what that started.
+fn session_of(entries: &[Entry], own_pid: u32) -> Option<u32> {
+    entries
+        .iter()
+        .find(|entry| entry.pid == own_pid)
+        .map(|entry| entry.session)
+}
+
+// A close or an end acts only in this app's own Windows session, and refuses while the image also runs in another: the launcher would still count as running.
+fn in_other_session(entries: &[Entry], image: &str, own_pid: u32) -> Result<(), ProcessError> {
+    let own = session_of(entries, own_pid);
+    if entries
+        .iter()
+        .any(|entry| named(entry, image) && Some(entry.session) != own)
+    {
+        return Err(ProcessError::Failed(format!(
+            "{image} is running under another Windows user on this PC. One Launch closes programs only for the user it runs as: close it in that user's session, then try again."
+        )));
+    }
+    Ok(())
+}
+
+// The processes a kill ends, the ones they started first. Only of this app's session; never a protected process or one of its descendants, never this app or what it descends from, and below the named image nothing with a protected process under it, nor what that started.
 pub(crate) fn end_targets(entries: &[Entry], image: &str, tree: bool, own_pid: u32) -> Vec<Entry> {
     let by_pid = index(entries);
     let shielded = shielded(entries);
     let above = above_shielded(entries, &shielded);
+    let session = session_of(entries, own_pid);
     let mut spared = ancestors(entries, own_pid);
     spared.insert(own_pid);
-    let untouchable = |entry: &Entry| shielded.contains(&entry.pid) || spared.contains(&entry.pid);
+    let untouchable = |entry: &Entry| {
+        shielded.contains(&entry.pid)
+            || spared.contains(&entry.pid)
+            || Some(entry.session) != session
+    };
 
     let mut targets = Vec::new();
     let mut visited = HashSet::new();
@@ -185,14 +213,17 @@ pub(crate) fn close_targets(
     own_pid: u32,
 ) -> Vec<Vec<isize>> {
     let (shielded_before, shielded_after) = (shielded(before), shielded(after));
+    let session = session_of(before, own_pid);
     let after_by_pid = index(after);
     before
         .iter()
         .filter(|entry| named(entry, image) && entry.pid != own_pid)
+        .filter(|entry| Some(entry.session) == session)
         .filter(|entry| !shielded_before.contains(&entry.pid))
         .filter(|entry| {
             after_by_pid.get(&entry.pid).is_some_and(|same| {
                 same.created == entry.created
+                    && same.session == entry.session
                     && named(same, image)
                     && !shielded_after.contains(&same.pid)
             })
@@ -367,11 +398,13 @@ impl<S: System> ProcessRunner for Port<S> {
 
     fn close(&self, image: &str) -> Result<(), ProcessError> {
         checked(image)?;
+        let own_pid = self.system.own_pid();
         let before = self.system.snapshot()?;
+        in_other_session(&before, image, own_pid)?;
         let windows = self.system.top_windows();
         let after = self.system.snapshot()?;
         let mut denied = false;
-        for windows in close_targets(&before, &windows, &after, image, self.system.own_pid()) {
+        for windows in close_targets(&before, &windows, &after, image, own_pid) {
             let mut posted = false;
             let mut refused = false;
             for window in windows {
@@ -393,6 +426,7 @@ impl<S: System> ProcessRunner for Port<S> {
         checked(image)?;
         let entries = self.system.snapshot()?;
         let own_pid = self.system.own_pid();
+        in_other_session(&entries, image, own_pid)?;
         let ancestors = ancestors(&entries, own_pid);
         if entries
             .iter()
@@ -440,11 +474,18 @@ mod tests {
 
     const OWN: u32 = 900;
 
+    const SESSION: u32 = 1;
+
     fn entry(pid: u32, parent: u32, created: u64, name: &str) -> Entry {
+        in_session(pid, parent, created, name, SESSION)
+    }
+
+    fn in_session(pid: u32, parent: u32, created: u64, name: &str, session: u32) -> Entry {
         Entry {
             pid,
             parent,
             created,
+            session,
             name: name.to_owned(),
         }
     }
@@ -689,6 +730,64 @@ mod tests {
         assert!(processes.kill("steamwebhelper.exe", false).is_ok());
         let calls = processes.system.calls();
         assert_eq!(calls.ended, [410]);
+    }
+
+    #[test]
+    fn another_windows_users_programs_are_seen_and_never_closed_or_ended() {
+        let table = vec![
+            in_session(200, 4, 2, "explorer.exe", SESSION),
+            in_session(OWN, 200, 3, "OneLaunch.exe", SESSION),
+            in_session(250, 4, 2, "explorer.exe", 2),
+            in_session(400, 250, 10, "steam.exe", 2),
+            in_session(410, 400, 11, "steamwebhelper.exe", 2),
+            in_session(500, 200, 12, "EpicGamesLauncher.exe", SESSION),
+            in_session(510, 250, 13, "EpicGamesLauncher.exe", 2),
+            in_session(600, 200, 14, "Battle.net.exe", SESSION),
+            in_session(610, 600, 15, "Agent.exe", 2),
+            in_session(620, 600, 16, "Battle.net Helper.exe", SESSION),
+        ];
+        let processes = Port {
+            system: MadeUp::new(table.clone()),
+        };
+        assert!(processes.is_running("steam.exe").unwrap());
+        assert!(
+            processes
+                .running_names()
+                .unwrap()
+                .contains(&"steam.exe".to_owned())
+        );
+        assert_eq!(processes.list_processes().unwrap().len(), table.len());
+
+        for image in ["steam.exe", "EpicGamesLauncher.exe"] {
+            let wanted = format!(
+                "{image} is running under another Windows user on this PC. One Launch closes programs only for the user it runs as: close it in that user's session, then try again."
+            );
+            for refused in [
+                processes.kill(image, true),
+                processes.kill(image, false),
+                processes.close(image),
+            ] {
+                assert_eq!(refused.unwrap_err(), ProcessError::Failed(wanted.clone()));
+            }
+        }
+        {
+            let calls = processes.system.calls();
+            assert!(calls.ended.is_empty() && calls.posted.is_empty());
+        }
+        processes.kill("Battle.net.exe", true).unwrap();
+        processes.close("Battle.net.exe").unwrap();
+        let calls = processes.system.calls();
+        assert_eq!(
+            calls.ended.iter().copied().collect::<HashSet<_>>(),
+            HashSet::from([600, 620])
+        );
+        assert_eq!(calls.posted, [6001]);
+        assert!(
+            end_targets(&table, "Agent.exe", true, OWN).is_empty(),
+            "a process of another session is no target"
+        );
+        let windows = MadeUp::new(table.clone()).windows;
+        assert!(close_targets(&table, &windows, &table, "Agent.exe", OWN).is_empty());
     }
 
     #[test]
