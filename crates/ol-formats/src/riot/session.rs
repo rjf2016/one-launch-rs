@@ -58,6 +58,8 @@ pub enum Unexpected {
     UnreadableIdToken,
     #[error("id_token names no account id")]
     NoAccountId,
+    #[error("a comment at the left of the riot-client block cuts it")]
+    CommentInBlock,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -258,12 +260,38 @@ impl<'a> Lines<'a> {
         }
         end
     }
+
+    // A comment no deeper than `entry` with lines of the block below it. For YAML the block goes on past the comment; for this reader and for a splice it would end there, and a sign-out would leave the rest of the block behind, which the client cannot read.
+    fn cut_by_comment(&self, entry: &Entry<'_>) -> bool {
+        let mut after_comment = false;
+        for at in entry.line + 1..self.spans.len() {
+            let line = self.line(at);
+            if is_blank(line) {
+                continue;
+            }
+            let shallow = indent_of(line) <= entry.indent;
+            if js::trim(line).starts_with('#') {
+                after_comment |= shallow;
+                continue;
+            }
+            if shallow {
+                return false;
+            }
+            if after_comment {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 // The file with the `riot-client` block replaced: by `riot-client: null`, the client's own signed-out state, when there is no body, else by the given lines one level in. Every byte outside the block stays as it is: each other line keeps its own line end, and a byte order mark stays. The new lines end as the file's lines do, CRLF when it holds one.
 pub fn splice_session_block(text: &str, body: Option<&[&str]>) -> Result<String, Unexpected> {
     let lines = Lines::of(text);
     let entry = lines.session_block().map_err(Unexpected::NoBlock)?;
+    if lines.cut_by_comment(&entry) {
+        return Err(Unexpected::CommentInBlock);
+    }
     let end = lines.block_end(&entry);
     let eol = if text.contains("\r\n") { "\r\n" } else { "\n" };
     let pad = " ".repeat(entry.indent);
@@ -399,6 +427,9 @@ pub fn read_session(text: &str) -> SessionRead {
         } else {
             SessionRead::Unexpected(Unexpected::NeitherNullNorBlock)
         };
+    }
+    if lines.cut_by_comment(&block) {
+        return SessionRead::Unexpected(Unexpected::CommentInBlock);
     }
     let fields = lines.entries_of(Some(&block));
     if fields.is_empty() {
@@ -577,6 +608,37 @@ mod tests {
             plan_sign_out(&with_mark).unwrap().text,
             format!("\u{feff}{SIGNED_OUT}")
         );
+    }
+
+    #[test]
+    fn a_comment_at_the_left_that_cuts_the_session_block_is_refused_and_never_written() {
+        let file = signed_in(
+            "11111111-1111-4111-8111-111111111111",
+            "placeholder-refresh",
+        );
+        let cut = file.replacen("            scopes:", "# a note\r\n            scopes:", 1);
+        assert!(cut != file);
+        assert!(read_session(&cut) == SessionRead::Unexpected(Unexpected::CommentInBlock));
+        assert!(plan_sign_out(&cut).err() == Some(LeftAlone(Unexpected::CommentInBlock)));
+        assert_eq!(
+            splice_session_block(&cut, None).err(),
+            Some(Unexpected::CommentInBlock)
+        );
+        // One that stands between the block and what follows it cuts nothing.
+        let after = file.replacen("rso-authenticator:", "# a note\r\nrso-authenticator:", 1);
+        assert!(matches!(read_session(&after), SessionRead::Session(_)));
+        let write = plan_sign_out(&after).unwrap();
+        assert!(
+            write
+                .text
+                .contains("riot-client: null\r\n# a note\r\nrso-authenticator:")
+        );
+        let inside = file.replacen(
+            "            scopes:",
+            "            # a note\r\n            scopes:",
+            1,
+        );
+        assert!(matches!(read_session(&inside), SessionRead::Session(_)));
     }
 
     // Every file the oracle recorded a write for, written both ways: what stands before the block's first line and after its last is the file's own, byte for byte.
