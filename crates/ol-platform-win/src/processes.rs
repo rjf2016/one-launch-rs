@@ -4,6 +4,7 @@ mod command_line;
 mod win32;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
+use std::sync::{Mutex, PoisonError};
 
 use ol_platform_api::protected::{image_key, is_protected};
 use ol_platform_api::{ProcessArg, ProcessError, ProcessInfo, ProcessLister, ProcessRunner};
@@ -95,15 +96,18 @@ fn lineage<'a>(
     line
 }
 
-// The protected processes and everything they started, at any depth.
-pub(crate) fn shielded(entries: &[Entry]) -> HashSet<u32> {
+// Processes by id and start time, seen in a table under a protected one.
+pub(crate) type Held = BTreeSet<(u32, u64)>;
+
+// The protected processes, the held ones, and everything they started, at any depth.
+pub(crate) fn shielded(entries: &[Entry], held: &Held) -> HashSet<u32> {
     let by_pid = index(entries);
     entries
         .iter()
         .filter(|entry| {
             lineage(entry, &by_pid, any_parent_of)
                 .iter()
-                .any(|step| is_protected(&step.name))
+                .any(|step| is_protected(&step.name) || held.contains(&(step.pid, step.created)))
         })
         .map(|entry| entry.pid)
         .collect()
@@ -166,9 +170,15 @@ fn in_other_session(entries: &[Entry], image: &str, own_pid: u32) -> Result<(), 
 }
 
 // The processes a kill ends, the ones they started first. Only of this app's session; never a protected process or one of its descendants, never this app or what it descends from, and below the named image nothing with a protected process under it, nor what that started.
-pub(crate) fn end_targets(entries: &[Entry], image: &str, tree: bool, own_pid: u32) -> Vec<Entry> {
+pub(crate) fn end_targets(
+    entries: &[Entry],
+    held: &Held,
+    image: &str,
+    tree: bool,
+    own_pid: u32,
+) -> Vec<Entry> {
     let by_pid = index(entries);
-    let shielded = shielded(entries);
+    let shielded = shielded(entries, held);
     let above = above_shielded(entries, &shielded);
     let session = session_of(entries, own_pid);
     let mut spared = ancestors(entries, own_pid);
@@ -210,13 +220,14 @@ pub(crate) fn end_targets(entries: &[Entry], image: &str, tree: bool, own_pid: u
 
 // For each process of the image that was there before and after the windows were listed, the same process both times: its first visible window without an owner, as taskkill picks it, or else every hidden one without an owner.
 pub(crate) fn close_targets(
-    before: &[Entry],
+    (before, held_before): (&[Entry], &Held),
     windows: &[TopWindow],
-    after: &[Entry],
+    (after, held_after): (&[Entry], &Held),
     image: &str,
     own_pid: u32,
 ) -> Vec<Vec<isize>> {
-    let (shielded_before, shielded_after) = (shielded(before), shielded(after));
+    let (shielded_before, shielded_after) =
+        (shielded(before, held_before), shielded(after, held_after));
     let session = session_of(before, own_pid);
     let after_by_pid = index(after);
     before
@@ -251,8 +262,8 @@ pub(crate) fn close_targets(
 }
 
 // The processes whose file may be named: all but the protected ones and what they started.
-pub(crate) fn path_wanted(entries: &[Entry]) -> Vec<bool> {
-    let shielded = shielded(entries);
+pub(crate) fn path_wanted(entries: &[Entry], held: &Held) -> Vec<bool> {
+    let shielded = shielded(entries, held);
     entries
         .iter()
         .map(|entry| !shielded.contains(&entry.pid))
@@ -317,7 +328,7 @@ pub struct WindowsProcesses(Port<Win32>);
 
 impl WindowsProcesses {
     pub const fn new() -> Self {
-        Self(Port { system: Win32 })
+        Self(Port::new(Win32))
     }
 }
 
@@ -352,11 +363,35 @@ impl ProcessRunner for WindowsProcesses {
 #[derive(Default)]
 pub(crate) struct Port<S> {
     system: S,
+    // Once the process between a protected one and what it started has exited, the table no longer links them: what this port saw linked stays shielded while it runs, and nothing it never saw linked is.
+    held: Mutex<Held>,
+}
+
+impl<S: System> Port<S> {
+    pub(crate) const fn new(system: S) -> Self {
+        Self {
+            system,
+            held: Mutex::new(BTreeSet::new()),
+        }
+    }
+
+    // Every read of the table goes through here; the lock spans it, so an older table never drops what a newer one added.
+    fn read(&self) -> Result<(Vec<Entry>, Held), ProcessError> {
+        let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
+        let entries = self.system.snapshot()?;
+        let shield = shielded(&entries, &held);
+        *held = entries
+            .iter()
+            .filter(|entry| shield.contains(&entry.pid))
+            .map(|entry| (entry.pid, entry.created))
+            .collect();
+        Ok((entries, held.clone()))
+    }
 }
 
 impl<S: System> ProcessLister for Port<S> {
     fn is_running(&self, image: &str) -> Result<bool, ProcessError> {
-        let entries = self.system.snapshot()?;
+        let (entries, _) = self.read()?;
         Ok(entries
             .iter()
             .any(|entry| !entry.name.is_empty() && named(entry, image)))
@@ -364,15 +399,15 @@ impl<S: System> ProcessLister for Port<S> {
 
     // A path is asked by id: the table is read again just before, so an id handed to another process since is not asked, and just after, so a path that may be another process's is dropped.
     fn list_processes(&self) -> Result<Vec<ProcessInfo>, ProcessError> {
-        let entries = self.system.snapshot()?;
-        let wanted = path_wanted(&entries);
+        let (entries, held) = self.read()?;
+        let wanted = path_wanted(&entries, &held);
         let named: Vec<(Entry, bool)> = entries
             .into_iter()
             .zip(wanted)
             .filter(|(entry, _)| !entry.name.is_empty())
             .collect();
-        let before = self.system.snapshot()?;
-        let still_wanted = path_wanted(&before);
+        let (before, held) = self.read()?;
+        let still_wanted = path_wanted(&before, &held);
         let before_by_pid: HashMap<u32, (&Entry, bool)> = before
             .iter()
             .zip(still_wanted)
@@ -390,7 +425,7 @@ impl<S: System> ProcessLister for Port<S> {
             .collect();
         let pids: Vec<u32> = asked.iter().map(|entry| entry.pid).collect();
         let found = self.system.image_paths(&pids);
-        let after = self.system.snapshot()?;
+        let (after, _) = self.read()?;
         let after_by_pid = index(&after);
         let mut paths: HashMap<u32, String> = asked
             .iter()
@@ -413,7 +448,7 @@ impl<S: System> ProcessLister for Port<S> {
     }
 
     fn running_names(&self) -> Result<Vec<String>, ProcessError> {
-        let entries = self.system.snapshot()?;
+        let (entries, _) = self.read()?;
         let names: BTreeSet<String> = entries
             .iter()
             .filter(|entry| !entry.name.is_empty())
@@ -457,12 +492,18 @@ impl<S: System> ProcessRunner for Port<S> {
     fn close(&self, image: &str) -> Result<(), ProcessError> {
         checked(image)?;
         let own_pid = self.system.own_pid();
-        let before = self.system.snapshot()?;
+        let (before, held_before) = self.read()?;
         in_other_session(&before, image, own_pid)?;
         let windows = self.system.top_windows();
-        let after = self.system.snapshot()?;
+        let (after, held_after) = self.read()?;
         let mut denied = false;
-        for windows in close_targets(&before, &windows, &after, image, own_pid) {
+        for windows in close_targets(
+            (&before, &held_before),
+            &windows,
+            (&after, &held_after),
+            image,
+            own_pid,
+        ) {
             let mut posted = false;
             let mut refused = false;
             for window in windows {
@@ -482,7 +523,7 @@ impl<S: System> ProcessRunner for Port<S> {
 
     fn kill(&self, image: &str, tree: bool) -> Result<(), ProcessError> {
         checked(image)?;
-        let entries = self.system.snapshot()?;
+        let (entries, held) = self.read()?;
         let own_pid = self.system.own_pid();
         in_other_session(&entries, image, own_pid)?;
         let ancestors = ancestors(&entries, own_pid);
@@ -494,12 +535,13 @@ impl<S: System> ProcessRunner for Port<S> {
                 "One Launch was started from {image}, so it will not end it. Close {image} yourself, or start One Launch on its own, then try again."
             )));
         }
-        let chosen = end_targets(&entries, image, tree, own_pid);
+        let chosen = end_targets(&entries, &held, image, tree, own_pid);
         if chosen.is_empty() {
             return Ok(());
         }
         // Chosen again from a table read just before the opens: an id handed to another process since, or a process that now has a Riot game below it, is left.
-        let still = end_targets(&self.system.snapshot()?, image, tree, own_pid);
+        let (now, held) = self.read()?;
+        let still = end_targets(&now, &held, image, tree, own_pid);
         let targets: Vec<Entry> = chosen
             .into_iter()
             .filter(|target| still.contains(target))
@@ -598,6 +640,8 @@ mod tests {
         calls: Mutex<Calls>,
         refuse: bool,
         ending: HashMap<u32, Ended>,
+        // Once set, every read sees this table.
+        now: Mutex<Option<Vec<Entry>>>,
     }
 
     impl MadeUp {
@@ -635,11 +679,16 @@ mod tests {
                 calls: Mutex::default(),
                 refuse: false,
                 ending: HashMap::new(),
+                now: Mutex::default(),
             }
         }
 
         fn calls(&self) -> std::sync::MutexGuard<'_, Calls> {
             self.calls.lock().unwrap()
+        }
+
+        fn becomes(&self, table: Vec<Entry>) {
+            *self.now.lock().unwrap() = Some(table);
         }
     }
 
@@ -649,6 +698,9 @@ mod tests {
         }
 
         fn snapshot(&self) -> Result<Vec<Entry>, ProcessError> {
+            if let Some(table) = self.now.lock().unwrap().clone() {
+                return Ok(table);
+            }
             let mut calls = self.calls();
             calls.reads += 1;
             let later = calls.reads.checked_sub(2).map(|at| {
@@ -721,14 +773,14 @@ mod tests {
 
     #[test]
     fn the_shield_covers_riot_games_vanguard_and_whatever_they_started() {
-        assert_eq!(shielded(&table()), protected_pids());
+        assert_eq!(shielded(&table(), &Held::new()), protected_pids());
     }
 
     #[test]
     fn a_tree_end_takes_what_the_image_started_and_nothing_shielded_or_unrelated() {
         let pids =
             |targets: Vec<Entry>| -> Vec<u32> { targets.iter().map(|target| target.pid).collect() };
-        let steam = pids(end_targets(&table(), "STEAM", true, OWN));
+        let steam = pids(end_targets(&table(), &Held::new(), "STEAM", true, OWN));
         assert_eq!(
             steam.iter().copied().collect::<HashSet<_>>(),
             HashSet::from([400, 410, 411, 420])
@@ -737,18 +789,45 @@ mod tests {
             steam.iter().position(|pid| *pid == 411) < steam.iter().position(|pid| *pid == 410)
         );
         assert_eq!(steam.last(), Some(&400));
-        assert_eq!(pids(end_targets(&table(), "steam.exe", false, OWN)), [400]);
+        assert_eq!(
+            pids(end_targets(&table(), &Held::new(), "steam.exe", false, OWN)),
+            [400]
+        );
 
-        let client = pids(end_targets(&table(), "RiotClientServices.exe", true, OWN));
+        let client = pids(end_targets(
+            &table(),
+            &Held::new(),
+            "RiotClientServices.exe",
+            true,
+            OWN,
+        ));
         assert_eq!(
             client.iter().copied().collect::<HashSet<_>>(),
             HashSet::from([300, 310, 330])
         );
-        assert!(pids(end_targets(&table(), "explorer.exe", true, OWN)).is_empty());
-        assert!(pids(end_targets(&table(), "OneLaunch.exe", true, OWN)).is_empty());
+        assert!(
+            pids(end_targets(
+                &table(),
+                &Held::new(),
+                "explorer.exe",
+                true,
+                OWN
+            ))
+            .is_empty()
+        );
+        assert!(
+            pids(end_targets(
+                &table(),
+                &Held::new(),
+                "OneLaunch.exe",
+                true,
+                OWN
+            ))
+            .is_empty()
+        );
         for image in PROTECTED_IMAGES {
             assert!(
-                end_targets(&table(), image, true, OWN).is_empty(),
+                end_targets(&table(), &Held::new(), image, true, OWN).is_empty(),
                 "{image}"
             );
         }
@@ -770,15 +849,13 @@ mod tests {
             entry(411, 410, 17, "steamwebhelper.exe"),
             entry(420, 400, 18, "Game.exe"),
         ];
-        let ended: HashSet<u32> = end_targets(&table, "steam.exe", true, OWN)
+        let ended: HashSet<u32> = end_targets(&table, &Held::new(), "steam.exe", true, OWN)
             .iter()
             .map(|target| target.pid)
             .collect();
         assert_eq!(ended, HashSet::from([400, 410, 411, 420]));
 
-        let processes = Port {
-            system: MadeUp::new(table),
-        };
+        let processes = Port::new(MadeUp::new(table));
         processes.kill("steam.exe", true).unwrap();
         let calls = processes.system.calls();
         assert_eq!(
@@ -795,9 +872,7 @@ mod tests {
             entry(410, 400, 11, "steamwebhelper.exe"),
             entry(OWN, 400, 12, "OneLaunch.exe"),
         ];
-        let processes = Port {
-            system: MadeUp::new(table),
-        };
+        let processes = Port::new(MadeUp::new(table));
         for tree in [true, false] {
             let refused = processes.kill("STEAM.exe", tree).unwrap_err().to_string();
             assert_eq!(
@@ -824,9 +899,7 @@ mod tests {
             in_session(610, 600, 15, "Agent.exe", 2),
             in_session(620, 600, 16, "Battle.net Helper.exe", SESSION),
         ];
-        let processes = Port {
-            system: MadeUp::new(table.clone()),
-        };
+        let processes = Port::new(MadeUp::new(table.clone()));
         assert!(processes.is_running("steam.exe").unwrap());
         assert!(
             processes
@@ -861,11 +934,20 @@ mod tests {
         );
         assert_eq!(calls.posted, [6001]);
         assert!(
-            end_targets(&table, "Agent.exe", true, OWN).is_empty(),
+            end_targets(&table, &Held::new(), "Agent.exe", true, OWN).is_empty(),
             "a process of another session is no target"
         );
         let windows = MadeUp::new(table.clone()).windows;
-        assert!(close_targets(&table, &windows, &table, "Agent.exe", OWN).is_empty());
+        assert!(
+            close_targets(
+                (&table, &Held::new()),
+                &windows,
+                (&table, &Held::new()),
+                "Agent.exe",
+                OWN
+            )
+            .is_empty()
+        );
     }
 
     #[test]
@@ -888,7 +970,7 @@ mod tests {
         let ended = |then: Vec<Entry>, image: &str| {
             let mut made_up = MadeUp::new(first.clone());
             made_up.then = vec![then];
-            let processes = Port { system: made_up };
+            let processes = Port::new(made_up);
             let _ = processes.kill(image, true);
             let calls = processes.system.calls();
             calls.ended.iter().copied().collect::<HashSet<_>>()
@@ -920,7 +1002,7 @@ mod tests {
 
         let mut made_up = MadeUp::new(first);
         made_up.then = vec![taken, renewed];
-        let processes = Port { system: made_up };
+        let processes = Port::new(made_up);
         let listed = processes.list_processes().unwrap();
         let path = |pid: u32| {
             listed
@@ -942,22 +1024,89 @@ mod tests {
         let mut table = table();
         table.push(entry(323, 320, 4, "Overlay.exe"));
         table.push(entry(324, 323, 5, "Helper.exe"));
-        let shield = shielded(&table);
+        let shield = shielded(&table, &Held::new());
         assert!(shield.contains(&323) && shield.contains(&324));
-        assert!(end_targets(&table, "Overlay.exe", true, OWN).is_empty());
-        assert!(end_targets(&table, "Helper.exe", false, OWN).is_empty());
-        let client: HashSet<u32> = end_targets(&table, "RiotClientServices.exe", true, OWN)
-            .iter()
-            .map(|target| target.pid)
-            .collect();
+        assert!(end_targets(&table, &Held::new(), "Overlay.exe", true, OWN).is_empty());
+        assert!(end_targets(&table, &Held::new(), "Helper.exe", false, OWN).is_empty());
+        let client: HashSet<u32> =
+            end_targets(&table, &Held::new(), "RiotClientServices.exe", true, OWN)
+                .iter()
+                .map(|target| target.pid)
+                .collect();
         assert_eq!(client, HashSet::from([300, 310, 330]));
+    }
+
+    #[test]
+    fn what_a_riot_game_started_stays_shielded_after_the_process_between_them_exits() {
+        let linked = vec![
+            entry(200, 4, 2, "explorer.exe"),
+            entry(OWN, 200, 3, "OneLaunch.exe"),
+            entry(320, 200, 10, "VALORANT.exe"),
+            entry(340, 320, 11, "Bootstrap.exe"),
+            entry(341, 340, 12, "Helper.exe"),
+            entry(342, 341, 13, "Overlay.exe"),
+            entry(400, 200, 14, "Unrelated.exe"),
+            entry(401, 400, 15, "Helper.exe"),
+        ];
+        let mut orphaned = linked.clone();
+        orphaned.retain(|entry| entry.pid != 340);
+        let mut later = orphaned.clone();
+        later.push(entry(343, 341, 16, "Late.exe"));
+
+        let seen = Port::new(MadeUp::new(linked));
+        seen.running_names().unwrap();
+        seen.system.becomes(later.clone());
+        for image in ["Helper.exe", "Overlay.exe", "Late.exe"] {
+            let _ = seen.kill(image, true);
+            let _ = seen.kill(image, false);
+            let _ = seen.close(image);
+        }
+        let listed = seen.list_processes().unwrap();
+        {
+            let calls = seen.system.calls();
+            let touched = touched(&calls);
+            for pid in [320, 341, 342, 343] {
+                assert!(!touched.contains(&pid), "process {pid} was touched");
+            }
+            assert!(calls.ended.contains(&401) && calls.pathed.contains(&401));
+        }
+        for process in &listed {
+            assert_eq!(
+                process.path.is_none(),
+                [320, 341, 342, 343].contains(&process.pid),
+                "{}",
+                process.pid
+            );
+        }
+
+        // Gone, and its id handed to a newer process: that one is no longer held.
+        let mut renewed = later.clone();
+        renewed.retain(|entry| entry.pid != 341 && entry.pid != 342 && entry.pid != 343);
+        seen.running_names().unwrap();
+        seen.system.becomes(renewed.clone());
+        seen.running_names().unwrap();
+        renewed.push(entry(341, 200, 30, "Helper.exe"));
+        seen.system.becomes(renewed);
+        seen.kill("Helper.exe", false).unwrap();
+        assert!(seen.system.calls().ended.contains(&341));
+
+        // A port that never read the table while the link stood cannot know it.
+        let unseen = Port::new(MadeUp::new(orphaned));
+        unseen.kill("Helper.exe", false).unwrap();
+        assert!(unseen.system.calls().ended.contains(&341));
     }
 
     #[test]
     fn a_close_goes_to_the_visible_window_and_only_of_a_process_that_stayed_the_same() {
         let made_up = MadeUp::new(table());
         assert_eq!(
-            close_targets(&table(), &made_up.windows, &table(), "Riot Client", OWN),
+            close_targets(
+                (&table(), &Held::new()),
+                &made_up.windows,
+                (&table(), &Held::new()),
+                "Riot Client",
+                OWN
+            ),
             [vec![3101]]
         );
         let hidden = [
@@ -975,7 +1124,13 @@ mod tests {
             },
         ];
         assert_eq!(
-            close_targets(&table(), &hidden, &table(), "steam.exe", OWN),
+            close_targets(
+                (&table(), &Held::new()),
+                &hidden,
+                (&table(), &Held::new()),
+                "steam.exe",
+                OWN
+            ),
             [vec![7, 8]]
         );
 
@@ -985,19 +1140,44 @@ mod tests {
             .find(|entry| entry.pid == 400)
             .unwrap()
             .created = 99;
-        assert!(close_targets(&table(), &hidden, &after, "steam.exe", OWN).is_empty());
+        assert!(
+            close_targets(
+                (&table(), &Held::new()),
+                &hidden,
+                (&after, &Held::new()),
+                "steam.exe",
+                OWN
+            )
+            .is_empty()
+        );
         let mut taken = table();
         let reused = taken.iter_mut().find(|entry| entry.pid == 400).unwrap();
         reused.name = "VALORANT.exe".to_owned();
-        assert!(close_targets(&table(), &hidden, &taken, "steam.exe", OWN).is_empty());
-        assert!(close_targets(&taken, &hidden, &table(), "steam.exe", OWN).is_empty());
+        assert!(
+            close_targets(
+                (&table(), &Held::new()),
+                &hidden,
+                (&taken, &Held::new()),
+                "steam.exe",
+                OWN
+            )
+            .is_empty()
+        );
+        assert!(
+            close_targets(
+                (&taken, &Held::new()),
+                &hidden,
+                (&table(), &Held::new()),
+                "steam.exe",
+                OWN
+            )
+            .is_empty()
+        );
     }
 
     #[test]
     fn whatever_the_caller_asks_no_protected_process_is_opened_named_or_sent_a_close() {
-        let processes = Port {
-            system: MadeUp::new(table()),
-        };
+        let processes = Port::new(MadeUp::new(table()));
         let mut images: Vec<String> = table().iter().map(|entry| entry.name.clone()).collect();
         images.extend(PROTECTED_IMAGES.iter().map(|image| (*image).to_owned()));
         images.extend(["valorant", "VGC", "", " ", r"C:\x\vgc.exe", "*"].map(str::to_owned));
@@ -1031,9 +1211,7 @@ mod tests {
 
     #[test]
     fn a_protected_image_is_refused_before_anything_is_asked() {
-        let processes = Port {
-            system: MadeUp::new(table()),
-        };
+        let processes = Port::new(MadeUp::new(table()));
         for image in ["VALORANT.exe", "vgtray", "League of Legends.exe"] {
             let closed = processes.close(image).unwrap_err().to_string();
             assert!(closed.contains("Riot game or part of Vanguard"), "{closed}");
@@ -1058,9 +1236,7 @@ mod tests {
 
     #[test]
     fn a_start_with_a_nul_or_without_a_full_path_is_refused_before_anything_else() {
-        let processes = Port {
-            system: MadeUp::new(table()),
-        };
+        let processes = Port::new(MadeUp::new(table()));
         for (exe, cwd) in [
             (
                 "D:\\Riot Games\\VALORANT\\live\\VALORANT.exe\0\\steam.exe",
@@ -1114,7 +1290,7 @@ mod tests {
     fn windows_refusing_a_close_or_an_end_is_access_denied() {
         let mut made_up = MadeUp::new(table());
         made_up.refuse = true;
-        let processes = Port { system: made_up };
+        let processes = Port::new(made_up);
         let closed = processes.close("steam.exe").unwrap_err();
         assert_eq!(closed.code(), Some("PROCESS_ACCESS_DENIED"));
         let ended = processes.kill("steam.exe", true).unwrap_err();
@@ -1135,7 +1311,7 @@ mod tests {
         let kill = |outcomes: &[(u32, Ended)], tree: bool| {
             let mut made_up = MadeUp::new(table.clone());
             made_up.ending = outcomes.iter().copied().collect();
-            let processes = Port { system: made_up };
+            let processes = Port::new(made_up);
             let result = processes.kill("steam.exe", tree);
             let ended: HashSet<u32> = processes.system.calls().ended.iter().copied().collect();
             (result, ended)
@@ -1185,9 +1361,7 @@ mod tests {
 
     #[test]
     fn a_secret_argument_is_in_no_error() {
-        let processes = Port {
-            system: MadeUp::new(table()),
-        };
+        let processes = Port::new(MadeUp::new(table()));
         for args in [
             &[
                 ProcessArg::Plain("-login"),
@@ -1206,9 +1380,7 @@ mod tests {
 
     #[test]
     fn the_names_are_every_image_in_lower_case_once() {
-        let processes = Port {
-            system: MadeUp::new(table()),
-        };
+        let processes = Port::new(MadeUp::new(table()));
         let names = processes.running_names().unwrap();
         assert!(names.contains(&"valorant-win64-shipping.exe".to_owned()));
         assert_eq!(names.iter().filter(|name| *name == "steam.exe").count(), 1);
