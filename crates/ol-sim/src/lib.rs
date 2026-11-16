@@ -4,6 +4,7 @@
 
 mod battlenet;
 mod epic;
+mod files;
 mod riot;
 mod scenario;
 mod steam;

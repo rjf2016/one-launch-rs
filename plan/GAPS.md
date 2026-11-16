@@ -11,6 +11,7 @@ What is known to be missing, unchecked or unlike the Electron app, and the slice
 - Nothing reloads the Library after an artwork fetch, because nothing fetches artwork yet. A scan and a launch do.
 - Not seen in a capture, because each lasts a few milliseconds on fake launchers: "Scanning your launchers…" with its disabled button, "Scanning…" on Rescan, and the turning Play mark of a one-click Play.
 - A database that cannot be opened shows its message in place of the grid ("Could not load the library: …") and the app keeps running. The Electron app shows the box "One Launch could not start", with the log and the data folder, and exits with 1.
+- A read of the Library that fails after it has shown its games, after a scan or a launch, leaves the games on screen and says "Could not load the library: …" beside Rescan for six seconds, as a failed scan is told. The Electron app puts that sentence in place of the grid until a read succeeds. On purpose: the games on screen are the last ones read, and a passing fault no longer empties the page.
 - The Filter and Sort menus take the mouse and Escape only: no arrow keys, Home, End or Enter, and they stay open while the window is resized.
 - Names sort by their lower-cased characters. The Electron app sorts them by the rules of the system language; `triage.toml` X-02 asks for the order of the Windows regional settings, through a native call.
 - A poster appears at once, without the 200 ms fade, and the Update badge and the More button have no blur behind them.

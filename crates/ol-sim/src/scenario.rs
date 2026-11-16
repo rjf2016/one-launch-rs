@@ -11,7 +11,7 @@ use ol_model::LauncherId;
 use ol_platform_api::{Platform, ProcessInfo};
 use ol_platform_fake::{
     FakeClock, FakeProcesses, FakeRegistry, FakeRiotLaunch, FakeShell, OpLog, ProcessKnobs,
-    RegistryValue, ScratchFiles,
+    RegistryValue,
 };
 use ol_runtime::TimingOverrides;
 use serde_json::{Map, Value};
@@ -20,6 +20,7 @@ use time::OffsetDateTime;
 
 use crate::battlenet::{BattlenetFolders, BattlenetKnobs, BattlenetScript, BattlenetSim};
 use crate::epic::{EpicKnobs, EpicSim};
+use crate::files::ContainedFiles;
 use crate::riot::{RiotFolders, RiotKnobs, RiotSim, fake_session_file};
 use crate::steam::{SteamKnobs, SteamSim};
 
@@ -595,7 +596,7 @@ fn materialize_on(
     let platform = Platform {
         registry: Arc::clone(&registry) as _,
         processes: Arc::clone(&processes) as _,
-        files: Arc::new(ScratchFiles::new(&roots, log.clone())),
+        files: Arc::new(ContainedFiles::new(&roots, log.clone())),
         shell: Arc::new(FakeShell::new(log.clone())),
         clock: Arc::clone(&clock) as _,
     };
@@ -658,5 +659,43 @@ mod tests {
         let login_users = text(&data.join("Steam").join("config").join("loginusers.vdf"));
         assert!(files.write_atomic(&[(&login_users, b"x")]).is_err());
         assert!(!Path::new(&login_users).exists());
+    }
+
+    #[test]
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "std makes no junction, and a junction is what a test of a junction needs"
+    )]
+    fn a_junction_in_the_scenario_folder_does_not_lead_the_file_port_out_of_it() {
+        let scratch = Scratch::new("sim-junction");
+        let (dir, data) = (scratch.join("launchers"), scratch.join("data"));
+        lay_down(
+            &oracle("fixtures/dev-only/fake-launchers/all-four"),
+            &oracle("fixtures/launchers"),
+            &dir,
+        )
+        .unwrap();
+        let beside = data.join("Steam").join("config");
+        fs::create_dir_all(&beside).unwrap();
+        fs::write(beside.join("loginusers.vdf"), b"old").unwrap();
+        let link = dir.join("linked");
+        let made = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&link)
+            .arg(&beside)
+            .output()
+            .unwrap();
+        assert!(made.status.success(), "mklink /J failed");
+        let fake = materialize(&dir, &data, datetime!(2026-11-06 16:46:23 UTC));
+        let files = fake.as_ref().map(|fake| &fake.platform.files);
+        let through = link.join("loginusers.vdf").to_string_lossy().into_owned();
+        let read = files.map(|files| files.read(&through).is_err());
+        let written = files.map(|files| files.write_atomic(&[(&through, b"new")]).is_err());
+        let kept = fs::read(beside.join("loginusers.vdf")).unwrap();
+        fs::remove_dir(&link).unwrap();
+
+        assert!(read.unwrap());
+        assert!(written.unwrap());
+        assert_eq!(kept, b"old");
     }
 }

@@ -1075,6 +1075,7 @@ impl LaunchHost {
                 actions.push(
                     Button::new("switch-now", Tone::Primary, "Turn preview off and play now")
                         .glyph(assets::PLAY)
+                        .disabled(request.starting)
                         .on_click(cx.listener(|this, _, _, cx| this.switch_now(cx))),
                 );
             }
