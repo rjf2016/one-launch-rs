@@ -53,3 +53,23 @@ impl<'a> ClientProcesses<'a> {
         Ok(self.0.kill(image.exe(), false)?)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ol_formats::riot::products::PRODUCTS;
+    use ol_platform_api::protected::is_protected;
+
+    use super::*;
+
+    #[test]
+    fn every_riot_game_image_is_one_the_ports_never_touch_and_the_client_is_not() {
+        for (_, product) in PRODUCTS {
+            for image in product.game_images {
+                assert!(is_protected(image), "{image}");
+            }
+        }
+        for image in [ClientImage::Core, ClientImage::Window] {
+            assert!(!is_protected(image.exe()));
+        }
+    }
+}

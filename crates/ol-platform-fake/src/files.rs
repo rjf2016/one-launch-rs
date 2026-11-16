@@ -91,37 +91,27 @@ impl FileReader for ScratchFiles {
 
 impl FileWriter for ScratchFiles {
     fn write_atomic(&self, files: &[(&str, &[u8])]) -> io::Result<()> {
-        let mut staged = Vec::new();
+        let targets = files
+            .iter()
+            .map(|(path, _)| self.inside(path))
+            .collect::<io::Result<Vec<PathBuf>>>()?;
+        let staged: Vec<(&Path, &[u8])> = targets
+            .iter()
+            .zip(files)
+            .map(|(target, (_, bytes))| (target.as_path(), *bytes))
+            .collect();
+        ol_platform_api::atomic::write_files(&staged)?;
         for (path, bytes) in files {
-            let target = self.inside(path)?;
-            let mut temporary = target.clone().into_os_string();
-            temporary.push(format!(".onelaunch-{}.tmp", std::process::id()));
-            staged.push((*path, target, PathBuf::from(temporary), *bytes));
+            let digest: String = Sha256::digest(bytes)
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect();
+            self.log.record(
+                "file.write",
+                [("path", (*path).into()), ("sha256", digest.into())],
+            );
         }
-        let written = (|| {
-            for (_, target, temporary, bytes) in &staged {
-                if let Some(folder) = target.parent() {
-                    fs::create_dir_all(folder)?;
-                }
-                fs::write(temporary, bytes)?;
-            }
-            for (path, target, temporary, bytes) in &staged {
-                fs::rename(temporary, target)?;
-                let digest: String = Sha256::digest(bytes)
-                    .iter()
-                    .map(|byte| format!("{byte:02x}"))
-                    .collect();
-                self.log.record(
-                    "file.write",
-                    [("path", (*path).into()), ("sha256", digest.into())],
-                );
-            }
-            Ok(())
-        })();
-        for (_, _, temporary, _) in &staged {
-            let _ = fs::remove_file(temporary);
-        }
-        written
+        Ok(())
     }
 }
 
@@ -192,6 +182,13 @@ mod tests {
             events[0]["sha256"],
             ol_testkit::vectors::sha256_hex(b"abc").as_str()
         );
+    }
+
+    #[test]
+    fn the_file_port_contract_holds() {
+        let scratch = Scratch::new("fake-files-contract");
+        let files = ScratchFiles::new(&[scratch.path()], OpLog::new());
+        ol_platform_api::contract::files(&files, &text(scratch.path()));
     }
 
     #[test]

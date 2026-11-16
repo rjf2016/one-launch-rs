@@ -366,6 +366,12 @@ mod tests {
     }
 
     #[test]
+    fn the_registry_port_contract_holds() {
+        let registry = FakeRegistry::new(OpLog::new());
+        ol_platform_api::contract::registry(&registry, r"Software\OneLaunchRsTest\fake");
+    }
+
+    #[test]
     fn a_write_told_to_fail_changes_nothing_and_the_next_one_goes_through() {
         let log = OpLog::new();
         let registry = FakeRegistry::new(log.clone());
