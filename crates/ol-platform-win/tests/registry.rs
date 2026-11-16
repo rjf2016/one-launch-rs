@@ -4,7 +4,8 @@ use ol_platform_api::{Hive, RegistryReader, RegistryWriter, contract};
 use ol_platform_win::registry::WindowsRegistry;
 use windows::Win32::System::Registry::{
     HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE, KEY_WOW64_64KEY, REG_MULTI_SZ, REG_OPTION_NON_VOLATILE,
-    REG_QWORD, RegCloseKey, RegCreateKeyExW, RegDeleteKeyExW, RegDeleteTreeW, RegSetValueExW,
+    REG_QWORD, REG_SZ, RegCloseKey, RegCreateKeyExW, RegDeleteKeyExW, RegDeleteTreeW,
+    RegSetValueExW,
 };
 use windows::core::PCWSTR;
 
@@ -28,8 +29,17 @@ impl ScratchKey {
         kind: windows::Win32::System::Registry::REG_VALUE_TYPE,
         bytes: &[u8],
     ) {
+        self.plant_named(&wide(name), kind, bytes);
+    }
+
+    // `name` ends with its NUL.
+    fn plant_named(
+        &self,
+        name: &[u16],
+        kind: windows::Win32::System::Registry::REG_VALUE_TYPE,
+        bytes: &[u8],
+    ) {
         let key = wide(&self.0);
-        let name = wide(name);
         let mut made = HKEY::default();
         unsafe {
             assert!(
@@ -126,6 +136,33 @@ fn an_error_never_repeats_what_was_to_be_written() {
             .list_values(Hive::Hkcu, &scratch.0)
             .unwrap()
             .is_empty()
+    );
+}
+
+#[test]
+fn a_value_is_never_listed_or_written_under_a_name_other_than_its_own() {
+    let scratch = ScratchKey::new();
+    let half_pair = [u16::from(b'A'), 0xD800, 0];
+    scratch.plant_named(&half_pair, REG_SZ, &[0, 0]);
+    scratch.plant("A", REG_SZ, &[u8::from(b'x'), 0, 0, 0]);
+    let listed = WindowsRegistry.list_values(Hive::Hkcu, &scratch.0).unwrap();
+    let names: Vec<&str> = listed.iter().map(|value| value.name.as_str()).collect();
+    assert_eq!(names, ["A"]);
+
+    for refused in [
+        WindowsRegistry.set_string(Hive::Hkcu, &scratch.0, "A\0B", "y"),
+        WindowsRegistry.set_dword(Hive::Hkcu, &scratch.0, "A\0B", 1),
+        WindowsRegistry.delete_value(Hive::Hkcu, &scratch.0, "A\0B"),
+        WindowsRegistry.set_string(Hive::Hkcu, &format!("{}\0x", scratch.0), "B", "y"),
+    ] {
+        assert!(refused.is_err());
+    }
+    assert_eq!(
+        WindowsRegistry
+            .get_string(Hive::Hkcu, &scratch.0, "A")
+            .unwrap()
+            .as_deref(),
+        Some("x")
     );
 }
 

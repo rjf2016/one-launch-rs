@@ -100,7 +100,18 @@ impl FakeRegistry {
             .collect()
     }
 
-    fn write(&self, path: &str, value: Option<RegistryValue>) -> Result<(), RegistryError> {
+    fn write(
+        &self,
+        hive: Hive,
+        path: &str,
+        value: Option<RegistryValue>,
+    ) -> Result<(), RegistryError> {
+        if hive != Hive::Hkcu {
+            return Err(RegistryError(format!(
+                "One Launch writes nothing under {}",
+                hive.as_str()
+            )));
+        }
         let mut state = self.state();
         if let Some(message) = state.fail_next_write.take() {
             return Err(RegistryError(message));
@@ -209,6 +220,7 @@ impl RegistryWriter for FakeRegistry {
         value: &str,
     ) -> Result<(), RegistryError> {
         self.write(
+            hive,
             &path(hive, key, name),
             Some(RegistryValue::Text(value.to_owned())),
         )
@@ -221,7 +233,11 @@ impl RegistryWriter for FakeRegistry {
         name: &str,
         value: u32,
     ) -> Result<(), RegistryError> {
-        self.write(&path(hive, key, name), Some(RegistryValue::Dword(value)))
+        self.write(
+            hive,
+            &path(hive, key, name),
+            Some(RegistryValue::Dword(value)),
+        )
     }
 
     fn set_binary(
@@ -232,13 +248,14 @@ impl RegistryWriter for FakeRegistry {
         hex: &str,
     ) -> Result<(), RegistryError> {
         self.write(
+            hive,
             &path(hive, key, name),
             Some(RegistryValue::Binary(hex.to_uppercase())),
         )
     }
 
     fn delete_value(&self, hive: Hive, key: &str, name: &str) -> Result<(), RegistryError> {
-        self.write(&path(hive, key, name), None)
+        self.write(hive, &path(hive, key, name), None)
     }
 }
 

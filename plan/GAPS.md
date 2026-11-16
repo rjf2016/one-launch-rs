@@ -203,6 +203,7 @@ Since the real ports. The first four are the ones a user could meet, and are the
 - A link is handed to Windows only when it is a `steam://`, `com.epicgames.launcher://` or `battlenet://` link of plain characters; anything else is refused before Windows sees it. Electron's `shell.openExternal` takes any link.
 - The registry port writes only under HKCU. The Electron app's would write anywhere it was asked; no caller asks for HKLM.
 - A registry value of a kind the ports do not know (`REG_MULTI_SZ`, `REG_QWORD`, `REG_NONE` and the like) is passed over by `list_values` and is no number for `get_dword`. The Electron app read a `REG_QWORD` as a number. Values under a key are listed in the order of their lower-cased names, as the fake lists them; the Electron app took the registry's own order.
+- A value whose name is not whole UTF-16 text or holds a NUL is left out of `list_values`, and a key or value name with a NUL is refused: either would have a later set or delete act on another value. So a Battle.net switch or restore, which removes every value the listing gives under `UnifiedAuth`, cannot remove such a value, nor one of a kind the ports do not know: the trait has no way to name either.
 - Every temporary file of a write is flushed to the disk before it is moved over its target.
 - No `reg.exe`, PowerShell or `cmd.exe` runs for the registry or the processes: the same reads and writes go through the Win32 calls.
 

@@ -54,6 +54,18 @@ pub fn registry(registry: &dyn Registry, base: &str) {
         Some("the default")
     );
     assert_eq!(registry.get_string(Hive::Hklm, &key, "Name").unwrap(), None);
+    for refused in [
+        registry.set_string(Hive::Hklm, &key, "Name", "x"),
+        registry.set_dword(Hive::Hklm, &key, "Count", 1),
+        registry.set_binary(Hive::Hklm, &key, "Token", "00"),
+        registry.delete_value(Hive::Hklm, &key, "Name"),
+    ] {
+        assert_eq!(
+            refused.unwrap_err().to_string(),
+            "One Launch writes nothing under HKLM"
+        );
+    }
+    assert_eq!(registry.get_string(Hive::Hklm, &key, "Name").unwrap(), None);
 
     let listed = registry.list_values(hive, &key).unwrap();
     assert_eq!(names(&listed), ["", "Count", "Name", "Token"]);

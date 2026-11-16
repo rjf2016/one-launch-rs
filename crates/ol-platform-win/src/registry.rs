@@ -82,7 +82,19 @@ fn open_below(parent: HKEY, key: &str, access: REG_SAM_FLAGS) -> Result<Option<K
     }
 }
 
+// Windows reads a name only up to a NUL, so one that holds a NUL would name another key or value.
+fn whole(names: &[&str]) -> Result<(), RegistryError> {
+    if names.iter().any(|name| name.contains('\0')) {
+        return Err(RegistryError(
+            "One Launch was asked for a registry key or value by a name that holds a NUL"
+                .to_owned(),
+        ));
+    }
+    Ok(())
+}
+
 fn open(hive: Hive, key: &str, access: REG_SAM_FLAGS) -> Result<Option<Key>, RegistryError> {
+    whole(&[key])?;
     open_below(root(hive), key, access).map_err(|code| failed("open", hive, key, None, code))
 }
 
@@ -157,6 +169,7 @@ fn read(
     name: &str,
     wanted: &[REG_VALUE_TYPE],
 ) -> Result<Option<RegistryData>, RegistryError> {
+    whole(&[name])?;
     let Some(opened) = open(hive, key, KEY_QUERY_VALUE)? else {
         return Ok(None);
     };
@@ -247,7 +260,13 @@ fn list(key: &Key, binary: bool, found: &mut Vec<RegistryNamedValue>) -> Result<
         }
         tries = 0;
         index += 1;
-        let name = String::from_utf16_lossy(&name[..(name_length as usize).min(name.len())]);
+        // A name that does not read back as itself would have a later set or delete act on another value.
+        let Ok(name) = String::from_utf16(&name[..(name_length as usize).min(name.len())]) else {
+            continue;
+        };
+        if name.contains('\0') {
+            continue;
+        }
         bytes.truncate(length as usize);
         let kind = REG_VALUE_TYPE(kind);
         if kind == REG_BINARY && !binary {
@@ -284,9 +303,11 @@ fn subkeys(key: &Key) -> Result<Vec<String>, WIN32_ERROR> {
             _ => {}
         }
         index += 1;
-        found.push(String::from_utf16_lossy(
-            &name[..(length as usize).min(name.len())],
-        ));
+        if let Ok(name) = String::from_utf16(&name[..(length as usize).min(name.len())])
+            && !name.contains('\0')
+        {
+            found.push(name);
+        }
     }
     Ok(found)
 }
@@ -407,6 +428,7 @@ impl WindowsRegistry {
                 hive.as_str()
             )));
         }
+        whole(&[key, name])?;
         let wide_key = wide(key);
         let mut created = HKEY::default();
         let code = unsafe {
@@ -494,6 +516,7 @@ impl RegistryWriter for WindowsRegistry {
                 hive.as_str()
             )));
         }
+        whole(&[name])?;
         let Some(opened) = open(hive, key, KEY_SET_VALUE)? else {
             return Ok(());
         };
