@@ -740,4 +740,77 @@ mod tests {
         assert!(log.contains(&format!("OnLoginComplete - 0 TRUE {other} ")));
         assert!(!log.contains(&format!("OnLoginComplete - 0 TRUE {on_disk} ")));
     }
+
+    const BATTLENET_EXE: &str = "Battle.net.exe";
+
+    fn battlenet_scenario(name: &str, knobs: &Value) -> (Scratch, std::path::PathBuf) {
+        let scratch = Scratch::new(name);
+        let dir = scratch.join("launchers");
+        lay_down(
+            &oracle("fixtures/dev-only/fake-launchers/all-four"),
+            &oracle("fixtures/launchers"),
+            &dir,
+        )
+        .unwrap();
+        write_knobs(&dir, knobs).unwrap();
+        (scratch, dir)
+    }
+
+    fn newest_battlenet_log(dir: &Path) -> String {
+        let logs = dir.join(r"localappdata\Battle.net\Logs");
+        let names = fs::read_dir(&logs).unwrap().flatten();
+        let newest = names.map(|entry| entry.file_name()).max().unwrap();
+        fs::read_to_string(logs.join(newest)).unwrap()
+    }
+
+    fn start_battlenet(fake: &FakeLaunchers, dir: &Path) {
+        let exe = dir.join("battlenet").join(BATTLENET_EXE);
+        let exe = exe.to_string_lossy().into_owned();
+        fake.platform.processes.start(&exe, &[], "").unwrap();
+    }
+
+    #[test]
+    fn the_newest_battlenet_log_is_that_of_the_client_already_running() {
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "runningAs": "0f0f0f0f" } } });
+        let (scratch, dir) = battlenet_scenario("sim-bnet-running", &knobs);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let _fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        assert!(newest_battlenet_log(&dir).contains("|bnet=1:0:0f0f0f0f|"));
+    }
+
+    #[test]
+    fn a_battlenet_client_closed_before_it_came_up_does_not_come_up_later() {
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "reactMs": 400 } } });
+        let (scratch, dir) = battlenet_scenario("sim-bnet-closed", &knobs);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        let config = fs::read(dir.join(r"appdata\Battle.net\Battle.net.config")).unwrap();
+        start_battlenet(&fake, &dir);
+        fake.platform.processes.close(BATTLENET_EXE).unwrap();
+        while fake.platform.processes.is_running(BATTLENET_EXE).unwrap() {}
+        fake.platform.clock.sleep(
+            std::time::Duration::from_secs(5),
+            &ol_platform_api::CancelToken::new(),
+        );
+        assert!(!fake.platform.processes.is_running(BATTLENET_EXE).unwrap());
+        assert!(fs::read(dir.join(r"appdata\Battle.net\Battle.net.config")).unwrap() == config);
+    }
+
+    #[test]
+    fn a_battlenet_client_started_after_a_restart_logs_after_the_runs_before_it() {
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "reactMs": 0 } } });
+        let (scratch, dir) = battlenet_scenario("sim-bnet-restart", &knobs);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        for _ in 0..3 {
+            start_battlenet(&fake, &dir);
+        }
+        drop(fake);
+
+        let knobs = serde_json::json!({ "knobs": { "battlenet": { "reactMs": 0, "updatesPending": ["prometheus"] } } });
+        write_knobs(&dir, &knobs).unwrap();
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        start_battlenet(&fake, &dir);
+        assert!(newest_battlenet_log(&dir).contains("(prometheus): currentOperation=Update"));
+    }
 }
