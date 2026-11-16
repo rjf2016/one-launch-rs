@@ -22,6 +22,9 @@ pub enum AdapterError {
     LauncherRunning(String),
     #[error("{0}")]
     SwitchBlocked(String),
+    // The launcher's own state says the game cannot start now: it has to be updated first, or it runs already.
+    #[error("{0}")]
+    GameNotPlayable(String),
     #[error(transparent)]
     Registry(#[from] RegistryError),
     #[error(transparent)]
@@ -40,6 +43,7 @@ impl AdapterError {
             Self::ConfirmationRequired { .. } => "CONFIRM_REQUIRED",
             Self::LauncherRunning(_) => "LAUNCHER_RUNNING",
             Self::SwitchBlocked(_) => "SWITCH_BLOCKED",
+            Self::GameNotPlayable(_) => "GAME_NOT_PLAYABLE",
             Self::Registry(_) => RegistryError::CODE,
             Self::Process(ProcessError::AccessDenied(_)) => "PROCESS_ACCESS_DENIED",
             Self::Aborted => "ABORTED",
@@ -52,6 +56,7 @@ impl AdapterError {
         matches!(
             self.code(),
             "CONFIRM_REQUIRED"
+                | "GAME_NOT_PLAYABLE"
                 | "LAUNCHER_RUNNING"
                 | "NOT_INSTALLED"
                 | "PROCESS_ACCESS_DENIED"

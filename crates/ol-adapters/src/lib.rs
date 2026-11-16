@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod battlenet;
 mod directory;
 pub mod epic;
 mod error;
