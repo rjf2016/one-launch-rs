@@ -167,10 +167,11 @@ pub fn restore_backup(
 }
 
 enum SignInWait {
-    // The account id is None when the client has not written the file yet.
     SignedIn {
-        account_id: Option<String>,
+        account_id: String,
     },
+    // The log reports a sign-in, and the file named no account for as long as the client gets to write it: the log never names the account, so who signed in is not known.
+    Unconfirmed,
     WrongAccount {
         account_id: String,
         owner: Option<AccountRef>,
@@ -188,6 +189,8 @@ enum Ending {
     Done,
     Cancelled,
     NeedsSignIn,
+    // A sign-in the file did not name: it is neither taken as the account's nor put back.
+    Unconfirmed,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -474,14 +477,12 @@ impl Switch<'_> {
                             Some(expected) if *expected != account_id => {
                                 SignInWait::WrongAccount { account_id, owner }
                             }
-                            _ => SignInWait::SignedIn {
-                                account_id: Some(account_id),
-                            },
+                            _ => SignInWait::SignedIn { account_id },
                         });
                     }
                     let now = self.now();
                     if now >= *file_deadline.get_or_insert(now + timing.capture) {
-                        return Ok(SignInWait::SignedIn { account_id: None });
+                        return Ok(SignInWait::Unconfirmed);
                     }
                 }
                 Some(SignInOutcome::Failed { reason, detail }) if !manual => {
@@ -515,13 +516,8 @@ impl Switch<'_> {
     }
 
     // The first sign-in that is confirmed is where the account's Riot id comes from. Refused when another account holds it.
-    fn signed_in_detail(&mut self, signed_in_as: Option<&str>) -> Result<String, Thrown> {
+    fn signed_in_detail(&mut self, signed_in_as: &str) -> Result<String, Thrown> {
         let login = &self.account.login;
-        let Some(signed_in_as) = signed_in_as else {
-            return Ok(format!(
-                "Signed in as {login} (the client has not written {SESSION_FILE} yet, so the account id is unconfirmed)."
-            ));
-        };
         let (Some(account_id), None) = (self.account.id.as_deref(), &self.expected_uid) else {
             return Ok(format!("Signed in as {login}."));
         };
@@ -531,6 +527,13 @@ impl Switch<'_> {
             "Signed in as {login}. Linked to Riot account {}.",
             id_tail(Some(signed_in_as), 4)
         ))
+    }
+
+    fn unconfirmed_detail(&self) -> String {
+        format!(
+            "The client reported a sign-in, but {SESSION_FILE} named no account within {} s.",
+            seconds(self.riot.timing().capture)
+        )
     }
 
     fn confirm_sign_in(&mut self) -> Result<SignInWait, Thrown> {
@@ -544,10 +547,10 @@ impl Switch<'_> {
         };
         let waited = self.wait_for_sign_in(timeout, false)?;
         let (status, detail) = match &waited {
-            SignInWait::SignedIn { account_id } => (
-                JobStepStatus::Done,
-                self.signed_in_detail(account_id.as_deref())?,
-            ),
+            SignInWait::SignedIn { account_id } => {
+                (JobStepStatus::Done, self.signed_in_detail(account_id)?)
+            }
+            SignInWait::Unconfirmed => (JobStepStatus::Failed, self.unconfirmed_detail()),
             SignInWait::WrongAccount { .. } => (
                 JobStepStatus::Failed,
                 "Signed in as a different account.".to_owned(),
@@ -596,8 +599,11 @@ impl Switch<'_> {
         let waited = self.wait_for_sign_in(timing.manual_sign_in, true);
         let settled = match &waited {
             Ok(SignInWait::SignedIn { account_id }) => self
-                .signed_in_detail(account_id.as_deref())
+                .signed_in_detail(account_id)
                 .map(|detail| Some((JobStepStatus::Done, detail))),
+            Ok(SignInWait::Unconfirmed) => {
+                Ok(Some((JobStepStatus::Failed, self.unconfirmed_detail())))
+            }
             Ok(SignInWait::WrongAccount { .. }) => Ok(Some((
                 JobStepStatus::Failed,
                 "Signed in as a different account.".to_owned(),
@@ -726,6 +732,7 @@ impl Switch<'_> {
         }
         match self.confirm_sign_in()? {
             SignInWait::Cancelled => return Ok(Ending::Cancelled),
+            SignInWait::Unconfirmed => return Ok(Ending::Unconfirmed),
             SignInWait::WrongAccount { account_id, owner } => {
                 return Err(self.wrong_account(&account_id, owner.as_ref()));
             }
@@ -751,6 +758,7 @@ impl Switch<'_> {
                 }
                 match self.wait_for_manual_sign_in(&unsettled)? {
                     SignInWait::Cancelled => return Ok(Ending::Cancelled),
+                    SignInWait::Unconfirmed => return Ok(Ending::Unconfirmed),
                     SignInWait::WrongAccount { account_id, owner } => {
                         return Err(self.wrong_account(&account_id, owner.as_ref()));
                     }
@@ -861,6 +869,7 @@ pub fn run_switch(
     let attempt = switch.attempt(context.running);
     let login = account.login.clone();
     let manual_minutes = minutes(riot.timing().manual_sign_in);
+    let capture_seconds = seconds(riot.timing().capture);
     let cancelled_after_start = |handed_over: bool| {
         if handed_over {
             format!(
@@ -889,6 +898,15 @@ pub fn run_switch(
             None,
             Some(format!(
                 "One Launch waited {manual_minutes} min for the sign-in as {login} and gave up. The Riot Client is still on its login page: sign in there with “Stay signed in” ticked, and the sign-in is saved at the next switch."
+            )),
+        ),
+        Ok(Ending::Unconfirmed) => (
+            false,
+            true,
+            false,
+            None,
+            Some(format!(
+                "The Riot Client reported a sign-in, but {SESSION_FILE} did not name the account within {capture_seconds} s, so One Launch cannot tell whether it is {login} and stopped there: nothing was put back and no game was started. The client was left running; look at its window to see who is signed in."
             )),
         ),
         Err(thrown) => {

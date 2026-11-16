@@ -854,6 +854,77 @@ fn a_riot_game_that_starts_after_a_rollback_or_a_restore_has_closed_the_client_k
     fakes.backend.shut_down();
 }
 
+// Once, at the first sleep of the job while the named step runs and `first` acts: `first`, then a byte that is not UTF-8 at the end of the client's file. The scripted client reads past such a byte; One Launch refuses the file, so it names no account.
+fn file_unreadable_at(
+    fakes: &Fakes,
+    step: &'static str,
+    first: impl Fn() -> bool + Send + Sync + 'static,
+) {
+    let (file, latest) = (fakes.session_file(), Arc::clone(&fakes.latest));
+    let done = std::sync::atomic::AtomicBool::new(false);
+    fakes.fake.clock.before_sleep(move || {
+        let job = latest.lock().unwrap().clone();
+        let at_the_step = |job: &LaunchJob| {
+            let running = |at: &JobStep| at.id == step && at.status == JobStepStatus::Running;
+            job.steps.iter().any(running)
+        };
+        let ordering = std::sync::atomic::Ordering::SeqCst;
+        if job.is_some_and(|job| at_the_step(&job)) && !done.load(ordering) && first() {
+            done.store(true, ordering);
+            let mut bytes = fs::read(&file).unwrap();
+            bytes.push(0xff);
+            fs::write(&file, bytes).unwrap();
+        }
+    });
+}
+
+#[test]
+fn a_sign_in_the_file_does_not_name_ends_the_switch_unconfirmed_with_nothing_verified_and_no_game_started()
+ {
+    let unconfirmed = |fakes: &Fakes, login: &str| {
+        format!(
+            "The Riot Client reported a sign-in, but RiotGamesPrivateSettings.yaml did not name the account within {} s, so One Launch cannot tell whether it is {login} and stopped there: nothing was put back and no game was started. The client was left running; look at its window to see who is signed in.",
+            RiotTiming::with(&fakes.fake.riot_timing).capture.as_secs()
+        )
+    };
+    // Alt's saved sign-in: the client keeps the token it is given, and its file becomes unreadable once the switch has written it.
+    let knobs = json!({ "knobs": { "riot": { "rotateOnStart": false } } });
+    let fakes = fakes(Some(&knobs));
+    file_unreadable_at(&fakes, "verify", || true);
+    let states = fakes.play(ALT);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::NeedsSignIn && !last.switched && last.restored.is_none());
+    assert_eq!(last.error, Some(unconfirmed(&fakes, ALT)));
+    assert!(detail(last, "verify").starts_with(
+        "The client reported a sign-in, but RiotGamesPrivateSettings.yaml named no account within "
+    ));
+    assert_eq!(asked_of_the_machine(&fakes), ["file.write", "proc.start"]);
+    let saved = block_on(fakes.backend.session(&fakes.account(ALT).id)).unwrap();
+    assert!(saved.session.unwrap().verified_at.is_none());
+    fakes.backend.shut_down();
+
+    // New, with no saved sign-in: the user signs in by hand, and the file is unreadable from then on.
+    let fakes = self::fakes(None);
+    let riot = Arc::clone(fakes.fake.riot.as_ref().unwrap());
+    let platform = fakes.fake.platform.clone();
+    // Once the client is up on its login page, which its window processes show.
+    file_unreadable_at(&fakes, "manual", move || {
+        let up = platform.processes.is_running("Riot Client.exe").unwrap();
+        if up {
+            riot.sign_in_by_hand(Some(NEW_UID));
+        }
+        up
+    });
+    let states = fakes.play(NEW);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::NeedsSignIn && !last.switched && last.restored.is_none());
+    assert_eq!(last.error, Some(unconfirmed(&fakes, NEW)));
+    assert_eq!(asked_of_the_machine(&fakes), ["file.write", "proc.start"]);
+    let new = fakes.account(NEW);
+    assert!(new.launcher_uid.is_none() && !new.has_session);
+    fakes.backend.shut_down();
+}
+
 #[test]
 fn a_riot_game_that_starts_while_the_client_ignores_its_close_stops_the_switch_before_the_client_is_ended()
  {
