@@ -68,7 +68,6 @@ What is there: on fake launchers the backend finds Steam, scans its games into t
 - Nothing is logged: the Electron app writes a line for each start, refusal, failure and rollback of a switch, with account names masked.
 - The launch job runs on a thread of its own and the adapter is plain blocking code over the ports, where `architecture.md` planned one thread and an executor. The owner has not decided whether to keep it. Since Epic, that thread asks the database's thread for what a switch needs of the accounts and their saved sign-ins (`StoreThread`), and waits for the answer.
 - Launcher-owned writes are the thirteen functions at the top of `crates/ol-services/src/switch.rs`: Steam's file and its two registry values, Epic's file, Battle.net's file and the set and the removal of a value under its `UnifiedAuth` key, Riot's file, the restore of each launcher, and the one write of a snapshot's files that the restores of Steam, Epic and Battle.net share. Nothing but review keeps another module from asking a writer port for the same.
-- A quit that lands between a job's check and its start does not stop that job: `JobBoard::begin` (`ol-services/src/launch.rs`) does not look at `closing` again, where the Electron app's `start` does. For every launcher; found in the review of Riot and not changed there.
 
 ## Epic (slice 4)
 
