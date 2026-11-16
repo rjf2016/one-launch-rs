@@ -180,7 +180,7 @@ fn restore_battlenet(
     })
 }
 
-// Riot: RiotGamesPrivateSettings.yaml, whole: the account's saved copy of the file as the client left it, the file with its session block set to null, or a snapshot's copy of it. It is the one launcher file a Riot switch writes, and it is never made where there is none: the client writes it at its first start, with the mark Riot knows this PC by. `ready` shows that the client was seen closed and that the sign-in the file held was stored for its owner first.
+// Riot: RiotGamesPrivateSettings.yaml, whole: the account's saved copy of the file as the client left it, the file with its session block set to null, or a snapshot's copy of it. It is the one launcher file a Riot switch writes, and it is never made where there is none: the client writes it at its first start, with the mark Riot knows this PC by. `ready` shows that the client was seen closed and that the sign-in the file held was handed to the store for its owner first.
 fn write_riot_session(
     files: &dyn Files,
     path: &str,

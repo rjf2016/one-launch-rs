@@ -1,4 +1,4 @@
-// Riot's switch: refuse while a Riot game runs, close the client, save the sign-in it leaves behind for its owner, copy RiotGamesPrivateSettings.yaml, put the target account's saved copy of the whole file in its place (or the client's own signed-out state, so that the client asks), start the client as its shortcut does and read its log and the file for the sign-in. It reads, waits and decides; every write goes through the two functions for Riot at the top of switch.rs, and neither takes a write that cannot show a `ReadyToWrite`: the client was seen closed, and what the file held was stored for its owner. A saved sign-in is decrypted in one place, `write_session`, and goes nowhere but into the client's own file.
+// Riot's switch: refuse while a Riot game runs, close the client, save the sign-in it leaves behind for its owner, copy RiotGamesPrivateSettings.yaml, put the target account's saved copy of the whole file in its place (or the client's own signed-out state, so that the client asks), start the client as its shortcut does and read its log and the file for the sign-in. It reads, waits and decides; every write goes through the two functions for Riot at the top of switch.rs, and neither takes a write that cannot show a `ReadyToWrite`: the client was seen closed, and what the file held was handed to the store for its owner. A saved sign-in is decrypted in one place, `write_session`, and goes nowhere but into the client's own file.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -34,7 +34,7 @@ use crate::launchers::ServiceError;
 // The client was seen closed a moment ago. Only `seen_closed` makes one.
 struct Closed(());
 
-// What every write of the session file has to show: the client was seen closed, and the sign-in the file held was stored for the account it belongs to, because the client replaces the token at every start and an older copy must never be the one that is kept. Only `save_what_the_file_holds` makes one, here, in this module.
+// What every write of the session file has to show: the client was seen closed, and the sign-in the file held was read and handed to the store for the account it belongs to, because the client replaces the token at every start and an older copy must never be the one that is kept. It shows that the store was asked, not that it kept the copy: a store that fails does not stop the write, as in the Electron app. Only `save_what_the_file_holds` makes one, here, in this module.
 pub(super) struct ReadyToWrite(());
 
 fn seen_closed(riot: &RiotAdapter<'_>) -> Result<Option<Closed>, AdapterError> {
@@ -344,13 +344,13 @@ impl Switch<'_> {
         }
         let write =
             plan_sign_out(&on_disk.file.file).map_err(|error| Thrown::Failed(error.to_string()))?;
+        // What is left of the file still holds the device cookie, so it is wiped like the file itself, also when there is nothing to write.
+        let signed_out = RiotSessionBlob { file: write.text };
         self.written_fingerprint = None;
         if write.noop {
             self.mark(STEP.file, JobStepStatus::Skipped, "Already signed out.");
             return Ok(());
         }
-        // What is left of the file still holds the device cookie, so it is wiped like the file itself.
-        let signed_out = RiotSessionBlob { file: write.text };
         self.modified = true;
         write_riot_session(files, &self.session_path, signed_out.file.as_bytes(), ready)
             .map_err(|error| Thrown::Failed(error.to_string()))?;
@@ -743,8 +743,11 @@ impl Switch<'_> {
         if let Some(game) = self.riot.find_running_game(None).map_err(text)? {
             return Err(RiotAdapter::game_running_error(game, "restore").to_string());
         }
-        if self.riot.is_running().map_err(text)? {
-            let _ = self.riot.shutdown(None, &CancelToken::new());
+        if self.riot.is_running().map_err(text)?
+            && let Err(game @ AdapterError::GameRunning { .. }) =
+                self.riot.shutdown(None, &CancelToken::new())
+        {
+            return Err(game.to_string());
         }
         let Some(closed) = seen_closed(self.riot).map_err(text)? else {
             return Err(format!(

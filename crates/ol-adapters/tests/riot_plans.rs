@@ -2,6 +2,7 @@
 
 // Dry-run plans and preflights held against oracle/tests/goldens: what the Electron app's Riot adapter answered in its own tests. The account of each call comes from the golden; the test here only builds the machine those tests ran on: a client folder, the metadata of five products of which two are installed, the fixture's session file with Main signed in, three accounts of which Alt has a saved sign-in, and the short waits. Below them, the adapter's own rules on that machine: what it does to a process, and what a running game or a process list that cannot be read refuses.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -106,6 +107,7 @@ struct World {
     log: OpLog,
     registry: Arc<FakeRegistry>,
     processes: Arc<FakeProcesses>,
+    clock: Arc<FakeClock>,
     platform: Platform,
     config: RiotConfig,
     book: Book,
@@ -305,12 +307,13 @@ fn world_with(knobs: ProcessKnobs) -> World {
         .as_str()
         .map(|at| OffsetDateTime::parse(at, &Rfc3339).unwrap())
         .unwrap();
+    let clock = Arc::new(FakeClock::starting_at(clock));
     let platform = Platform {
         registry: Arc::clone(&registry) as _,
         processes: Arc::clone(&processes) as _,
         files: Arc::new(ScratchFiles::new(&[scratch.path()], log.clone())),
         shell: Arc::new(FakeShell::new(log.clone())),
-        clock: Arc::new(FakeClock::starting_at(clock)),
+        clock: Arc::clone(&clock) as _,
     };
     let mut timing = TimingOverrides::default();
     for (name, milliseconds) in [
@@ -371,6 +374,7 @@ fn world_with(knobs: ProcessKnobs) -> World {
         log,
         registry,
         processes,
+        clock,
         platform,
         config,
         book,
@@ -775,8 +779,10 @@ fn a_client_that_ignores_its_window_close_is_ended_alone_and_never_with_what_it_
     });
     world.processes.set_running(EXE, true);
     world.processes.set_running(WINDOW_EXE, true);
-    // A game the client started runs beside it: it is the client's child.
-    world.processes.set_running("VALORANT.exe", true);
+    // Something the client started runs beside it. It is no game: beside a game the client is not closed at all.
+    world
+        .processes
+        .set_running("RiotClientCrashHandler.exe", true);
     world.adapter().shutdown(None, &CancelToken::new()).unwrap();
     assert_eq!(
         world.asked(),
@@ -787,7 +793,63 @@ fn a_client_that_ignores_its_window_close_is_ended_alone_and_never_with_what_it_
             "proc.kill Riot Client.exe tree=false",
         ]
     );
-    assert!(world.platform.processes.is_running("VALORANT.exe").unwrap());
+    let processes = &world.platform.processes;
+    assert!(processes.is_running("RiotClientCrashHandler.exe").unwrap());
+}
+
+#[test]
+fn nothing_of_the_client_is_closed_beside_a_riot_game_not_even_a_client_that_came_back() {
+    let refusal =
+        "VALORANT is running. Close it, then try again: One Launch never closes a Riot game.";
+    let refused = |world: &World| {
+        let refused = world.adapter().shutdown(None, &CancelToken::new());
+        let refused = refused.expect_err("a refusal");
+        assert_eq!(refused.code(), "GAME_RUNNING");
+        assert_eq!(refused.to_string(), refusal);
+    };
+
+    let world = world();
+    world.processes.set_running(EXE, true);
+    world.processes.set_running(WINDOW_EXE, true);
+    world.processes.add_name_to_table("VALORANT.exe");
+    refused(&world);
+    assert!(world.asked().is_empty());
+
+    // The windows a client left behind are the client's too.
+    let world = self::world();
+    world.processes.set_running(WINDOW_EXE, true);
+    world.processes.add_name_to_table("VALORANT.exe");
+    refused(&world);
+    assert!(world.asked().is_empty());
+
+    // The client comes back by itself after its close, and a game starts meanwhile: the client is not closed a second time.
+    let world = world_with(ProcessKnobs {
+        reappears_after_polls: BTreeMap::from([(EXE.to_owned(), 1)]),
+        ..ProcessKnobs::default()
+    });
+    world.processes.set_running(EXE, true);
+    let processes = Arc::clone(&world.processes);
+    world
+        .clock
+        .before_sleep(move || processes.add_name_to_table("VALORANT.exe"));
+    refused(&world);
+    assert_eq!(world.asked(), ["proc.close RiotClientServices.exe"]);
+    assert!(world.adapter().is_running().unwrap());
+
+    // Without the game the same client is closed again.
+    let world = world_with(ProcessKnobs {
+        reappears_after_polls: BTreeMap::from([(EXE.to_owned(), 1)]),
+        ..ProcessKnobs::default()
+    });
+    world.processes.set_running(EXE, true);
+    world.adapter().shutdown(None, &CancelToken::new()).unwrap();
+    assert_eq!(
+        world.asked(),
+        [
+            "proc.close RiotClientServices.exe",
+            "proc.close RiotClientServices.exe"
+        ]
+    );
 }
 
 #[test]

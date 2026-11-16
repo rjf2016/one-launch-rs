@@ -801,7 +801,14 @@ impl<'a> RiotAdapter<'a> {
         }
     }
 
-    // Closes the client's own processes and nothing else: a window close for the client, which is ended alone when it ignores the close, then the same for the window processes it leaves behind. A client that comes back by itself is given time to finish starting and is closed again, three times at most.
+    fn no_game_runs(&self) -> Result<(), AdapterError> {
+        match self.find_running_game(None)? {
+            Some(game) => Err(Self::game_running_error(game, "try again")),
+            None => Ok(()),
+        }
+    }
+
+    // Closes the client's own processes and nothing else: a window close for the client, which is ended alone when it ignores the close, then the same for the window processes it leaves behind. A client that comes back by itself is given time to finish starting and is closed again, three times at most. A Riot game is looked for before every close, the later ones included, because a client that came back may have started one: beside a game nothing is closed.
     pub fn shutdown(
         &self,
         timeout: Option<Duration>,
@@ -809,10 +816,12 @@ impl<'a> RiotAdapter<'a> {
     ) -> Result<(), AdapterError> {
         self.require_install()?;
         if !self.is_running()? {
+            self.no_game_runs()?;
             return self.close_windows(cancel);
         }
         let timing = self.timing();
         for attempt in 1.. {
+            self.no_game_runs()?;
             let mark = self.log_mark();
             let ended = self.close_and_wait(
                 ClientImage::Core,

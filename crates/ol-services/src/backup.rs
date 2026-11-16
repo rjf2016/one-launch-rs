@@ -14,6 +14,7 @@ use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use time::OffsetDateTime;
+use zeroize::Zeroizing;
 
 pub const DEFAULT_BACKUPS_TO_KEEP: i64 = 20;
 // Pinned snapshots are kept beside the ordinary ones, the newest ten of them.
@@ -99,9 +100,9 @@ struct Manifest {
     pinned: Option<String>,
 }
 
-// What a snapshot holds for the files that were there when it was taken, each checked against its recorded hash.
+// What a snapshot holds for the files that were there when it was taken, each checked against its recorded hash. A copy can be a sign-in out of the vault, so each is wiped when it is dropped.
 pub struct Restorable {
-    pub files: Vec<(String, Vec<u8>)>,
+    pub files: Vec<(String, Zeroizing<Vec<u8>>)>,
     pub meta: Map<String, Value>,
 }
 
@@ -247,14 +248,15 @@ impl<'a> BackupService<'a> {
                 encrypted: false,
             };
             if self.files.exists(file.source) {
-                let bytes = self.files.read(file.source)?;
+                // The file as it is can be a sign-in, so what was read is wiped once its copy is made.
+                let bytes = Zeroizing::new(self.files.read(file.source)?);
                 entry.encrypted = file.sensitive;
                 // A copy that holds a sign-in is the vault's ciphertext of the file in base64, as the Electron app stores it.
                 let kept = if file.sensitive {
-                    let sealed = self.vault.encrypt(&Secret::new(STANDARD.encode(&bytes)))?;
+                    let sealed = self.vault.encrypt(&Secret::new(STANDARD.encode(&*bytes)))?;
                     sealed.into_bytes()
                 } else {
-                    bytes.clone()
+                    bytes.to_vec()
                 };
                 let stored = Self::stored_path(&folder, &entry);
                 if let Some(parent) = stored.parent() {
@@ -422,7 +424,7 @@ impl<'a> BackupService<'a> {
             } else {
                 bytes
             };
-            files.push((file.source.clone(), bytes));
+            files.push((file.source.clone(), Zeroizing::new(bytes)));
         }
         Ok(Restorable {
             files,

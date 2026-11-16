@@ -6,7 +6,7 @@ use zeroize::Zeroize;
 
 pub use crate::epic::session::short_fingerprint;
 use crate::js;
-use crate::js_json::{JsObject, JsString, JsValue, parse, stringify};
+use crate::js_json::{JsObject, JsValue, parse, quote_text, quoted_capacity};
 
 const BLOCK_PATH: [(&str, &str); 3] = [
     ("psl", "psl"),
@@ -441,17 +441,15 @@ pub fn read_session(text: &str) -> SessionRead {
     })
 }
 
+const BLOB_HEAD: &str = "{\"v\":1,\"file\":";
+
 // The JSON that is encrypted and stored, byte for byte the Electron app's. It is the session: the caller seals it at once.
 pub fn serialize_blob(blob: &RiotSessionBlob) -> String {
-    let mut shaped = JsObject::default();
-    shaped.insert(JsString::from("v"), JsValue::Number(1.0));
-    shaped.insert(
-        JsString::from("file"),
-        JsValue::String(JsString::from(blob.file.as_str())),
-    );
-    let mut shaped = JsValue::Object(shaped);
-    let written = stringify(&shaped, 0);
-    shaped.wipe();
+    // Written straight into a buffer sized for the longest it can be: one that grew would leave a part of the sign-in behind where nothing wipes it.
+    let mut written = String::with_capacity(BLOB_HEAD.len() + quoted_capacity(&blob.file) + 1);
+    written.push_str(BLOB_HEAD);
+    quote_text(&mut written, &blob.file);
+    written.push('}');
     written
 }
 
@@ -479,6 +477,7 @@ pub fn session_of_blob(blob: &RiotSessionBlob) -> Result<RiotSession, BlobError>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::js_json::{JsString, stringify};
 
     const SIGNED_OUT: &str = "psl:\r\n    authorization:\r\n        riot-client: null\r\nrso-authenticator:\r\n    tdid:\r\n        value: \"placeholder\"\r\n";
 
@@ -639,5 +638,26 @@ mod tests {
             session_of_blob(&signed_out).err(),
             Some(BlobError::SignedOut)
         );
+    }
+
+    #[test]
+    fn a_stored_copy_is_written_as_json_stringify_writes_it_into_a_buffer_that_never_grows() {
+        let odd = "\"quoted\" back\\slash\r\n\ttab \u{8}\u{c}\u{1}\u{1f}\u{7f} caf\u{e9} \u{2028} \u{1f600}";
+        for file in [odd.to_owned(), "\u{1}".repeat(64), String::new()] {
+            let stored = serialize_blob(&RiotSessionBlob { file: file.clone() });
+            let mut shaped = JsObject::default();
+            shaped.insert(JsString::from("v"), JsValue::Number(1.0));
+            shaped.insert(
+                JsString::from("file"),
+                JsValue::String(JsString::from(file.as_str())),
+            );
+            assert_eq!(stored, stringify(&JsValue::Object(shaped), 0));
+            assert!(stored.len() <= BLOB_HEAD.len() + quoted_capacity(&file) + 1);
+            assert!(parse_blob(&stored).unwrap().file == file);
+        }
+        let longest = serialize_blob(&RiotSessionBlob {
+            file: "\u{1}".repeat(64),
+        });
+        assert_eq!(longest.len(), BLOB_HEAD.len() + 6 * 64 + 2 + 1);
     }
 }

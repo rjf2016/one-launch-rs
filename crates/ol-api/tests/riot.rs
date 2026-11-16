@@ -828,6 +828,61 @@ fn what_the_file_holds_is_stored_for_its_owner_before_a_rollback_overwrites_it()
 }
 
 #[test]
+fn a_failed_switch_is_not_put_back_while_a_riot_game_runs_and_is_offered_at_the_next_start() {
+    let knobs = json!({
+        "knobs": { "riot": { "signInWhenAskedMs": 600, "signInAs": MAIN_UID } },
+    });
+    let fakes = fakes(Some(&knobs));
+    // A game starts while the user is at the client's login page.
+    let (processes, latest) = (Arc::clone(&fakes.fake.processes), Arc::clone(&fakes.latest));
+    fakes.fake.clock.before_sleep(move || {
+        let job = latest.lock().unwrap().clone();
+        let waiting = |job: &LaunchJob| {
+            let asked = |at: &JobStep| at.id == "manual" && at.status == JobStepStatus::Running;
+            job.steps.iter().any(asked)
+        };
+        if job.is_some_and(|job| waiting(&job)) {
+            processes.add_name_to_table("VALORANT.exe");
+        }
+    });
+    let states = fakes.play(NEW);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Failed);
+    assert_eq!(last.restored, Some(false));
+    let backup_id = last.backup_id.clone().expect("the switch took a snapshot");
+    assert_eq!(
+        last.error,
+        Some(format!(
+            "The Riot Client signed in as Riot Main (Riot account …1111), which is another One Launch account, instead of Riot New. Sign in to the client as riot_new.. Restoring backup {backup_id} also failed: VALORANT is running. Close it, then restore: One Launch never closes a Riot game."
+        ))
+    );
+    // The client was not closed under the game, and the file was not written again: it holds what the user signed in with.
+    assert_eq!(asked_of_the_machine(&fakes), ["file.write", "proc.start"]);
+    assert!(fakes.fake.platform.processes.is_running(EXE).unwrap());
+    assert!(fakes.on_disk().contains(&clients_token(1)));
+    assert_eq!(
+        fakes.saved(MAIN),
+        Some(sha256_hex(mains_token().as_bytes()))
+    );
+    fakes.backend.shut_down();
+
+    // The next start offers the snapshot. By then the game and the client are closed, and what the file holds goes to Main before the snapshot goes over it.
+    let fakes = start(fakes.scratch);
+    let pending = block_on(fakes.backend.recovery())
+        .unwrap()
+        .expect("a recovery");
+    assert!(pending.backup_id == backup_id && pending.snapshot_available);
+    block_on(fakes.backend.restore_recovery()).unwrap();
+    assert!(fakes.on_disk() == planted_file());
+    assert_eq!(
+        fakes.saved(MAIN),
+        Some(sha256_hex(clients_token(1).as_bytes()))
+    );
+    assert!(block_on(fakes.backend.recovery()).unwrap().is_none());
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn the_lockfiles_password_is_in_no_plan_job_error_or_log_and_play_is_pressed_through_the_port() {
     let password = format!("made-up-lockfile-password-{}", "p".repeat(24));
     let lockfile = format!("Riot Client:4242:51234:{password}:https");

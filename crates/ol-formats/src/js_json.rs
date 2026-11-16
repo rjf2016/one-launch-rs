@@ -430,25 +430,45 @@ pub fn number_to_string(number: f64) -> String {
     out
 }
 
+fn push_quoted(out: &mut String, character: char) {
+    match character {
+        '"' => out.push_str("\\\""),
+        '\\' => out.push_str("\\\\"),
+        '\u{8}' => out.push_str("\\b"),
+        '\u{c}' => out.push_str("\\f"),
+        '\n' => out.push_str("\\n"),
+        '\r' => out.push_str("\\r"),
+        '\t' => out.push_str("\\t"),
+        control if control < ' ' => {
+            let _ = write!(out, "\\u{:04x}", u32::from(control));
+        }
+        character => out.push(character),
+    }
+}
+
 fn quote(out: &mut String, text: &JsString) {
     out.push('"');
     for unit in char::decode_utf16(text.0.iter().copied()) {
         match unit {
-            Ok('"') => out.push_str("\\\""),
-            Ok('\\') => out.push_str("\\\\"),
-            Ok('\u{8}') => out.push_str("\\b"),
-            Ok('\u{c}') => out.push_str("\\f"),
-            Ok('\n') => out.push_str("\\n"),
-            Ok('\r') => out.push_str("\\r"),
-            Ok('\t') => out.push_str("\\t"),
-            Ok(control) if control < ' ' => {
-                let _ = write!(out, "\\u{:04x}", u32::from(control));
-            }
-            Ok(character) => out.push(character),
+            Ok(character) => push_quoted(out, character),
             Err(half) => {
                 let _ = write!(out, "\\u{:04x}", half.unpaired_surrogate());
             }
         }
+    }
+    out.push('"');
+}
+
+// The most bytes `quote_text` writes for a text: a control character, one byte, becomes six.
+pub const fn quoted_capacity(text: &str) -> usize {
+    6 * text.len() + 2
+}
+
+// What JSON.stringify writes for a string, into the caller's buffer. For a text that has to be wiped: a buffer of `quoted_capacity` never grows, so no part of the text is left behind in memory that was given back.
+pub fn quote_text(out: &mut String, text: &str) {
+    out.push('"');
+    for character in text.chars() {
+        push_quoted(out, character);
     }
     out.push('"');
 }
