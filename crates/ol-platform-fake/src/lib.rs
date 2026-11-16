@@ -7,6 +7,7 @@ mod files;
 mod oplog;
 mod processes;
 mod registry;
+mod riot;
 mod shell;
 
 pub use clock::FakeClock;
@@ -14,4 +15,5 @@ pub use files::ScratchFiles;
 pub use oplog::OpLog;
 pub use processes::{CLOSE_ARGUMENT, FakeProcesses, ProcessKnobs};
 pub use registry::{FakeRegistry, RegistryValue};
+pub use riot::FakeRiotLaunch;
 pub use shell::FakeShell;

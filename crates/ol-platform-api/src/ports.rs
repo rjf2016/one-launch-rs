@@ -131,6 +131,8 @@ pub trait ProcessLister: Send + Sync {
     // By image name, such as steam.exe.
     fn is_running(&self, image: &str) -> Result<bool, ProcessError>;
     fn list_processes(&self) -> Result<Vec<ProcessInfo>, ProcessError>;
+    // The image names that run now, from a listing that opens no process: no handle, no path and no command line is asked for. It is all that is ever asked about a Riot game.
+    fn running_names(&self) -> Result<Vec<String>, ProcessError>;
 }
 
 pub trait ProcessRunner: Send + Sync {
@@ -175,6 +177,34 @@ pub struct ShellError(pub String);
 pub trait Shell: Send + Sync {
     // Hands a link such as steam://rungameid/1 to whatever program Windows opens it with.
     fn open_url(&self, url: &str) -> Result<(), ShellError>;
+}
+
+// The launch request the Riot Client's own Play button sends, to be sent to the client's local server on this PC once the client shows the game's page. Nothing else is ever asked of that server, and nothing at all of Riot's.
+pub struct RiotLaunchRequest<'a> {
+    // Both as the game's metadata folder names them: letters, digits and underscores. Whoever sends the request checks that before it reads the lockfile.
+    pub product: &'a str,
+    pub patchline: &'a str,
+    // The client's Config\lockfile, which names the server's port and the password of this run. It is read at the moment of the request, the password is used for that one request, and neither is kept.
+    pub lockfile_path: &'a str,
+    pub cancel: &'a CancelToken,
+}
+
+// Why the launch request did not take. Each is a fixed sentence with at most a status or a word of the network's: none can carry the lockfile's password or anything the client answered.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+pub enum RiotLaunchError {
+    #[error("the Riot Client has no lockfile to answer on")]
+    NoLockfile,
+    #[error("the lockfile is not in the shape One Launch knows")]
+    LockfileShape,
+    #[error("the launch request did not reach the Riot Client ({0})")]
+    Unreachable(&'static str),
+    #[error("the Riot Client answered the launch request with HTTP {0}")]
+    Status(u16),
+}
+
+// Handed to the Riot adapter's launch and to nothing else.
+pub trait RiotLocalLaunch: Send + Sync {
+    fn launch(&self, request: &RiotLaunchRequest<'_>) -> Result<(), RiotLaunchError>;
 }
 
 // Stops a switch: whoever holds a copy can ask, and every wait of the switch looks at it.
