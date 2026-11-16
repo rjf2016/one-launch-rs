@@ -2,7 +2,7 @@
 
 use ol_formats::js;
 use ol_formats::steam::loginusers::{
-    SteamLoginUser, UNWRITABLE_LAYOUT, find_login_user, marks_most_recent, parse_login_users,
+    SteamLoginUser, UNWRITABLE_LAYOUT, find_login_user, marks_only, parse_login_users,
     plan_auto_login_rewrite, steam_id3,
 };
 use ol_formats::winpath::join;
@@ -182,7 +182,7 @@ impl SteamAdapter<'_> {
         };
         let expected_id3 = target.as_ref().and_then(|user| steam_id3(&user.steam_id64));
         let unwritable = match (&rewrite, &target) {
-            (Some(rewrite), Some(target)) => !marks_most_recent(&rewrite.text, &target.steam_id64),
+            (Some(rewrite), Some(target)) => !marks_only(&rewrite.text, &target.steam_id64),
             _ => false,
         };
         let points_at_target =
