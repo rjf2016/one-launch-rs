@@ -748,7 +748,7 @@ impl Switch<'_> {
         }
         restore_epic(self.epic, self.platform, self.backups, backup_id)
             .map(|_| ())
-            .map_err(|error| error.message())
+            .map_err(|error| error.to_string())
     }
 }
 

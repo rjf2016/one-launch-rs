@@ -757,7 +757,7 @@ impl Switch<'_> {
         let (ready, _) = save_what_the_file_holds(self.riot, &closed);
         restore_riot(self.riot, self.platform, self.backups, backup_id, &ready)
             .map(|_| ())
-            .map_err(|error| error.message())
+            .map_err(|error| error.to_string())
     }
 }
 

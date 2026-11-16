@@ -230,21 +230,12 @@ fn write_restored(files: &dyn FileWriter, restorable: &Restorable) -> Result<(),
     Ok(files.write_atomic(&copies).map_err(BackupError::Io)?)
 }
 
+#[derive(Debug, thiserror::Error)]
 enum RestoreError {
-    Adapter(AdapterError),
-    Backup(BackupError),
-}
-
-impl From<AdapterError> for RestoreError {
-    fn from(error: AdapterError) -> Self {
-        Self::Adapter(error)
-    }
-}
-
-impl From<BackupError> for RestoreError {
-    fn from(error: BackupError) -> Self {
-        Self::Backup(error)
-    }
+    #[error(transparent)]
+    Adapter(#[from] AdapterError),
+    #[error(transparent)]
+    Backup(#[from] BackupError),
 }
 
 impl From<ol_platform_api::RegistryError> for RestoreError {
@@ -254,13 +245,6 @@ impl From<ol_platform_api::RegistryError> for RestoreError {
 }
 
 impl RestoreError {
-    fn message(&self) -> String {
-        match self {
-            Self::Adapter(error) => error.to_string(),
-            Self::Backup(error) => error.to_string(),
-        }
-    }
-
     fn into_service(self, launcher: LauncherId) -> ServiceError {
         match self {
             Self::Adapter(source) => ServiceError::adapter(launcher)(source),

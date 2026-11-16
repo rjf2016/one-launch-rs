@@ -767,7 +767,7 @@ impl Switch<'_> {
         }
         restore_steam(self.steam, self.platform, self.backups, backup_id)
             .map(|_| ())
-            .map_err(|error| error.message())
+            .map_err(|error| error.to_string())
     }
 }
 

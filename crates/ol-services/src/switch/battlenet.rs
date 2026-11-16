@@ -341,7 +341,7 @@ impl Switch<'_> {
             None,
             self.config_exists,
         )
-        .map_err(|error| Thrown::Failed(error.message()))?;
+        .map_err(|error| Thrown::Failed(error.to_string()))?;
         self.sink.backup(&taken.id);
         self.backup_id = Some(taken.id);
         self.mark(STEP.backup, JobStepStatus::Done, taken.path);
@@ -831,7 +831,7 @@ impl Switch<'_> {
         }
         restore_battlenet(self.battlenet, self.platform, self.backups, backup_id)
             .map(|_| ())
-            .map_err(|error| error.message())
+            .map_err(|error| error.to_string())
     }
 }
 
