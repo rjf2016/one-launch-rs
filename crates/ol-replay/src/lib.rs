@@ -359,6 +359,7 @@ impl<'a> Replay<'a> {
     fn crash(&mut self) {
         if let Some(running) = self.running.take() {
             self.events.extend(running.fake.log.snapshot());
+            self.registry = state::registry(&running.fake.registry);
             self.now = running.fake.clock.now();
             self.gate.hold_for_good();
             self.gate = Gate::default();
