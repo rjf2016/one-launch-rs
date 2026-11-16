@@ -281,3 +281,34 @@ fn a_file_whose_layout_the_rewrite_cannot_change_blocks_the_switch() {
         Some(ol_formats::steam::loginusers::UNWRITABLE_LAYOUT)
     );
 }
+
+#[test]
+fn a_file_the_rewrite_would_leave_with_another_account_marked_blocks_the_switch() {
+    let world = world();
+    let layout = "\"users\"\n{\n\t\"111111111111111\"\n\t{\n\t\t\"AccountName\"\t\t\"a\"\n\t\t\"RememberPassword\"\t\t\"1\"\n\t\t\"AutoLogin\"\t\t\"1\" // a\n\t\t\"MostRecent\"\t\t\"0\"\n\t}\n\t\"222222222222222\"\n\t{\n\t\t\"AccountName\"\t\t\"b\"\n\t\t\"RememberPassword\"\t\t\"1\"\n\t\t\"AutoLogin\"\t\t\"0\"\n\t\t\"MostRecent\"\t\t\"0\"\n\t}\n}\n";
+    fs::write(
+        world
+            .scratch
+            .join("Steam")
+            .join("config")
+            .join("loginusers.vdf"),
+        layout,
+    )
+    .unwrap();
+    let account = AccountRef {
+        id: Some("account-b".to_owned()),
+        display_name: "B".to_owned(),
+        login: "b".to_owned(),
+        launcher_uid: Some("222222222222222".to_owned()),
+        has_secret: false,
+    };
+    let preflight = SteamAdapter::new(&world.platform, &world.config)
+        .preflight(&account)
+        .unwrap();
+    assert!(!preflight.already_active);
+    assert!(!preflight.plan.executable);
+    assert_eq!(
+        preflight.plan.warnings.first().map(String::as_str),
+        Some(ol_formats::steam::loginusers::UNWRITABLE_LAYOUT)
+    );
+}
