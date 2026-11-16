@@ -132,7 +132,7 @@ pub fn parse_blob(json: &str) -> Result<EpicSessionBlob, BlobError> {
     };
     let remember = &raw["rememberMe"];
     let blob = match (raw["v"].as_f64(), filled(&remember["data"])) {
-        (Some(version), Some(data)) if version == 1.0 => Ok(EpicSessionBlob {
+        (Some(1.0), Some(data)) => Ok(EpicSessionBlob {
             enable: remember["enable"].as_str().unwrap_or("True").to_owned(),
             data,
             offline: filled(&raw["offline"]["data"]),
