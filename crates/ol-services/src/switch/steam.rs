@@ -910,5 +910,6 @@ pub fn run_switch(
         started_at,
         finished_at: ol_store::iso_timestamp(platform.clock.now()),
         ready_at: None,
+        started_with_game: None,
     })
 }

@@ -221,10 +221,7 @@ fn a_scan_brings_steams_games_into_the_library_and_a_missing_steam_takes_them_ou
 
     let scanned = block_on(fakes.backend.rescan()).unwrap();
     let scanned_launchers: Vec<LauncherId> = scanned.iter().map(|scan| scan.launcher).collect();
-    assert_eq!(
-        scanned_launchers,
-        [LauncherId::Steam, LauncherId::Epic, LauncherId::Battlenet]
-    );
+    assert_eq!(scanned_launchers, LauncherId::ALL);
     let steam = &scanned[0];
     assert_eq!(
         (
@@ -360,16 +357,6 @@ fn the_accounts_steam_remembers_are_listed_and_imported_once() {
             .all(|(_, reason)| *reason == "already in One Launch")
     );
     assert_eq!(again.skipped.len(), new.len());
-
-    assert_eq!(
-        refusal(block_on(
-            fakes.backend.remembered_accounts(LauncherId::Riot)
-        )),
-        (
-            "NOT_IMPLEMENTED",
-            "The Riot Games adapter is not available yet".to_owned()
-        )
-    );
     fakes.backend.shut_down();
 }
 

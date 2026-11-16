@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
 use ol_adapters::steam::SwitchPreflight;
-use ol_adapters::{AccountRef, AdapterError};
+use ol_adapters::{AccountRef, AdapterError, GameRef};
 use ol_model::{
     Account, Ciphertext, Game, JobAccount, JobGame, JobState, JobStep, JobStepStatus,
     LaunchAttention, LaunchJob, LaunchPreflight, LaunchResult, SettingKey,
@@ -156,12 +156,17 @@ fn take_preflight(
     launchers: &Launchers,
     data_dir: &Path,
     account: &Account,
+    game: Option<&Game>,
 ) -> Result<SwitchPreflight, ServiceError> {
     let configs = launchers.configs(&store.settings()?, data_dir);
     let directory = launchers.directory(store, account.launcher);
+    let game = game.map(|game| GameRef {
+        launcher_game_id: &game.launcher_game_id,
+        name: &game.name,
+    });
     launchers
         .adapter(account.launcher, &configs, &directory)?
-        .preflight(&account_ref(account))
+        .preflight(&account_ref(account), game)
         .map_err(ServiceError::adapter(account.launcher))
 }
 
@@ -175,8 +180,8 @@ pub fn preflight(
     game_id: Option<&str>,
 ) -> Result<LaunchPreflight, ServiceError> {
     let account = accounts::require(store, account_id)?;
-    game_for(store, &account, game_id)?;
-    let taken = take_preflight(store, launchers, data_dir, &account)?;
+    let game = game_for(store, &account, game_id)?;
+    let taken = take_preflight(store, launchers, data_dir, &account, game.as_ref())?;
     let needs_confirmation = taken.launcher_running && !taken.already_active;
     let answer = LaunchPreflight {
         plan: taken.plan.clone(),
@@ -254,7 +259,7 @@ pub fn prepare(
         };
         let preflight = match reused {
             Some((age, preflight)) if !stale_for_direct(age, &preflight) => preflight,
-            _ => take_preflight(store, launchers, data_dir, &account)?,
+            _ => take_preflight(store, launchers, data_dir, &account, game.as_ref())?,
         };
         if preflight.launcher_running && !preflight.already_active {
             return Err(ServiceError::adapter(account.launcher)(
@@ -477,17 +482,19 @@ pub fn run(
 
     let launch = |sink: &mut JobSink<'_>,
                   adapter: &Adapter<'_>,
-                  game: &JobGame|
+                  game: &JobGame,
+                  started_by_switch: bool|
      -> Result<(), ServiceError> {
         sink.set_launch(JobStepStatus::Running);
         sink.publish();
-        let command = adapter
-            .launch_game(game, &cancel)
+        let launched = adapter
+            .launch_game(game, started_by_switch, &cancel)
             .map_err(ServiceError::adapter(launcher))?;
         if let Some(step) = &mut sink.launch_step {
-            step.detail = format!("Sent {command}");
+            step.detail = format!("Sent {}", launched.command);
         }
         sink.set_launch(JobStepStatus::Done);
+        sink.job.hand_off = launched.hand_off;
         Ok(())
     };
 
@@ -495,7 +502,7 @@ pub fn run(
         let adapter = launchers.adapter(launcher, &configs, &directory)?;
         if direct && let Some(game) = &game {
             sink.job.switched = true;
-            launch(&mut sink, &adapter, game)?;
+            launch(&mut sink, &adapter, game, false)?;
             touch_last_used = true;
             result = LaunchResult::Ok;
             sink.job.state = JobState::Done;
@@ -507,6 +514,10 @@ pub fn run(
         let options = SwitchOptions {
             confirm_close,
             cancel: &cancel,
+            game: game.as_ref().map(|game| GameRef {
+                launcher_game_id: &game.launcher_game_id,
+                name: &game.name,
+            }),
         };
         let switched = match run_switch(
             &adapter,
@@ -572,7 +583,9 @@ pub fn run(
                 touch_last_used = true;
                 return Ok(());
             }
-            launch(&mut sink, &adapter, game)?;
+            let started_by_switch =
+                switched.started_with_game.as_deref() == Some(game.launcher_game_id.as_str());
+            launch(&mut sink, &adapter, game, started_by_switch)?;
         }
         touch_last_used = true;
         result = LaunchResult::Ok;

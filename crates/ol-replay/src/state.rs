@@ -7,6 +7,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use ol_formats::battlenet::config::{parse_config, read_client_settings};
 use ol_formats::epic::session::read_session_from_ini;
+use ol_formats::riot::session::{SessionRead, read_session};
 use ol_formats::steam::loginusers::parse_login_users;
 use ol_model::{Ciphertext, LauncherId};
 use ol_platform_fake::{FakeRegistry, RegistryValue};
@@ -22,6 +23,12 @@ const STEAM_LOGIN_USERS: &str = "steam/config/loginusers.vdf";
 const EPIC_SETTINGS: &str =
     "localappdata/EpicGamesLauncher/Saved/Config/Windows/GameUserSettings.ini";
 const BATTLENET_CONFIG: &str = "appdata/Battle.net/Battle.net.config";
+const RIOT_SESSION: &str = "localappdata/Riot Games/Riot Client/Data/RiotGamesPrivateSettings.yaml";
+// What a scripted client stamps into a file it writes: the Riot Client's two token times are the time of the write.
+const STAMPS: [&str; 2] = [
+    "last_token_creation_time: ",
+    "original_token_creation_time: ",
+];
 
 pub struct Read {
     pub state: Value,
@@ -69,21 +76,73 @@ pub fn snapshot_ids(data_dir: &Path, launcher: LauncherId) -> Vec<String> {
     ids
 }
 
-fn sealed(value: ValueRef<'_>, vault: &dyn Vault) -> Value {
+// The ids and folders of a run, for the digest of a content once they are taken out of it.
+pub struct Projector<'a> {
+    ids: Vec<(String, String)>,
+    launchers_dir: &'a Path,
+    data_dir: &'a Path,
+}
+
+// A text with the digits after each stamp replaced, as the oracle masks what a scripted client stamps.
+fn without_stamps(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some((at, stamp)) = STAMPS
+        .iter()
+        .filter_map(|stamp| Some((rest.find(stamp)?, *stamp)))
+        .min()
+    {
+        let after = at + stamp.len();
+        let digits = rest[after..].bytes().take_while(u8::is_ascii_digit).count();
+        out.push_str(&rest[..after]);
+        if digits > 0 {
+            out.push_str("<ms>");
+        }
+        rest = &rest[after + digits..];
+    }
+    out.push_str(rest);
+    out
+}
+
+impl Projector<'_> {
+    fn text(&self, text: &str) -> String {
+        let mut out = text.to_owned();
+        for (id, alias) in &self.ids {
+            if !id.is_empty() {
+                out = out.replace(id.as_str(), alias);
+            }
+        }
+        let out = without_folder(&out, self.launchers_dir, "{launchers}");
+        without_folder(&out, self.data_dir, "{data}")
+    }
+
+    // The digest of a content with what a scripted client stamps, the two folders and the run's ids taken out: what two runs agree on where the bytes differ. Of bytes that are not text, the digest of the bytes.
+    fn projection(&self, bytes: &[u8]) -> String {
+        match std::str::from_utf8(bytes) {
+            Ok(text) => sha256_hex(self.text(&without_stamps(text)).as_bytes()),
+            Err(_) => sha256_hex(bytes),
+        }
+    }
+}
+
+fn sealed(value: ValueRef<'_>, vault: &dyn Vault, projector: &Projector<'_>) -> Value {
     let plain = match value {
-        ValueRef::Blob(bytes) => vault
-            .decrypt(&Ciphertext::new(bytes.to_vec()))
-            .ok()
-            .map(|secret| sha256_hex(secret.expose().as_bytes())),
+        ValueRef::Blob(bytes) => vault.decrypt(&Ciphertext::new(bytes.to_vec())).ok(),
         _ => None,
     };
-    json!({ "present": !matches!(value, ValueRef::Null), "plaintextSha256": plain })
+    let plain = plain.as_ref().map(|secret| secret.expose().as_bytes());
+    json!({
+        "present": !matches!(value, ValueRef::Null),
+        "plaintextSha256": plain.map(sha256_hex),
+        "projectionSha256": plain.map(|plain| projector.projection(plain)),
+    })
 }
 
 fn rows(
     database: &Connection,
     sql: &str,
     vault: &dyn Vault,
+    projector: &Projector<'_>,
 ) -> Result<Vec<Map<String, Value>>, ReplayError> {
     let mut statement = database.prepare(sql)?;
     let names: Vec<String> = statement.column_names().map(str::to_owned).collect();
@@ -94,7 +153,7 @@ fn rows(
         for (index, name) in names.iter().enumerate() {
             let value = row.get_ref(index)?;
             let shown = if name.ends_with("_enc") {
-                sealed(value, vault)
+                sealed(value, vault, projector)
             } else if name == "fingerprint" {
                 json!({ "sha256": value.as_str().unwrap_or_default() })
             } else {
@@ -113,10 +172,6 @@ fn rows(
     Ok(out)
 }
 
-fn text(row: &Map<String, Value>, column: &str) -> String {
-    row[column].as_str().unwrap_or_default().to_owned()
-}
-
 // The bytes a snapshot holds of a file, as they were in the launcher's own: a copy stored encrypted is the vault's ciphertext of the file in base64.
 fn original(folder: &Path, relative: &str, encrypted: bool, vault: &dyn Vault) -> Option<Vec<u8>> {
     if !encrypted {
@@ -127,7 +182,12 @@ fn original(folder: &Path, relative: &str, encrypted: bool, vault: &dyn Vault) -
     STANDARD.decode(opened.expose()).ok()
 }
 
-fn backups(data_dir: &Path, launcher: LauncherId, vault: &dyn Vault) -> Vec<Value> {
+fn backups(
+    data_dir: &Path,
+    launcher: LauncherId,
+    vault: &dyn Vault,
+    projector: &Projector<'_>,
+) -> Vec<Value> {
     snapshot_ids(data_dir, launcher)
         .into_iter()
         .filter_map(|id| {
@@ -147,7 +207,8 @@ fn backups(data_dir: &Path, launcher: LauncherId, vault: &dyn Vault) -> Vec<Valu
                         "existed": file["existed"],
                         "bytes": file["bytes"],
                         "encrypted": encrypted,
-                        "sha256": stored.map(|bytes| sha256_hex(&bytes)),
+                        "sha256": stored.as_deref().map(sha256_hex),
+                        "projectionSha256": stored.as_deref().map(|bytes| projector.projection(bytes)),
                     })
                 })
                 .collect();
@@ -236,6 +297,49 @@ fn epic_settings(launchers_dir: &Path) -> Option<Value> {
     }))
 }
 
+// The Riot Client's session file, and of the sign-in it holds only what the app's own reader says of it: whose it is and the digest of its token.
+fn riot_session(launchers_dir: &Path, projector: &Projector<'_>) -> Option<Value> {
+    let bytes = fs::read(launchers_dir.join(RIOT_SESSION)).ok()?;
+    let parsed = match read_session(&String::from_utf8_lossy(&bytes)) {
+        SessionRead::SignedOut => json!({ "kind": "signed-out" }),
+        SessionRead::Unexpected(reason) => {
+            json!({ "kind": "unexpected", "reason": reason.to_string() })
+        }
+        SessionRead::Session(session) => json!({
+            "kind": "session",
+            "session": {
+                "accountId": session.account_id,
+                "riotId": session.riot_id.map(|id| json!({
+                    "gameName": id.game_name,
+                    "tagLine": id.tag_line,
+                })),
+                "fingerprint": { "sha256": session.fingerprint },
+                "dpopBound": session.dpop_bound,
+                "writeCount": session.write_count,
+            },
+        }),
+    };
+    Some(json!({
+        "bytes": bytes.len(),
+        "sha256": sha256_hex(&bytes),
+        "projectionSha256": projector.projection(&bytes),
+        "parsed": parsed,
+    }))
+}
+
+// The id of every row of a table, with what names the row.
+fn named(database: &Connection, sql: &str) -> Result<Vec<Vec<String>>, ReplayError> {
+    let mut statement = database.prepare(sql)?;
+    let columns = statement.column_count();
+    let mut found = statement.query([])?;
+    let mut out = Vec::new();
+    while let Some(row) = found.next()? {
+        let texts = (0..columns).map(|at| row.get::<_, String>(at));
+        out.push(texts.collect::<Result<Vec<_>, _>>()?);
+    }
+    Ok(out)
+}
+
 // The final state, as the app left it once it had quit.
 pub fn read(
     data_dir: &Path,
@@ -248,7 +352,37 @@ pub fn read(
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
     let version: i64 = database.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-    let table = |sql: &str| rows(&database, sql, vault);
+    // Every id of the run comes first: the digest of a content is taken with them out of it.
+    let mut ids = Vec::new();
+    for account in named(&database, "SELECT id, launcher, login FROM accounts")? {
+        ids.push((
+            account[0].clone(),
+            format!("@acct:{}:{}", account[1], account[2]),
+        ));
+    }
+    for game in named(
+        &database,
+        "SELECT id, launcher, launcher_game_id FROM games",
+    )? {
+        ids.push((game[0].clone(), format!("@game:{}:{}", game[1], game[2])));
+    }
+    let launches = named(&database, "SELECT id FROM launch_history ORDER BY rowid")?;
+    for (index, launch) in launches.iter().enumerate() {
+        ids.push((launch[0].clone(), format!("@history:{}", index + 1)));
+    }
+    for launcher in LauncherId::ALL {
+        for (index, id) in snapshot_ids(data_dir, launcher).into_iter().enumerate() {
+            ids.push((id, format!("@backup:{}:{}", launcher.as_str(), index + 1)));
+        }
+    }
+    let mut by_length = ids.clone();
+    by_length.sort_by_key(|(id, _)| std::cmp::Reverse(id.len()));
+    let projector = Projector {
+        ids: by_length,
+        launchers_dir,
+        data_dir,
+    };
+    let table = |sql: &str| rows(&database, sql, vault, &projector);
     let accounts = table(
         "SELECT id, launcher, display_name, login, secret_enc, launcher_uid, tags, notes, last_used_at, created_at, updated_at
          FROM accounts ORDER BY launcher, login",
@@ -267,42 +401,15 @@ pub fn read(
          FROM launcher_sessions s JOIN accounts a ON a.id = s.account_id ORDER BY a.launcher, a.login",
     )?;
 
-    let mut ids = Vec::new();
-    for account in &accounts {
-        ids.push((
-            text(account, "id"),
-            format!(
-                "@acct:{}:{}",
-                text(account, "launcher"),
-                text(account, "login")
-            ),
-        ));
-    }
-    for game in &games {
-        ids.push((
-            text(game, "id"),
-            format!(
-                "@game:{}:{}",
-                text(game, "launcher"),
-                text(game, "launcher_game_id")
-            ),
-        ));
-    }
-    for (index, launch) in history.iter().enumerate() {
-        ids.push((text(launch, "id"), format!("@history:{}", index + 1)));
-    }
     let mut snapshots = Map::new();
     let copies = fs::read_dir(data_dir.join("backups").join("db"))
         .map(Iterator::count)
         .unwrap_or(0);
     snapshots.insert("db".to_owned(), json!({ "copies": copies }));
     for launcher in LauncherId::ALL {
-        for (index, id) in snapshot_ids(data_dir, launcher).into_iter().enumerate() {
-            ids.push((id, format!("@backup:{}:{}", launcher.as_str(), index + 1)));
-        }
         snapshots.insert(
             launcher.as_str().to_owned(),
-            backups(data_dir, launcher, vault).into(),
+            backups(data_dir, launcher, vault, &projector).into(),
         );
     }
 
@@ -319,6 +426,9 @@ pub fn read(
     }
     if let Some(file) = battlenet_config(launchers_dir) {
         launcher_files.insert(BATTLENET_CONFIG.to_owned(), file);
+    }
+    if let Some(file) = riot_session(launchers_dir, &projector) {
+        launcher_files.insert(RIOT_SESSION.to_owned(), file);
     }
     let as_values = |rows: Vec<Map<String, Value>>| -> Value {
         rows.into_iter()

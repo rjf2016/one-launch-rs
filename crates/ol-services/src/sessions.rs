@@ -6,6 +6,7 @@ use std::sync::mpsc::sync_channel;
 use ol_adapters::{AccountRef, AdapterError, Directory};
 use ol_formats::battlenet::session as battlenet;
 use ol_formats::epic::session::{fingerprint_of, parse_blob};
+use ol_formats::riot::session as riot;
 use ol_model::{Account, LauncherId, LauncherSession};
 use ol_platform_api::Clock;
 use ol_store::{NewSession, Store};
@@ -136,7 +137,11 @@ pub fn seed(
         LauncherId::Battlenet => battlenet::parse_blob(blob.expose())
             .map(|blob| battlenet::fingerprint_of(&blob.unified_auth.hex))
             .map_err(|error| adapter(failed(error)))?,
-        other => return Err(ServiceError::NotImplemented(other)),
+        LauncherId::Riot => riot::parse_blob(blob.expose())
+            .and_then(|blob| riot::session_of_blob(&blob))
+            .map(|session| session.fingerprint)
+            .map_err(|error| adapter(failed(error)))?,
+        LauncherId::Steam => return Err(ServiceError::NotImplemented(LauncherId::Steam)),
     };
     directory
         .save_session(&account.id, launcher_uid, &fingerprint, blob)

@@ -6,15 +6,16 @@ use std::sync::Arc;
 
 use ol_adapters::battlenet::{self, BattlenetAdapter, BattlenetConfig};
 use ol_adapters::epic::{self, EpicAdapter, EpicConfig};
+use ol_adapters::riot::{self, Launched, RiotAdapter, RiotConfig};
 use ol_adapters::steam::{self, SteamAdapter, SteamConfig, SwitchPreflight, Timing};
-use ol_adapters::{AccountRef, AdapterError, Directory};
+use ol_adapters::{AccountRef, AdapterError, Directory, GameRef};
 use ol_formats::battlenet::products::LaunchForm;
 use ol_formats::epic::manifests::LaunchUriForm;
 use ol_model::{
     Account, InstalledGame, JobGame, LauncherId, LauncherSessionState, LibraryScanResult,
     RememberedAccount, SettingKey, Settings, SwitchPlan,
 };
-use ol_platform_api::{CancelToken, Platform};
+use ol_platform_api::{CancelToken, Platform, RiotLocalLaunch};
 use ol_store::{Store, StoreError};
 use ol_vault::Vault;
 use thiserror::Error;
@@ -70,6 +71,31 @@ impl Default for BattlenetMachine {
     }
 }
 
+// Where the Riot Client keeps its files on this PC, how long a switch waits for it, and the way to its own local server.
+#[derive(Clone)]
+pub struct RiotMachine {
+    pub timing: riot::Timing,
+    pub default_dir: String,
+    // %LOCALAPPDATA% and %ProgramData%.
+    pub local_app_data: String,
+    pub program_data: String,
+    // Sends the client's local server the launch request its Play button sends. None on a machine that has no such way: Play is then left to the user.
+    pub local_launch: Option<Arc<dyn RiotLocalLaunch>>,
+}
+
+// As for Epic: the folders where Windows has them when it names none, until whoever builds the machine puts the real ones in.
+impl Default for RiotMachine {
+    fn default() -> Self {
+        Self {
+            timing: riot::Timing::default(),
+            default_dir: riot::DEFAULT_DIR.to_owned(),
+            local_app_data: r"C:\AppData\Local".to_owned(),
+            program_data: r"C:\ProgramData".to_owned(),
+            local_launch: None,
+        }
+    }
+}
+
 // The machine the adapters run on and the vault that keeps passwords and saved sign-ins. A build with fake launchers hands in fakes; nothing else in the app can tell.
 #[derive(Clone)]
 pub struct Launchers {
@@ -80,6 +106,7 @@ pub struct Launchers {
     pub steam_default_dir: String,
     pub epic: EpicMachine,
     pub battlenet: BattlenetMachine,
+    pub riot: RiotMachine,
 }
 
 // What the settings say to each launcher's adapter, read once for the call in hand.
@@ -88,6 +115,7 @@ pub struct Configs {
     pub steam: SteamConfig,
     pub epic: EpicConfig,
     pub battlenet: BattlenetConfig,
+    pub riot: RiotConfig,
 }
 
 impl Configs {
@@ -101,6 +129,7 @@ pub enum Adapter<'a> {
     Steam(SteamAdapter<'a>),
     Epic(EpicAdapter<'a>),
     Battlenet(BattlenetAdapter<'a>),
+    Riot(RiotAdapter<'a>),
 }
 
 impl Adapter<'_> {
@@ -109,6 +138,7 @@ impl Adapter<'_> {
             Self::Steam(_) => LauncherId::Steam,
             Self::Epic(_) => LauncherId::Epic,
             Self::Battlenet(_) => LauncherId::Battlenet,
+            Self::Riot(_) => LauncherId::Riot,
         }
     }
 
@@ -117,6 +147,7 @@ impl Adapter<'_> {
             Self::Steam(steam) => steam.list_installed_games(),
             Self::Epic(epic) => epic.list_installed_games(),
             Self::Battlenet(battlenet) => battlenet.list_installed_games(),
+            Self::Riot(riot) => riot.list_installed_games(),
         }
     }
 
@@ -125,14 +156,21 @@ impl Adapter<'_> {
             Self::Steam(steam) => steam.list_remembered_accounts(),
             Self::Epic(epic) => epic.list_remembered_accounts(),
             Self::Battlenet(battlenet) => battlenet.list_remembered_accounts(),
+            Self::Riot(riot) => riot.list_remembered_accounts(),
         }
     }
 
-    pub fn preflight(&self, account: &AccountRef) -> Result<SwitchPreflight, AdapterError> {
+    // `game` is the game a launch follows the switch with, which changes how Riot's client is started.
+    pub fn preflight(
+        &self,
+        account: &AccountRef,
+        game: Option<GameRef<'_>>,
+    ) -> Result<SwitchPreflight, AdapterError> {
         match self {
             Self::Steam(steam) => steam.preflight(account),
             Self::Epic(epic) => epic.preflight(account),
             Self::Battlenet(battlenet) => battlenet.preflight(account),
+            Self::Riot(riot) => riot.preflight(account, game),
         }
     }
 
@@ -141,21 +179,33 @@ impl Adapter<'_> {
             Self::Steam(steam) => steam.plan_switch(account),
             Self::Epic(epic) => epic.plan_switch(account),
             Self::Battlenet(battlenet) => battlenet.plan_switch(account),
+            Self::Riot(riot) => riot.plan_switch(account),
         }
     }
 
-    // Starts a game, with the right account signed in already. Returns what was sent. A launcher that is watched for the game's start stops watching when `cancel` is set.
+    // Starts a game, with the right account signed in already. Returns what was sent, and what is left for the user to do when the launcher only shows the game's page. A launcher that is watched for the game's start stops watching when `cancel` is set. `started_by_switch` says that the switch has just started the launcher for this game.
     pub fn launch_game(
         &self,
         game: &JobGame,
+        started_by_switch: bool,
         cancel: &CancelToken,
-    ) -> Result<String, AdapterError> {
+    ) -> Result<Launched, AdapterError> {
+        let sent = |command: String| Launched {
+            command,
+            hand_off: None,
+        };
         match self {
-            Self::Steam(steam) => steam.launch_game(&game.launcher_game_id),
-            Self::Epic(epic) => epic.launch_game(&game.launcher_game_id),
-            Self::Battlenet(battlenet) => {
-                battlenet.launch_game(&game.launcher_game_id, &game.name, cancel)
-            }
+            Self::Steam(steam) => steam.launch_game(&game.launcher_game_id).map(sent),
+            Self::Epic(epic) => epic.launch_game(&game.launcher_game_id).map(sent),
+            Self::Battlenet(battlenet) => battlenet
+                .launch_game(&game.launcher_game_id, &game.name, cancel)
+                .map(sent),
+            Self::Riot(riot) => riot.launch_game(
+                &game.launcher_game_id,
+                &game.name,
+                started_by_switch,
+                cancel,
+            ),
         }
     }
 
@@ -165,6 +215,7 @@ impl Adapter<'_> {
             Self::Steam(_) => None,
             Self::Epic(epic) => Some(epic.session_state()),
             Self::Battlenet(battlenet) => Some(battlenet.session_state()),
+            Self::Riot(riot) => Some(riot.session_state()),
         }
     }
 }
@@ -178,12 +229,12 @@ impl Launchers {
             steam_default_dir: steam::DEFAULT_DIR.to_owned(),
             epic: EpicMachine::default(),
             battlenet: BattlenetMachine::default(),
+            riot: RiotMachine::default(),
         }
     }
 
     // The launchers this build can scan, switch and start, in the order they are scanned.
-    pub const IMPLEMENTED: [LauncherId; 3] =
-        [LauncherId::Steam, LauncherId::Epic, LauncherId::Battlenet];
+    pub const IMPLEMENTED: [LauncherId; 4] = LauncherId::ALL;
 
     pub fn configs(&self, settings: &Settings, data_dir: &Path) -> Configs {
         let backups_to_keep = settings.get_int(SettingKey::BackupsKeep, DEFAULT_BACKUPS_TO_KEEP);
@@ -223,8 +274,18 @@ impl Launchers {
                     LaunchForm::Exec
                 },
                 backups_to_keep,
-                backups_dir,
+                backups_dir: backups_dir.clone(),
                 timing: self.battlenet.timing,
+            },
+            riot: RiotConfig {
+                chosen_dir: settings.get(SettingKey::RiotPath).map(str::to_owned),
+                default_dir: self.riot.default_dir.clone(),
+                local_app_data: self.riot.local_app_data.clone(),
+                program_data: self.riot.program_data.clone(),
+                press_play: settings.get_bool(SettingKey::RiotPressPlay, true),
+                backups_to_keep,
+                backups_dir,
+                timing: self.riot.timing,
             },
         }
     }
@@ -251,7 +312,12 @@ impl Launchers {
                 &configs.battlenet,
                 directory,
             ))),
-            other => Err(ServiceError::NotImplemented(other)),
+            LauncherId::Riot => Ok(Adapter::Riot(RiotAdapter::new(
+                &self.platform,
+                &configs.riot,
+                directory,
+                self.riot.local_launch.as_deref(),
+            ))),
         }
     }
 
