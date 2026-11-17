@@ -1574,38 +1574,42 @@ impl LibraryView {
         cx.notify();
     }
 
-    // While a thumb is held the pointer is followed wherever it goes, in the window or out of it, until the button is let go.
-    fn render_grab(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
-        self.grab?;
+    // While a thumb is held the pointer is followed wherever it goes, in the window or out of it, until the button is let go. The listeners stand in every frame: a button let go before the frame after the press would find none, and the thumb would stay held.
+    fn render_grab(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let this = cx.weak_entity();
-        Some(
-            canvas(
-                |_, _, _| {},
-                move |_, (), window, _| {
-                    let moved = this.clone();
-                    window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
-                        if phase == DispatchPhase::Capture {
-                            moved
-                                .update(cx, |this, cx| this.drag_thumb(event.position, cx))
-                                .ok();
-                        }
-                    });
-                    let released = this.clone();
-                    window.on_mouse_event(move |event: &MouseUpEvent, phase, _, cx| {
-                        if phase == DispatchPhase::Capture && event.button == MouseButton::Left {
-                            released
-                                .update(cx, |this, cx| {
-                                    this.grab = None;
-                                    cx.notify();
-                                })
-                                .ok();
-                        }
-                    });
-                },
-            )
-            .absolute()
-            .size_0(),
+        canvas(
+            |_, _, _| {},
+            move |_, (), window, _| {
+                let moved = this.clone();
+                window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
+                    if phase == DispatchPhase::Capture {
+                        moved
+                            .update(cx, |this, cx| {
+                                if event.dragging() {
+                                    this.drag_thumb(event.position, cx);
+                                } else {
+                                    this.let_go(cx);
+                                }
+                            })
+                            .ok();
+                    }
+                });
+                let released = this.clone();
+                window.on_mouse_event(move |event: &MouseUpEvent, phase, _, cx| {
+                    if phase == DispatchPhase::Capture && event.button == MouseButton::Left {
+                        released.update(cx, |this, cx| this.let_go(cx)).ok();
+                    }
+                });
+            },
         )
+        .absolute()
+        .size_0()
+    }
+
+    fn let_go(&mut self, cx: &mut Context<Self>) {
+        if self.grab.take().is_some() {
+            cx.notify();
+        }
     }
 }
 
@@ -1726,7 +1730,7 @@ impl Render for LibraryView {
             .flex_col()
             .child(self.render_header(grid.strip, window, cx))
             .child(body)
-            .children(self.render_grab(cx))
+            .child(self.render_grab(cx))
     }
 }
 
