@@ -136,10 +136,47 @@ fn fake_folder(_: &Args) -> Option<(&'static str, &Path)> {
 
 #[cfg(not(feature = "fake"))]
 fn start_backend(args: &Args) -> anyhow::Result<(Backend, Machine)> {
-    Ok((
-        Backend::start(args.data_dir.clone(), VERSION),
-        Machine::None,
-    ))
+    if !args.real_launchers {
+        return Ok((
+            Backend::start(args.data_dir.clone(), VERSION),
+            Machine::None,
+        ));
+    }
+    let backend = Backend::start_with(
+        args.data_dir.clone(),
+        VERSION,
+        real_launchers(&args.data_dir)?,
+        None,
+    );
+    Ok((backend, Machine::None))
+}
+
+// This PC behind the launchers. The Riot Client is given no way to its local server: Play is left to the user, as the hand-over says.
+#[cfg(not(feature = "fake"))]
+fn real_launchers(data_dir: &Path) -> anyhow::Result<ol_api::launchers::Launchers> {
+    use anyhow::Context as _;
+    use ol_platform_win::machine;
+
+    let mut launchers = ol_api::launchers::on_this_pc(machine::platform(), data_dir, &Dpapi)
+        .context("the vault of --data-dir could not be opened")?;
+    let folders = machine::folders();
+    if let Some(app_data) = folders.app_data {
+        launchers.battlenet.app_data = app_data;
+    }
+    if let Some(local_app_data) = folders.local_app_data {
+        launchers.epic.local_app_data.clone_from(&local_app_data);
+        launchers
+            .battlenet
+            .local_app_data
+            .clone_from(&local_app_data);
+        launchers.riot.local_app_data = local_app_data;
+    }
+    if let Some(program_data) = folders.program_data {
+        launchers.epic.program_data.clone_from(&program_data);
+        launchers.battlenet.program_data.clone_from(&program_data);
+        launchers.riot.program_data = program_data;
+    }
+    Ok(launchers)
 }
 
 #[cfg(feature = "fake")]

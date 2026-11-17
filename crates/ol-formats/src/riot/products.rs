@@ -92,12 +92,36 @@ pub fn image_key(name: &str) -> String {
     }
 }
 
-// The product one of these process names belongs to, with or without `.exe`.
+// A game started by its 8.3 path runs under the short name Windows made for it: the long name's first six characters without its spaces, `~` and a number (VALORA~1), or its first two, four hex digits, `~` and a number once five names shared the six. Narrower than `ol_platform_api::protected`, which shields any name that starts alike: here another program's short name would refuse every Riot switch.
+fn short_form(name: &str, long: &str) -> bool {
+    let long: Vec<u8> = image_key(long)
+        .bytes()
+        .filter(|byte| *byte != b' ')
+        .collect();
+    let Some((head, number)) = image_key(name)
+        .split_once('~')
+        .map(|(head, number)| (head.as_bytes().to_vec(), number.to_owned()))
+    else {
+        return false;
+    };
+    if long.len() <= 8 || number.is_empty() || !number.bytes().all(|byte| byte.is_ascii_digit()) {
+        return false;
+    }
+    let hashed =
+        head.len() == 6 && head[..2] == long[..2] && head[2..].iter().all(u8::is_ascii_hexdigit);
+    head == long[..6] || hashed
+}
+
+// The product one of these process names belongs to, with or without `.exe`, or under its short name.
 pub fn product_with_running_image<'n>(
     names: impl IntoIterator<Item = &'n str>,
 ) -> Option<&'static str> {
     let running: Vec<String> = names.into_iter().map(image_key).collect();
-    let runs = |image: &&str| running.contains(&image_key(image));
+    let runs = |image: &&str| {
+        running
+            .iter()
+            .any(|name| *name == image_key(image) || short_form(name, image))
+    };
     let found = PRODUCTS
         .iter()
         .find(|(_, info)| info.game_images.iter().any(runs));
@@ -333,6 +357,39 @@ mod tests {
         assert_eq!(product_display_name("bacon"), "Legends of Runeterra");
         assert_eq!(product_display_name("constructor"), "constructor");
         assert!(game_images_of("toString").is_empty());
+    }
+
+    #[test]
+    fn a_game_under_the_short_name_windows_made_for_it_counts_and_vanguard_does_not() {
+        assert_eq!(
+            product_with_running_image(["VALORA~1.EXE"]),
+            Some("valorant")
+        );
+        assert_eq!(
+            product_with_running_image(["explorer", "league~2"]),
+            Some("league_of_legends")
+        );
+        assert_eq!(product_with_running_image(["2XKO-W~1"]), Some("lion"));
+        assert_eq!(
+            product_with_running_image(["VA3F2A~1.EXE"]),
+            Some("valorant")
+        );
+        assert_eq!(
+            product_with_running_image(["VGTRAY~1.EXE", "riotcl~1", "valora~x", "steamw~1"]),
+            None
+        );
+        assert_eq!(
+            product_with_running_image([
+                "LENOVO~1.EXE",
+                "LOGITE~1.EXE",
+                "VAIOUP~1.EXE",
+                "2XTOOL~1.EXE",
+                "LOR~1.EXE",
+                "VALORA~1X.EXE",
+                "LEAG~1.EXE",
+            ]),
+            None
+        );
     }
 
     #[test]

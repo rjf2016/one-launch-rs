@@ -896,6 +896,17 @@ fn a_riot_game_is_known_by_its_image_name_alone_and_refuses_a_launch() {
 }
 
 #[test]
+fn a_riot_game_under_its_short_name_counts_as_running() {
+    let world = world();
+    let adapter = world.adapter();
+    world.processes.add_name_to_table("VGTRAY~1.EXE");
+    assert!(adapter.find_running_game(None).unwrap().is_none());
+    world.processes.add_name_to_table("VALORA~1.EXE");
+    let game = adapter.find_running_game(None).unwrap().expect("a game");
+    assert_eq!(game.launcher_game_id, "valorant.live");
+}
+
+#[test]
 fn a_process_list_that_cannot_be_read_refuses_the_plan_the_preflight_and_the_launch() {
     let world = world();
     world.processes.fail_listings(true);
