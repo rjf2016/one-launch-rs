@@ -5,10 +5,11 @@ use std::time::{Duration, Instant, SystemTime};
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, BoxShadow, ClickEvent, Context, Div, Entity, EventEmitter, FontWeight,
-    Keystroke, ObjectFit, Pixels, RenderImage, ScrollStrategy, SharedString, Stateful,
-    Subscription, Task, UniformListScrollHandle, Window, anchored, deferred, div, hsla, img,
-    linear_color_stop, linear_gradient, point, px, uniform_list,
+    AnyElement, App, BoxShadow, ClickEvent, Context, DispatchPhase, Div, Entity, EventEmitter,
+    FontWeight, Keystroke, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ObjectFit,
+    Pixels, Point, RenderImage, ScrollHandle, ScrollStrategy, SharedString, Size, Stateful,
+    Subscription, Task, UniformListScrollHandle, Window, anchored, canvas, deferred, div, hsla,
+    img, linear_color_stop, linear_gradient, point, px, uniform_list,
 };
 use ol_api::library::{LibraryGame, caption, monogram, relative, visible};
 use ol_api::{ApiError, Backend, Library};
@@ -17,6 +18,7 @@ use ol_ui_kit::TextField;
 use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::assets;
+use crate::follow::{Follow, follow};
 use crate::host::{JobSettled, LaunchHost};
 use crate::posters::{self, Lookup, Posters, Shape};
 use crate::shell::sidebar_width;
@@ -35,6 +37,11 @@ const CLOCK: Duration = Duration::from_secs(60);
 const RECENT: u32 = 8;
 // The strip with its heading and the gap under it.
 const RECENT_STRIP: f32 = 110.;
+const RECENT_CARD: f32 = 240.;
+const RECENT_GAP: f32 = 8.;
+const RECENT_FADE: f32 = 40.;
+const THUMB_LEAST: f32 = 32.;
+const THUMB_INSET: f32 = 3.;
 const FLASH_STAYS: Duration = Duration::from_secs(3);
 const ERROR_FLASH_STAYS: Duration = Duration::from_secs(6);
 
@@ -43,6 +50,8 @@ pub struct LibraryView {
     host: Entity<LaunchHost>,
     search: TextField,
     scroll: UniformListScrollHandle,
+    recent_scroll: ScrollHandle,
+    grab: Option<Grab>,
     posters: Posters,
     // Counts the lists of games shown: a poster decoded for an earlier list is not one of this list's.
     list: u64,
@@ -64,7 +73,28 @@ pub struct LibraryView {
     over_trigger: Option<Menu>,
     sweep: Option<Sweep>,
     sweep_report: Option<SweepReport>,
+    frames: Option<Vec<LibraryFrame>>,
     _subscriptions: [Subscription; 4],
+}
+
+// What a frame was drawn for and how its grid was laid out, for a capture to tell a layout that changes its mind from one drawn late.
+#[derive(Clone, Copy, Debug)]
+pub struct LibraryFrame {
+    pub at: Instant,
+    pub viewport: Size<Pixels>,
+    pub columns: usize,
+    pub card: f32,
+    pub gap: f32,
+    pub strip: f32,
+}
+
+impl LibraryFrame {
+    pub fn same_grid(&self, other: &Self) -> bool {
+        self.columns == other.columns
+            && self.card == other.card
+            && self.gap == other.gap
+            && self.strip == other.strip
+    }
 }
 
 enum Load {
@@ -103,6 +133,51 @@ enum Menu {
 struct OpenMenu {
     which: Menu,
     highlight: usize,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Axis {
+    Vertical,
+    Horizontal,
+}
+
+#[derive(Clone, Copy)]
+struct Grab {
+    axis: Axis,
+    pointer: f32,
+    scrolled: f32,
+    per_pixel: f32,
+}
+
+#[derive(Clone, Copy)]
+struct Track {
+    view: f32,
+    content: f32,
+}
+
+impl Track {
+    fn thumb(self) -> Option<f32> {
+        (self.view > 0. && self.content > self.view + 0.5).then(|| {
+            (self.view * self.view / self.content).clamp(THUMB_LEAST.min(self.view), self.view)
+        })
+    }
+
+    fn place(self, length: f32, offset: Pixels, max: Pixels) -> f32 {
+        let max = f32::from(max);
+        if max <= 0. {
+            return 0.;
+        }
+        (self.view - length) * (-f32::from(offset) / max).clamp(0., 1.)
+    }
+
+    fn per_pixel(self, length: f32) -> f32 {
+        let travel = self.view - length;
+        if travel <= 0. {
+            0.
+        } else {
+            (self.content - self.view) / travel
+        }
+    }
 }
 
 struct Sweep {
@@ -266,6 +341,8 @@ impl LibraryView {
             host,
             search,
             scroll: UniformListScrollHandle::new(),
+            recent_scroll: ScrollHandle::new(),
+            grab: None,
             posters: Posters::default(),
             list: 0,
             stale: Vec::new(),
@@ -285,6 +362,7 @@ impl LibraryView {
             over_trigger: None,
             sweep: None,
             sweep_report: None,
+            frames: None,
             _subscriptions: [search_changed, keys, host_changed, job_settled],
         }
     }
@@ -509,6 +587,14 @@ impl LibraryView {
         self.sweep_report.take()
     }
 
+    pub fn log_frames(&mut self) {
+        self.frames = Some(Vec::new());
+    }
+
+    pub fn take_frames(&mut self) -> Vec<LibraryFrame> {
+        self.frames.take().unwrap_or_default()
+    }
+
     fn await_frame(&self, window: &mut Window, cx: &mut Context<Self>) {
         let this = cx.weak_entity();
         window.on_next_frame(move |window, cx| {
@@ -544,16 +630,9 @@ impl LibraryView {
         self.search.focus(window, cx);
     }
 
-    pub fn scroll_to_row(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn scroll_to_row(&mut self, row: usize, cx: &mut Context<Self>) {
         self.scroll.scroll_to_item_strict(row, ScrollStrategy::Top);
         cx.notify();
-        // The list only moves when it is drawn. What is placed by how far it has moved, the Recent strip and the thumb, is drawn once more after that.
-        let this = cx.weak_entity();
-        window.on_next_frame(move |window, _| {
-            window.on_next_frame(move |_, cx| {
-                this.update(cx, |_, cx| cx.notify()).ok();
-            });
-        });
     }
 
     fn on_keystroke(
@@ -599,6 +678,7 @@ impl LibraryView {
             .borrow()
             .base_handle
             .set_offset(point(px(0.), px(0.)));
+        self.recent_scroll.set_offset(point(px(0.), px(0.)));
         cx.notify();
     }
 
@@ -1242,12 +1322,12 @@ impl LibraryView {
     fn render_recent(
         &mut self,
         shown: &[(usize, usize)],
+        track: Track,
         strip: f32,
         scale: f32,
         cx: &mut Context<Self>,
-    ) -> Div {
+    ) -> Follow {
         let now = SystemTime::now();
-        let scrolled = self.scroll.0.borrow().base_handle.offset().y;
         let mut cards = Vec::with_capacity(shown.len());
         for (entry, game) in shown.iter().copied() {
             let poster = self.poster(game, scale, cx);
@@ -1260,7 +1340,7 @@ impl LibraryView {
                     .flex_none()
                     .items_center()
                     .gap(px(12.))
-                    .w(px(240.))
+                    .w(px(RECENT_CARD))
                     .py(px(6.))
                     .pl(px(6.))
                     .pr(px(12.))
@@ -1317,9 +1397,72 @@ impl LibraryView {
                     ),
             );
         }
-        div()
+        // The offset is the one the wheel left, which may lie past either end until the strip is laid out.
+        let beyond = (track.content - track.view).max(0.);
+        let scrolled = (-f32::from(self.recent_scroll.offset().x)).clamp(0., beyond);
+        let fade = |angle: f32| {
+            div()
+                .absolute()
+                .top_0()
+                .bottom(px(SCROLLBAR))
+                .w(px(RECENT_FADE))
+                .bg(linear_gradient(
+                    angle,
+                    linear_color_stop(color(theme::BG), 0.),
+                    linear_color_stop(alpha(theme::BG, 0.), 1.),
+                ))
+        };
+        let thumb = track.thumb().map(|length| {
+            let per_pixel = track.per_pixel(length);
+            let thumb = div()
+                .absolute()
+                .left_0()
+                .bottom_0()
+                .w(px(length))
+                .h(px(SCROLLBAR))
+                .p(px(THUMB_INSET))
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(move |this, down: &MouseDownEvent, _, cx| {
+                        this.grab_thumb(Axis::Horizontal, down.position, per_pixel, cx);
+                        cx.stop_propagation();
+                    }),
+                )
+                .child(self.thumb_bar(Axis::Horizontal, "recent"));
+            follow(
+                &self.recent_scroll,
+                move |handle| {
+                    point(
+                        px(track.place(length, handle.offset().x, handle.max_offset().x)),
+                        px(0.),
+                    )
+                },
+                thumb,
+            )
+        });
+        let row = div()
+            .group("recent")
+            .relative()
+            .when(thumb.is_some(), |row| row.pb(px(SCROLLBAR)))
+            .child(
+                div()
+                    .id("recent-strip")
+                    .flex()
+                    .gap(px(RECENT_GAP))
+                    .pb(px(4.))
+                    .overflow_x_scroll()
+                    .restrict_scroll_to_axis()
+                    .track_scroll(&self.recent_scroll)
+                    .children(cards),
+            )
+            .when(scrolled > 1., |row| row.child(fade(90.).left_0()))
+            .when(scrolled < beyond - 1., |row| {
+                row.child(fade(270.).right_0())
+            })
+            .children(thumb);
+        let strip = div()
             .absolute()
-            .top(scrolled)
+            .top_0()
             .left_0()
             .right_0()
             .pl(px(PAGE_PADDING))
@@ -1337,35 +1480,131 @@ impl LibraryView {
                     .child(icon(assets::CLOCK, 14., theme::MUTED))
                     .child("RECENT"),
             )
-            .child(
-                div()
-                    .id("recent-strip")
-                    .flex()
-                    .gap(px(8.))
-                    .overflow_x_scroll()
-                    .restrict_scroll_to_axis()
-                    .children(cards),
-            )
+            .child(row);
+        follow(
+            &self.scroll.0.borrow().base_handle,
+            |handle| point(px(0.), handle.offset().y),
+            strip,
+        )
     }
 
-    fn render_thumb(&self, content: f32, view: f32) -> Option<Div> {
-        if content <= view || view <= 0. {
-            return None;
+    fn render_thumb(&self, track: Track, cx: &mut Context<Self>) -> Option<Follow> {
+        let length = track.thumb()?;
+        let per_pixel = track.per_pixel(length);
+        let thumb = div()
+            .absolute()
+            .top_0()
+            .right_0()
+            .w(px(SCROLLBAR))
+            .h(px(length))
+            .p(px(THUMB_INSET))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, down: &MouseDownEvent, _, cx| {
+                    this.grab_thumb(Axis::Vertical, down.position, per_pixel, cx);
+                    cx.stop_propagation();
+                }),
+            )
+            .child(self.thumb_bar(Axis::Vertical, "pane"));
+        Some(follow(
+            &self.scroll.0.borrow().base_handle,
+            move |handle| {
+                point(
+                    px(0.),
+                    px(track.place(length, handle.offset().y, handle.max_offset().y)),
+                )
+            },
+            thumb,
+        ))
+    }
+
+    fn thumb_bar(&self, axis: Axis, shown_over: &'static str) -> Div {
+        let held = self.grab.is_some_and(|grab| grab.axis == axis);
+        div()
+            .size_full()
+            .rounded_full()
+            .bg(color(theme::BORDER_STRONG))
+            .when(!held, |bar| {
+                bar.opacity(0.)
+                    .group_hover(shown_over, |style| style.opacity(1.))
+            })
+    }
+
+    fn grab_thumb(
+        &mut self,
+        axis: Axis,
+        pointer: Point<Pixels>,
+        per_pixel: f32,
+        cx: &mut Context<Self>,
+    ) {
+        let (pointer, offset) = match axis {
+            Axis::Vertical => (pointer.y, self.scroll.0.borrow().base_handle.offset().y),
+            Axis::Horizontal => (pointer.x, self.recent_scroll.offset().x),
+        };
+        self.grab = Some(Grab {
+            axis,
+            pointer: f32::from(pointer),
+            scrolled: -f32::from(offset),
+            per_pixel,
+        });
+        cx.notify();
+    }
+
+    // The element scrolled keeps the offset within its range when it is next laid out.
+    fn drag_thumb(&mut self, pointer: Point<Pixels>, cx: &mut Context<Self>) {
+        let Some(grab) = self.grab else {
+            return;
+        };
+        let along = match grab.axis {
+            Axis::Vertical => pointer.y,
+            Axis::Horizontal => pointer.x,
+        };
+        let scrolled = px(-(grab.scrolled + (f32::from(along) - grab.pointer) * grab.per_pixel));
+        match grab.axis {
+            Axis::Vertical => {
+                let state = self.scroll.0.borrow();
+                let offset = state.base_handle.offset();
+                state.base_handle.set_offset(point(offset.x, scrolled));
+            }
+            Axis::Horizontal => {
+                let offset = self.recent_scroll.offset();
+                self.recent_scroll.set_offset(point(scrolled, offset.y));
+            }
         }
-        let scrolled = -f32::from(self.scroll.0.borrow().base_handle.offset().y);
-        let length = (view * view / content).max(32.);
-        let top = (view - length) * (scrolled / (content - view)).clamp(0., 1.);
+        cx.notify();
+    }
+
+    // While a thumb is held the pointer is followed wherever it goes, in the window or out of it, until the button is let go.
+    fn render_grab(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+        self.grab?;
+        let this = cx.weak_entity();
         Some(
-            div()
-                .absolute()
-                .top(px(top + 3.))
-                .right(px(3.))
-                .w(px(6.))
-                .h(px(length - 6.))
-                .rounded_full()
-                .bg(color(theme::BORDER_STRONG))
-                .opacity(0.)
-                .group_hover("pane", |style| style.opacity(1.)),
+            canvas(
+                |_, _, _| {},
+                move |_, (), window, _| {
+                    let moved = this.clone();
+                    window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
+                        if phase == DispatchPhase::Capture {
+                            moved
+                                .update(cx, |this, cx| this.drag_thumb(event.position, cx))
+                                .ok();
+                        }
+                    });
+                    let released = this.clone();
+                    window.on_mouse_event(move |event: &MouseUpEvent, phase, _, cx| {
+                        if phase == DispatchPhase::Capture && event.button == MouseButton::Left {
+                            released
+                                .update(cx, |this, cx| {
+                                    this.grab = None;
+                                    cx.notify();
+                                })
+                                .ok();
+                        }
+                    });
+                },
+            )
+            .absolute()
+            .size_0(),
         )
     }
 }
@@ -1394,15 +1633,40 @@ impl Render for LibraryView {
         let banner = self.host.read(cx).banner_height();
         let pane = (f32::from(viewport.height) - TITLE_BAR - banner - HEADER).max(0.);
         let recent = self.recent_shown();
-        let above = if recent.is_empty() { 0. } else { RECENT_STRIP };
-        let grid = Grid::for_pane(
-            viewport.width - sidebar_width(viewport.width),
-            viewport.width,
-            pane - above,
-            self.shown.len(),
-        );
+        let pane_width = viewport.width - sidebar_width(viewport.width);
+        let launches = recent.len() as f32;
+        let recent_track = |strip: f32| Track {
+            view: (f32::from(pane_width) - 2. * PAGE_PADDING - strip).max(0.),
+            content: launches * RECENT_CARD + (launches - 1.).max(0.) * RECENT_GAP,
+        };
+        // As in the Electron app, a strip that scrolls sideways takes room for its scrollbar under it, and the pane's own scrollbar can be what makes it scroll.
+        let above = |strip: f32| match recent_track(strip).thumb() {
+            _ if recent.is_empty() => 0.,
+            Some(_) => RECENT_STRIP + SCROLLBAR,
+            None => RECENT_STRIP,
+        };
+        let lay_out = |strip: f32| {
+            let room = above(strip);
+            let grid = Grid::for_pane(pane_width, viewport.width, pane - room, self.shown.len());
+            (grid, room)
+        };
+        let (grid, above) = match lay_out(0.) {
+            (grid, room) if grid.strip > 0. && above(grid.strip) != room => lay_out(grid.strip),
+            laid_out => laid_out,
+        };
+        let recent_track = recent_track(grid.strip);
         let rows = self.shown.len().div_ceil(grid.columns);
         let scale = window.scale_factor();
+        if let Some(frames) = self.frames.as_mut() {
+            frames.push(LibraryFrame {
+                at: Instant::now(),
+                viewport,
+                columns: grid.columns,
+                card: f32::from(grid.card),
+                gap: f32::from(grid.gap),
+                strip: grid.strip,
+            });
+        }
 
         self.posters.tick();
         let on_screen = (pane / f32::from(grid.row_height())).ceil() as usize + 1;
@@ -1412,7 +1676,14 @@ impl Render for LibraryView {
         }
 
         let strip = (above > 0. && rows > 0 && matches!(self.load, Load::Ready))
-            .then(|| self.render_recent(&recent, grid.strip, scale, cx));
+            .then(|| self.render_recent(&recent, recent_track, grid.strip, scale, cx));
+        let thumb = self.render_thumb(
+            Track {
+                view: pane,
+                content: grid.height_of(self.shown.len()) + above,
+            },
+            cx,
+        );
         let body = match &self.load {
             Load::Pending => div().flex_1(),
             Load::Failed(message) => div()
@@ -1437,11 +1708,16 @@ impl Render for LibraryView {
                         }),
                     )
                     .track_scroll(&self.scroll)
+                    // Shift and the wheel scroll the Recent strip sideways; without this the grid would take them as a vertical scroll too.
+                    .map(|mut list| {
+                        list.style().restrict_scroll_to_axis = Some(true);
+                        list
+                    })
                     .size_full()
                     .pt(px(above)),
                 )
                 .children(strip)
-                .children(self.render_thumb(grid.height_of(self.shown.len()) + above, pane)),
+                .children(thumb),
         };
 
         div()
@@ -1450,6 +1726,7 @@ impl Render for LibraryView {
             .flex_col()
             .child(self.render_header(grid.strip, window, cx))
             .child(body)
+            .children(self.render_grab(cx))
     }
 }
 
