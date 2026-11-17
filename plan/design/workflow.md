@@ -146,7 +146,7 @@ Stop and ask the owner when:
 | UI scenarios bypass the UI | State-changing API passthrough disabled in UI scenarios |
 | Compounding architecture errors | Crate graph and public-API snapshot in CI; capability tokens; audits |
 | CI weakened to get green | Required checks pinned; one aggregate job; the token cannot push workflow files |
-| Hooks silently absent | Hooks in a committed `.claude/settings.json`; CI repeats every hook check |
+| Hooks silently absent | Each hook refuses when its script is missing or fails to load. CI repeats the secret scan on the tree at the head of a pull request only. What an earlier commit of the branch held and a later one removed is scanned only where the hooks run, before the commit. The hooks are in `.claude/` on the owner's PC, which git ignores: a clone elsewhere has none, and a commit made there is scanned by nothing until CI reads the head |
 
 ## CLAUDE.md outline (Milestone 1)
 

@@ -13,7 +13,8 @@ Decided by the owner on 2026-11-15. This page is the plan. It replaces the miles
 ## How 3 and 4 are kept
 
 - The standing rules in `CLAUDE.md`.
-- The safety hooks in `.claude/`: an agent's command is read before it runs; the real data folder, real launchers and the app's key are refused; what a commit would hold is scanned before the commit.
+- The safety hooks: an agent's command is read before it runs; the real data folder, real launchers and the app's key are refused; what a commit would hold is scanned before the commit.
+- `CLAUDE.md`, the hooks in `.claude/` and the wrappers in `scripts/agent/` are in the main checkout on the owner's PC, where the agents run. Git ignores them, so the repository and a worktree do not hold them.
 - CI scans every pull request for secrets, addresses and profile paths, and `cargo deny` holds the dependency list.
 - An agent never opens the real data folder, nor a copy of it. Development runs on `oracle/fixtures/` and on scratch folders with fake launchers. When a slice has to be tried on real data, the owner runs the build on a copy of their own folder.
 - A development build refuses to start without `--data-dir=<folder>`.
