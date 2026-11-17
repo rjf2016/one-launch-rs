@@ -38,11 +38,13 @@ struct State {
 }
 
 type StartListener = Arc<dyn Fn(&str, &[String]) + Send + Sync>;
+type LookHook = Arc<dyn Fn() + Send + Sync>;
 
 // A process table in memory. Starting a program marks its image as running; starting one with -shutdown makes it go after a few looks; a kill ends it at once.
 pub struct FakeProcesses {
     state: Mutex<State>,
     listeners: Mutex<Vec<StartListener>>,
+    looks: Mutex<Vec<LookHook>>,
     log: OpLog,
 }
 
@@ -74,8 +76,41 @@ impl FakeProcesses {
                 listing_fails: false,
             }),
             listeners: Mutex::new(Vec::new()),
+            looks: Mutex::new(Vec::new()),
             log,
         }
+    }
+
+    // Runs before every look at the processes, so a simulator can end what has had its time, such as a game the user quits, even while nothing sleeps.
+    pub fn on_look(&self, hook: impl Fn() + Send + Sync + 'static) {
+        self.looks
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(Arc::new(hook));
+    }
+
+    fn looked_at(&self) {
+        let hooks = self
+            .looks
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        for hook in hooks {
+            hook();
+        }
+    }
+
+    // Whether the image runs, without counting as a look.
+    pub fn runs(&self, image: &str) -> bool {
+        self.state().running.contains(&image.to_lowercase())
+    }
+
+    // A program of the table quits: it is listed no more.
+    pub fn remove_from_table(&self, name: &str) {
+        let mut state = self.state();
+        state
+            .table
+            .retain(|process| !process.name.eq_ignore_ascii_case(name));
     }
 
     // Hears of every start, as the launcher itself would: a simulator hangs its reactions here.
@@ -156,6 +191,7 @@ impl FakeProcesses {
 
 impl ProcessLister for FakeProcesses {
     fn is_running(&self, image: &str) -> Result<bool, ProcessError> {
+        self.looked_at();
         let image = image.to_lowercase();
         let mut state = self.state();
         if let Some((pending, polls)) = &mut state.pending_shutdown
@@ -188,6 +224,7 @@ impl ProcessLister for FakeProcesses {
     }
 
     fn list_processes(&self) -> Result<Vec<ProcessInfo>, ProcessError> {
+        self.looked_at();
         let state = self.state();
         if state.listing_fails {
             return Err(listing_refused());
@@ -197,6 +234,7 @@ impl ProcessLister for FakeProcesses {
 
     // Both views of the fake machine, as on a real one: the images that run, and the table.
     fn running_names(&self) -> Result<Vec<String>, ProcessError> {
+        self.looked_at();
         let mut state = self.state();
         if state.listing_fails {
             return Err(listing_refused());

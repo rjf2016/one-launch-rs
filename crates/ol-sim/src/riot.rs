@@ -78,6 +78,8 @@ pub struct RiotKnobs {
     pub direct_launch: bool,
     // The client refuses the launch request its Play button sends.
     pub press_play_fails: bool,
+    // The simulated user quits a game this long after its start. Without it the game runs until a test ends it.
+    pub game_quits_after_ms: Option<u64>,
 }
 
 impl Default for RiotKnobs {
@@ -94,6 +96,7 @@ impl Default for RiotKnobs {
             updates_pending: Vec::new(),
             direct_launch: false,
             press_play_fails: false,
+            game_quits_after_ms: None,
         }
     }
 }
@@ -120,6 +123,8 @@ struct State {
     signed_in: bool,
     // How often the client was closed: what was scheduled for a run that has been closed since does nothing.
     closes: u32,
+    // The games the user will quit, by image, each with the time they quit it.
+    quits: Vec<(String, OffsetDateTime)>,
 }
 
 pub struct RiotSim {
@@ -357,6 +362,7 @@ impl RiotSim {
                 core_running: false,
                 signed_in: false,
                 closes: 0,
+                quits: Vec::new(),
             }),
         });
         if let Some(uid) = &sim.knobs.running_as {
@@ -377,7 +383,33 @@ impl RiotSim {
         }
         let hears = Arc::clone(&sim);
         processes.on_start(move |exe, args| hears.on_start(exe, args));
+        let plays = Arc::clone(&sim);
+        processes.on_look(move || plays.games_quit_when_due());
         sim
+    }
+
+    fn games_quit_when_due(&self) {
+        let now = self.clock.now();
+        let due: Vec<String> = {
+            let mut state = self.state();
+            let (due, later) = std::mem::take(&mut state.quits)
+                .into_iter()
+                .partition(|(_, at)| *at <= now);
+            state.quits = later;
+            due.into_iter().map(|(image, _)| image).collect()
+        };
+        for image in due {
+            self.quit_game(&image);
+        }
+    }
+
+    // Stands in for the user quitting a game: its process goes.
+    fn quit_game(&self, image: &str) {
+        self.state()
+            .quits
+            .retain(|(quitting, _)| !quitting.eq_ignore_ascii_case(image));
+        self.processes.set_running(image, false);
+        self.processes.remove_from_table(image);
     }
 
     fn write(file: &Path, bytes: &[u8]) {
@@ -662,6 +694,12 @@ impl RiotSim {
         if let Some(image) = game_images_of(launch.product()).first() {
             self.processes.set_running(image, true);
             self.processes.add_name_to_table(image);
+            if let Some(after) = self.knobs.game_quits_after_ms {
+                let at = self.clock.now() + Duration::from_millis(after);
+                let mut state = self.state();
+                state.quits.retain(|(quitting, _)| quitting != image);
+                state.quits.push(((*image).to_owned(), at));
+            }
         }
         vec![
             self.line(

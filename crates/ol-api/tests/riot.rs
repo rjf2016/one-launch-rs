@@ -1307,6 +1307,70 @@ fn a_running_client_is_closed_by_its_windows_once_the_user_has_said_yes() {
 }
 
 #[test]
+fn a_game_still_running_refuses_the_next_launch_and_once_the_user_has_quit_it_it_starts_again() {
+    let knobs = json!({ "knobs": { "riot": { "gameQuitsAfterMs": 60_000 } } });
+    let fakes = fakes(Some(&knobs));
+    let (main, alt, game) = (fakes.account(MAIN), fakes.account(ALT), fakes.game());
+    let pressed = "(One Launch pressed Play and the Riot Client started the game)";
+    let first = fakes.play(MAIN);
+    assert!(detail(first.last().unwrap(), "launch").ends_with(&format!(
+        "(the switch started the client with these arguments; {}",
+        &pressed[1..]
+    )));
+
+    let asked = asked_of_the_machine(&fakes);
+    let running = "Riot Games: VALORANT is running. Close it, then switch: One Launch never closes a Riot game.";
+    for (account, login) in [(&main, MAIN), (&alt, ALT)] {
+        let preflight = fakes.backend.launch_preflight(&account.id, Some(&game.id));
+        assert_eq!(
+            refusal(block_on(preflight)),
+            ("GAME_RUNNING", running.to_owned())
+        );
+        assert_eq!(
+            refusal(fakes.play_with(login, false)),
+            ("GAME_RUNNING", running.to_owned())
+        );
+        let confirmed = fakes.play_with(login, true).unwrap();
+        let last = confirmed.last().unwrap();
+        assert!(last.state == JobState::Failed && !last.switched);
+        assert_eq!(last.error.as_deref(), Some(running));
+    }
+    assert_eq!(asked_of_the_machine(&fakes), asked);
+
+    let cancel = ol_platform_api::CancelToken::new();
+    let quits = || {
+        fakes
+            .fake
+            .platform
+            .clock
+            .sleep(std::time::Duration::from_secs(60), &cancel);
+    };
+    quits();
+    let again = fakes.play(MAIN);
+    let last = again.last().unwrap();
+    assert!(
+        last.state == JobState::Done && last.direct,
+        "{:?}",
+        last.error
+    );
+    assert!(detail(last, "launch").ends_with(pressed));
+
+    quits();
+    let other = fakes.play_with(ALT, true).unwrap();
+    let last = other.last().unwrap();
+    assert!(
+        last.state == JobState::Done && last.switched,
+        "{:?}",
+        last.error
+    );
+    assert!(detail(last, "launch").ends_with(&format!(
+        "(the switch started the client with these arguments; {}",
+        &pressed[1..]
+    )));
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn a_client_that_runs_as_the_account_is_left_alone_and_the_game_is_handed_to_it() {
     let knobs = json!({ "knobs": { "riot": { "runningAs": MAIN_UID } } });
     let fakes = fakes(Some(&knobs));

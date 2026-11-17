@@ -8,8 +8,9 @@ use std::time::Duration;
 use ol_formats::battlenet::config::{parse_config, plan_saved_account_names, read_client_settings};
 use ol_formats::battlenet::products::PRODUCTS;
 use ol_formats::js_json::{JsString, JsValue, stringify};
-use ol_platform_api::{Hive, RegistryData, RegistryReader};
+use ol_platform_api::{Clock, Hive, RegistryData, RegistryReader};
 use ol_platform_fake::{CLOSE_ARGUMENT, FakeClock, FakeProcesses, FakeRegistry, RegistryValue};
+use time::OffsetDateTime;
 
 // Where a Battle.net client keeps what the app reads. The simulator has its own copy of these names: it stands in for the client, not for the app's idea of the client.
 const EXE: &str = "Battle.net.exe";
@@ -50,6 +51,8 @@ pub struct BattlenetKnobs {
     pub updates_pending: Vec<String>,
     // Codenames whose game runs already, outside the client: every start of the client logs it running, and a launch command for one only shows its page.
     pub games_running: Vec<String>,
+    // The simulated user quits a game the client started this long after its start. Without it the game runs until a test ends it.
+    pub game_quits_after_ms: Option<u64>,
 }
 
 // The scenario's stand-ins for %APPDATA%, %LOCALAPPDATA% and %ProgramData%, and the folder its games are installed under.
@@ -78,6 +81,8 @@ struct State {
     tokens: u32,
     // How many times the client was closed: what it was about to do in a run that has been closed since is not done.
     closes: u32,
+    // The games that run, by codename, each with the time the user quits it, if ever.
+    games: Vec<(String, Option<OffsetDateTime>)>,
 }
 
 pub struct BattlenetSim {
@@ -85,6 +90,7 @@ pub struct BattlenetSim {
     logins: HashMap<String, String>,
     config_path: PathBuf,
     logs_dir: PathBuf,
+    games_dir: String,
     registry: Arc<FakeRegistry>,
     processes: Arc<FakeProcesses>,
     clock: Arc<FakeClock>,
@@ -179,18 +185,16 @@ impl BattlenetSim {
                 runs: Self::last_run(&logs_dir),
                 tokens: 0,
                 closes: 0,
+                games: Vec::new(),
             }),
             logs_dir,
+            games_dir: folders.games.to_owned(),
             registry,
             processes: Arc::clone(processes),
             clock,
         });
         for codename in &sim.knobs.games_running {
-            let image = format!("{}.exe", product_name(codename));
-            let program: PathBuf = [folders.games, &product_name(codename), "_retail_", &image]
-                .iter()
-                .collect();
-            processes.add_to_table(&image, &program.to_string_lossy());
+            sim.game_runs(codename, None);
         }
         // The simulator owns every log: one laid down by a scenario would sort after its own and hide them. This is the run of the account the client's token belongs to, older than that of a client already running.
         if let Some(uid) = &script.on_disk {
@@ -213,7 +217,76 @@ impl BattlenetSim {
         }
         let hears = Arc::clone(&sim);
         processes.on_start(move |exe, args| hears.on_start(exe, args));
+        let plays = Arc::clone(&sim);
+        processes.on_look(move || plays.games_quit_when_due());
         sim
+    }
+
+    fn game_image(codename: &str) -> String {
+        format!("{}.exe", product_name(codename))
+    }
+
+    // A game's process appears under its folder, and every start of the client from now on logs it running.
+    fn game_runs(&self, codename: &str, quits_at: Option<OffsetDateTime>) {
+        let image = Self::game_image(codename);
+        let name = product_name(codename);
+        let program: PathBuf = [self.games_dir.as_str(), &name, "_retail_", &image]
+            .iter()
+            .collect();
+        self.processes
+            .add_to_table(&image, &program.to_string_lossy());
+        let mut state = self.state();
+        state.games.retain(|(running, _)| running != codename);
+        state.games.push((codename.to_owned(), quits_at));
+    }
+
+    fn game_is_running(&self, codename: &str) -> bool {
+        let state = self.state();
+        state.games.iter().any(|(running, _)| running == codename)
+    }
+
+    fn games_quit_when_due(&self) {
+        let now = self.clock.now();
+        let due: Vec<String> = {
+            let state = self.state();
+            let ended = |(_, quits_at): &&(String, Option<OffsetDateTime>)| {
+                quits_at.is_some_and(|at| at <= now)
+            };
+            state
+                .games
+                .iter()
+                .filter(ended)
+                .map(|(codename, _)| codename.clone())
+                .collect()
+        };
+        for codename in due {
+            self.quit_game(&codename);
+        }
+    }
+
+    // Stands in for the user quitting a game: its process goes, and a running client logs the end.
+    fn quit_game(&self, codename: &str) {
+        let was_running = {
+            let mut state = self.state();
+            let before = state.games.len();
+            state.games.retain(|(running, _)| running != codename);
+            state.games.len() != before
+        };
+        if !was_running {
+            return;
+        }
+        self.processes
+            .remove_from_table(&Self::game_image(codename));
+        if self.processes.runs(EXE) && self.newest_log().is_some() {
+            self.append_log(&[
+                format!(
+                    "D 2026-09-13 04:40:00.000000 [InstallInfo] {{Main}} Operation status changed: opType=Execute oldStatus=On newStatus=Off agentUid={codename}"
+                ),
+                format!(
+                    "D 2026-09-13 04:40:00.000100 [ProductState] {{Main}} InstallState ({codename}): gameRunning=0 isGameProcessRunning=0"
+                ),
+            ]);
+        }
     }
 
     // The logs stay when the fake machine is built again, so a new run is numbered after the last one there.
@@ -349,8 +422,8 @@ impl BattlenetSim {
         Self::write(&file, format!("{}\r\n", lines.join("\r\n")).as_bytes());
     }
 
-    fn append_log(&self, lines: &[String]) {
-        let newest = fs::read_dir(&self.logs_dir)
+    fn newest_log(&self) -> Option<String> {
+        fs::read_dir(&self.logs_dir)
             .map(|entries| {
                 entries
                     .flatten()
@@ -360,6 +433,11 @@ impl BattlenetSim {
             })
             .ok()
             .flatten()
+    }
+
+    fn append_log(&self, lines: &[String]) {
+        let newest = self
+            .newest_log()
             .expect("the simulated client has a log to add to");
         let written = fs::OpenOptions::new()
             .append(true)
@@ -389,8 +467,13 @@ impl BattlenetSim {
 
     // What a starting client logs for a game it finds running, a few seconds after its install states.
     fn running_game_lines(&self) -> Vec<String> {
-        self.knobs
-            .games_running
+        let running: Vec<String> = self
+            .state()
+            .games
+            .iter()
+            .map(|(codename, _)| codename.clone())
+            .collect();
+        running
             .iter()
             .flat_map(|codename| {
                 [
@@ -425,14 +508,24 @@ impl BattlenetSim {
             .iter()
             .find(|product| product.1.eq_ignore_ascii_case(program_code))
             .map(|product| product.0);
-        let held = |list: &[String], codename: &str| list.iter().any(|held| held == codename);
+        let pending = |codename: &str| {
+            self.knobs
+                .updates_pending
+                .iter()
+                .any(|held| held == codename)
+        };
         let Some(codename) = codename.filter(|codename| {
             KNOWN_PRODUCTS.contains(codename)
-                && !held(&self.knobs.updates_pending, codename)
-                && !held(&self.knobs.games_running, codename)
+                && !pending(codename)
+                && !self.game_is_running(codename)
         }) else {
             return lines;
         };
+        let quits_at = self
+            .knobs
+            .game_quits_after_ms
+            .map(|after| self.clock.now() + Duration::from_millis(after));
+        self.game_runs(codename, quits_at);
         let exe = product_name(codename);
         lines.extend([
             format!(
