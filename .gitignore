@@ -1,5 +1,5 @@
 target/
-.claude/worktrees/
+.claude/
 *.pem
 *.local.*
 .DS_Store

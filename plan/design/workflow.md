@@ -146,7 +146,7 @@ Stop and ask the owner when:
 | UI scenarios bypass the UI | State-changing API passthrough disabled in UI scenarios |
 | Compounding architecture errors | Crate graph and public-API snapshot in CI; capability tokens; audits |
 | CI weakened to get green | Required checks pinned; one aggregate job; the token cannot push workflow files |
-| Hooks silently absent | Hooks in a committed `.claude/settings.json`; CI repeats every hook check |
+| Hooks silently absent | Each hook refuses when its script is missing or fails to load; CI repeats the secret scan. The hooks are in `.claude/` on the owner's PC only, which git ignores: a clone elsewhere has none |
 
 ## CLAUDE.md outline (Milestone 1)
 
