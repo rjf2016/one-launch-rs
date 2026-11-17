@@ -399,12 +399,18 @@ impl RiotSim {
             due.into_iter().map(|(image, _)| image).collect()
         };
         for image in due {
-            self.quit_game(&image);
+            self.quit_image(&image);
         }
     }
 
-    // Stands in for the user quitting a game: its process goes.
-    fn quit_game(&self, image: &str) {
+    // Stands in for the user quitting a product's game, such as "valorant": its process goes from the running images and the table alike.
+    pub fn quit_game(&self, product: &str) {
+        for image in game_images_of(product) {
+            self.quit_image(image);
+        }
+    }
+
+    fn quit_image(&self, image: &str) {
         self.state()
             .quits
             .retain(|(quitting, _)| !quitting.eq_ignore_ascii_case(image));

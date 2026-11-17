@@ -804,15 +804,23 @@ mod tests {
         assert!(fs::read(dir.join(r"appdata\Battle.net\Battle.net.config")).unwrap() == config);
     }
 
-    // In the window nothing sleeps on the fake clock between two presses of Play: the game has to be gone at the next look all the same.
-    #[test]
-    fn a_game_a_watched_client_started_quits_by_itself_and_the_client_logs_its_end() {
-        let knobs = serde_json::json!({ "knobs": {
-            "battlenet": { "runningAs": "0a1b2c3d", "gameQuitsAfterMs": 50 },
-            "riot": { "runningAs": "11111111-1111-4111-8111-111111111111", "gameQuitsAfterMs": 50 },
+    const GAME_ENDED: &str = "opType=Execute oldStatus=On newStatus=Off agentUid=prometheus";
+
+    fn games_knobs(quits_after_ms: Option<u64>) -> Value {
+        let mut knobs = serde_json::json!({ "knobs": {
+            "battlenet": { "runningAs": "0a1b2c3d" },
+            "riot": { "runningAs": "11111111-1111-4111-8111-111111111111" },
         } });
-        let (scratch, dir) = battlenet_scenario("sim-quits", &knobs);
-        let fake = materialize_in_real_time(&dir, &scratch.join("data")).unwrap();
+        if let Some(after) = quits_after_ms {
+            for launcher in ["battlenet", "riot"] {
+                knobs["knobs"][launcher]["gameQuitsAfterMs"] = after.into();
+            }
+        }
+        knobs
+    }
+
+    // Overwatch through the running Battle.net client's launch command, and VALORANT through Play on the running Riot Client.
+    fn play_both(fake: &FakeLaunchers, dir: &Path) {
         let exe = dir.join("battlenet").join(BATTLENET_EXE);
         let exe = exe.to_string_lossy().into_owned();
         let command = ol_platform_api::ProcessArg::Plain("--exec=launch Pro");
@@ -822,23 +830,75 @@ mod tests {
             .unwrap()
             .press_play("valorant.live")
             .unwrap();
-        let processes = &fake.platform.processes;
-        let names = processes.running_names().unwrap();
-        assert!(names.contains(&"overwatch.exe".to_owned()));
-        assert!(names.contains(&"valorant.exe".to_owned()));
+    }
+
+    // Whether Overwatch and VALORANT are listed, as one look at the processes sees them.
+    fn games_listed(fake: &FakeLaunchers) -> (bool, bool) {
+        let names = fake.platform.processes.running_names().unwrap();
+        let listed = |image: &str| names.iter().any(|name| name == image);
+        (listed("overwatch.exe"), listed("valorant.exe"))
+    }
+
+    #[test]
+    fn a_game_runs_until_its_time_and_is_gone_at_the_first_look_after_it_and_the_client_logs_its_end()
+     {
+        let (scratch, dir) = battlenet_scenario("sim-quits", &games_knobs(Some(1_000)));
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        play_both(&fake, &dir);
+        let clock = &fake.platform.clock;
+        let cancel = ol_platform_api::CancelToken::new();
+        clock.sleep(std::time::Duration::from_millis(999), &cancel);
+        assert_eq!(games_listed(&fake), (true, true));
+        assert!(fake.platform.processes.is_running("VALORANT.exe").unwrap());
         let log = newest_battlenet_log(&dir);
         assert!(log.contains("InstallState (prometheus): gameRunning=1"));
         assert!(!log.contains("gameRunning=0"));
 
-        std::thread::sleep(std::time::Duration::from_millis(200));
-        let names = processes.running_names().unwrap();
-        assert!(!names.contains(&"overwatch.exe".to_owned()));
-        assert!(!names.contains(&"valorant.exe".to_owned()));
-        assert!(!processes.is_running("VALORANT.exe").unwrap());
-        assert!(
-            newest_battlenet_log(&dir)
-                .contains("opType=Execute oldStatus=On newStatus=Off agentUid=prometheus")
-        );
+        clock.sleep(std::time::Duration::from_millis(1), &cancel);
+        assert_eq!(games_listed(&fake), (false, false));
+        assert!(!fake.platform.processes.is_running("VALORANT.exe").unwrap());
+        let log = newest_battlenet_log(&dir);
+        assert!(log.contains(GAME_ENDED));
+        assert!(log.contains("InstallState (prometheus): gameRunning=0 isGameProcessRunning=0"));
+    }
+
+    // In the window nothing sleeps on the fake clock between two presses of Play: the game has to go at a look all the same.
+    #[test]
+    fn a_game_a_watched_client_started_goes_at_a_look_with_nothing_sleeping_on_the_fake_clock() {
+        let (scratch, dir) = battlenet_scenario("sim-quits-watched", &games_knobs(Some(50)));
+        let fake = materialize_in_real_time(&dir, &scratch.join("data")).unwrap();
+        play_both(&fake, &dir);
+        let given_up = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        while games_listed(&fake) != (false, false) && std::time::Instant::now() < given_up {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert_eq!(games_listed(&fake), (false, false));
+        assert!(!fake.platform.processes.is_running("VALORANT.exe").unwrap());
+        assert!(newest_battlenet_log(&dir).contains(GAME_ENDED));
+    }
+
+    #[test]
+    fn a_game_a_test_quits_is_gone_from_the_client_and_the_processes_and_starts_again_at_the_next_play()
+     {
+        let (scratch, dir) = battlenet_scenario("sim-quit-by-test", &games_knobs(None));
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        play_both(&fake, &dir);
+        assert_eq!(games_listed(&fake), (true, true));
+
+        fake.battlenet.as_ref().unwrap().quit_game("prometheus");
+        fake.riot.as_ref().unwrap().quit_game("valorant");
+        assert_eq!(games_listed(&fake), (false, false));
+        assert!(!fake.platform.processes.is_running("VALORANT.exe").unwrap());
+        assert!(newest_battlenet_log(&dir).contains(GAME_ENDED));
+
+        play_both(&fake, &dir);
+        assert_eq!(games_listed(&fake), (true, true));
+        let started = newest_battlenet_log(&dir)
+            .matches("Game is running: prometheus")
+            .count();
+        assert_eq!(started, 2);
     }
 
     #[test]

@@ -264,8 +264,8 @@ impl BattlenetSim {
         }
     }
 
-    // Stands in for the user quitting a game: its process goes, and a running client logs the end.
-    fn quit_game(&self, codename: &str) {
+    // Stands in for the user quitting a game, by codename: its process goes, the client forgets it, and a running client logs the end.
+    pub fn quit_game(&self, codename: &str) {
         let was_running = {
             let mut state = self.state();
             let before = state.games.len();
