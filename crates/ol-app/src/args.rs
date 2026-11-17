@@ -9,6 +9,9 @@ pub struct Args {
     pub doctor: Option<DoctorVault>,
     #[cfg(feature = "fake")]
     pub fake: Option<FakeMachine>,
+    // The registry, the processes, the files and the shell of this PC behind the launchers. Without it the app reaches no launcher.
+    #[cfg(not(feature = "fake"))]
+    pub real_launchers: bool,
 }
 
 // The folder a fake machine lives in, and the scenario and fixtures to fill it from when it holds none yet.
@@ -49,9 +52,19 @@ impl Args {
         let (mut doctor, mut fake_vault) = (false, false);
         let mut plan = CapturePlan::default();
         let mut steps = false;
+        let mut real_launchers = false;
         #[cfg(feature = "fake")]
         let (mut fake_folder, mut fake_scenario, mut fake_fixtures) = (None, None, None);
         for argument in arguments {
+            if argument == "--real-launchers" {
+                if cfg!(feature = "fake") {
+                    return Err(
+                        "--real-launchers is for the build without the feature fake".to_owned()
+                    );
+                }
+                real_launchers = true;
+                continue;
+            }
             if argument == "--probe" {
                 probe = true;
                 continue;
@@ -129,6 +142,13 @@ impl Args {
         if doctor && (file.is_some() || probe || steps) {
             return Err("--doctor does not go with --capture or --probe".to_owned());
         }
+        // A capture or a probe is run by agents and kept as a file: neither may ever show a real launcher's accounts.
+        if real_launchers && (file.is_some() || probe || steps || doctor) {
+            return Err(
+                "--real-launchers does not go with --capture, --capture-..., --probe or --doctor: a capture or a probe must never show a real launcher's accounts"
+                    .to_owned(),
+            );
+        }
         #[cfg(feature = "fake")]
         let fake = fake_machine(fake_folder, fake_scenario, fake_fixtures)?;
         #[cfg(feature = "fake")]
@@ -151,6 +171,8 @@ impl Args {
             doctor,
             #[cfg(feature = "fake")]
             fake,
+            #[cfg(not(feature = "fake"))]
+            real_launchers,
         })
     }
 }
@@ -351,6 +373,63 @@ mod tests {
             &[data, "--fake-launchers"],
         ] {
             assert!(parse(refused).is_err(), "{refused:?}");
+        }
+    }
+
+    #[cfg(not(feature = "fake"))]
+    #[test]
+    fn the_real_launchers_are_reached_only_when_asked_and_never_in_a_capture_or_a_probe() {
+        let data = r"--data-dir=D:\scratch";
+        assert!(!parse(&[data]).unwrap().real_launchers);
+        assert!(parse(&[data, "--real-launchers"]).unwrap().real_launchers);
+        for refused in [
+            &[data, "--real-launchers", r"--capture=D:\a.png"][..],
+            &[
+                data,
+                r"--capture=D:\a.png",
+                "--capture-row=3",
+                "--real-launchers",
+            ],
+            &[
+                data,
+                r"--capture=D:\a.png",
+                "--capture-focus",
+                "--real-launchers",
+            ],
+            &[data, "--real-launchers", "--capture-keys=a"],
+            &[data, "--probe", "--real-launchers"],
+            &[data, "--real-launchers", "--doctor"],
+            &[data, "--real-launchers=1"],
+            &[data, "--Real-Launchers"],
+            &[
+                data,
+                "--real-launchers",
+                r"--fake-launchers=D:\scratch\launchers",
+            ],
+        ] {
+            assert!(parse(refused).is_err(), "{refused:?}");
+        }
+        let said = parse(&[data, "--real-launchers", "--probe"]).unwrap_err();
+        assert!(
+            said.contains("must never show a real launcher's accounts"),
+            "{said}"
+        );
+    }
+
+    #[cfg(feature = "fake")]
+    #[test]
+    fn a_build_with_the_fake_launchers_never_reaches_the_real_ones() {
+        let data = r"--data-dir=D:\scratch";
+        for refused in [
+            &[data, "--real-launchers"][..],
+            &[
+                data,
+                r"--fake-launchers=D:\scratch\launchers",
+                "--real-launchers",
+            ],
+        ] {
+            let said = parse(refused).unwrap_err();
+            assert!(said.contains("without the feature fake"), "{said}");
         }
     }
 

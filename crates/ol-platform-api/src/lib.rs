@@ -1,6 +1,9 @@
 #![forbid(unsafe_code)]
 
+pub mod atomic;
+pub mod contract;
 mod ports;
+pub mod protected;
 
 pub use ports::{
     CancelToken, Clock, FileReader, FileWriter, Files, Hive, Platform, ProcessArg, ProcessError,
