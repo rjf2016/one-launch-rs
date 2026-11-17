@@ -15,7 +15,6 @@ The repo holds the plan, the behavioural spec, the seed of the oracle (reference
 | `plan/waivers.toml` | Tests and parity rows the owner agreed not to port |
 | `spec/SPEC.md` | Behavioural spec of the Electron app at the pinned commit |
 | `oracle/` | Pin, fixtures, screenshot checklist; Milestone 0 fills in the rest |
-| `scripts/agent/` | How the agents sign in to GitHub as the app `one-launch-agents` |
 | `crates/` | The product, one crate per row of `plan/design/architecture.md`; `ol-app` builds `OneLaunch.exe` |
 | `spikes/` | The proofs of Milestone 1, `s01` to `s12`. Not default members, and no crate depends on one |
 | `xtask/` | `cargo xtask check`: formatting, the lints, the secret scan, the oracle's hashes, `cargo deny`, clippy, build and tests |

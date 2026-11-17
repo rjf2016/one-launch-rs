@@ -1,5 +1,7 @@
 target/
 .claude/
+/CLAUDE.md
+/scripts/agent/
 *.pem
 *.local.*
 .DS_Store
