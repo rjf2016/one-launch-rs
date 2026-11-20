@@ -1,21 +1,25 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
 use gpui::{
     AnyWindowHandle, App, AsyncApp, Keystroke, Modifiers, MouseButton, MouseDownEvent,
-    MouseMoveEvent, MouseUpEvent, Pixels, PlatformInput, Point, Window, WindowHandle, point, px,
+    MouseMoveEvent, MouseUpEvent, Pixels, PlatformInput, Point, ScrollDelta, ScrollEvent,
+    ScrollSource, TouchPhase, Window, WindowHandle, point, px,
 };
 use ol_platform_win::own_process;
 use ol_platform_win::probe::{self, OuterRect};
 use ol_platform_win::window::AppWindow;
-use ol_ui::{LibraryView, Shell};
+use ol_ui::{LibraryFrame, LibraryView, Shell};
 
 use crate::args::CapturePlan;
 
 const SETTLE: Duration = Duration::from_millis(1200);
 const STEP: Duration = Duration::from_millis(400);
+const FRAME: Duration = Duration::from_millis(16);
 const SWEEP_STEP: f32 = 30.;
 const LONGEST_WAIT: u64 = 60_000;
+const MOST_SIDE: i32 = 8000;
+const MOST_STEPS: usize = 2000;
 
 pub async fn run(
     plan: &CapturePlan,
@@ -25,17 +29,8 @@ pub async fn run(
     let native = AppWindow::on_this_thread().context("the GPUI window was not found")?;
     pause(SETTLE, cx).await;
 
-    if let Some((width, height)) = plan.size {
-        let client = native
-            .client_size()
-            .context("the window has no client area")?;
-        let outer = probe::outer_rect(native).context("the window has no frame")?;
-        let resized = OuterRect {
-            width: width + outer.width - client.0,
-            height: height + outer.height - client.1,
-            ..outer
-        };
-        probe::set_outer_rect(native, resized);
+    if let Some(size) = plan.size {
+        set_client_size(native, size)?;
         pause(STEP, cx).await;
     }
 
@@ -64,9 +59,7 @@ pub async fn run(
     }
 
     if let Some(row) = plan.row {
-        in_library(window, cx, |library, window, cx| {
-            library.scroll_to_row(row, window, cx);
-        })?;
+        in_library(window, cx, |library, _, cx| library.scroll_to_row(row, cx))?;
         pause(STEP, cx).await;
     }
 
@@ -85,10 +78,24 @@ pub async fn run(
                 pause(time, cx).await;
                 continue;
             }
+            Step::Size(size) => {
+                set_client_size(native, size)?;
+                pause(STEP, cx).await;
+                continue;
+            }
+            Step::Resize { from, to, steps } => {
+                resize(native, window, (from, to, steps), cx).await?;
+                pause(STEP, cx).await;
+                continue;
+            }
+            Step::Drag(from, to) => {
+                drag(window, from, to, cx).await?;
+                pause(STEP, cx).await;
+                continue;
+            }
             step => step,
         };
-        // Through the untyped handle: a key press can redraw the window, and the typed one holds the root view meanwhile.
-        AnyWindowHandle::from(window).update(cx, |_, window, cx| step.take(window, cx))?;
+        dispatch(window, cx, move |window, cx| step.take(window, cx))?;
         pause(STEP, cx).await;
     }
 
@@ -117,43 +124,103 @@ pub async fn run(
     Ok(())
 }
 
-// A step of --capture-keys: a key press, the pointer at a place of the client area, moved there or clicked, or a wait for something that takes its time, such as a fake switch.
+// A step of --capture-keys: a key press; the pointer at a place of the client area, moved there, clicked, dragged from there or turning the wheel there, with Shift held as Windows reports it; a wait for something that takes its time, such as a fake switch; or the client area set to a size, at once or in steps as an edge dragged by hand does.
 enum Step {
     Key(Keystroke),
     Move(Point<Pixels>),
     Click(Point<Pixels>),
+    Wheel(Point<Pixels>, Point<f32>, Modifiers),
+    Drag(Point<Pixels>, Point<Pixels>),
     Wait(Duration),
+    Size((i32, i32)),
+    Resize {
+        from: (i32, i32),
+        to: (i32, i32),
+        steps: usize,
+    },
 }
 
 impl Step {
     fn parse(text: &str) -> anyhow::Result<Self> {
-        let (pointer, spot) = match text.split_once(':') {
-            Some(("wait", milliseconds)) => {
-                return milliseconds
-                    .parse::<u64>()
-                    .ok()
-                    .filter(|milliseconds| *milliseconds <= LONGEST_WAIT)
-                    .map(|milliseconds| Self::Wait(Duration::from_millis(milliseconds)))
-                    .with_context(|| {
-                        format!("{text} is not wait:<milliseconds up to {LONGEST_WAIT}>")
-                    });
-            }
-            Some(pointer @ ("move" | "click", _)) => pointer,
-            _ => {
-                return Keystroke::parse(text.to_owned().leak())
-                    .map(Self::Key)
-                    .with_context(|| format!("{text} is not a keystroke"));
-            }
+        let Some((kind, rest)) = text.split_once(':') else {
+            return Self::key(text);
         };
-        let position = spot
-            .split_once('x')
-            .and_then(|(x, y)| Some(point(px(x.parse().ok()?), px(y.parse().ok()?))))
-            .with_context(|| format!("{text} is not {pointer}:<x>x<y>"))?;
-        Ok(if pointer == "click" {
-            Self::Click(position)
-        } else {
-            Self::Move(position)
+        let spot = |spot: &str| {
+            spot.split_once('x')
+                .and_then(|(x, y)| Some(point(px(x.parse().ok()?), px(y.parse().ok()?))))
+        };
+        let size = |size: &str| {
+            size.split_once('x')
+                .and_then(|(width, height)| Some((width.parse().ok()?, height.parse().ok()?)))
+                .filter(|(width, height): &(i32, i32)| {
+                    (1..=MOST_SIDE).contains(width) && (1..=MOST_SIDE).contains(height)
+                })
+        };
+        let step = match kind {
+            "wait" => rest
+                .parse::<u64>()
+                .ok()
+                .filter(|milliseconds| *milliseconds <= LONGEST_WAIT)
+                .map(|milliseconds| Self::Wait(Duration::from_millis(milliseconds))),
+            "move" => spot(rest).map(Self::Move),
+            "click" => spot(rest).map(Self::Click),
+            "wheel" | "shift-wheel" => rest.split_once(':').and_then(|(at, lines)| {
+                let lines = lines
+                    .parse::<f32>()
+                    .ok()
+                    .filter(|lines| lines.abs() <= 100.)?;
+                let shift = kind == "shift-wheel";
+                let delta = if shift {
+                    point(lines, 0.)
+                } else {
+                    point(0., lines)
+                };
+                let modifiers = Modifiers {
+                    shift,
+                    ..Modifiers::default()
+                };
+                Some(Self::Wheel(spot(at)?, delta, modifiers))
+            }),
+            "drag" => rest
+                .split_once(':')
+                .and_then(|(from, to)| Some(Self::Drag(spot(from)?, spot(to)?))),
+            "size" => size(rest).map(Self::Size),
+            "resize" => {
+                let mut parts = rest.split(':');
+                match (parts.next(), parts.next(), parts.next(), parts.next()) {
+                    (Some(from), Some(to), Some(steps), None) => (|| {
+                        let steps = steps
+                            .parse::<usize>()
+                            .ok()
+                            .filter(|steps| (1..=MOST_STEPS).contains(steps))?;
+                        Some(Self::Resize {
+                            from: size(from)?,
+                            to: size(to)?,
+                            steps,
+                        })
+                    })(),
+                    _ => None,
+                }
+            }
+            _ => return Self::key(text),
+        };
+        step.with_context(|| {
+            let form = match kind {
+                "wait" => "wait:<milliseconds up to 60000>",
+                "move" | "click" => "move:<x>x<y> or click:<x>x<y>",
+                "wheel" | "shift-wheel" => "wheel:<x>x<y>:<lines, minus is down>",
+                "drag" => "drag:<x>x<y>:<x>x<y>",
+                "size" => "size:<width>x<height>",
+                _ => "resize:<width>x<height>:<width>x<height>:<steps up to 2000>",
+            };
+            format!("{text} is not {form}")
         })
+    }
+
+    fn key(text: &str) -> anyhow::Result<Self> {
+        Keystroke::parse(text.to_owned().leak())
+            .map(Self::Key)
+            .with_context(|| format!("{text} is not a keystroke"))
     }
 
     fn take(self, window: &mut Window, cx: &mut App) {
@@ -164,7 +231,28 @@ impl Step {
             }
             Self::Move(position) => (position, false),
             Self::Click(position) => (position, true),
-            Self::Wait(_) => return,
+            Self::Wheel(position, lines, modifiers) => {
+                window.dispatch_event(
+                    PlatformInput::MouseMove(MouseMoveEvent {
+                        position,
+                        pressed_button: None,
+                        modifiers: Modifiers::default(),
+                    }),
+                    cx,
+                );
+                window.dispatch_event(
+                    PlatformInput::Scroll(ScrollEvent {
+                        position,
+                        delta: ScrollDelta::Lines(lines),
+                        modifiers,
+                        touch_phase: TouchPhase::Moved,
+                        source: ScrollSource::Pointer,
+                    }),
+                    cx,
+                );
+                return;
+            }
+            Self::Drag(..) | Self::Wait(_) | Self::Size(_) | Self::Resize { .. } => return,
         };
         let modifiers = Modifiers::default();
         window.dispatch_event(
@@ -204,6 +292,157 @@ pub async fn pause(duration: Duration, cx: &AsyncApp) {
     cx.background_executor().timer(duration).await;
 }
 
+// Through the untyped handle: a key press can redraw the window, and the typed one holds the root view meanwhile.
+fn dispatch(
+    window: WindowHandle<Shell>,
+    cx: &mut AsyncApp,
+    update: impl FnOnce(&mut Window, &mut App),
+) -> anyhow::Result<()> {
+    AnyWindowHandle::from(window).update(cx, |_, window, cx| update(window, cx))
+}
+
+fn set_client_size(native: AppWindow, (width, height): (i32, i32)) -> anyhow::Result<()> {
+    let client = native
+        .client_size()
+        .context("the window has no client area")?;
+    let outer = probe::outer_rect(native).context("the window has no frame")?;
+    probe::set_outer_rect(
+        native,
+        OuterRect {
+            width: width + outer.width - client.0,
+            height: height + outer.height - client.1,
+            ..outer
+        },
+    );
+    Ok(())
+}
+
+async fn drag(
+    window: WindowHandle<Shell>,
+    from: Point<Pixels>,
+    to: Point<Pixels>,
+    cx: &mut AsyncApp,
+) -> anyhow::Result<()> {
+    const MOVES: usize = 12;
+    let modifiers = Modifiers::default();
+    dispatch(window, cx, move |window, cx| {
+        window.dispatch_event(
+            PlatformInput::MouseMove(MouseMoveEvent {
+                position: from,
+                pressed_button: None,
+                modifiers,
+            }),
+            cx,
+        );
+        window.dispatch_event(
+            PlatformInput::MouseDown(MouseDownEvent {
+                button: MouseButton::Left,
+                position: from,
+                modifiers,
+                click_count: 1,
+                first_mouse: false,
+            }),
+            cx,
+        );
+    })?;
+    for step in 1..=MOVES {
+        pause(FRAME, cx).await;
+        let share = step as f32 / MOVES as f32;
+        let position = from + (to - from) * share;
+        dispatch(window, cx, move |window, cx| {
+            window.dispatch_event(
+                PlatformInput::MouseMove(MouseMoveEvent {
+                    position,
+                    pressed_button: Some(MouseButton::Left),
+                    modifiers,
+                }),
+                cx,
+            );
+        })?;
+    }
+    pause(FRAME, cx).await;
+    dispatch(window, cx, move |window, cx| {
+        window.dispatch_event(
+            PlatformInput::MouseUp(MouseUpEvent {
+                button: MouseButton::Left,
+                position: to,
+                modifiers,
+                click_count: 1,
+            }),
+            cx,
+        );
+    })
+}
+
+// Sets the client area from one size to the other a step a frame, as a window edge dragged by hand, and prints every frame the Library drew meanwhile: when, for which size, the size last set at that time, and the grid it laid out.
+async fn resize(
+    native: AppWindow,
+    window: WindowHandle<Shell>,
+    (from, to, steps): ((i32, i32), (i32, i32), usize),
+    cx: &mut AsyncApp,
+) -> anyhow::Result<()> {
+    set_client_size(native, from)?;
+    pause(STEP, cx).await;
+    in_library(window, cx, |library, _, _| library.log_frames())?;
+    let started = Instant::now();
+    let mut set = Vec::with_capacity(steps + 1);
+    for step in 0..=steps {
+        let share = step as f32 / steps as f32;
+        let side = |from: i32, to: i32| from + ((to - from) as f32 * share).round() as i32;
+        let size = (side(from.0, to.0), side(from.1, to.1));
+        set_client_size(native, size)?;
+        set.push((Instant::now(), size));
+        pause(FRAME, cx).await;
+    }
+    pause(STEP, cx).await;
+    let frames = in_library(window, cx, |library, _, _| library.take_frames())?;
+    let scale = native.scale();
+    let mut stale = 0;
+    let mut layouts: Vec<((i32, i32), LibraryFrame)> = Vec::new();
+    let mut differing = 0;
+    for (index, frame) in frames.iter().enumerate() {
+        let drawn = (
+            (frame.viewport.width.as_f32() * scale).round() as i32,
+            (frame.viewport.height.as_f32() * scale).round() as i32,
+        );
+        let last_set = set
+            .iter()
+            .take_while(|(at, _)| *at <= frame.at)
+            .last()
+            .map(|(_, size)| *size);
+        let behind = last_set.is_some_and(|size| size != drawn);
+        stale += usize::from(behind);
+        match layouts.iter().find(|(size, _)| *size == drawn) {
+            Some((_, earlier)) if !earlier.same_grid(frame) => differing += 1,
+            Some(_) => {}
+            None => layouts.push((drawn, *frame)),
+        }
+        println!(
+            "OneLaunch: frame {index:>3} at {:>7.1} ms: drawn for {}x{}, last set {}, {} columns of {:.2} px, gap {}, scrollbar strip {}{}",
+            frame.at.duration_since(started).as_secs_f32() * 1000.,
+            drawn.0,
+            drawn.1,
+            last_set.map_or("none".to_owned(), |(width, height)| format!(
+                "{width}x{height}"
+            )),
+            frame.columns,
+            frame.card,
+            frame.gap,
+            frame.strip,
+            if behind { " BEHIND" } else { "" },
+        );
+    }
+    println!(
+        "OneLaunch: resize from {}x{} to {}x{} in {steps} steps: {} frames drawn, {stale} drawn for a size already replaced, {differing} laid out differently from an earlier frame of the same size",
+        from.0,
+        from.1,
+        to.0,
+        to.1,
+        frames.len(),
+    );
+    Ok(())
+}
+
 fn in_library<R>(
     window: WindowHandle<Shell>,
     cx: &mut AsyncApp,
@@ -218,4 +457,50 @@ fn in_library<R>(
 
 fn megabytes(bytes: usize) -> f64 {
     bytes as f64 / (1024. * 1024.)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_pointer_and_size_steps_are_read_as_written() {
+        let Ok(Step::Wheel(at, lines, held)) = Step::parse("wheel:700x450:-3") else {
+            panic!("a wheel step");
+        };
+        assert_eq!(
+            (at, lines, held.shift),
+            (point(px(700.), px(450.)), point(0., -3.), false)
+        );
+        let Ok(Step::Wheel(_, lines, held)) = Step::parse("shift-wheel:10x20:2") else {
+            panic!("a wheel step with Shift");
+        };
+        assert_eq!((lines, held.shift), (point(2., 0.), true));
+        assert!(matches!(Step::parse("drag:1x2:3x4"), Ok(Step::Drag(..))));
+        assert!(matches!(
+            Step::parse("size:1000x600"),
+            Ok(Step::Size((1000, 600)))
+        ));
+        assert!(matches!(
+            Step::parse("resize:1600x1150:1000x1150:200"),
+            Ok(Step::Resize {
+                from: (1600, 1150),
+                to: (1000, 1150),
+                steps: 200
+            })
+        ));
+        for refused in [
+            "wheel:700x450",
+            "wheel:700x450:1000",
+            "drag:1x2",
+            "size:0x600",
+            "size:1000",
+            "resize:1600x1150:1000x1150",
+            "resize:1600x1150:1000x1150:0",
+            "resize:1600x1150:1000x1150:5000",
+            "wait:61000",
+        ] {
+            assert!(Step::parse(refused).is_err(), "{refused}");
+        }
+    }
 }

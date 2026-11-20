@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod assets;
+mod follow;
 mod host;
 mod library;
 mod posters;
@@ -14,7 +15,7 @@ use gpui::{
 use ol_api::Backend;
 
 pub use assets::Assets;
-pub use library::{LibraryLoaded, LibraryView, SweepReport};
+pub use library::{LibraryFrame, LibraryLoaded, LibraryView, SweepReport};
 pub use shell::Shell;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
