@@ -25,8 +25,8 @@ use crate::shell::sidebar_width;
 use crate::widgets::{Button, Tone, icon, launcher_dot, spinner};
 
 const PAGE_PADDING: f32 = 32.;
-// Five in a row in the window as it first opens, as in the Electron app.
-const CARD: f32 = 184.;
+// The least width of a card. It gives five in a row in the window as it first opens, as in the Electron app, and as many columns on either side of the width where the sidebar folds.
+const CARD_MIN: f32 = 184.;
 const CARD_GAP: f32 = 16.;
 const SCROLLBAR: f32 = 12.;
 const CAPTION: f32 = 62.;
@@ -224,12 +224,13 @@ struct Grid {
 }
 
 impl Grid {
-    // Not as the Electron app, on the owner's word: there a card filled its column, so it grew with the window and shrank again when a column fitted in. Here a card keeps its size, the width of the pane alone decides how many stand in a row, and what is left over stays at the right.
+    // Not quite as the Electron app, on the owner's word: there the least width of a card changed at a window 1536 px wide and a scrollbar took room, so a drag of the window's edge took columns away and gave them back. Here the width of the pane alone decides the columns, and the cards share out the row.
     fn for_pane(pane: Pixels) -> Self {
-        let room = (f32::from(pane) - 2. * PAGE_PADDING).max(0.);
+        let room = (f32::from(pane) - 2. * PAGE_PADDING).max(CARD_MIN);
+        let columns = (((room + CARD_GAP) / (CARD_MIN + CARD_GAP)) as usize).max(1);
         Self {
-            columns: (((room + CARD_GAP) / (CARD + CARD_GAP)) as usize).max(1),
-            card: px(CARD),
+            columns,
+            card: px((room - CARD_GAP * (columns - 1) as f32) / columns as f32),
             gap: px(CARD_GAP),
         }
     }
@@ -1757,16 +1758,42 @@ mod tests {
     }
 
     #[test]
-    fn a_window_dragged_wider_keeps_every_card_its_size_and_never_takes_a_column_away() {
+    fn a_window_dragged_wider_never_takes_a_column_away() {
         let (mut before, _) = grid_at(NARROWEST);
         for window in NARROWEST + 1..=3840 {
-            let (grid, room) = grid_at(window);
-            assert_eq!(grid.card, before.card, "{window}");
-            assert_eq!(grid.gap, before.gap, "{window}");
+            let (grid, _) = grid_at(window);
             assert!(grid.columns >= before.columns, "{window}");
             assert!(grid.columns <= before.columns + 1, "{window}");
-            let row = grid.columns as f32 * CARD + (grid.columns - 1) as f32 * CARD_GAP;
-            assert!(row <= room && room - row < CARD + CARD_GAP, "{window}");
+            before = grid;
+        }
+    }
+
+    #[test]
+    fn the_cards_fill_the_row_at_every_width_and_none_is_narrower_than_the_least() {
+        for window in NARROWEST..=3840 {
+            let (grid, room) = grid_at(window);
+            let (card, columns) = (f32::from(grid.card), grid.columns as f32);
+            let row = columns * card + (columns - 1.) * f32::from(grid.gap);
+            assert!((row - room).abs() < 0.01, "{window}");
+            assert!(card >= CARD_MIN, "{window}");
+            assert!(
+                card < CARD_MIN + (CARD_MIN + CARD_GAP) / columns,
+                "{window}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_card_only_grows_while_the_window_is_dragged_wider_and_the_columns_stay() {
+        let folds = (NARROWEST..=3840)
+            .find(|window| sidebar_width(px(*window as f32)) != sidebar_width(px(960.)))
+            .unwrap();
+        let (mut before, _) = grid_at(NARROWEST);
+        for window in NARROWEST + 1..=3840 {
+            let (grid, _) = grid_at(window);
+            if grid.columns == before.columns && window != folds {
+                assert!(grid.card > before.card, "{window}");
+            }
             before = grid;
         }
     }
