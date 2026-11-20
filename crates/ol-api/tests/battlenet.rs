@@ -1056,6 +1056,43 @@ fn a_sign_in_as_another_account_while_the_token_is_awaited_is_not_saved_for_the_
 }
 
 #[test]
+fn a_game_still_running_is_refused_with_why_and_once_the_user_has_quit_it_it_starts_again() {
+    let knobs = json!({ "knobs": { "battlenet": { "gameQuitsAfterMs": 60_000 } } });
+    let fakes = fakes(Some(&knobs));
+    let (alt, game) = (fakes.account(ALT), fakes.game());
+    let started = "--exec=launch Pro (Battle.net started the game)";
+    let first = fakes.play(MAIN);
+    assert!(detail(first.last().unwrap(), "launch").ends_with(started));
+
+    let again = fakes.play(MAIN);
+    let last = again.last().unwrap();
+    assert!(last.state == JobState::Failed && last.direct);
+    assert_eq!(
+        last.error.as_deref(),
+        Some("Battle.net: Overwatch is already running. Close it, then press Play again.")
+    );
+    let preflight = block_on(fakes.backend.launch_preflight(&alt.id, Some(&game.id))).unwrap();
+    assert_eq!(
+        preflight.close_message.as_deref(),
+        Some(
+            "Battle.net is running Overwatch. Switching closes Battle.net; the game keeps running."
+        )
+    );
+
+    let cancel = ol_platform_api::CancelToken::new();
+    fakes
+        .fake
+        .platform
+        .clock
+        .sleep(std::time::Duration::from_secs(60), &cancel);
+    let after_quit = fakes.play(MAIN);
+    let last = after_quit.last().unwrap();
+    assert!(last.state == JobState::Done, "{:?}", last.error);
+    assert!(detail(last, "launch").ends_with(started));
+    fakes.backend.shut_down();
+}
+
+#[test]
 fn a_sign_in_as_another_account_while_the_token_is_awaited_ends_the_switch_as_a_wrong_account_and_starts_no_game()
  {
     let first = "0c3d4e5f";

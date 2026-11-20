@@ -32,6 +32,8 @@ const FIXTURE_PREFIX: &str = "@fixtures/";
 const UNIFIED_AUTH: &str = r"Software\Blizzard Entertainment\Battle.net\UnifiedAuth";
 const BINARY_PREFIX: &str = "binary:";
 
+// A person watching cannot quit a fake game, and one that runs refuses the next Play: it quits by itself after this long unless the knobs say otherwise.
+const WATCHED_PLAY_MS: u64 = 20_000;
 // Waits short enough that a fake switch is over in a few seconds of its own clock.
 const SIM_TIMING: [(&str, u64); 17] = [
     ("pollMs", 100),
@@ -290,6 +292,7 @@ fn battlenet_knobs(fields: &Map<String, Value>) -> BattlenetKnobs {
         running_as: text("runningAs"),
         updates_pending: strings(fields.get("updatesPending")),
         games_running: strings(fields.get("gamesRunning")),
+        game_quits_after_ms: fields.get("gameQuitsAfterMs").and_then(Value::as_u64),
     }
 }
 
@@ -309,6 +312,7 @@ fn riot_knobs(fields: &Map<String, Value>) -> RiotKnobs {
         updates_pending: strings(fields.get("updatesPending")),
         direct_launch: flag("directLaunch") == Some(true),
         press_play_fails: flag("pressPlayFails") == Some(true),
+        game_quits_after_ms: fields.get("gameQuitsAfterMs").and_then(Value::as_u64),
     }
 }
 
@@ -451,21 +455,27 @@ pub fn materialize(
     data_dir: &Path,
     now: OffsetDateTime,
 ) -> Result<FakeLaunchers, ScenarioError> {
-    materialize_on(dir, data_dir, FakeClock::starting_at(now))
+    materialize_on(dir, data_dir, FakeClock::starting_at(now), None)
 }
 
-// As `materialize`, for a person to watch: the clock is the system's, so a switch takes the seconds its waits add up to.
+// As `materialize`, for a person to watch: the clock is the system's, so a switch takes the seconds its waits add up to, and a game the scripted clients start quits by itself after a while.
 pub fn materialize_in_real_time(
     dir: &Path,
     data_dir: &Path,
 ) -> Result<FakeLaunchers, ScenarioError> {
-    materialize_on(dir, data_dir, FakeClock::following_the_system())
+    materialize_on(
+        dir,
+        data_dir,
+        FakeClock::following_the_system(),
+        Some(WATCHED_PLAY_MS),
+    )
 }
 
 fn materialize_on(
     dir: &Path,
     data_dir: &Path,
     clock: FakeClock,
+    play_ms: Option<u64>,
 ) -> Result<FakeLaunchers, ScenarioError> {
     let scenario = read_json(&dir.join(SCENARIO_FILE), SCENARIO_FILE)?;
     if scenario["version"] != 1 {
@@ -565,7 +575,8 @@ fn materialize_on(
     });
 
     let battlenet = installed.contains(&LauncherId::Battlenet).then(|| {
-        let knobs = battlenet_knobs(&merged(&scenario, &overrides, &["knobs", "battlenet"]));
+        let mut knobs = battlenet_knobs(&merged(&scenario, &overrides, &["knobs", "battlenet"]));
+        knobs.game_quits_after_ms = knobs.game_quits_after_ms.or(play_ms);
         BattlenetSim::attach(
             &BattlenetFolders {
                 app_data: &app_data,
@@ -582,12 +593,9 @@ fn materialize_on(
 
     let riot_launch = Arc::new(FakeRiotLaunch::new(log.clone()));
     let riot = installed.contains(&LauncherId::Riot).then(|| {
-        let sim = RiotSim::attach(
-            &riot_folders,
-            &processes,
-            Arc::clone(&clock),
-            riot_knobs(&merged(&scenario, &overrides, &["knobs", "riot"])),
-        );
+        let mut knobs = riot_knobs(&merged(&scenario, &overrides, &["knobs", "riot"]));
+        knobs.game_quits_after_ms = knobs.game_quits_after_ms.or(play_ms);
+        let sim = RiotSim::attach(&riot_folders, &processes, Arc::clone(&clock), knobs);
         let plays = Arc::clone(&sim);
         riot_launch.on_launch(move |id| plays.press_play(id));
         sim
@@ -794,6 +802,103 @@ mod tests {
         );
         assert!(!fake.platform.processes.is_running(BATTLENET_EXE).unwrap());
         assert!(fs::read(dir.join(r"appdata\Battle.net\Battle.net.config")).unwrap() == config);
+    }
+
+    const GAME_ENDED: &str = "opType=Execute oldStatus=On newStatus=Off agentUid=prometheus";
+
+    fn games_knobs(quits_after_ms: Option<u64>) -> Value {
+        let mut knobs = serde_json::json!({ "knobs": {
+            "battlenet": { "runningAs": "0a1b2c3d" },
+            "riot": { "runningAs": "11111111-1111-4111-8111-111111111111" },
+        } });
+        if let Some(after) = quits_after_ms {
+            for launcher in ["battlenet", "riot"] {
+                knobs["knobs"][launcher]["gameQuitsAfterMs"] = after.into();
+            }
+        }
+        knobs
+    }
+
+    // Overwatch through the running Battle.net client's launch command, and VALORANT through Play on the running Riot Client.
+    fn play_both(fake: &FakeLaunchers, dir: &Path) {
+        let exe = dir.join("battlenet").join(BATTLENET_EXE);
+        let exe = exe.to_string_lossy().into_owned();
+        let command = ol_platform_api::ProcessArg::Plain("--exec=launch Pro");
+        fake.platform.processes.start(&exe, &[command], "").unwrap();
+        fake.riot
+            .as_ref()
+            .unwrap()
+            .press_play("valorant.live")
+            .unwrap();
+    }
+
+    // Whether Overwatch and VALORANT are listed, as one look at the processes sees them.
+    fn games_listed(fake: &FakeLaunchers) -> (bool, bool) {
+        let names = fake.platform.processes.running_names().unwrap();
+        let listed = |image: &str| names.iter().any(|name| name == image);
+        (listed("overwatch.exe"), listed("valorant.exe"))
+    }
+
+    #[test]
+    fn a_game_runs_until_its_time_and_is_gone_at_the_first_look_after_it_and_the_client_logs_its_end()
+     {
+        let (scratch, dir) = battlenet_scenario("sim-quits", &games_knobs(Some(1_000)));
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        play_both(&fake, &dir);
+        let clock = &fake.platform.clock;
+        let cancel = ol_platform_api::CancelToken::new();
+        clock.sleep(std::time::Duration::from_millis(999), &cancel);
+        assert_eq!(games_listed(&fake), (true, true));
+        assert!(fake.platform.processes.is_running("VALORANT.exe").unwrap());
+        let log = newest_battlenet_log(&dir);
+        assert!(log.contains("InstallState (prometheus): gameRunning=1"));
+        assert!(!log.contains("gameRunning=0"));
+
+        clock.sleep(std::time::Duration::from_millis(1), &cancel);
+        assert_eq!(games_listed(&fake), (false, false));
+        assert!(!fake.platform.processes.is_running("VALORANT.exe").unwrap());
+        let log = newest_battlenet_log(&dir);
+        assert!(log.contains(GAME_ENDED));
+        assert!(log.contains("InstallState (prometheus): gameRunning=0 isGameProcessRunning=0"));
+    }
+
+    // In the window nothing sleeps on the fake clock between two presses of Play: the game has to go at a look all the same.
+    #[test]
+    fn a_game_a_watched_client_started_goes_at_a_look_with_nothing_sleeping_on_the_fake_clock() {
+        let (scratch, dir) = battlenet_scenario("sim-quits-watched", &games_knobs(Some(50)));
+        let fake = materialize_in_real_time(&dir, &scratch.join("data")).unwrap();
+        play_both(&fake, &dir);
+        let given_up = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        while games_listed(&fake) != (false, false) && std::time::Instant::now() < given_up {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert_eq!(games_listed(&fake), (false, false));
+        assert!(!fake.platform.processes.is_running("VALORANT.exe").unwrap());
+        assert!(newest_battlenet_log(&dir).contains(GAME_ENDED));
+    }
+
+    #[test]
+    fn a_game_a_test_quits_is_gone_from_the_client_and_the_processes_and_starts_again_at_the_next_play()
+     {
+        let (scratch, dir) = battlenet_scenario("sim-quit-by-test", &games_knobs(None));
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        play_both(&fake, &dir);
+        assert_eq!(games_listed(&fake), (true, true));
+
+        fake.battlenet.as_ref().unwrap().quit_game("prometheus");
+        fake.riot.as_ref().unwrap().quit_game("valorant");
+        assert_eq!(games_listed(&fake), (false, false));
+        assert!(!fake.platform.processes.is_running("VALORANT.exe").unwrap());
+        assert!(newest_battlenet_log(&dir).contains(GAME_ENDED));
+
+        play_both(&fake, &dir);
+        assert_eq!(games_listed(&fake), (true, true));
+        let started = newest_battlenet_log(&dir)
+            .matches("Game is running: prometheus")
+            .count();
+        assert_eq!(started, 2);
     }
 
     #[test]
