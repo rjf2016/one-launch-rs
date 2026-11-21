@@ -24,11 +24,13 @@ use crate::posters::{self, Lookup, Posters, Shape};
 use crate::shell::sidebar_width;
 use crate::widgets::{Button, Tone, icon, launcher_dot, spinner};
 
-const PAGE_PADDING: f32 = 32.;
-// The least width of a card. It gives five in a row in the window as it first opens, as in the Electron app, and as many columns on either side of the width where the sidebar folds.
-const CARD_MIN: f32 = 184.;
-const CARD_GAP: f32 = 16.;
+// The owner's pick of 2026-11-21, from a prototype of the page: the padding at its sides, the least width of a card and the room between two.
+const PAGE_PADDING: f32 = 24.;
+const CARD_MIN: f32 = 163.;
+const CARD_GAP: f32 = 6.;
 const SCROLLBAR: f32 = 12.;
+// The page's scrollbar keeps its strip at the right whether it shows or not, so one that comes or goes moves nothing.
+const PAGE_END: f32 = PAGE_PADDING + SCROLLBAR;
 const CAPTION: f32 = 62.;
 const BORDER: f32 = 1.;
 const TITLE_BAR: f32 = 36.;
@@ -216,6 +218,10 @@ impl SweepReport {
     }
 }
 
+fn row_room(pane: Pixels) -> f32 {
+    (f32::from(pane) - PAGE_PADDING - PAGE_END).max(0.)
+}
+
 #[derive(Clone, Copy)]
 struct Grid {
     columns: usize,
@@ -224,9 +230,9 @@ struct Grid {
 }
 
 impl Grid {
-    // Not quite as the Electron app, on the owner's word: there the least width of a card changed at a window 1536 px wide and a scrollbar took room, so a drag of the window's edge took columns away and gave them back. Here the width of the pane alone decides the columns, and the cards share out the row.
+    // Not quite as the Electron app, on the owner's word: there the least width of a card changed at a window 1536 px wide and the scrollbar took its room only while the page scrolled, so a drag of the window's edge took columns away and gave them back. Here the width of the pane alone decides the columns, and the cards share out the row.
     fn for_pane(pane: Pixels) -> Self {
-        let room = (f32::from(pane) - 2. * PAGE_PADDING).max(CARD_MIN);
+        let room = row_room(pane).max(CARD_MIN);
         let columns = (((room + CARD_GAP) / (CARD_MIN + CARD_GAP)) as usize).max(1);
         Self {
             columns,
@@ -752,7 +758,12 @@ impl LibraryView {
         rows.map(|row| {
             let first = row * grid.columns;
             let last = (first + grid.columns).min(self.shown.len());
-            let mut line = div().flex().gap(grid.gap).px(px(PAGE_PADDING)).pb(grid.gap);
+            let mut line = div()
+                .flex()
+                .gap(grid.gap)
+                .pl(px(PAGE_PADDING))
+                .pr(px(PAGE_END))
+                .pb(grid.gap);
             for slot in first..last {
                 let game = self.shown[slot];
                 line = line.child(self.render_card(game, grid, scale, cx));
@@ -1060,7 +1071,8 @@ impl LibraryView {
             .flex()
             .flex_col()
             .flex_none()
-            .px(px(PAGE_PADDING))
+            .pl(px(PAGE_PADDING))
+            .pr(px(PAGE_END))
             .pt(px(28.))
             .pb(px(20.))
             .child(heading)
@@ -1446,7 +1458,8 @@ impl LibraryView {
             .top_0()
             .left_0()
             .right_0()
-            .px(px(PAGE_PADDING))
+            .pl(px(PAGE_PADDING))
+            .pr(px(PAGE_END))
             .child(
                 div()
                     .mb(px(8.))
@@ -1617,13 +1630,13 @@ impl Render for LibraryView {
         let banner = self.host.read(cx).banner_height();
         let pane = (f32::from(viewport.height) - TITLE_BAR - banner - HEADER).max(0.);
         let recent = self.recent_shown();
-        let pane_width = viewport.width - sidebar_width(viewport.width);
+        let pane_width = viewport.width - sidebar_width();
         let launches = recent.len() as f32;
         let recent_track = Track {
-            view: (f32::from(pane_width) - 2. * PAGE_PADDING).max(0.),
+            view: row_room(pane_width),
             content: launches * RECENT_CARD + (launches - 1.).max(0.) * RECENT_GAP,
         };
-        // Neither scrollbar takes room of its own, so one that comes or goes moves nothing.
+        // The Recent strip's scrollbar lies in the gap under the strip, so the strip is as high with it as without.
         let above = if recent.is_empty() { 0. } else { RECENT_STRIP };
         let grid = Grid::for_pane(pane_width);
         let rows = self.shown.len().div_ceil(grid.columns);
@@ -1752,9 +1765,8 @@ mod tests {
     const NARROWEST: usize = 960;
 
     fn grid_at(window: usize) -> (Grid, f32) {
-        let window = px(window as f32);
-        let pane = window - sidebar_width(window);
-        (Grid::for_pane(pane), f32::from(pane) - 2. * PAGE_PADDING)
+        let pane = px(window as f32) - sidebar_width();
+        (Grid::for_pane(pane), row_room(pane))
     }
 
     #[test]
@@ -1785,13 +1797,10 @@ mod tests {
 
     #[test]
     fn a_card_only_grows_while_the_window_is_dragged_wider_and_the_columns_stay() {
-        let folds = (NARROWEST..=3840)
-            .find(|window| sidebar_width(px(*window as f32)) != sidebar_width(px(960.)))
-            .unwrap();
         let (mut before, _) = grid_at(NARROWEST);
         for window in NARROWEST + 1..=3840 {
             let (grid, _) = grid_at(window);
-            if grid.columns == before.columns && window != folds {
+            if grid.columns == before.columns {
                 assert!(grid.card > before.card, "{window}");
             }
             before = grid;
@@ -1799,7 +1808,8 @@ mod tests {
     }
 
     #[test]
-    fn the_window_as_it_first_opens_shows_five_in_a_row() {
-        assert_eq!(grid_at(1280).0.columns, 5);
+    fn the_narrowest_window_shows_five_in_a_row_and_the_window_as_it_first_opens_six() {
+        assert_eq!(grid_at(NARROWEST).0.columns, 5);
+        assert_eq!(grid_at(1280).0.columns, 6);
     }
 }
