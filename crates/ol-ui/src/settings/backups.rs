@@ -1,5 +1,3 @@
-// The Backups tab: each launcher's snapshots, the number to keep, and the restore dialog. A restore goes through `Backend::restore_backup`, the switch pipeline's own.
-
 use std::collections::HashMap;
 
 use gpui::prelude::*;
@@ -15,14 +13,16 @@ use ol_ui_kit::theme::{self, alpha, color};
 use super::{Control, Pick, Refused, SettingsTab, SettingsView};
 use crate::assets;
 use crate::local_time;
-use crate::widgets::{Button, Tone, icon, launcher_dot, panel, panel_shadow, setting_row, tip};
+use crate::widgets::{
+    Appeared, Button, Tone, icon, launcher_dot, panel, panel_shadow, setting_row, tip,
+};
 
 #[derive(Default)]
 pub(super) struct Backups {
     lists: HashMap<LauncherId, List>,
-    reads: u64,
     // Every snapshot id seen, so the keyboard can stay on one snapshot's button while the lists change.
     seen: Vec<(LauncherId, String)>,
+    seen_at: HashMap<LauncherId, HashMap<String, usize>>,
     dialog: Option<Restoring>,
     dialogs: u64,
     outcome: Option<Outcome>,
@@ -34,7 +34,8 @@ struct List {
     snapshots: Option<Vec<BackupSnapshot>>,
     error: Option<SharedString>,
     loading: bool,
-    read: u64,
+    // Asked for while a read ran: one more read follows it, and the running one's answer is passed over.
+    again: bool,
     open: bool,
 }
 
@@ -45,6 +46,7 @@ struct Restoring {
     error: Option<SharedString>,
     // Cancel leads until Tab moves the ring, as the Electron app's dialog puts the keyboard on its first button.
     restore_leads: bool,
+    appeared: Appeared,
 }
 
 enum Outcome {
@@ -64,9 +66,15 @@ impl Backups {
     }
 
     fn seen_at(&self, launcher: LauncherId, id: &str) -> Option<usize> {
-        self.seen
-            .iter()
-            .position(|(seen, seen_id)| *seen == launcher && seen_id == id)
+        self.seen_at.get(&launcher)?.get(id).copied()
+    }
+
+    fn see(&mut self, launcher: LauncherId, id: &str) {
+        let known = self.seen_at.entry(launcher).or_default();
+        if !known.contains_key(id) {
+            known.insert(id.to_owned(), self.seen.len());
+            self.seen.push((launcher, id.to_owned()));
+        }
     }
 
     pub(super) fn controls(&self, controls: &mut Vec<Control>) {
@@ -127,58 +135,56 @@ impl SettingsView {
         self.list_backups(None, cx);
     }
 
-    // Every launcher's list, or one; only the newest read of a list is shown.
+    // Every launcher's list, or one. A list being read is read once more after it, and no more, however often it is asked for.
     pub(super) fn list_backups(&mut self, only: Option<LauncherId>, cx: &mut Context<Self>) {
         for launcher in LauncherId::ALL {
-            if only.is_some_and(|only| only != launcher) {
-                continue;
+            if only.is_none_or(|only| only == launcher) {
+                self.read_list(launcher, cx);
             }
-            let backups = &mut self.backups;
-            backups.reads += 1;
-            let read = backups.reads;
-            let list = backups.lists.entry(launcher).or_default();
-            list.read = read;
-            list.loading = true;
-            let backend = self.backend.clone();
-            cx.spawn(async move |this, cx| {
-                let listed = backend.backups(launcher).await;
-                this.update(cx, |this, cx| this.listed(launcher, read, listed, cx))
-                    .ok();
-            })
-            .detach();
         }
         cx.notify();
+    }
+
+    fn read_list(&mut self, launcher: LauncherId, cx: &mut Context<Self>) {
+        let list = self.backups.lists.entry(launcher).or_default();
+        if list.loading {
+            list.again = true;
+            return;
+        }
+        list.loading = true;
+        let backend = self.backend.clone();
+        cx.spawn(async move |this, cx| {
+            let listed = backend.backups(launcher).await;
+            this.update(cx, |this, cx| this.listed(launcher, listed, cx))
+                .ok();
+        })
+        .detach();
     }
 
     fn listed(
         &mut self,
         launcher: LauncherId,
-        read: u64,
         listed: Result<Vec<BackupSnapshot>, ApiError>,
         cx: &mut Context<Self>,
     ) {
         let backups = &mut self.backups;
-        let Some(list) = backups
-            .lists
-            .get_mut(&launcher)
-            .filter(|list| list.read == read)
-        else {
+        let Some(list) = backups.lists.get_mut(&launcher) else {
             return;
         };
         list.loading = false;
+        if std::mem::take(&mut list.again) {
+            self.read_list(launcher, cx);
+            return;
+        }
         match listed {
             Ok(snapshots) => {
                 for snapshot in &snapshots {
-                    if !backups
-                        .seen
-                        .iter()
-                        .any(|(seen, id)| *seen == launcher && *id == snapshot.id)
-                    {
-                        backups.seen.push((launcher, snapshot.id.clone()));
-                    }
+                    backups.see(launcher, &snapshot.id);
                 }
-                list.snapshots = Some(snapshots);
-                list.error = None;
+                if let Some(list) = backups.lists.get_mut(&launcher) {
+                    list.snapshots = Some(snapshots);
+                    list.error = None;
+                }
             }
             Err(error) => {
                 list.snapshots = None;
@@ -219,6 +225,7 @@ impl SettingsView {
             busy: false,
             error: None,
             restore_leads: false,
+            appeared: Appeared::now(),
         });
         cx.notify();
     }
@@ -736,11 +743,14 @@ impl SettingsView {
                 .disabled(busy)
                 .leading(!busy && dialog.restore_leads)
                 .on_click(cx.listener(|this, click: &ClickEvent, _, cx| {
-                    // The second click of a double click on the Restore button behind the dialog is not a yes.
-                    if click.click_count() > 1 {
-                        return;
+                    if this
+                        .backups
+                        .dialog
+                        .as_ref()
+                        .is_some_and(|dialog| dialog.appeared.takes(click))
+                    {
+                        this.restore(cx);
                     }
-                    this.restore(cx);
                 })),
             );
         let card = div()

@@ -1,5 +1,3 @@
-// The Launchers panel of the Launchers tab: each launcher's install, whether it runs, its health and its checks, with Locate and Reset.
-
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -24,8 +22,9 @@ pub type KnownStatuses = Rc<RefCell<Option<Vec<LauncherStatus>>>>;
 pub(super) struct Launchers {
     rows: Option<Vec<LauncherStatus>>,
     loading: bool,
+    // Asked for while a read ran: one more read follows it, and the running one's answer is passed over.
+    again: bool,
     error: Option<SharedString>,
-    reads: u64,
     open: HashSet<LauncherId>,
     acts: HashMap<LauncherId, Act>,
     made: u64,
@@ -110,14 +109,18 @@ impl SettingsView {
         self.read_statuses(cx);
     }
 
+    // A status read passes over all four adapters on the backend's one thread, so reads never pile up there.
     pub(super) fn read_statuses(&mut self, cx: &mut Context<Self>) {
         let launchers = &mut self.launchers;
-        launchers.reads += 1;
+        if launchers.loading {
+            launchers.again = true;
+            return;
+        }
         launchers.loading = true;
-        let (read, backend) = (launchers.reads, self.backend.clone());
+        let backend = self.backend.clone();
         cx.spawn(async move |this, cx| {
             let statuses = backend.launcher_statuses().await;
-            this.update(cx, |this, cx| this.statuses_read(read, statuses, cx))
+            this.update(cx, |this, cx| this.statuses_read(statuses, cx))
                 .ok();
         })
         .detach();
@@ -126,15 +129,15 @@ impl SettingsView {
 
     fn statuses_read(
         &mut self,
-        read: u64,
         statuses: Result<Vec<LauncherStatus>, ApiError>,
         cx: &mut Context<Self>,
     ) {
         let launchers = &mut self.launchers;
-        if read != launchers.reads {
+        launchers.loading = false;
+        if std::mem::take(&mut launchers.again) {
+            self.read_statuses(cx);
             return;
         }
-        launchers.loading = false;
         match statuses {
             Ok(rows) => {
                 *self.known.borrow_mut() = Some(rows.clone());

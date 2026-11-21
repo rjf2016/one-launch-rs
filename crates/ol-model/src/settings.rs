@@ -328,12 +328,10 @@ impl Settings {
             .0
     }
 
-    // What the Backups tab shows: the stored number when it is 1 or more, else the default.
+    // The number pruning keeps, so the Backups tab shows the one in force.
     pub fn backups_keep(&self) -> i64 {
-        self.get(SettingKey::BackupsKeep)
-            .and_then(|value| value.parse::<i64>().ok())
-            .filter(|keep| *keep >= 1)
-            .unwrap_or(DEFAULT_BACKUPS_TO_KEEP)
+        self.get_int(SettingKey::BackupsKeep, DEFAULT_BACKUPS_TO_KEEP)
+            .max(1)
     }
 
     pub fn backups_keep_choices(&self) -> Vec<i64> {
@@ -361,6 +359,23 @@ impl fmt::Debug for Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_number_of_snapshots_shown_is_the_one_pruning_keeps() {
+        let keep = |stored: Option<&str>| {
+            let mut settings = Settings::default();
+            if let Some(stored) = stored {
+                settings.insert(SettingKey::BackupsKeep, stored.to_owned());
+            }
+            settings.backups_keep()
+        };
+        assert_eq!(keep(None), DEFAULT_BACKUPS_TO_KEEP);
+        assert_eq!(keep(Some("7")), 7);
+        assert_eq!(keep(Some(" 7 ")), 7);
+        assert_eq!(keep(Some("0")), 1);
+        assert_eq!(keep(Some("-3")), 1);
+        assert_eq!(keep(Some("35px")), DEFAULT_BACKUPS_TO_KEEP);
+    }
 
     #[test]
     fn every_key_reads_back() {

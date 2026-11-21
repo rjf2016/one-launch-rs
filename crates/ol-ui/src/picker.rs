@@ -4,12 +4,10 @@ use std::rc::Rc;
 
 use gpui::{App, PathPromptOptions, Task};
 
-// What Locate asks for a launcher's program with. The app hands one in at its start; none handed in answers every ask as cancelled.
 #[derive(Clone)]
 pub enum FilePicker {
-    // The window's own file dialog, from GPUI: a run a person uses.
     Windows,
-    // A capture's or a probe's, which agents run: the answers its steps gave, taken in order, and nothing on the desktop.
+    // Agents run captures and probes, which must never put a dialog on the owner's desktop.
     Scripted(Rc<RefCell<Script>>),
 }
 
@@ -22,7 +20,6 @@ pub struct Script {
 }
 
 impl Script {
-    // `None` is a cancel.
     pub fn answer(&mut self, answer: Option<String>) {
         self.answers.push_back(answer);
     }
@@ -60,7 +57,6 @@ fn ask(picker: Option<&FilePicker>) -> Ask {
     }
 }
 
-// The one place in the app that can open a file dialog.
 pub(crate) fn pick_program(cx: &App) -> Task<Picked> {
     match ask(cx.try_global::<FilePicker>()) {
         Ask::Answered(picked) => Task::ready(picked),

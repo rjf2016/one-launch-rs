@@ -18,7 +18,7 @@ use crate::assets;
 use crate::host::{LaunchHost, PlayEnded, overlay};
 use crate::library::LibraryView;
 use crate::settings::{KnownStatuses, SettingsTab, SettingsView};
-use crate::widgets::{Button, Tone, panel_shadow, spinner, tip};
+use crate::widgets::{Appeared, Button, Tone, panel_shadow, spinner, tip};
 
 const SIDEBAR: f32 = 224.;
 const SIDEBAR_COLLAPSED: f32 = 60.;
@@ -115,6 +115,7 @@ struct Asking {
     asked: Asked,
     // The second answer carries the ring, and Enter gives it.
     act_leads: bool,
+    appeared: Appeared,
 }
 
 // The user answered Quit anyway: the app is to quit.
@@ -288,6 +289,7 @@ impl Shell {
             act: question.quit,
             asked: Asked::Quit,
             act_leads: false,
+            appeared: Appeared::now(),
         });
         window.blur(cx);
         cx.notify();
@@ -348,6 +350,7 @@ impl Shell {
                     return_to: go.return_to.map(Box::new),
                 },
                 act_leads: false,
+                appeared: Appeared::now(),
             });
             window.blur(cx);
             cx.notify();
@@ -395,6 +398,7 @@ impl Shell {
                     act: "",
                     asked: Asked::Stopping,
                     act_leads: false,
+                    appeared: Appeared::now(),
                 });
                 cx.emit(QuitAnyway);
             }
@@ -915,8 +919,11 @@ impl Shell {
                             Button::new("leave", Tone::Danger, asking.act)
                                 .leading(asking.act_leads)
                                 .on_click(cx.listener(|this, click: &ClickEvent, window, cx| {
-                                    // The second click of a double click is not an answer.
-                                    if click.click_count() == 1 {
+                                    if this
+                                        .asking
+                                        .as_ref()
+                                        .is_some_and(|asking| asking.appeared.takes(click))
+                                    {
                                         this.answer(true, window, cx);
                                     }
                                 })),

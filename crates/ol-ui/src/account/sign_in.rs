@@ -8,10 +8,9 @@ use ol_api::{ApiError, CapturedSignIn, SavedSignIn};
 use ol_model::{Account, LauncherId, LauncherSession, LauncherSessionState};
 use ol_ui_kit::theme::{self, color};
 
-use super::password::single;
 use super::{AccountPage, Kind};
 use crate::assets;
-use crate::widgets::{Button, Tone, icon, panel, row};
+use crate::widgets::{Appeared, Button, Tone, icon, panel, row};
 
 const DESCRIPTION: &str =
     "Saved the first time you play on this account, and put back whenever you switch to it.";
@@ -34,7 +33,7 @@ pub(super) struct SignIn {
     busy: bool,
     note: Option<SharedString>,
     failed: Option<SharedString>,
-    confirm_forget: bool,
+    confirm_forget: Option<Appeared>,
 }
 
 #[derive(Clone, Copy)]
@@ -202,7 +201,7 @@ impl AccountPage {
                 this.sign_in.busy = false;
                 match forgotten {
                     Ok(()) => {
-                        this.sign_in.confirm_forget = false;
+                        this.sign_in.confirm_forget = None;
                         this.sign_in.note = Some("Saved sign-in removed".into());
                         this.load_sign_in(cx);
                     }
@@ -383,13 +382,17 @@ impl AccountPage {
 
         let mut buttons: Vec<AnyElement> = Vec::new();
         if session.is_some() {
-            if sign_in.confirm_forget {
+            if sign_in.confirm_forget.is_some() {
                 buttons.push(
                     Button::new("sign-in-forget-yes", Tone::Danger, "Yes, forget it")
                         .glyph(assets::TRASH)
                         .disabled(busy)
                         .on_click(cx.listener(|this, click, _, cx| {
-                            if single(click) {
+                            if this
+                                .sign_in
+                                .confirm_forget
+                                .is_some_and(|shown| shown.takes(click))
+                            {
                                 this.forget_sign_in(cx);
                             }
                         })),
@@ -398,7 +401,7 @@ impl AccountPage {
                     Button::new("sign-in-forget-cancel", Tone::Ghost, "Cancel")
                         .disabled(busy)
                         .on_click(cx.listener(|this, _, _, cx| {
-                            this.sign_in.confirm_forget = false;
+                            this.sign_in.confirm_forget = None;
                             cx.notify();
                         })),
                 );
@@ -408,7 +411,7 @@ impl AccountPage {
                         .glyph(assets::TRASH)
                         .disabled(busy)
                         .on_click(cx.listener(|this, _, _, cx| {
-                            this.sign_in.confirm_forget = true;
+                            this.sign_in.confirm_forget = Some(Appeared::now());
                             cx.notify();
                         })),
                 );

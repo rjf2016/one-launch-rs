@@ -180,12 +180,14 @@ impl FolderShell for RecordingShell {
     }
 }
 
-// What Locate asks for a launcher's program with. A capture, a probe or the doctor is run by agents, so it is answered from the run's steps and never opens a dialog on the owner's desktop.
-fn file_picker(args: &Args) -> FilePicker {
-    match Opener::for_run(args) {
+// The one place a run is handed the picker Locate asks with. A capture or a probe is run by agents, so it is answered from the run's steps and never opens a dialog on the owner's desktop.
+fn hand_picker(args: &Args, set: impl FnOnce(FilePicker)) -> FilePicker {
+    let picker = match Opener::for_run(args) {
         Opener::Windows => FilePicker::Windows,
         Opener::Recording => FilePicker::Scripted(Rc::default()),
-    }
+    };
+    set(picker.clone());
+    picker
 }
 
 fn report_picks(picker: &FilePicker) {
@@ -267,16 +269,16 @@ fn main() -> ExitCode {
     };
     let heard = use_clipboard(Board::for_run(&args).give(), &backend);
     let _recorded = hand_shell(&args, &backend);
-    let picker = file_picker(&args);
+    let picker = Rc::new(RefCell::new(None));
     let failed = Rc::new(Cell::new(false));
     let tray = TraySlot::default();
     gpui_platform::application()
         .with_assets(ol_ui::Assets)
         .run({
             let (backend, failed, tray) = (backend.clone(), failed.clone(), tray.clone());
-            let picker = picker.clone();
+            let picker = Rc::clone(&picker);
             move |cx| {
-                cx.set_global(picker);
+                *picker.borrow_mut() = Some(hand_picker(&args, |given| cx.set_global(given)));
                 if let Err(error) = start(args, backend, machine, failed.clone(), tray, cx) {
                     eprintln!("OneLaunch: {error:#}");
                     failed.set(true);
@@ -294,7 +296,9 @@ fn main() -> ExitCode {
     if let Some(heard) = heard {
         heard();
     }
-    report_picks(&picker);
+    if let Some(picker) = picker.borrow().as_ref() {
+        report_picks(picker);
+    }
     if failed.get() {
         ExitCode::FAILURE
     } else {
@@ -790,22 +794,28 @@ mod tests {
     // Locate's dialog is GPUI's `prompt_for_paths`, which only `FilePicker::Windows` reaches.
     #[test]
     fn a_capture_or_a_probe_never_opens_the_file_dialog() {
-        let checks: [&[&str]; 7] = [
+        let checks: [&[&str]; 6] = [
             &[r"--capture=D:\scratch\shot.png"],
             &[r"--capture=D:\scratch\shot.png", "--capture-keys=enter"],
             &[r"--capture=D:\scratch\shot.png", "--capture-size=960x600"],
             &[r"--capture=D:\scratch\shot.png", "--capture-focus"],
             &[r"--capture=D:\scratch\shot.png", "--capture-type=abc"],
             &["--probe"],
-            &["--doctor"],
         ];
+        let handed = |arguments: &[&str]| {
+            let mut set = None;
+            let kept = hand_picker(&parsed(arguments), |given| set = Some(given));
+            (set.expect("the picker was handed on"), kept)
+        };
         for check in checks {
+            let (set, kept) = handed(check);
             assert!(
-                matches!(file_picker(&parsed(check)), FilePicker::Scripted(_)),
+                matches!(set, FilePicker::Scripted(_)) && matches!(kept, FilePicker::Scripted(_)),
                 "{check:?} could open the file dialog"
             );
         }
-        assert!(matches!(file_picker(&parsed(&[])), FilePicker::Windows));
+        let (set, _) = handed(&[]);
+        assert!(matches!(set, FilePicker::Windows));
     }
 
     fn parsed(arguments: &[&str]) -> Args {

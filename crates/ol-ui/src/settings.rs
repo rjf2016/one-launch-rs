@@ -22,8 +22,8 @@ use crate::assets;
 use crate::host::overlay;
 use crate::page::{PageScroll, scroll_page};
 use crate::widgets::{
-    Button, DropdownMenu, Spot, Tone, dropdown_menu, dropdown_place, dropdown_trigger, icon,
-    page_title, panel, setting_row, spot_of, switch, tab_strip,
+    Appeared, Button, DropdownMenu, Spot, Tone, dropdown_menu, dropdown_place, dropdown_trigger,
+    icon, page_title, panel, setting_row, spot_of, switch, tab_strip,
 };
 
 mod backups;
@@ -182,7 +182,7 @@ pub struct SettingsView {
     vault_reads: u64,
     test: SelfTest,
     tests: u64,
-    confirm_reset: bool,
+    confirm_reset: Option<Appeared>,
     resetting: bool,
     reset_note: Option<SharedString>,
     folder_error: Option<SharedString>,
@@ -224,7 +224,7 @@ impl SettingsView {
             vault_reads: 0,
             test: SelfTest::Idle,
             tests: 0,
-            confirm_reset: false,
+            confirm_reset: None,
             resetting: false,
             reset_note: None,
             folder_error: None,
@@ -485,7 +485,7 @@ impl SettingsView {
         if self.resetting || !self.shows_reset() {
             return;
         }
-        self.confirm_reset = ask;
+        self.confirm_reset = ask.then(Appeared::now);
         // The button that had the keyboard is gone, as in the Electron app: the next Enter presses nothing.
         self.focus = None;
         cx.notify();
@@ -493,7 +493,7 @@ impl SettingsView {
 
     // Enter and a click together reset once.
     fn reset(&mut self, cx: &mut Context<Self>) {
-        if self.resetting || !self.confirm_reset || !self.shows_reset() {
+        if self.resetting || self.confirm_reset.is_none() || !self.shows_reset() {
             return;
         }
         self.resetting = true;
@@ -506,7 +506,7 @@ impl SettingsView {
                 match reset {
                     Ok(reset) => {
                         this.reset_note = Some(reset.note().into());
-                        this.confirm_reset = false;
+                        this.confirm_reset = None;
                     }
                     Err(error) => this.reset_note = Some(error.message.into()),
                 }
@@ -542,7 +542,7 @@ impl SettingsView {
     fn controls(&self) -> Vec<Control> {
         let mut controls = vec![Control::Tabs];
         if self.shows_reset() && !self.resetting {
-            if self.confirm_reset {
+            if self.confirm_reset.is_some() {
                 controls.extend([Control::YesReset, Control::CancelReset]);
             } else {
                 controls.push(Control::AskReset);
@@ -892,7 +892,7 @@ impl SettingsView {
         ]);
         let buttons: Vec<AnyElement> = if !shows {
             Vec::new()
-        } else if self.confirm_reset {
+        } else if self.confirm_reset.is_some() {
             vec![
                 Button::new(
                     "reset-yes",
@@ -906,8 +906,7 @@ impl SettingsView {
                 .disabled(self.resetting)
                 .leading(self.ringed_on(Control::YesReset))
                 .on_click(cx.listener(|this, click: &ClickEvent, _, cx| {
-                    // The second click of a double click on the button before it is not a yes.
-                    if click.click_count() > 1 {
+                    if !this.confirm_reset.is_some_and(|shown| shown.takes(click)) {
                         return;
                     }
                     this.clicked(Control::YesReset);
@@ -949,7 +948,7 @@ impl SettingsView {
                         .child(icon(assets::SHIELD_OFF, 16., theme::DANGER).mt(px(2.)))
                         .child(div().flex_1().min_w_0().child(text)),
                 )
-                .when(self.confirm_reset && shows, |banner| {
+                .when(self.confirm_reset.is_some() && shows, |banner| {
                     banner.child(
                         div()
                             .ml(px(24.))
