@@ -488,9 +488,12 @@ fn a_save_and_a_forget_are_refused_while_a_switch_runs_and_for_steam_and_an_unkn
     fakes.fake.clock.before_sleep(move || {
         let mut seen = seen.lock().unwrap();
         if seen.is_none() {
+            // Kept as answers: a panic here would end the switch's own thread and leave the job running for good.
+            let answer =
+                |refused: Option<ApiError>| refused.map(|error| (error.code, error.message));
             *seen = Some((
-                refusal(block_on(backend.capture_session(&main_id))),
-                refusal(block_on(backend.forget_session(&alt_id))),
+                answer(block_on(backend.capture_session(&main_id)).err()),
+                answer(block_on(backend.forget_session(&alt_id)).err()),
             ));
         }
     });
@@ -500,7 +503,10 @@ fn a_save_and_a_forget_are_refused_while_a_switch_runs_and_for_steam_and_an_unkn
         "BUSY",
         "Another switch or launch is still running".to_owned(),
     );
-    assert_eq!(asked.lock().unwrap().clone(), Some((busy.clone(), busy)));
+    assert_eq!(
+        asked.lock().unwrap().clone(),
+        Some((Some(busy.clone()), Some(busy)))
+    );
 
     let steam = fakes.account(LauncherId::Steam, "user_1");
     assert_eq!(
