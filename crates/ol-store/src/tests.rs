@@ -1251,3 +1251,39 @@ fn a_deleted_account_takes_its_saved_sign_in_and_leaves_its_launches() {
     );
     assert!(!store.delete_account(&epic_alt).unwrap());
 }
+
+#[test]
+fn a_forgotten_sign_in_takes_its_row_alone() {
+    let scratch = data_folder();
+    let (store, _) = Store::open(&database_path(scratch.path())).unwrap();
+    let epic_alt = id_of(&store, LauncherId::Epic, "alt@example.com");
+    let accounts = account_rows(&store.conn);
+    let history = rows(&store.conn, "SELECT * FROM launch_history ORDER BY id");
+    let others = rows(
+        &store.conn,
+        &format!(
+            "SELECT * FROM launcher_sessions WHERE account_id <> '{epic_alt}' ORDER BY account_id"
+        ),
+    );
+    assert_eq!(others.len(), 2);
+    assert!(store.session(&epic_alt).unwrap().is_some());
+
+    assert!(store.delete_session(&epic_alt).unwrap());
+
+    assert!(store.session(&epic_alt).unwrap().is_none());
+    assert!(store.session_blob(&epic_alt).unwrap().is_none());
+    assert_eq!(
+        rows(
+            &store.conn,
+            "SELECT * FROM launcher_sessions ORDER BY account_id"
+        ),
+        others
+    );
+    assert_eq!(account_rows(&store.conn), accounts);
+    assert_eq!(
+        rows(&store.conn, "SELECT * FROM launch_history ORDER BY id"),
+        history
+    );
+    assert!(!store.delete_session(&epic_alt).unwrap());
+    assert!(!store.delete_session("no-such-account").unwrap());
+}

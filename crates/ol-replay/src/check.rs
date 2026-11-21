@@ -1,4 +1,4 @@
-// Holds the replay of a recorded run to its recording in oracle/l2: every platform event, the job events, and what the run left behind for the four launchers. Left out of every comparison, because nothing builds them yet: artwork, the vault probe, the log lines and the copies to the clipboard.
+// Holds the replay of a recorded run to its recording in oracle/l2: every platform event, the job events, and what the run left behind for the four launchers. Left out of every comparison: artwork, the vault probe and the log lines, because nothing builds them yet, and the copies to the clipboard, which the replay does not make.
 
 use std::fs;
 
@@ -53,7 +53,7 @@ fn replay(name: &str) -> (Value, Value) {
     (actual, recorded("expected", name))
 }
 
-// The events of one kind, without the copies to the clipboard, which this build does not make.
+// The events of one kind, without the copies to the clipboard, which the replay does not make.
 fn events(all: &[Value], kind: &str) -> Vec<Value> {
     all.iter()
         .filter(|event| event["k"] == kind)

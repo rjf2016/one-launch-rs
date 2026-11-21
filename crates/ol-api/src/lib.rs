@@ -3,6 +3,12 @@
 mod backend;
 
 pub use backend::{ApiError, Backend, JobObserver, Library, SavedSignIn, StartLaunch};
+pub use ol_services::capture::Captured as CapturedSignIn;
+
+pub mod clipboard {
+    pub use ol_platform_api::{Clipboard, ClipboardError};
+    pub use ol_services::clipboard::{CLEAR_AFTER, CopyField, CopyResult, SleepingTimer, Timer};
+}
 
 pub mod library {
     pub use ol_services::library::{

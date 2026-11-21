@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use thiserror::Error;
 use time::OffsetDateTime;
+use zeroize::Zeroizing;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Hive {
@@ -177,6 +178,19 @@ pub struct ShellError(pub String);
 pub trait Shell: Send + Sync {
     // Hands a link such as steam://rungameid/1 to whatever program Windows opens it with.
     fn open_url(&self, url: &str) -> Result<(), ShellError>;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[error("{0}")]
+pub struct ClipboardError(pub String);
+
+pub trait Clipboard: Send + Sync {
+    // With the formats that keep the text out of Windows' clipboard history and the cloud clipboard.
+    fn write_private(&self, text: &str) -> Result<(), ClipboardError>;
+    fn write_text(&self, text: &str) -> Result<(), ClipboardError>;
+    fn read_text(&self) -> Result<Option<Zeroizing<String>>, ClipboardError>;
+    // Reads and empties in one hold of the clipboard, so that nothing copied in between is emptied.
+    fn clear_if(&self, holds: &dyn Fn(&str) -> bool) -> Result<bool, ClipboardError>;
 }
 
 // The launch request the Riot Client's own Play button sends, to be sent to the client's local server on this PC once the client shows the game's page. Nothing else is ever asked of that server, and nothing at all of Riot's.

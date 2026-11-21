@@ -2,6 +2,8 @@
 
 pub mod accounts;
 pub mod backup;
+pub mod capture;
+pub mod clipboard;
 pub mod data_folder;
 pub mod doctor;
 pub mod journal;
