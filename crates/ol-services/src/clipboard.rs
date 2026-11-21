@@ -1,5 +1,4 @@
 use std::fmt;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
@@ -89,21 +88,39 @@ impl Timer for SleepingTimer {
 
 type Fingerprint = [u8; 32];
 
+// A clear that finds the clipboard held open is tried again this often, and is still pending for the clear at quit after that.
+const CLEAR_TRIES: u32 = 5;
+const CLEAR_RETRY: Duration = Duration::from_secs(2);
+
 fn fingerprint(text: &str) -> Fingerprint {
     Sha256::digest(text.as_bytes()).into()
 }
 
 struct Pending {
     fingerprint: Fingerprint,
+    length: usize,
     cancel: CancelToken,
     copy: u64,
+}
+
+#[derive(Default)]
+struct State {
+    pending: Option<Pending>,
+    copies: u64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Cleared {
+    Yes,
+    No,
+    Busy,
 }
 
 struct Inner {
     board: Arc<dyn Clipboard>,
     timer: Arc<dyn Timer>,
-    pending: Mutex<Option<Pending>>,
-    copies: AtomicU64,
+    // Held through every write and clear, so a clear acts only for the copy that is current while it reads the clipboard.
+    state: Mutex<State>,
 }
 
 #[derive(Clone)]
@@ -117,83 +134,101 @@ impl ClipboardService {
             inner: Arc::new(Inner {
                 board,
                 timer,
-                pending: Mutex::new(None),
-                copies: AtomicU64::new(0),
+                state: Mutex::new(State::default()),
             }),
         }
     }
 
+    // The marks that keep the text out of the history are left off only when Windows turns the marked write itself down. A clipboard another program holds is an error the user can try again, and the earlier copy stays due to be cleared.
     pub fn copy_sensitive(&self, text: &Secret) -> Result<CopyResult, ClipboardError> {
         let inner = &self.inner;
-        drop(inner.take_pending());
+        let mut state = inner.state();
         let text = text.expose();
-        let history_excluded = inner.board.write_private(text).is_ok()
-            && inner
-                .board
-                .read_text()
-                .is_ok_and(|back| back.as_deref().map(String::as_str) == Some(text));
-        if !history_excluded {
-            inner.board.write_text(text)?;
+        let history_excluded = match inner.board.write_private(text) {
+            Ok(()) => true,
+            Err(ClipboardError::Refused(_)) => {
+                inner.board.write_text(text)?;
+                false
+            }
+            Err(busy) => return Err(busy),
+        };
+        if let Some(earlier) = state.pending.take() {
+            earlier.cancel.cancel();
         }
-        let copy = inner.copies.fetch_add(1, Ordering::SeqCst);
+        let copy = state.copies;
+        state.copies += 1;
         let cancel = CancelToken::new();
-        *inner.pending() = Some(Pending {
+        state.pending = Some(Pending {
             fingerprint: fingerprint(text),
+            length: text.encode_utf16().count(),
             cancel: cancel.clone(),
             copy,
         });
-        let due = Arc::downgrade(inner);
-        inner.timer.after(
-            CLEAR_AFTER,
-            cancel,
-            Box::new(move || {
-                if let Some(inner) = due.upgrade() {
-                    inner.clear_copy(Some(copy));
-                }
-            }),
-        );
+        drop(state);
+        arm(inner, copy, cancel, CLEAR_AFTER, CLEAR_TRIES);
         Ok(CopyResult {
             clear_after: CLEAR_AFTER,
             history_excluded,
         })
     }
 
+    // At quit: the last chance, so a clipboard held open is tried as often as the timer would.
     pub fn clear_if_unchanged(&self) -> bool {
-        self.inner.clear_copy(None)
+        for _ in 0..CLEAR_TRIES {
+            match self.inner.clear_copy(None) {
+                Cleared::Yes => return true,
+                Cleared::No => return false,
+                Cleared::Busy => {}
+            }
+        }
+        false
     }
 }
 
+fn arm(inner: &Arc<Inner>, copy: u64, cancel: CancelToken, delay: Duration, tries: u32) {
+    let due = Arc::downgrade(inner);
+    let again = cancel.clone();
+    inner.timer.after(
+        delay,
+        cancel,
+        Box::new(move || {
+            let Some(inner) = due.upgrade() else {
+                return;
+            };
+            if inner.clear_copy(Some(copy)) == Cleared::Busy && tries > 1 {
+                arm(&inner, copy, again, CLEAR_RETRY, tries - 1);
+            }
+        }),
+    );
+}
+
 impl Inner {
-    fn pending(&self) -> MutexGuard<'_, Option<Pending>> {
-        self.pending
+    fn state(&self) -> MutexGuard<'_, State> {
+        self.state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    fn take_pending(&self) -> Option<Pending> {
-        let taken = self.pending().take();
-        if let Some(pending) = &taken {
+    // A timer names its copy, so one that fires late cannot clear a newer copy. A clear that could not read the clipboard leaves the copy pending.
+    fn clear_copy(&self, copy: Option<u64>) -> Cleared {
+        let mut state = self.state();
+        let Some(pending) = state.pending.as_ref() else {
+            return Cleared::No;
+        };
+        if copy.is_some_and(|copy| copy != pending.copy) {
+            return Cleared::No;
+        }
+        let (copied, length) = (pending.fingerprint, pending.length);
+        let Ok(cleared) = self
+            .board
+            .clear_if(length, &|held| fingerprint(held) == copied)
+        else {
+            return Cleared::Busy;
+        };
+        if let Some(pending) = state.pending.take() {
             pending.cancel.cancel();
         }
-        taken
-    }
-
-    // A timer names its copy, so one that fires late cannot clear a newer copy.
-    fn clear_copy(&self, copy: Option<u64>) -> bool {
-        let pending = {
-            let mut pending = self.pending();
-            if copy.is_some() && pending.as_ref().map(|pending| pending.copy) != copy {
-                return false;
-            }
-            pending.take()
-        };
-        let Some(pending) = pending else {
-            return false;
-        };
-        pending.cancel.cancel();
-        self.board
-            .clear_if(&|held| fingerprint(held) == pending.fingerprint)
-            .unwrap_or(false)
+        if cleared { Cleared::Yes } else { Cleared::No }
     }
 }
 

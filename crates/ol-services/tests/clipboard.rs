@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use ol_model::{Account, Ciphertext};
-use ol_platform_api::{CancelToken, Clock};
+use ol_platform_api::{CancelToken, ClipboardError, Clock};
 use ol_platform_fake::{FakeClock, Kept, OpLog, RecordingClipboard};
 use ol_services::clipboard::{CLEAR_AFTER, ClipboardService, CopyField, Timer, copy_account_field};
 use ol_store::{Store, database_path};
@@ -173,6 +173,92 @@ fn a_clipboard_another_program_holds_refuses_the_copy_and_names_no_text() {
     assert!(board.log.snapshot().is_empty());
     board.wait(60);
     assert!(!board.service.clear_if_unchanged());
+}
+
+#[test]
+fn a_copy_that_fails_leaves_the_earlier_copy_due_at_30_s_and_at_quit() {
+    let board = board();
+    board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
+    board.wait(10);
+    board.clipboard.busy_on_calls(&[2]);
+    let refused = board
+        .service
+        .copy_sensitive(&secret("the-login"))
+        .unwrap_err();
+    assert_eq!(refused, ClipboardError::Busy);
+    assert!(board.clipboard.holds(PASSWORD));
+    board.wait(20);
+    assert!(
+        board.clipboard.is_empty(),
+        "the earlier copy was not cleared at its time"
+    );
+
+    let board = self::board();
+    board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
+    board.clipboard.busy_on_calls(&[2]);
+    assert!(board.service.copy_sensitive(&secret("the-login")).is_err());
+    assert!(board.service.clear_if_unchanged());
+    assert!(board.clipboard.is_empty());
+}
+
+#[test]
+fn a_private_copy_is_never_written_again_without_its_marks_because_the_clipboard_was_busy_after_it()
+{
+    let board = board();
+    board.clipboard.busy_on_calls(&[2, 3]);
+    let copied = board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
+    assert!(copied.history_excluded);
+    assert_eq!(board.clipboard.kept(), Some(Kept::Private));
+    assert_eq!(board.ops(), ["clip.write"]);
+
+    let board = self::board();
+    board.clipboard.busy_on_calls(&[1]);
+    assert_eq!(
+        board.service.copy_sensitive(&secret(PASSWORD)).unwrap_err(),
+        ClipboardError::Busy
+    );
+    assert!(board.clipboard.is_empty());
+    assert!(board.log.snapshot().is_empty());
+}
+
+#[test]
+fn a_clear_that_finds_the_clipboard_busy_is_tried_again_and_still_made_at_quit() {
+    let board = board();
+    board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
+    board.clipboard.busy_on_calls(&[2]);
+    board.wait(30);
+    assert!(board.clipboard.holds(PASSWORD));
+    board.wait(2);
+    assert!(board.clipboard.is_empty(), "the clear was not tried again");
+
+    let board = self::board();
+    board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
+    board.clipboard.busy_on_calls(&[2, 3, 4, 5, 6]);
+    board.wait(120);
+    assert!(board.clipboard.holds(PASSWORD));
+    assert!(board.service.clear_if_unchanged());
+    assert!(board.clipboard.is_empty());
+}
+
+#[test]
+fn a_clear_never_reads_a_text_of_another_length() {
+    let board = board();
+    board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
+    board
+        .clipboard
+        .user_copies("a text of the user's own, of another length");
+    board.wait(30);
+    assert_eq!(board.clipboard.reads(), 0);
+    assert!(!board.service.clear_if_unchanged());
+    assert_eq!(board.clipboard.reads(), 0);
+
+    let board = self::board();
+    board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
+    let same_length = "x".repeat(PASSWORD.len());
+    board.clipboard.user_copies(&same_length);
+    board.wait(30);
+    assert_eq!(board.clipboard.reads(), 1);
+    assert!(board.clipboard.holds(&same_length));
 }
 
 struct Unavailable;

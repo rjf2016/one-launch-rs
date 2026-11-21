@@ -220,6 +220,11 @@ Since the real ports. The first four are the ones a user could meet, and are the
 - Every temporary file of a write is flushed to the disk before it is moved over its target.
 - No `reg.exe`, PowerShell or `cmd.exe` runs for the registry or the processes: the same reads and writes go through the Win32 calls.
 
+Since the clipboard. The first is one a user could meet.
+
+- A copy is written without the marks that keep it out of the clipboard history (Win+V) and the cloud clipboard only when Windows turns the marked write itself down, and the answer then says so. A clipboard another program holds open refuses the copy: "Windows would not let One Launch use the clipboard: another program holds the clipboard open. Try again.", and the copy before it stays due to be cleared. Nothing reads the copy back. The Electron app writes the plain copy whenever its PowerShell write fails for any reason or its read-back differs.
+- A clear that finds the clipboard held open is tried again up to four times, 2 s apart, and again at quit; a clear compares only a text of the copy's own length, and reads no other. The Electron app tries once, at 30 s or at quit, and reads whatever text the clipboard holds.
+
 ## Tray (slice 5)
 
 - The tray listens for raw mouse messages. Listen for `NIN_SELECT` and `NIN_KEYSELECT` instead, and change the probe to match.

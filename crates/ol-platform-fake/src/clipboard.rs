@@ -16,6 +16,9 @@ struct State {
     held: Option<(Zeroizing<String>, Kept)>,
     refuse_private: bool,
     refuse_all: bool,
+    calls: usize,
+    busy_calls: Vec<usize>,
+    reads: usize,
 }
 
 // The log never holds the text: a test asks `holds`.
@@ -44,6 +47,16 @@ impl RecordingClipboard {
         clipboard
     }
 
+    // The calls of these numbers, counted from 1 over every call since the clipboard was made, find it held open by another program.
+    pub fn busy_on_calls(&self, calls: &[usize]) {
+        self.state().busy_calls.extend_from_slice(calls);
+    }
+
+    // How often a clear read what the clipboard holds to compare it.
+    pub fn reads(&self) -> usize {
+        self.state().reads
+    }
+
     pub fn user_copies(&self, text: &str) {
         self.state().held = Some((Zeroizing::new(text.to_owned()), Kept::ByTheUser));
     }
@@ -69,10 +82,22 @@ impl RecordingClipboard {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    fn write(&self, text: &str, kept: Kept) -> Result<(), ClipboardError> {
+    fn open(&self) -> Result<MutexGuard<'_, State>, ClipboardError> {
         let mut state = self.state();
-        if state.refuse_all || (kept == Kept::Private && state.refuse_private) {
-            return Err(ClipboardError("the clipboard refused the write".to_owned()));
+        state.calls += 1;
+        let call = state.calls;
+        if state.refuse_all || state.busy_calls.contains(&call) {
+            return Err(ClipboardError::Busy);
+        }
+        Ok(state)
+    }
+
+    fn write(&self, text: &str, kept: Kept) -> Result<(), ClipboardError> {
+        let mut state = self.open()?;
+        if kept == Kept::Private && state.refuse_private {
+            return Err(ClipboardError::Refused(
+                "the clipboard refused the write".to_owned(),
+            ));
         }
         state.held = Some((Zeroizing::new(text.to_owned()), kept));
         drop(state);
@@ -92,21 +117,27 @@ impl Clipboard for RecordingClipboard {
     }
 
     fn read_text(&self) -> Result<Option<Zeroizing<String>>, ClipboardError> {
-        let state = self.state();
-        if state.refuse_all {
-            return Err(ClipboardError("the clipboard refused the read".to_owned()));
-        }
+        let state = self.open()?;
         Ok(state
             .held
             .as_ref()
             .map(|(held, _)| Zeroizing::new(held.as_str().to_owned())))
     }
 
-    fn clear_if(&self, holds: &dyn Fn(&str) -> bool) -> Result<bool, ClipboardError> {
-        let mut state = self.state();
-        if state.refuse_all {
-            return Err(ClipboardError("the clipboard refused the read".to_owned()));
+    fn clear_if(
+        &self,
+        length: usize,
+        holds: &dyn Fn(&str) -> bool,
+    ) -> Result<bool, ClipboardError> {
+        let mut state = self.open()?;
+        let same_length = state
+            .held
+            .as_ref()
+            .is_some_and(|(held, _)| held.encode_utf16().count() == length);
+        if !same_length {
+            return Ok(false);
         }
+        state.reads += 1;
         if !state.held.as_ref().is_some_and(|(held, _)| holds(held)) {
             return Ok(false);
         }
@@ -127,11 +158,13 @@ mod tests {
         let clipboard = RecordingClipboard::new(log.clone());
         clipboard.write_private("placeholder-secret").unwrap();
         assert_eq!(clipboard.kept(), Some(Kept::Private));
-        assert!(!clipboard.clear_if(&|held| held == "another").unwrap());
+        assert!(!clipboard.clear_if(18, &|held| held == "another").unwrap());
+        assert!(!clipboard.clear_if(7, &|_| true).unwrap());
+        assert_eq!(clipboard.reads(), 1);
         assert!(clipboard.holds("placeholder-secret"));
         assert!(
             clipboard
-                .clear_if(&|held| held == "placeholder-secret")
+                .clear_if(18, &|held| held == "placeholder-secret")
                 .unwrap()
         );
         assert!(clipboard.is_empty());

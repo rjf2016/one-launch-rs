@@ -11,6 +11,7 @@ use windows::Win32::System::Memory::{
     GMEM_MOVEABLE, GMEM_ZEROINIT, GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock,
 };
 use windows::core::PCWSTR;
+use zeroize::Zeroize as _;
 
 use crate::wide;
 
@@ -41,14 +42,13 @@ impl Opened {
                 thread::sleep(PAUSE);
             }
         }
-        Err(ClipboardError(
-            "another program holds the clipboard open".to_owned(),
-        ))
+        Err(ClipboardError::Busy)
     }
 
     fn empty(&self) -> Result<(), ClipboardError> {
-        unsafe { EmptyClipboard() }
-            .map_err(|_| ClipboardError("Windows would not empty the clipboard".to_owned()))
+        unsafe { EmptyClipboard() }.map_err(|_| {
+            ClipboardError::Refused("Windows would not empty the clipboard".to_owned())
+        })
     }
 
     fn set(
@@ -57,7 +57,7 @@ impl Opened {
         length: usize,
         fill: impl FnOnce(&mut [u8]),
     ) -> Result<(), ClipboardError> {
-        let refused = || ClipboardError("Windows would not take the copy".to_owned());
+        let refused = || ClipboardError::Refused("Windows would not take the copy".to_owned());
         let block =
             unsafe { GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, length) }.map_err(|_| refused())?;
         let at = unsafe { GlobalLock(block) }.cast::<u8>();
@@ -68,6 +68,11 @@ impl Opened {
         fill(unsafe { std::slice::from_raw_parts_mut(at, length) });
         let _ = unsafe { GlobalUnlock(block) };
         if unsafe { SetClipboardData(format, Some(HANDLE(block.0))) }.is_err() {
+            let at = unsafe { GlobalLock(block) }.cast::<u8>();
+            if !at.is_null() {
+                unsafe { std::slice::from_raw_parts_mut(at, length) }.zeroize();
+                let _ = unsafe { GlobalUnlock(block) };
+            }
             let _ = unsafe { GlobalFree(Some(block)) };
             return Err(refused());
         }
@@ -82,11 +87,17 @@ impl Opened {
     }
 
     fn text(&self) -> Result<Option<Zeroizing<String>>, ClipboardError> {
+        self.with_units(read_utf16)
+    }
+
+    // Hands the clipboard's text, as Windows keeps it, to `read` without a copy.
+    fn with_units<T>(&self, read: impl FnOnce(&[u16]) -> T) -> Result<Option<T>, ClipboardError> {
         if unsafe { IsClipboardFormatAvailable(CF_UNICODETEXT) }.is_err() {
             return Ok(None);
         }
-        let unreadable =
-            || ClipboardError("Windows would not hand over the clipboard's text".to_owned());
+        let unreadable = || {
+            ClipboardError::Refused("Windows would not hand over the clipboard's text".to_owned())
+        };
         let handle = unsafe { GetClipboardData(CF_UNICODETEXT) }.map_err(|_| unreadable())?;
         let block = HGLOBAL(handle.0);
         let length = unsafe { GlobalSize(block) };
@@ -94,9 +105,9 @@ impl Opened {
         if at.is_null() {
             return Err(unreadable());
         }
-        let text = read_utf16(unsafe { std::slice::from_raw_parts(at, length / 2) });
+        let read = read(unsafe { std::slice::from_raw_parts(at, length / 2) });
         let _ = unsafe { GlobalUnlock(block) };
-        Ok(Some(text))
+        Ok(Some(read))
     }
 }
 
@@ -116,18 +127,26 @@ pub fn write_utf16(text: &str, bytes: &mut [u8]) {
     }
 }
 
-// Full room at once, so a growing string leaves no partial copy behind in freed memory.
+// The exact room at once, so a growing string leaves no partial copy behind in freed memory.
 pub fn read_utf16(units: &[u16]) -> Zeroizing<String> {
     let end = units
         .iter()
         .position(|unit| *unit == 0)
         .unwrap_or(units.len());
-    let mut text = Zeroizing::new(String::with_capacity(end * 3));
-    text.extend(
+    let letters = || {
         char::decode_utf16(units[..end].iter().copied())
-            .map(|unit| unit.unwrap_or(char::REPLACEMENT_CHARACTER)),
-    );
+            .map(|unit| unit.unwrap_or(char::REPLACEMENT_CHARACTER))
+    };
+    let mut text = Zeroizing::new(String::with_capacity(letters().map(char::len_utf8).sum()));
+    text.extend(letters());
     text
+}
+
+// The text only when it is `length` units long: no more of the user's own text is read than the copy it is compared with.
+pub fn read_utf16_of_length(units: &[u16], length: usize) -> Option<Zeroizing<String>> {
+    let ends = units.get(length).is_none_or(|unit| *unit == 0);
+    let text = units.get(..length)?;
+    (ends && !text.contains(&0)).then(|| read_utf16(text))
 }
 
 pub fn private_format(name: &str) -> Option<u32> {
@@ -140,7 +159,7 @@ fn private_formats() -> Result<[u32; 3], ClipboardError> {
     let mut formats = [0; 3];
     for (format, name) in formats.iter_mut().zip(PRIVATE_FORMATS) {
         *format = private_format(name).ok_or_else(|| {
-            ClipboardError(format!("Windows does not know the clipboard format {name}"))
+            ClipboardError::Refused(format!("Windows does not know the clipboard format {name}"))
         })?;
     }
     Ok(formats)
@@ -172,9 +191,16 @@ impl Clipboard for WindowsClipboard {
         Opened::open()?.text()
     }
 
-    fn clear_if(&self, holds: &dyn Fn(&str) -> bool) -> Result<bool, ClipboardError> {
+    fn clear_if(
+        &self,
+        length: usize,
+        holds: &dyn Fn(&str) -> bool,
+    ) -> Result<bool, ClipboardError> {
         let clipboard = Opened::open()?;
-        let Some(text) = clipboard.text()? else {
+        let Some(text) = clipboard
+            .with_units(|units| read_utf16_of_length(units, length))?
+            .flatten()
+        else {
             return Ok(false);
         };
         if !holds(&text) {
@@ -206,6 +232,23 @@ mod tests {
         assert_eq!(read_utf16(&back).as_str(), text);
         assert_eq!(read_utf16(&[0x41, 0x42]).as_str(), "AB");
         assert_eq!(read_utf16(&[0xd800, 0x41, 0]).as_str(), "\u{fffd}A");
+    }
+
+    #[test]
+    fn a_text_of_another_length_is_not_read() {
+        let units: Vec<u16> = "abcd".encode_utf16().chain([0, 0x41]).collect();
+        assert_eq!(
+            read_utf16_of_length(&units, 4)
+                .as_deref()
+                .map(String::as_str),
+            Some("abcd")
+        );
+        assert!(read_utf16_of_length(&units, 3).is_none());
+        assert!(read_utf16_of_length(&units, 5).is_none());
+        assert!(read_utf16_of_length(&units, 50).is_none());
+        assert!(read_utf16_of_length(&units[..4], 4).is_some());
+        let longer: Vec<u16> = "abcdef".encode_utf16().collect();
+        assert!(read_utf16_of_length(&longer, 4).is_none());
     }
 
     // Registering a format name leaves the clipboard as it is.
