@@ -127,9 +127,22 @@ mod tests {
         }
     }
 
+    // Wraps a key of its own as DPAPI does for any user, so a code path that replaced a key it cannot unwrap would succeed.
     struct AnotherUser;
 
     impl DataProtector for AnotherUser {
+        fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ProtectError> {
+            Ok(plain.to_vec())
+        }
+
+        fn unprotect(&self, _: &[u8]) -> Result<Zeroizing<Vec<u8>>, ProtectError> {
+            Err(ProtectError::Unprotect)
+        }
+    }
+
+    struct CannotWrap;
+
+    impl DataProtector for CannotWrap {
         fn protect(&self, _: &[u8]) -> Result<Vec<u8>, ProtectError> {
             Err(ProtectError::Protect)
         }
@@ -402,7 +415,7 @@ mod tests {
     #[test]
     fn a_key_that_cannot_be_wrapped_leaves_no_file() {
         let scratch = Scratch::new("vault");
-        let refused = OsCryptVault::open_or_create(scratch.path(), &AnotherUser);
+        let refused = OsCryptVault::open_or_create(scratch.path(), &CannotWrap);
         assert!(matches!(refused, Err(KeyError::Wrap)));
         assert!(snapshot(scratch.path()).is_empty());
     }

@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-// What the Accounts screen asks of the backend, on a copy of the fixture folder: one account, an edit, a delete and the stored password, on every kind of run.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -24,7 +22,6 @@ const MASK: u8 = 0xa7;
 const UNAVAILABLE: &str =
     "Secure storage is not available on this system. Secrets cannot be stored.";
 
-// Stands in for DPAPI: what it wraps it alone unwraps.
 struct Reversible;
 
 impl DataProtector for Reversible {
@@ -39,12 +36,12 @@ impl DataProtector for Reversible {
     }
 }
 
-// The key belongs to another Windows user.
+// The key belongs to another Windows user: this user's DPAPI still wraps a key of its own, so a code path that replaced the key would succeed.
 struct AnotherUser;
 
 impl DataProtector for AnotherUser {
-    fn protect(&self, _: &[u8]) -> Result<Vec<u8>, ProtectError> {
-        Err(ProtectError::Protect)
+    fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ProtectError> {
+        Ok(plain.to_vec())
     }
 
     fn unprotect(&self, _: &[u8]) -> Result<Zeroizing<Vec<u8>>, ProtectError> {
@@ -87,7 +84,6 @@ fn files(folder: &Path) -> BTreeSet<String> {
     snapshot(folder).into_keys().collect()
 }
 
-// The stored passwords as they are on disk, each opened with the vault given.
 fn passwords(data_dir: &Path, vault: &dyn Vault) -> Vec<(String, Option<String>)> {
     let opened = Store::open_read_only(&database_path(data_dir)).unwrap();
     let store = opened.store;

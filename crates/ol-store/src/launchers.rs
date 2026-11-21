@@ -27,12 +27,12 @@ pub struct NewAccount<'a> {
     pub now: &'a str,
 }
 
-// The fields an edit of an account writes, each as it is to be stored: the password has writes of its own.
 pub struct AccountUpdate<'a> {
     pub display_name: &'a str,
     pub login: &'a str,
     pub launcher_uid: Option<&'a str>,
-    pub tags: &'a [String],
+    // None leaves the column as it is: a stored value this reader cannot parse is not replaced by an edit of another field.
+    pub tags: Option<&'a [String]>,
     pub notes: &'a str,
     pub now: &'a str,
 }
@@ -229,12 +229,12 @@ impl Store {
 
     pub fn update_account(&self, id: &str, update: &AccountUpdate<'_>) -> Result<(), StoreError> {
         self.conn.execute(
-            "UPDATE accounts SET display_name = ?1, login = ?2, launcher_uid = ?3, tags = ?4, notes = ?5, updated_at = ?6 WHERE id = ?7",
+            "UPDATE accounts SET display_name = ?1, login = ?2, launcher_uid = ?3, tags = COALESCE(?4, tags), notes = ?5, updated_at = ?6 WHERE id = ?7",
             params![
                 update.display_name,
                 update.login,
                 update.launcher_uid,
-                tags_json(update.tags),
+                update.tags.map(tags_json),
                 update.notes,
                 update.now,
                 id,
@@ -243,7 +243,6 @@ impl Store {
         Ok(())
     }
 
-    // None clears the stored password.
     pub fn set_account_password(
         &self,
         id: &str,
@@ -257,7 +256,6 @@ impl Store {
         Ok(())
     }
 
-    // False when there was no such account. Its saved sign-in goes with it by the foreign key; its launches stay.
     pub fn delete_account(&self, id: &str) -> Result<bool, StoreError> {
         Ok(self
             .conn

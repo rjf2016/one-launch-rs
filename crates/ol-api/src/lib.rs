@@ -8,7 +8,6 @@ pub mod library {
     pub use ol_services::library::{LibraryGame, caption, monogram, relative, visible};
 }
 
-// What the Accounts screen hands the backend: a new account, an edit of one, and a password.
 pub mod accounts {
     pub use ol_services::accounts::{AccountPatch, NewAccount};
     pub use ol_vault::Secret;

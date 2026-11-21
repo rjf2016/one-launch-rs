@@ -26,11 +26,18 @@ use thiserror::Error;
 const RECENT_LAUNCHES_MOST: u32 = 50;
 
 // What the Electron app sends across to its page for a failure: a code to act on and a sentence to show.
-#[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[derive(Clone, PartialEq, Eq, Error)]
 #[error("{message}")]
 pub struct ApiError {
     pub code: &'static str,
     pub message: String,
+}
+
+// The message can name an account, as a refused duplicate does, so only the code is printed.
+impl std::fmt::Debug for ApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ApiError({})", self.code)
+    }
 }
 
 impl ApiError {
@@ -156,14 +163,12 @@ type Thread = Arc<Mutex<Option<JoinHandle<()>>>>;
 
 type SharedVault = Arc<dyn Vault + Send + Sync>;
 
-// Where the backend's vault comes from: the launchers' own, or the data folder's, opened on the backend's thread.
 enum VaultSource {
     None,
     Launchers,
     DataFolder(Box<dyn DataProtector + Send>),
 }
 
-// What a backend without a vault answers: nothing can be encrypted, so no password is stored.
 struct NoVault;
 
 impl Vault for NoVault {
@@ -194,12 +199,12 @@ fn take(thread: &Thread) -> Option<JoinHandle<()>> {
 }
 
 impl Backend {
-    // Returns at once: the folder is made and the database opened on the new thread, and a failure there is the answer to every request. Without launchers nothing can be scanned, switched or started, and without a vault no password can be stored.
+    // Returns at once: the folder is made and the database opened on the new thread, and a failure there is the answer to every request. Without launchers nothing can be scanned, switched or started.
     pub fn start(data_dir: PathBuf, version: &str) -> Self {
         Self::start_on(data_dir, version, None, VaultSource::None, None)
     }
 
-    // As `start`, with the data folder's own vault, opened on the backend's thread once the database is: its key in chromium\Local State is unwrapped by `protector`, or made and wrapped for a folder that has none, as the Electron app does at its first start. A key that does not unwrap is never replaced; the vault is then unavailable.
+    // A key that does not unwrap is never replaced: it may be another Windows user's, and what it sealed would be lost with it.
     pub fn start_with_vault_of_data_folder(
         data_dir: PathBuf,
         version: &str,
@@ -214,7 +219,7 @@ impl Backend {
         )
     }
 
-    // As `start`, on the machine `launchers` describes, with their vault. `on_job` hears every change of a launch job.
+    // As `start`, on the machine `launchers` describes. `on_job` hears every change of a launch job.
     pub fn start_with(
         data_dir: PathBuf,
         version: &str,
@@ -307,26 +312,22 @@ impl Backend {
             .await
     }
 
-    // One account, for its page.
     pub async fn account(&self, id: &str) -> Result<Account, ApiError> {
         let id = id.to_owned();
         self.ask(|reply| Command::Account(id, reply)).await
     }
 
-    // Changes the fields the patch names. Refused while a switch runs.
     pub async fn update_account(&self, id: &str, patch: AccountPatch) -> Result<Account, ApiError> {
         let id = id.to_owned();
         self.ask(|reply| Command::UpdateAccount(id, Box::new(patch), reply))
             .await
     }
 
-    // Removes the account with its stored password and its saved sign-in; nothing changes in the launcher. Refused while a switch runs.
     pub async fn delete_account(&self, id: &str) -> Result<(), ApiError> {
         let id = id.to_owned();
         self.ask(|reply| Command::DeleteAccount(id, reply)).await
     }
 
-    // Stores the password encrypted, in place of the one stored before. Refused while a switch runs.
     pub async fn set_account_password(
         &self,
         id: &str,
@@ -337,7 +338,6 @@ impl Backend {
             .await
     }
 
-    // Refused while a switch runs.
     pub async fn clear_account_password(&self, id: &str) -> Result<Account, ApiError> {
         let id = id.to_owned();
         self.ask(|reply| Command::ClearAccountPassword(id, reply))

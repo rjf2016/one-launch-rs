@@ -302,7 +302,7 @@ async fn copy_database(backend: &Backend, cx: &AsyncApp) {
     capture::pause(COPY_DELAY, cx).await;
     match backend.back_up_database().await {
         Ok(()) => println!("OneLaunch: database copied"),
-        Err(error) => eprintln!("OneLaunch: database copy failed: {error}"),
+        Err(error) => eprintln!("OneLaunch: database copy failed ({})", error.code),
     }
 }
 

@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-// Making, changing and deleting accounts on a copy of the fixture folder, as `AccountsService` of the Electron app does (`test/accounts.test.ts`).
-
 use ol_model::{Account, Ciphertext, LauncherId};
 use ol_services::accounts::{self, AccountError, AccountPatch, NewAccount};
 use ol_store::{Store, database_path};

@@ -82,7 +82,6 @@ pub struct NewAccount {
     pub notes: String,
 }
 
-// An edit of an account: a field left at None stays as it is. The password is set and cleared on its own.
 #[derive(Default)]
 pub struct AccountPatch {
     pub display_name: Option<String>,
@@ -243,7 +242,6 @@ pub fn create(
     require(store, &id)
 }
 
-// Every present field is checked as for a new account, and the login and the launcher's id are unique again with this account left out. The password and the launcher are never touched.
 pub fn update(
     store: &Store,
     id: &str,
@@ -263,10 +261,7 @@ pub fn update(
         Some(uid) => optional_uid(uid.as_deref())?,
         None => current.launcher_uid,
     };
-    let tags = match &patch.tags {
-        Some(tags) => normalize_tags(tags),
-        None => current.tags,
-    };
+    let tags = patch.tags.as_deref().map(normalize_tags);
     let notes = match &patch.notes {
         Some(notes) => {
             check_notes(notes)?;
@@ -287,7 +282,7 @@ pub fn update(
             display_name: &display_name,
             login: &login,
             launcher_uid: launcher_uid.as_deref(),
-            tags: &tags,
+            tags: tags.as_deref(),
             notes: &notes,
             now,
         },
@@ -295,7 +290,6 @@ pub fn update(
     require(store, id)
 }
 
-// Its stored password and its saved sign-in go with the account. Its launches stay, and show the account as removed.
 pub fn delete(store: &Store, id: &str) -> Result<(), AccountError> {
     if store.delete_account(id)? {
         Ok(())
@@ -304,7 +298,6 @@ pub fn delete(store: &Store, id: &str) -> Result<(), AccountError> {
     }
 }
 
-// Encrypts the password and puts it in place of the one stored, if any. The launcher is never touched.
 pub fn set_password(
     store: &Store,
     vault: &dyn Vault,

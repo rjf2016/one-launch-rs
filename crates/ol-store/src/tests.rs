@@ -1050,7 +1050,6 @@ fn account_rows(conn: &Connection) -> Vec<Vec<Value>> {
     )
 }
 
-// The rows as they were, with the named columns of one account set to what is given.
 fn with_changed(before: &[Vec<Value>], id: &str, changes: &[(usize, Value)]) -> Vec<Vec<Value>> {
     let mut after = before.to_vec();
     let row = after
@@ -1086,7 +1085,7 @@ fn an_edit_writes_the_columns_the_electron_app_writes_and_leaves_every_other_byt
                 display_name: "Edited",
                 login: "user_1b",
                 launcher_uid: None,
-                tags: &tags,
+                tags: Some(&tags),
                 notes: "",
                 now: EDITED_AT,
             },
@@ -1115,7 +1114,7 @@ fn an_edit_writes_the_columns_the_electron_app_writes_and_leaves_every_other_byt
                 display_name: "Edited",
                 login: "user_1b",
                 launcher_uid: Some("uid-one"),
-                tags: &[],
+                tags: Some(&[]),
                 notes: "line one\nline two",
                 now: EDITED_AT,
             },
@@ -1131,6 +1130,35 @@ fn an_edit_writes_the_columns_the_electron_app_writes_and_leaves_every_other_byt
         row,
         &[text("uid-one"), text("[]"), text("line one\nline two")]
     );
+
+    let unreadable = r#"["\ud800"]"#;
+    store
+        .conn
+        .execute(
+            "UPDATE accounts SET tags = ?1 WHERE id = ?2",
+            [unreadable, persona_one.as_str()],
+        )
+        .unwrap();
+    store
+        .update_account(
+            &persona_one,
+            &AccountUpdate {
+                display_name: "Edited again",
+                login: "user_1b",
+                launcher_uid: Some("uid-one"),
+                tags: None,
+                notes: "line one\nline two",
+                now: EDITED_AT,
+            },
+        )
+        .unwrap();
+    let [row] = &rows(
+        &store.conn,
+        &format!("SELECT display_name, tags FROM accounts WHERE id = '{persona_one}'"),
+    )[..] else {
+        panic!("one row");
+    };
+    assert_eq!(row, &[text("Edited again"), text(unreadable)]);
 }
 
 #[test]
