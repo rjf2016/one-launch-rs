@@ -4,17 +4,18 @@ use std::time::{Duration, SystemTime};
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Context, Div, EventEmitter, FontWeight, Keystroke, SharedString, Subscription,
-    Window, div, px,
+    AnyElement, App, Context, Div, Entity, EventEmitter, FontWeight, Keystroke, SharedString,
+    Subscription, Window, div, px,
 };
 use ol_api::accounts::{AccountPatch, NewAccount, Secret};
 use ol_api::library::{date_time, relative};
 use ol_api::{ApiError, Backend};
-use ol_model::{Account, LauncherId};
+use ol_model::{Account, Game, LauncherId, SwitchPlan};
 use ol_ui_kit::theme::{self, color};
 use ol_ui_kit::{FieldEvent, TextArea, TextField};
 
 use crate::assets;
+use crate::host::{LaunchHost, generated_at, plan_view};
 use crate::local_time;
 use crate::page::{PageScroll, scroll_page};
 use crate::shell::{Go, Question, Route};
@@ -166,8 +167,19 @@ fn uid_placeholder(launcher: LauncherId) -> &'static str {
     }
 }
 
+#[derive(Default)]
+struct Preview {
+    busy: bool,
+    plan: Option<SwitchPlan>,
+    error: Option<SharedString>,
+}
+
 pub struct AccountPage {
     backend: Backend,
+    host: Option<Entity<LaunchHost>>,
+    // On the form that adds an account: the game whose Play sent the user here, which a new account of its launcher goes back to.
+    return_to: Option<Game>,
+    preview: Preview,
     kind: Kind,
     launcher: Option<LauncherId>,
     account: Option<Account>,
@@ -198,10 +210,12 @@ impl AccountPage {
     pub fn create(
         backend: Backend,
         launcher: LauncherId,
+        return_to: Option<Game>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
         let mut page = Self::new(backend, Kind::Create, window, cx);
+        page.return_to = return_to.filter(|game| game.launcher == launcher);
         let password = TextField::new("", true, window, cx).limited_to(PASSWORD_MOST, cx);
         page._subscriptions
             .push(password.on_event_in(window, cx, |_, _, _, cx| cx.notify()));
@@ -213,6 +227,7 @@ impl AccountPage {
 
     pub fn edit(
         backend: Backend,
+        host: Entity<LaunchHost>,
         id: String,
         created: bool,
         window: &mut Window,
@@ -229,7 +244,9 @@ impl AccountPage {
             }
         })
         .detach();
-        Self::new(backend, Kind::Edit { id }, window, cx)
+        let mut page = Self::new(backend, Kind::Edit { id }, window, cx);
+        page.host = Some(host);
+        page
     }
 
     fn new(backend: Backend, kind: Kind, window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -251,6 +268,9 @@ impl AccountPage {
         ];
         Self {
             backend,
+            host: None,
+            return_to: None,
+            preview: Preview::default(),
             kind,
             launcher: None,
             account: None,
@@ -423,10 +443,44 @@ impl AccountPage {
     }
 
     fn back(&mut self, cx: &mut Context<Self>) {
-        cx.emit(Go {
-            route: Route::Accounts,
-            guarded: true,
-        });
+        cx.emit(Go::to(Route::Accounts));
+    }
+
+    fn switch(&mut self, cx: &mut Context<Self>) {
+        let (Some(host), Some(account)) = (&self.host, &self.account) else {
+            return;
+        };
+        if self.busy || self.dirty(cx) {
+            return;
+        }
+        let (launcher, id) = (account.launcher, account.id.clone());
+        host.update(cx, |host, cx| host.open_switch(launcher, id, cx));
+    }
+
+    fn preview(&mut self, cx: &mut Context<Self>) {
+        let Kind::Edit { id } = &self.kind else {
+            return;
+        };
+        if self.preview.busy {
+            return;
+        }
+        self.preview.busy = true;
+        self.preview.error = None;
+        let (backend, id) = (self.backend.clone(), id.clone());
+        cx.spawn(async move |this, cx| {
+            let plan = backend.switch_plan(&id).await;
+            this.update(cx, |this, cx| {
+                this.preview.busy = false;
+                match plan {
+                    Ok(plan) => this.preview.plan = Some(plan),
+                    Err(error) => this.preview.error = Some(error.message.into()),
+                }
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+        cx.notify();
     }
 
     fn create_account(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -462,13 +516,17 @@ impl AccountPage {
         cx.spawn(async move |this, cx| {
             let made = backend.create_account(account).await;
             this.update(cx, |this, cx| match made {
-                Ok(account) => cx.emit(Go {
-                    route: Route::Account {
+                // Sent here by a game's Play: back to that game, with the new account picked.
+                Ok(account) => cx.emit(Go::done(match this.return_to.take() {
+                    Some(game) => Route::Play {
+                        game: Box::new(game),
+                        account: Some(account.id),
+                    },
+                    None => Route::Account {
                         id: account.id,
                         created: true,
                     },
-                    guarded: false,
-                }),
+                })),
                 Err(error) => {
                     this.error = Some(error.message.into());
                     this.set_busy(false, cx);
@@ -522,6 +580,14 @@ impl AccountPage {
         match saved {
             Ok(account) => {
                 self.show(&account, window, cx);
+                // A plan describes the account as it was.
+                if self
+                    .account
+                    .as_ref()
+                    .is_none_or(|was| was.updated_at != account.updated_at)
+                {
+                    self.preview.plan = None;
+                }
                 self.account = Some(account);
                 self.flash = Some(Flash::new(
                     "Saved",
@@ -555,10 +621,7 @@ impl AccountPage {
         cx.spawn(async move |this, cx| {
             let deleted = backend.delete_account(&id).await;
             this.update(cx, |this, cx| match deleted {
-                Ok(()) => cx.emit(Go {
-                    route: Route::Accounts,
-                    guarded: false,
-                }),
+                Ok(()) => cx.emit(Go::done(Route::Accounts)),
                 Err(error) => {
                     this.error = Some(error.message.into());
                     this.set_busy(false, cx);
@@ -729,6 +792,18 @@ impl AccountPage {
                             .disabled(busy)
                             .on_click(cx.listener(|this, _, window, cx| this.discard(window, cx))),
                     );
+                } else if let Some(launcher) = self.account.as_ref().map(|account| account.launcher)
+                {
+                    actions.push(
+                        Button::new("switch", Tone::Secondary, "Switch to this account")
+                            .glyph(assets::SWITCH)
+                            .disabled(busy)
+                            .tip(format!(
+                                "Switch {} to this account without launching a game",
+                                launcher.display_name()
+                            ))
+                            .on_click(cx.listener(|this, _, _, cx| this.switch(cx))),
+                    );
                 }
                 let invalid = self.errors(cx).any();
                 actions.push(
@@ -859,6 +934,57 @@ impl AccountPage {
         ))
     }
 
+    fn render_preview(&self, launcher: LauncherId, cx: &mut Context<Self>) -> Option<Div> {
+        self.account.as_ref()?;
+        let preview = &self.preview;
+        let name = launcher.display_name();
+        let label = if preview.busy {
+            format!("Checking {name}\u{2026}")
+        } else if preview.plan.is_some() {
+            "Refresh".to_owned()
+        } else {
+            "Preview".to_owned()
+        };
+        let action = Button::new("preview", Tone::Secondary, label)
+            .glyph(assets::LIST_CHECKS)
+            .disabled(preview.busy)
+            .on_click(cx.listener(|this, _, _, cx| this.preview(cx)));
+        let body = div()
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .children(
+                preview
+                    .error
+                    .clone()
+                    .map(|error| div().text_color(color(theme::DANGER)).child(error)),
+            )
+            .children(
+                preview
+                    .plan
+                    .as_ref()
+                    .map(|plan| plan_view(plan, generated_at(plan, cx))),
+            )
+            .when(preview.plan.is_none() && preview.error.is_none(), |body| {
+                body.child(
+                    div()
+                        .text_color(color(theme::MUTED))
+                        .child("Press Preview to see the steps."),
+                )
+            });
+        Some(panel(
+            "Switch preview",
+            Some(
+                format!(
+                    "Exactly what switching {name} to this account would change. Previewing changes nothing."
+                )
+                .into(),
+            ),
+            Some(action),
+            body,
+        ))
+    }
+
     fn render_advanced(
         &self,
         launcher: LauncherId,
@@ -907,24 +1033,33 @@ impl AccountPage {
                             .text_size(px(12.))
                             .line_height(px(16.))
                             .text_color(color(theme::FAINT))
-                            .child("Launcher account id"),
+                            .child(match self.kind {
+                                Kind::Create => "Launcher account id",
+                                Kind::Edit { .. } => "Launcher account id and the switch preview",
+                            }),
                     ),
             )
             .when(open, |section| {
                 section.child(
-                    div().mt(px(8.)).child(panel(
-                        "Launcher account id",
-                        None,
-                        None,
-                        field(
-                            uid_label(launcher),
-                            Some(uid_hint(launcher).into()),
+                    div()
+                        .mt(px(8.))
+                        .flex()
+                        .flex_col()
+                        .gap(px(16.))
+                        .child(panel(
+                            "Launcher account id",
                             None,
-                            self.uid
-                                .form_frame("uid", None, window, cx)
-                                .font_family(theme::MONO),
-                        ),
-                    )),
+                            None,
+                            field(
+                                uid_label(launcher),
+                                Some(uid_hint(launcher).into()),
+                                None,
+                                self.uid
+                                    .form_frame("uid", None, window, cx)
+                                    .font_family(theme::MONO),
+                            ),
+                        ))
+                        .children(self.render_preview(launcher, cx)),
                 )
             })
     }

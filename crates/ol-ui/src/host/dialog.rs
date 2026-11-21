@@ -4,23 +4,24 @@ use std::time::SystemTime;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, BoxShadow, ClickEvent, Context, Div, FontWeight, HighlightStyle, Hsla,
+    AnyElement, App, BoxShadow, ClickEvent, Context, Div, FontWeight, HighlightStyle, Hsla,
     SharedString, Stateful, StyledText, div, hsla, px,
 };
 use ol_api::launch::{
     PhaseNames, failed_note, group_steps, phase_label, plan_phases, sentence, stopped_note,
     update_note,
 };
-use ol_api::library::relative;
+use ol_api::library::{date_time, relative};
 use ol_model::{
-    Account, JobState, JobStepStatus, LaunchAttention, LaunchJob, LaunchPreflight, SwitchPlan,
-    SwitchStepKind, SwitchStrategy,
+    Account, JobState, JobStepStatus, LaunchAttention, LaunchJob, LaunchPreflight, LauncherId,
+    SwitchPlan, SwitchStepKind, SwitchStrategy,
 };
 use ol_ui_kit::theme::{self, alpha, color};
 
-use super::{Accounts, LaunchHost, Request, Stage};
+use super::{Accounts, LaunchHost, Request, Stage, can_import};
 use crate::assets;
-use crate::widgets::{Button, Tone, icon, launcher_badge, spinner};
+use crate::local_time;
+use crate::widgets::{Button, PillTone, Tone, icon, launcher_badge, pill, spinner, tip};
 
 #[derive(Clone, Copy)]
 enum Paint {
@@ -130,44 +131,22 @@ fn text_button(id: &'static str, label: &'static str) -> Stateful<Div> {
         .child(label)
 }
 
-fn pill(hex: u32, glyph: Option<&'static str>, label: impl Into<SharedString>) -> Div {
-    small(div())
-        .flex()
-        .flex_none()
-        .items_center()
-        .gap(px(4.))
-        .rounded(px(6.))
-        .border_1()
-        .border_color(alpha(hex, 0.3))
-        .bg(alpha(hex, 0.1))
-        .px(px(8.))
-        .py(px(2.))
-        .font_weight(FontWeight::MEDIUM)
-        .text_color(color(hex))
-        .children(glyph.map(|glyph| icon(glyph, 12., hex)))
-        .child(label.into())
-}
-
-fn plan_view(plan: &SwitchPlan) -> Div {
+// What a switch would do, step by step; `generated` is when the plan was made, in the user's own time.
+pub(crate) fn plan_view(plan: &SwitchPlan, generated: Option<String>) -> Div {
     let active = plan.steps.iter().filter(|step| !step.skipped).count();
     let strategy = if plan.strategy == SwitchStrategy::Remembered {
-        pill(theme::SUCCESS, None, "Remembered session")
+        pill(PillTone::Ok, None, "Remembered session")
     } else {
-        pill(theme::WARNING, None, "Needs credentials")
+        pill(PillTone::Warn, None, "Needs credentials")
     };
     let runs = if plan.executable {
-        small(div())
-            .flex_none()
-            .rounded(px(6.))
-            .border_1()
-            .border_color(color(theme::BORDER))
-            .bg(color(theme::SURFACE_2))
-            .px(px(8.))
-            .py(px(2.))
-            .font_weight(FontWeight::MEDIUM)
-            .child(format!("{active} of {} steps would run", plan.steps.len()))
+        pill(
+            PillTone::Info,
+            None,
+            format!("{active} of {} steps would run", plan.steps.len()),
+        )
     } else {
-        pill(theme::DANGER, None, "Cannot run yet")
+        pill(PillTone::Fail, None, "Cannot run yet")
     };
     let state = format!(
         "{} is {}{}.",
@@ -356,6 +335,7 @@ fn plan_view(plan: &SwitchPlan) -> Div {
                 .flex_wrap()
                 .items_center()
                 .gap(px(8.))
+                .text_color(color(theme::MUTED))
                 .child(strategy)
                 .child(runs)
                 .child(state),
@@ -371,8 +351,16 @@ fn plan_view(plan: &SwitchPlan) -> Div {
         .child(
             tiny(div())
                 .text_color(color(theme::FAINT))
-                .child("This is a preview: nothing was changed."),
+                .child(match generated {
+                    Some(at) => format!("Generated {at}. This is a preview: nothing was changed."),
+                    None => "This is a preview: nothing was changed.".to_owned(),
+                }),
         )
+}
+
+pub(crate) fn generated_at(plan: &SwitchPlan, cx: &App) -> Option<String> {
+    let local = local_time(cx);
+    date_time(&plan.generated_at, local.offset, local.clock)
 }
 
 fn picker(request: &Request, cx: &mut Context<LaunchHost>) -> Div {
@@ -587,7 +575,7 @@ fn hand_over(
         )
 }
 
-fn outcome(job: &LaunchJob, client: &str) -> Option<Div> {
+fn outcome(job: &LaunchJob, client: &str, plays: bool) -> Option<Div> {
     let account = &job.account.display_name;
     match job.state {
         JobState::Running => None,
@@ -598,7 +586,7 @@ fn outcome(job: &LaunchJob, client: &str) -> Option<Div> {
                 "Switched to"
             };
             let mut launched = div().flex().flex_col().gap(px(12.)).child(pill(
-                theme::SUCCESS,
+                PillTone::Ok,
                 Some(assets::CHECK),
                 format!("{said} {account}"),
             ));
@@ -629,7 +617,7 @@ fn outcome(job: &LaunchJob, client: &str) -> Option<Div> {
                     job.error.clone().unwrap_or_default(),
                 ))
                 .children(
-                    stopped_note(job, client, "Play")
+                    stopped_note(job, client, if plays { "Play" } else { "Switch" })
                         .map(|note| small(div()).ml(px(24.)).child(note)),
                 ),
         ),
@@ -812,7 +800,9 @@ impl LaunchHost {
                     }))
                     .child("Details"),
             )
-            .when(request.plan_open, |details| details.child(plan_view(plan)))
+            .when(request.plan_open, |details| {
+                details.child(plan_view(plan, generated_at(plan, cx)))
+            })
     }
 
     // What a check of the launcher found, before anything runs: the close box, the plan's warnings and notes, and the whole plan behind "Details".
@@ -822,7 +812,7 @@ impl LaunchHost {
         preflight: &LaunchPreflight,
         cx: &mut Context<Self>,
     ) -> Vec<Div> {
-        let client = request.game.launcher.client_name();
+        let client = request.launcher.client_name();
         let account = request
             .account()
             .map(|account| account.display_name.as_str())
@@ -852,15 +842,16 @@ impl LaunchHost {
         job: Option<&LaunchJob>,
         cx: &mut Context<Self>,
     ) -> Div {
-        let game = &request.game;
-        let client = game.launcher.client_name();
+        let game = request.game.as_ref();
+        let launcher = request.launcher;
+        let client = launcher.client_name();
         let body = div().flex().flex_col().gap(px(12.));
         match &request.stage {
             Stage::Unreachable => {
                 let words = if self.backend.can_reach(ol_model::LauncherId::Steam) {
                     format!(
                         "{} is not available in this build yet. Its games are listed, but One Launch cannot switch its account or start them.",
-                        game.launcher.display_name()
+                        launcher.display_name()
                     )
                 } else {
                     "No launcher is available in this build yet. The games are listed, but One Launch cannot switch accounts or start them.".to_owned()
@@ -881,19 +872,30 @@ impl LaunchHost {
                     ),
                     Accounts::Loading | Accounts::Ready(_) => None,
                 };
-                let note = (game.needs_update && !request.candidates().is_empty()).then(|| {
-                    small(framed(Paint::Warning)).child(marked(
-                        assets::UPDATE,
-                        14.,
-                        theme::WARNING,
-                        update_note(game.launcher, &game.name),
-                    ))
-                });
+                let note = game
+                    .filter(|game| game.needs_update && !request.candidates().is_empty())
+                    .map(|game| {
+                        small(framed(Paint::Warning)).child(marked(
+                            assets::UPDATE,
+                            14.,
+                            theme::WARNING,
+                            update_note(game.launcher, &game.name),
+                        ))
+                    });
                 let empty = request.empty().then(|| {
-                    let launcher = game.launcher.display_name();
+                    let name = launcher.display_name();
+                    let more = match launcher {
+                        LauncherId::Steam => {
+                            " Import the ones Steam remembers, or add one by hand on the Accounts page."
+                        }
+                        LauncherId::Battlenet => {
+                            " Import the logins Battle.net has saved, or add one by hand on the Accounts page."
+                        }
+                        LauncherId::Epic | LauncherId::Riot => "",
+                    };
                     div()
                         .text_color(color(theme::MUTED))
-                        .child(format!("No {launcher} accounts yet."))
+                        .child(format!("No {name} accounts yet.{more}"))
                 });
                 let list = (!request.candidates().is_empty()).then(|| picker(request, cx));
                 body.children(failed)
@@ -909,9 +911,9 @@ impl LaunchHost {
                         .account()
                         .map(|account| account.display_name.as_str())
                         .unwrap_or_default(),
-                    game: Some(&game.name),
+                    game: game.map(|game| game.name.as_str()),
                 };
-                let would_run = plan_phases(&preflight.plan, true)
+                let would_run = plan_phases(&preflight.plan, game.is_some())
                     .into_iter()
                     .enumerate()
                     .map(|(index, phase)| {
@@ -967,11 +969,9 @@ impl LaunchHost {
                     .attention
                     .as_ref()
                     .filter(|_| job.state == JobState::Running)
-                    .map(|attention| {
-                        hand_over(attention, game.launcher.display_name(), stopping, cx)
-                    });
+                    .map(|attention| hand_over(attention, launcher.display_name(), stopping, cx));
                 body.gap(px(16.))
-                    .children(outcome(job, client))
+                    .children(outcome(job, client, game.is_some()))
                     .children(waiting)
                     .child(phases(job, client))
                     .child(
@@ -998,7 +998,13 @@ impl LaunchHost {
         job: Option<&LaunchJob>,
         cx: &mut Context<Self>,
     ) -> Div {
-        let client = request.game.launcher.client_name();
+        let client = request.launcher.client_name();
+        let plays = request.game.is_some();
+        let (action, action_glyph) = if plays {
+            ("Play", assets::PLAY)
+        } else {
+            ("Switch", assets::SWITCH)
+        };
         let busy = self.busy();
         let running = job.is_some_and(|job| job.state == JobState::Running);
         let waiting = running && job.is_some_and(|job| job.attention.is_some());
@@ -1022,7 +1028,20 @@ impl LaunchHost {
         let mut actions: Vec<AnyElement> = Vec::new();
         match &request.stage {
             Stage::Unreachable => actions.push(close(cx)),
-            Stage::Pick if request.empty() => actions.push(close(cx)),
+            Stage::Pick if request.empty() => {
+                let launcher = request.launcher.display_name();
+                let label = if can_import(request.launcher) {
+                    format!("Import {launcher} accounts")
+                } else {
+                    format!("Add {launcher} account")
+                };
+                actions.push(
+                    Button::new("to-accounts", Tone::Primary, label)
+                        .glyph(assets::KEY)
+                        .leading(true)
+                        .on_click(cx.listener(|this, _, _, cx| this.go_to_accounts(cx))),
+                );
+            }
             Stage::Pick | Stage::Checking => {
                 let checking = matches!(request.stage, Stage::Checking);
                 let ready = request.account().is_some() && !busy;
@@ -1035,9 +1054,9 @@ impl LaunchHost {
                     Button::new(
                         "play",
                         Tone::Primary,
-                        if checking { "Checking\u{2026}" } else { "Play" },
+                        if checking { "Checking\u{2026}" } else { action },
                     )
-                    .glyph(assets::PLAY)
+                    .glyph(action_glyph)
                     .disabled(!ready)
                     .leading(true)
                     .on_click(cx.listener(|this, _, _, cx| this.check(cx))),
@@ -1052,7 +1071,7 @@ impl LaunchHost {
                         format!("Close {client} and continue"),
                     )
                 } else {
-                    (Tone::Primary, assets::PLAY, "Continue".to_owned())
+                    (Tone::Primary, action_glyph, "Continue".to_owned())
                 };
                 let confirm_close = preflight.needs_confirmation;
                 actions.push(
@@ -1073,10 +1092,18 @@ impl LaunchHost {
             Stage::Preview(_) => {
                 actions.push(back(Tone::Ghost, false, cx));
                 actions.push(
-                    Button::new("switch-now", Tone::Primary, "Turn preview off and play now")
-                        .glyph(assets::PLAY)
-                        .disabled(request.starting)
-                        .on_click(cx.listener(|this, _, _, cx| this.switch_now(cx))),
+                    Button::new(
+                        "switch-now",
+                        Tone::Primary,
+                        if plays {
+                            "Turn preview off and play now"
+                        } else {
+                            "Turn preview off and switch now"
+                        },
+                    )
+                    .glyph(action_glyph)
+                    .disabled(request.starting)
+                    .on_click(cx.listener(|this, _, _, cx| this.switch_now(cx))),
                 );
             }
             Stage::Blocked(_) => actions.push(back(Tone::Secondary, true, cx)),
@@ -1092,6 +1119,9 @@ impl LaunchHost {
                             if stopping { "Stopping\u{2026}" } else { "Stop" },
                         )
                         .glyph(assets::STOP)
+                        .tip(format!(
+                            "Stop the switch. Until {client} is started again, anything already changed is put back; after that, {client} finishes signing in on its own."
+                        ))
                         .disabled(stopping)
                         .on_click(cx.listener(|this, _, _, cx| this.stop(cx))),
                     );
@@ -1099,6 +1129,7 @@ impl LaunchHost {
                 actions.push(
                     Button::new("hide", Tone::Ghost, "Hide")
                         .glyph(assets::HIDE)
+                        .tip("Keep the switch running and come back to it from the banner")
                         .on_click(cx.listener(|this, _, _, cx| this.close(cx))),
                 );
             }
@@ -1150,12 +1181,14 @@ impl LaunchHost {
             _ => None,
         };
         let busy = self.busy();
-        let game = &request.game;
+        let game = request.game.as_ref();
+        let launcher = request.launcher;
         let playing_as = job.map(|job| job.account.display_name.as_str()).or(request
             .account()
             .map(|account| account.display_name.as_str()));
         let subtitle = match (playing_as, &request.stage) {
-            (Some(account), _) => format!("Play as {account}"),
+            (Some(account), _) if game.is_some() => format!("Play as {account}"),
+            (Some(account), _) => format!("Switch {} to {account}", launcher.display_name()),
             (None, Stage::Unreachable) => "Not available in this build".to_owned(),
             (None, _) if request.empty() => "Add an account first".to_owned(),
             (None, _) => "Pick the account to use".to_owned(),
@@ -1186,9 +1219,24 @@ impl LaunchHost {
                                     .line_height(px(24.))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(color(theme::TEXT_STRONG))
-                                    .child(game.name.clone()),
+                                    .child(game.map_or_else(
+                                        || "Switch account".to_owned(),
+                                        |game| game.name.clone(),
+                                    )),
                             )
-                            .child(launcher_badge(game.launcher)),
+                            .child(
+                                div()
+                                    .id("launch-badge")
+                                    .flex_none()
+                                    .when_some(game, |badge, game| {
+                                        badge.tooltip(tip(format!(
+                                            "{} id: {}",
+                                            launcher.display_name(),
+                                            game.launcher_game_id
+                                        )))
+                                    })
+                                    .child(launcher_badge(launcher)),
+                            ),
                     )
                     .child(
                         small(div())

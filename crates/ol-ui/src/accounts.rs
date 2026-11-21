@@ -1,4 +1,6 @@
-use std::time::SystemTime;
+mod import;
+
+use std::time::{Duration, SystemTime};
 
 use gpui::prelude::*;
 use gpui::{
@@ -8,23 +10,55 @@ use gpui::{
 use ol_api::launch::in_pick_order;
 use ol_api::library::relative;
 use ol_api::{ApiError, Backend};
-use ol_model::{Account, LauncherId};
+use ol_model::{Account, Game, LauncherId};
 use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::assets;
+use crate::host::{can_import, overlay};
 use crate::page::{PageScroll, scroll_page};
 use crate::shell::{Go, Route};
 use crate::widgets::{
-    Button, Tone, icon, launcher_dot, menu_chevron, menu_shadow, page_title, tip,
+    Button, Flash, FlashTone, Tone, icon, launcher_dot, menu_chevron, menu_shadow, page_title, tip,
 };
 
+use import::Import;
+
 const MENU_GAP: f32 = 6.;
+const IMPORTED_FLASH_STAYS: Duration = Duration::from_secs(4);
+
+const IMPORT_ITEMS: [(LauncherId, &str, &str); 4] = [
+    (LauncherId::Steam, "From Steam", "Logins Steam has saved"),
+    (
+        LauncherId::Battlenet,
+        "From Battle.net",
+        "Logins Battle.net has saved",
+    ),
+    (
+        LauncherId::Epic,
+        "Epic Games: add by hand",
+        "Epic keeps no account list",
+    ),
+    (
+        LauncherId::Riot,
+        "Riot Games: add by hand",
+        "The Riot Client keeps no account list",
+    ),
+];
 
 pub struct AccountsView {
+    backend: Backend,
     load: Load,
+    // Counts the reads of the list: only the newest one is shown.
+    reads: u64,
     menu: Option<OpenMenu>,
-    over_trigger: Option<MenuAt>,
+    over_trigger: Option<MenuSpot>,
     scroll: PageScroll,
+    import: Option<Import>,
+    // Counts the import dialogs opened: an answer for one that was closed is no answer for the next.
+    imports: u64,
+    // The game whose Play sent the user here: an import of an account of its launcher goes back to it.
+    return_to: Option<Game>,
+    flash: Option<Flash>,
 }
 
 enum Load {
@@ -34,13 +68,36 @@ enum Load {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+enum MenuKind {
+    Import,
+    Add,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum MenuAt {
     Header,
     Empty,
 }
 
-struct OpenMenu {
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct MenuSpot {
+    kind: MenuKind,
     at: MenuAt,
+}
+
+impl MenuSpot {
+    fn id(self) -> &'static str {
+        match (self.kind, self.at) {
+            (MenuKind::Import, MenuAt::Header) => "import-account",
+            (MenuKind::Import, MenuAt::Empty) => "import-account-empty",
+            (MenuKind::Add, MenuAt::Header) => "add-account",
+            (MenuKind::Add, MenuAt::Empty) => "add-account-empty",
+        }
+    }
+}
+
+struct OpenMenu {
+    spot: MenuSpot,
     highlight: Option<usize>,
 }
 
@@ -56,18 +113,45 @@ fn note_preview(notes: &str) -> Option<&str> {
 }
 
 impl AccountsView {
-    pub fn new(backend: Backend, cx: &mut Context<Self>) -> Self {
-        cx.spawn(async move |this, cx| {
-            let accounts = backend.accounts().await;
-            this.update(cx, |this, cx| this.loaded(accounts, cx)).ok();
-        })
-        .detach();
-        Self {
+    // `import` opens that launcher's import dialog at once, as a game's empty Play asks.
+    pub fn new(
+        backend: Backend,
+        import: Option<LauncherId>,
+        return_to: Option<Game>,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let mut view = Self {
+            backend,
             load: Load::Pending,
+            reads: 0,
             menu: None,
             over_trigger: None,
             scroll: PageScroll::default(),
+            import: None,
+            imports: 0,
+            return_to,
+            flash: None,
+        };
+        view.reload(cx);
+        if let Some(launcher) = import.filter(|launcher| can_import(*launcher)) {
+            view.open_import(launcher, cx);
         }
+        view
+    }
+
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        self.reads += 1;
+        let (read, backend) = (self.reads, self.backend.clone());
+        cx.spawn(async move |this, cx| {
+            let accounts = backend.accounts().await;
+            this.update(cx, |this, cx| {
+                if this.reads == read {
+                    this.loaded(accounts, cx);
+                }
+            })
+            .ok();
+        })
+        .detach();
     }
 
     fn loaded(&mut self, accounts: Result<Vec<Account>, ApiError>, cx: &mut Context<Self>) {
@@ -78,23 +162,50 @@ impl AccountsView {
         cx.notify();
     }
 
-    fn toggle_menu(&mut self, at: MenuAt, cx: &mut Context<Self>) {
-        let open = self.menu.as_ref().is_some_and(|menu| menu.at == at);
+    pub fn importing(&self) -> bool {
+        self.import.is_some()
+    }
+
+    fn say(
+        &mut self,
+        text: String,
+        tone: FlashTone,
+        stays: Option<Duration>,
+        cx: &mut Context<Self>,
+    ) {
+        self.flash = Some(Flash::new(
+            text,
+            tone,
+            stays,
+            |this: &mut Self| &mut this.flash,
+            cx,
+        ));
+        cx.notify();
+    }
+
+    fn toggle_menu(&mut self, spot: MenuSpot, cx: &mut Context<Self>) {
+        let open = self.menu.as_ref().is_some_and(|menu| menu.spot == spot);
         self.menu = (!open).then_some(OpenMenu {
-            at,
+            spot,
             highlight: None,
         });
         cx.notify();
     }
 
-    fn pick(&mut self, option: usize, cx: &mut Context<Self>) {
+    fn pick(&mut self, kind: MenuKind, option: usize, cx: &mut Context<Self>) {
         self.menu = None;
         cx.notify();
-        if let Some(launcher) = LauncherId::ALL.get(option).copied() {
-            cx.emit(Go {
-                route: Route::NewAccount(launcher),
-                guarded: true,
-            });
+        let launcher = match kind {
+            MenuKind::Add => LauncherId::ALL.get(option).copied(),
+            MenuKind::Import => IMPORT_ITEMS.get(option).map(|(launcher, _, _)| *launcher),
+        };
+        let Some(launcher) = launcher else {
+            return;
+        };
+        if kind == MenuKind::Import && can_import(launcher) {
+            self.open_import(launcher, cx);
+        } else {
+            cx.emit(Go::to(Route::NewAccount(launcher)));
         }
     }
 
@@ -102,7 +213,10 @@ impl AccountsView {
         let Some(menu) = self.menu.as_mut() else {
             return false;
         };
-        let last = LauncherId::ALL.len() - 1;
+        let last = match menu.spot.kind {
+            MenuKind::Add => LauncherId::ALL.len() - 1,
+            MenuKind::Import => IMPORT_ITEMS.len() - 1,
+        };
         match keystroke.key.as_str() {
             "down" => menu.highlight = Some(menu.highlight.map_or(0, |at| (at + 1) % (last + 1))),
             "up" => {
@@ -112,7 +226,8 @@ impl AccountsView {
             "end" => menu.highlight = Some(last),
             "enter" | "space" => {
                 if let Some(option) = menu.highlight {
-                    self.pick(option, cx);
+                    let kind = menu.spot.kind;
+                    self.pick(kind, option, cx);
                 }
             }
             "escape" | "tab" => self.menu = None,
@@ -123,53 +238,50 @@ impl AccountsView {
     }
 
     fn open(&mut self, account: &Account, cx: &mut Context<Self>) {
-        cx.emit(Go {
-            route: Route::Account {
-                id: account.id.clone(),
-                created: false,
-            },
-            guarded: true,
-        });
+        cx.emit(Go::to(Route::Account {
+            id: account.id.clone(),
+            created: false,
+        }));
     }
 
-    fn render_add_menu(
+    fn render_menu_button(
         &self,
-        at: MenuAt,
+        spot: MenuSpot,
         tone: Tone,
         label: &'static str,
         cx: &mut Context<Self>,
     ) -> Div {
-        let open = self.menu.as_ref().filter(|menu| menu.at == at);
+        let open = self.menu.as_ref().filter(|menu| menu.spot == spot);
         let (hex, opacity) = if tone == Tone::Primary {
             (theme::TEXT_STRONG, 0.7)
         } else {
             (theme::FAINT, 1.)
         };
-        let id = match at {
-            MenuAt::Header => "add-account",
-            MenuAt::Empty => "add-account-empty",
+        let glyph = match spot.kind {
+            MenuKind::Import => assets::DOWNLOAD,
+            MenuKind::Add => assets::PLUS,
         };
         let trigger = div()
-            .id(id)
+            .id(spot.id())
             .on_hover(cx.listener(move |this, over: &bool, _, _| {
                 if *over {
-                    this.over_trigger = Some(at);
-                } else if this.over_trigger == Some(at) {
+                    this.over_trigger = Some(spot);
+                } else if this.over_trigger == Some(spot) {
                     this.over_trigger = None;
                 }
             }))
             .child(
                 Button::new("trigger", tone, label)
-                    .glyph(assets::PLUS)
+                    .glyph(glyph)
                     .trailing(menu_chevron(open.is_some(), hex, opacity))
-                    .on_click(cx.listener(move |this, _, _, cx| this.toggle_menu(at, cx))),
+                    .on_click(cx.listener(move |this, _, _, cx| this.toggle_menu(spot, cx))),
             );
         div()
             .relative()
             .flex_none()
             .child(trigger)
             .children(open.map(|open| {
-                let (anchor, place) = match at {
+                let (anchor, place) = match spot.at {
                     MenuAt::Header => (Anchor::TopRight, div().absolute().top_full().right_0()),
                     MenuAt::Empty => (Anchor::TopLeft, div().absolute().top_full().left_0()),
                 };
@@ -178,7 +290,7 @@ impl AccountsView {
                         anchored()
                             .anchor(anchor)
                             .offset(point(px(0.), px(MENU_GAP)))
-                            .child(self.render_menu(at, open.highlight, cx)),
+                            .child(self.render_menu(spot, open.highlight, cx)),
                     )
                     .with_priority(1),
                 )
@@ -187,12 +299,23 @@ impl AccountsView {
 
     fn render_menu(
         &self,
-        at: MenuAt,
+        spot: MenuSpot,
         highlight: Option<usize>,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
+        let items: Vec<(LauncherId, &'static str, Option<&'static str>)> = match spot.kind {
+            MenuKind::Add => LauncherId::ALL
+                .into_iter()
+                .map(|launcher| (launcher, launcher.display_name(), None))
+                .collect(),
+            MenuKind::Import => IMPORT_ITEMS
+                .into_iter()
+                .map(|(launcher, label, hint)| (launcher, label, Some(hint)))
+                .collect(),
+        };
+        let kind = spot.kind;
         div()
-            .id("add-menu")
+            .id("account-menu")
             .occlude()
             .flex()
             .flex_col()
@@ -205,16 +328,16 @@ impl AccountsView {
             .shadow(menu_shadow())
             .on_mouse_down_out(cx.listener(move |this, _, _, cx| {
                 // A press on the button that opened the menu is that button's to answer: it closes it.
-                if this.over_trigger != Some(at) {
+                if this.over_trigger != Some(spot) {
                     this.menu = None;
                     cx.notify();
                 }
             }))
             .children(
-                LauncherId::ALL
+                items
                     .into_iter()
                     .enumerate()
-                    .map(|(option, launcher)| {
+                    .map(|(option, (launcher, label, hint))| {
                         let lit = highlight == Some(option);
                         div()
                             .id(("launcher", option))
@@ -237,14 +360,23 @@ impl AccountsView {
                                     cx.notify();
                                 }
                             }))
-                            .on_click(cx.listener(move |this, _, _, cx| this.pick(option, cx)))
+                            .on_click(
+                                cx.listener(move |this, _, _, cx| this.pick(kind, option, cx)),
+                            )
                             .child(launcher_dot(launcher))
-                            .child(launcher.display_name())
+                            .child(div().min_w_0().child(label).children(hint.map(|hint| {
+                                div()
+                                    .text_size(px(11.))
+                                    .line_height(px(15.))
+                                    .text_color(color(theme::FAINT))
+                                    .child(hint)
+                            })))
                     }),
             )
     }
 
     fn render_header(&self, cx: &mut Context<Self>) -> Div {
+        let header = MenuAt::Header;
         div()
             .flex()
             .flex_wrap()
@@ -264,11 +396,30 @@ impl AccountsView {
                     .flex_none()
                     .items_center()
                     .gap(px(8.))
-                    .child(self.render_add_menu(MenuAt::Header, Tone::Primary, "Add account", cx)),
+                    .children(self.flash.as_ref().map(Flash::render))
+                    .child(self.render_menu_button(
+                        MenuSpot {
+                            kind: MenuKind::Import,
+                            at: header,
+                        },
+                        Tone::Secondary,
+                        "Import",
+                        cx,
+                    ))
+                    .child(self.render_menu_button(
+                        MenuSpot {
+                            kind: MenuKind::Add,
+                            at: header,
+                        },
+                        Tone::Primary,
+                        "Add account",
+                        cx,
+                    )),
             )
     }
 
     fn render_empty(&self, cx: &mut Context<Self>) -> Div {
+        let empty = MenuAt::Empty;
         div()
             .flex()
             .flex_col()
@@ -307,7 +458,27 @@ impl AccountsView {
             .child(
                 div()
                     .mt(px(20.))
-                    .child(self.render_add_menu(MenuAt::Empty, Tone::Secondary, "Add account", cx)),
+                    .flex()
+                    .items_center()
+                    .gap(px(8.))
+                    .child(self.render_menu_button(
+                        MenuSpot {
+                            kind: MenuKind::Import,
+                            at: empty,
+                        },
+                        Tone::Primary,
+                        "Import accounts",
+                        cx,
+                    ))
+                    .child(self.render_menu_button(
+                        MenuSpot {
+                            kind: MenuKind::Add,
+                            at: empty,
+                        },
+                        Tone::Secondary,
+                        "Add account",
+                        cx,
+                    )),
             )
     }
 
@@ -515,7 +686,7 @@ impl AccountsView {
 }
 
 impl Render for AccountsView {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let body: AnyElement = match &self.load {
             Load::Pending => div().into_any_element(),
             Load::Failed(message) => div()
@@ -530,6 +701,10 @@ impl Render for AccountsView {
                 self.render_groups(&accounts, cx).into_any_element()
             }
         };
-        scroll_page("accounts-page", &self.scroll, self.render_header(cx), body)
+        let viewport = window.viewport_size();
+        let dialog = self
+            .render_import(cx)
+            .map(|dialog| overlay(viewport, 2, dialog));
+        scroll_page("accounts-page", &self.scroll, self.render_header(cx), body).children(dialog)
     }
 }

@@ -5,7 +5,7 @@ use gpui::{
     WindowControlArea, canvas, div, px, svg,
 };
 use ol_api::Backend;
-use ol_model::{LauncherId, Sidebar};
+use ol_model::{Game, LauncherId, Sidebar};
 use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::account::AccountPage;
@@ -42,15 +42,46 @@ impl Screen {
 pub(crate) enum Route {
     Library,
     Accounts,
+    // The Accounts list with the launcher's import dialog up.
+    Import(LauncherId),
     NewAccount(LauncherId),
     // `created`: the page a Create account just opened, which says what comes next.
-    Account { id: String, created: bool },
+    Account {
+        id: String,
+        created: bool,
+    },
     Settings,
+    // The Library with the game's launch dialog open, the account picked when one is named.
+    Play {
+        game: Box<Game>,
+        account: Option<String>,
+    },
 }
 
 pub(crate) struct Go {
     pub route: Route,
     pub guarded: bool,
+    // The game whose Play sent the user off to add or import an account: the page this move opens may bring them back to it. Only the move that carries it has it.
+    pub return_to: Option<Game>,
+}
+
+impl Go {
+    pub fn to(route: Route) -> Self {
+        Self {
+            route,
+            guarded: true,
+            return_to: None,
+        }
+    }
+
+    // A move a page makes once its work is done.
+    pub fn done(route: Route) -> Self {
+        Self {
+            route,
+            guarded: false,
+            return_to: None,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -62,6 +93,7 @@ pub(crate) struct Question {
 struct Asking {
     question: Question,
     then: Route,
+    return_to: Option<Game>,
     leave_leads: bool,
 }
 
@@ -95,6 +127,7 @@ pub struct Shell {
     fake_launchers: bool,
     _page: Option<Subscription>,
     _keys: Subscription,
+    _host: Subscription,
 }
 
 pub fn sidebar_width(open: bool) -> Pixels {
@@ -136,6 +169,7 @@ impl Shell {
             }
         });
         let host = cx.new(|cx| LaunchHost::new(backend.clone(), cx));
+        let from_host = cx.subscribe_in(&host, window, Self::on_go);
         Self {
             library: cx.new(|cx| LibraryView::new(backend.clone(), host.clone(), window, cx)),
             backend,
@@ -147,6 +181,7 @@ impl Shell {
             fake_launchers,
             _page: None,
             _keys: keys,
+            _host: from_host,
         }
     }
 
@@ -165,28 +200,31 @@ impl Shell {
             Screen::Accounts => Route::Accounts,
             Screen::Settings => Route::Settings,
         };
-        self.go(route, true, window, cx);
+        self.go(Go::to(route), window, cx);
     }
 
-    // An unguarded move is one a page makes when a create or a delete has finished: it wins over a question still open.
-    fn go(&mut self, route: Route, guarded: bool, window: &mut Window, cx: &mut Context<Self>) {
+    // An unguarded move is one a page makes when a create, a delete or an import has finished: it wins over a question still open.
+    fn go(&mut self, go: Go, window: &mut Window, cx: &mut Context<Self>) {
         if self.asking.is_some() {
-            if guarded {
+            if go.guarded {
                 return;
             }
             self.asking = None;
         }
-        if guarded && let Some(question) = self.question(cx) {
+        if go.guarded
+            && let Some(question) = self.question(cx)
+        {
             self.asking = Some(Asking {
                 question,
-                then: route,
+                then: go.route,
+                return_to: go.return_to,
                 leave_leads: false,
             });
             window.blur(cx);
             cx.notify();
             return;
         }
-        self.enter(route, window, cx);
+        self.enter(go.route, go.return_to, window, cx);
     }
 
     fn question(&self, cx: &Context<Self>) -> Option<Question> {
@@ -201,30 +239,49 @@ impl Shell {
             return;
         };
         if leave {
-            self.enter(asking.then, window, cx);
+            self.enter(asking.then, asking.return_to, window, cx);
         }
         cx.notify();
     }
 
-    fn enter(&mut self, route: Route, window: &mut Window, cx: &mut Context<Self>) {
+    // Every page but the Library is made afresh, so the return target lives exactly as long as the page it was handed to.
+    fn enter(
+        &mut self,
+        route: Route,
+        return_to: Option<Game>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let left = self.page.screen();
         let backend = self.backend.clone();
+        let mut play = None;
         self._page = None;
         self.page = match route {
             Route::Library => Page::Library,
+            Route::Play { game, account } => {
+                play = Some((*game, account));
+                Page::Library
+            }
             Route::Settings => Page::Settings(cx.new(|_| SettingsView)),
             Route::Accounts => {
-                let page = cx.new(|cx| AccountsView::new(backend, cx));
+                let page = cx.new(|cx| AccountsView::new(backend, None, None, cx));
+                self._page = Some(cx.subscribe_in(&page, window, Self::on_go));
+                Page::Accounts(page)
+            }
+            Route::Import(launcher) => {
+                let page = cx.new(|cx| AccountsView::new(backend, Some(launcher), return_to, cx));
                 self._page = Some(cx.subscribe_in(&page, window, Self::on_go));
                 Page::Accounts(page)
             }
             Route::NewAccount(launcher) => {
-                let page = cx.new(|cx| AccountPage::create(backend, launcher, window, cx));
+                let page =
+                    cx.new(|cx| AccountPage::create(backend, launcher, return_to, window, cx));
                 self._page = Some(cx.subscribe_in(&page, window, Self::on_go));
                 Page::Account(page)
             }
             Route::Account { id, created } => {
-                let page = cx.new(|cx| AccountPage::edit(backend, id, created, window, cx));
+                let host = self.host.clone();
+                let page = cx.new(|cx| AccountPage::edit(backend, host, id, created, window, cx));
                 self._page = Some(cx.subscribe_in(&page, window, Self::on_go));
                 Page::Account(page)
             }
@@ -237,11 +294,23 @@ impl Shell {
                 library.leave(window, cx);
             }
         });
+        if let Some((game, account)) = play {
+            self.host
+                .update(cx, |host, cx| host.open(game, account, false, cx));
+        }
         cx.notify();
     }
 
     fn on_go<E>(&mut self, _: &Entity<E>, go: &Go, window: &mut Window, cx: &mut Context<Self>) {
-        self.go(go.route.clone(), go.guarded, window, cx);
+        self.go(
+            Go {
+                route: go.route.clone(),
+                guarded: go.guarded,
+                return_to: go.return_to.clone(),
+            },
+            window,
+            cx,
+        );
     }
 
     // The mouse's Back button and Alt+Left leave an account's page for the list; nowhere else has anywhere to go back to.
@@ -249,12 +318,16 @@ impl Shell {
         if !matches!(self.page, Page::Account(_)) || self.modal(cx) {
             return false;
         }
-        self.go(Route::Accounts, true, window, cx);
+        self.go(Go::to(Route::Accounts), window, cx);
         true
     }
 
     fn modal(&self, cx: &Context<Self>) -> bool {
-        self.asking.is_some() || self.host.read(cx).is_modal()
+        self.asking.is_some() || self.host.read(cx).is_modal() || self.importing(cx)
+    }
+
+    fn importing(&self, cx: &Context<Self>) -> bool {
+        matches!(&self.page, Page::Accounts(page) if page.read(cx).importing())
     }
 
     fn typing(&self, window: &Window, cx: &Context<Self>) -> bool {
@@ -316,6 +389,15 @@ impl Shell {
         }
         if self.host.read(cx).is_modal() {
             return false;
+        }
+        if let Page::Accounts(page) = &self.page
+            && page.read(cx).importing()
+        {
+            if held.alt || held.platform {
+                return false;
+            }
+            page.update(cx, |page, cx| page.on_import_key(keystroke, cx));
+            return true;
         }
         let only_alt = held.alt && !held.control && !held.shift && !held.platform && !held.function;
         if only_alt && keystroke.key == "left" {
