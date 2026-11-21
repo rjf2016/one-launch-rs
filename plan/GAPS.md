@@ -223,7 +223,8 @@ Since the real ports. The first four are the ones a user could meet, and are the
 Since the clipboard. The first is one a user could meet.
 
 - A copy is written without the marks that keep it out of the clipboard history (Win+V) and the cloud clipboard only when Windows will not register or take the marks themselves, and the answer then says so. Any other failure refuses the copy, a clipboard another program holds open among them: "Windows would not let One Launch use the clipboard: another program holds the clipboard open. Try again.", and the copy before it stays due to be cleared. Nothing reads the copy back. The Electron app writes the plain copy whenever its PowerShell write fails for any reason or its read-back differs.
-- A clear that finds the clipboard held open is tried again up to four times, 2 s apart, and again at quit, also when the backend's thread ends in a panic. A clipboard Windows reports unchanged since the copy (`GetClipboardSequenceNumber`) is emptied without being read; one that changed is compared only when it holds a text of the copy's own length, and no other text is read. The Electron app tries once, at 30 s or at quit, and reads whatever text the clipboard holds.
+- A clear that finds the clipboard held open is tried again up to four times, 2 s apart, and again at quit, also when the backend's thread ends in a panic. A clear compares only a text of the copy's own length, and reads no other. The Electron app tries once, at 30 s or at quit, and reads whatever text the clipboard holds.
+- A clear reads the clipboard's text when its length matches the copy's, and can then wait for a program that renders its copy on request, while it holds the clipboard open.
 
 ## Tray (slice 5)
 

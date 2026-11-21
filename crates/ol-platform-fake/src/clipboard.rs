@@ -1,6 +1,6 @@
 use std::sync::{Mutex, MutexGuard};
 
-use ol_platform_api::{Clipboard, ClipboardError, ClipboardSequence, Zeroizing};
+use ol_platform_api::{Clipboard, ClipboardError, Zeroizing};
 
 use crate::OpLog;
 
@@ -17,7 +17,6 @@ struct State {
     refuse_private: bool,
     refuse_text: bool,
     refuse_all: bool,
-    sequence: ClipboardSequence,
     calls: usize,
     busy_calls: Vec<usize>,
     reads: usize,
@@ -68,7 +67,6 @@ impl RecordingClipboard {
     pub fn user_copies(&self, text: &str) {
         let mut state = self.state();
         state.held = Some((Zeroizing::new(text.to_owned()), Kept::ByTheUser));
-        state.sequence += 1;
     }
 
     pub fn holds(&self, text: &str) -> bool {
@@ -102,7 +100,7 @@ impl RecordingClipboard {
         Ok(state)
     }
 
-    fn write(&self, text: &str, kept: Kept) -> Result<ClipboardSequence, ClipboardError> {
+    fn write(&self, text: &str, kept: Kept) -> Result<(), ClipboardError> {
         let mut state = self.open()?;
         if kept == Kept::Private && state.refuse_text {
             return Err(ClipboardError::Refused(
@@ -115,21 +113,19 @@ impl RecordingClipboard {
             ));
         }
         state.held = Some((Zeroizing::new(text.to_owned()), kept));
-        state.sequence += 1;
-        let written = state.sequence;
         drop(state);
         let private = kept == Kept::Private;
         self.log.record("clip.write", [("private", private.into())]);
-        Ok(written)
+        Ok(())
     }
 }
 
 impl Clipboard for RecordingClipboard {
-    fn write_private(&self, text: &str) -> Result<ClipboardSequence, ClipboardError> {
+    fn write_private(&self, text: &str) -> Result<(), ClipboardError> {
         self.write(text, Kept::Private)
     }
 
-    fn write_text(&self, text: &str) -> Result<ClipboardSequence, ClipboardError> {
+    fn write_text(&self, text: &str) -> Result<(), ClipboardError> {
         self.write(text, Kept::Plain)
     }
 
@@ -143,18 +139,10 @@ impl Clipboard for RecordingClipboard {
 
     fn clear_if(
         &self,
-        written: ClipboardSequence,
         length: usize,
         holds: &dyn Fn(&str) -> bool,
     ) -> Result<bool, ClipboardError> {
         let mut state = self.open()?;
-        if state.sequence == written {
-            state.held = None;
-            state.sequence += 1;
-            drop(state);
-            self.log.record("clip.clear", []);
-            return Ok(true);
-        }
         let same_length = state
             .held
             .as_ref()
@@ -167,7 +155,6 @@ impl Clipboard for RecordingClipboard {
             return Ok(false);
         }
         state.held = None;
-        state.sequence += 1;
         drop(state);
         self.log.record("clip.clear", []);
         Ok(true)
@@ -182,19 +169,18 @@ mod tests {
     fn a_write_is_written_down_without_its_text_and_a_clear_needs_the_same_text() {
         let log = OpLog::new();
         let clipboard = RecordingClipboard::new(log.clone());
-        let written = clipboard.write_private("placeholder-secret").unwrap();
+        clipboard.write_private("placeholder-secret").unwrap();
         assert_eq!(clipboard.kept(), Some(Kept::Private));
-        let changed = written - 1;
-        assert!(
-            !clipboard
-                .clear_if(changed, 18, &|held| held == "another")
-                .unwrap()
-        );
-        assert!(!clipboard.clear_if(changed, 7, &|_| true).unwrap());
+        assert!(!clipboard.clear_if(18, &|held| held == "another").unwrap());
+        assert!(!clipboard.clear_if(7, &|_| true).unwrap());
         assert_eq!(clipboard.reads(), 1);
         assert!(clipboard.holds("placeholder-secret"));
-        assert!(clipboard.clear_if(written, 18, &|_| false).unwrap());
-        assert_eq!(clipboard.reads(), 1);
+        assert!(
+            clipboard
+                .clear_if(18, &|held| held == "placeholder-secret")
+                .unwrap()
+        );
+        assert_eq!(clipboard.reads(), 2);
         assert!(clipboard.is_empty());
         let events = serde_json::to_string(&log.snapshot()).unwrap();
         assert!(!events.contains("placeholder"));

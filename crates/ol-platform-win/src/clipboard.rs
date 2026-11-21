@@ -1,11 +1,11 @@
 use std::thread;
 use std::time::Duration;
 
-use ol_platform_api::{Clipboard, ClipboardError, ClipboardSequence, Zeroizing};
+use ol_platform_api::{Clipboard, ClipboardError, Zeroizing};
 use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL};
 use windows::Win32::System::DataExchange::{
-    CloseClipboard, EmptyClipboard, GetClipboardData, GetClipboardSequenceNumber,
-    IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
+    CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard,
+    RegisterClipboardFormatW, SetClipboardData,
 };
 use windows::Win32::System::Memory::{
     GMEM_MOVEABLE, GMEM_ZEROINIT, GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock,
@@ -111,13 +111,6 @@ impl Opened {
     }
 }
 
-impl Opened {
-    // Taken while the clipboard is held, so it is the count of this program's own write.
-    fn sequence(&self) -> ClipboardSequence {
-        unsafe { GetClipboardSequenceNumber() }
-    }
-}
-
 impl Drop for Opened {
     fn drop(&mut self) {
         let _ = unsafe { CloseClipboard() };
@@ -173,7 +166,7 @@ fn private_formats() -> Result<[u32; 3], ClipboardError> {
 }
 
 impl Clipboard for WindowsClipboard {
-    fn write_private(&self, text: &str) -> Result<ClipboardSequence, ClipboardError> {
+    fn write_private(&self, text: &str) -> Result<(), ClipboardError> {
         let formats = private_formats()?;
         let clipboard = Opened::open()?;
         clipboard.empty()?;
@@ -191,14 +184,13 @@ impl Clipboard for WindowsClipboard {
         if written.is_err() {
             let _ = clipboard.empty();
         }
-        written.map(|()| clipboard.sequence())
+        written
     }
 
-    fn write_text(&self, text: &str) -> Result<ClipboardSequence, ClipboardError> {
+    fn write_text(&self, text: &str) -> Result<(), ClipboardError> {
         let clipboard = Opened::open()?;
         clipboard.empty()?;
-        clipboard.set_text(text)?;
-        Ok(clipboard.sequence())
+        clipboard.set_text(text)
     }
 
     fn read_text(&self) -> Result<Option<Zeroizing<String>>, ClipboardError> {
@@ -207,16 +199,10 @@ impl Clipboard for WindowsClipboard {
 
     fn clear_if(
         &self,
-        written: ClipboardSequence,
         length: usize,
         holds: &dyn Fn(&str) -> bool,
     ) -> Result<bool, ClipboardError> {
         let clipboard = Opened::open()?;
-        // Unchanged since the copy: nothing is read, so no program is asked to render a text it put there.
-        if clipboard.sequence() == written {
-            clipboard.empty()?;
-            return Ok(true);
-        }
         let Some(text) = clipboard
             .with_units(|units| read_utf16_of_length(units, length))?
             .flatten()
@@ -302,7 +288,7 @@ mod tests {
     impl Drop for PutBack {
         fn drop(&mut self) {
             let put_back = match &self.0 {
-                Some(earlier) => WindowsClipboard.write_text(earlier).map(|_| ()),
+                Some(earlier) => WindowsClipboard.write_text(earlier),
                 None => Opened::open().and_then(|clipboard| clipboard.empty()),
             };
             assert!(put_back.is_ok(), "the clipboard could not be put back");
@@ -352,26 +338,14 @@ mod tests {
         assert!(holds_made_up(&board), "the private write did not read back");
         assert_eq!(private_marks(), [true; 3]);
 
-        let written = board.write_text(MADE_UP).unwrap();
+        board.write_text(MADE_UP).unwrap();
         assert!(holds_made_up(&board), "the plain write did not read back");
         assert_eq!(private_marks(), [false; 3]);
 
-        let changed = written.wrapping_sub(1);
-        assert!(
-            !board
-                .clear_if(changed, length, &|held| held == "another")
-                .unwrap()
-        );
-        assert!(!board.clear_if(changed, length + 1, &|_| true).unwrap());
+        assert!(!board.clear_if(length, &|held| held == "another").unwrap());
+        assert!(!board.clear_if(length + 1, &|_| true).unwrap());
         assert!(board.read_text().unwrap().is_some());
-        assert!(
-            board
-                .clear_if(changed, length, &|held| held == MADE_UP)
-                .unwrap()
-        );
-        assert!(board.read_text().unwrap().is_none());
-        let written = board.write_text(MADE_UP).unwrap();
-        assert!(board.clear_if(written, length, &|_| false).unwrap());
+        assert!(board.clear_if(length, &|held| held == MADE_UP).unwrap());
         assert!(board.read_text().unwrap().is_none());
         println!("passed: private and plain writes, their marks, and a clear");
     }

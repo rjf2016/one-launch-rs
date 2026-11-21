@@ -271,20 +271,6 @@ fn a_write_refused_for_anything_but_the_marks_is_an_error_and_never_a_plain_copy
 }
 
 #[test]
-fn a_clipboard_unchanged_since_the_copy_is_emptied_without_being_read() {
-    let board = board();
-    board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
-    board.wait(30);
-    assert!(board.clipboard.is_empty());
-    assert_eq!(board.clipboard.reads(), 0);
-
-    let board = self::board();
-    board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
-    assert!(board.service.clear_if_unchanged());
-    assert_eq!(board.clipboard.reads(), 0);
-}
-
-#[test]
 fn a_password_of_any_letters_is_cleared_after_the_clipboard_changed_and_holds_it_again() {
     let letters = "h\u{e4}rse-b\u{f6}ttery-\u{1f600}-made-up";
     let board = board();
