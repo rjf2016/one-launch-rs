@@ -497,7 +497,6 @@ pub fn field(
         }))
 }
 
-// A line of a panel: what it is on the left, its value on the right. Each is followed by more of the panel, so each has the line under it.
 pub fn row(
     label: impl Into<SharedString>,
     hint: Option<SharedString>,

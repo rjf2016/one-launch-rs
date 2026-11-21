@@ -72,7 +72,6 @@ struct Request {
     starting: bool,
     stopping: Option<String>,
     note: Option<SharedString>,
-    // What the hand-over's last copy said, while the hand-over is up.
     copied: Option<SharedString>,
     steps_open: bool,
     plan_open: bool,
@@ -540,7 +539,6 @@ impl LaunchHost {
         cx.notify();
     }
 
-    // As the account's page copies: the backend decrypts and writes, the window only hears how it went.
     fn copy(&mut self, field: CopyField, cx: &mut Context<Self>) {
         let (Some(request), Some(active)) = (&self.request, &self.active) else {
             return;

@@ -402,9 +402,17 @@ impl AccountPage {
         cx.notify();
     }
 
-    // A save of the sign-in can record the launcher's id for the account: it shows under Advanced without losing other changes.
+    // Only an id the save recorded anew replaces what is in the field, so an unsaved edit of it is kept otherwise.
     fn take_linked(&mut self, account: Account, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(uid) = account.launcher_uid.clone() {
+        let before = self
+            .account
+            .as_ref()
+            .and_then(|before| before.launcher_uid.clone());
+        if let Some(uid) = account
+            .launcher_uid
+            .clone()
+            .filter(|uid| Some(uid) != before.as_ref())
+        {
             self.uid.set_text(uid, window, cx);
         }
         self.take_account(account, cx);
@@ -686,13 +694,7 @@ impl AccountPage {
             .password
             .as_ref()
             .is_some_and(|password| password.is_focused(window, cx));
-        // The field's own Copy and Cut work while the eye shows the password: here they do nothing.
-        if in_password
-            && held.control
-            && !held.alt
-            && !held.platform
-            && matches!(keystroke.key.as_str(), "c" | "x")
-        {
+        if in_password && password::copies_or_cuts(keystroke) {
             return true;
         }
         let plain = !held.control && !held.alt && !held.platform && !held.function;
