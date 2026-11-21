@@ -196,7 +196,6 @@ impl<'a> BackupService<'a> {
         }
     }
 
-    // Snapshots taken, pruned, found unreadable and put back are logged under `main:backup`.
     #[must_use]
     pub fn logging_to(mut self, log: &Log) -> Self {
         self.log = log.child("backup");
@@ -204,7 +203,6 @@ impl<'a> BackupService<'a> {
         self
     }
 
-    // After a snapshot's files were written back, by a restore or a rollback: the two lines the Electron app's backup service and adapter write. Riot and Epic keep nothing in the registry, and their line says nothing of it.
     pub fn log_restored(
         &self,
         launcher: LauncherId,

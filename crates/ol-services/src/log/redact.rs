@@ -1,5 +1,3 @@
-// What the Electron app's redaction does to a line before it is written, rule for rule: JavaScript's idea of a space, a digit and a word boundary included, so the masks fall where its masks fall.
-
 use std::borrow::Cow;
 use std::fmt::Write as _;
 use std::sync::LazyLock;
@@ -7,15 +5,14 @@ use std::sync::LazyLock;
 use ol_formats::js::{WHITESPACE_CLASS, utf16_len};
 use ol_formats::js_json::{number_to_string, quote_text};
 use ol_model::LogLevel;
-use ol_model::redact::AccountNames;
+use ol_model::redact::{AccountNames, USER_MASK};
 use regex::{Captures, Regex};
 use serde_json::{Map, Value};
 
 pub const REDACTED: &str = "[REDACTED]";
 pub const EMAIL_MASK: &str = "[EMAIL]";
 pub const STEAM_ID_MASK: &str = "[STEAMID]";
-pub const USER_MASK: &str = "[USER]";
-// Message and fields are each cut to this many UTF-16 units, after redaction: cutting first could leave the start of a secret too short for its pattern to match.
+// Cutting before redaction could leave the start of a secret too short for its pattern to match.
 pub const MAX_TEXT_LENGTH: usize = 8 * 1024;
 const MAX_DEPTH: i64 = 6;
 
@@ -45,7 +42,7 @@ static RULES: LazyLock<Rules> = LazyLock::new(|| {
     Rules {
         id_tail: rule("\u{2026}[0-9A-Za-z_-]{3,}"),
         key_value: rule(&format!(
-            r#"{boundary}((?i-u:pass(?:word|wd|phrase)?|pwd|secret|token|api[_-]?key|apikey|authorization|cookie|session|refresh[_-]?token|access[_-]?token|credentials?|private[_-]?key)){boundary}(\\?["']?{space}*[=:]{space}*)(\\?["']?)[^{spaces}"',;&}}]+"#
+            r#"{boundary}((?i-u:pass(?:word|wd|phrase)?|pwd|secret|token|api[_-]?key|apikey|authorization|cookie|session|refresh[_-]?token|access[_-]?token|credentials?|private[_-]?key)){boundary}(\\?["']?{space}*[=:]{space}*)(\\?["']?)(?:[^{spaces}"',;&}}\\]|\\[^{spaces}"])+"#
         )),
         ini_data: rule(&format!(r"({boundary}Data{space}*={space}*){not_space}+")),
         steam_login: rule(&format!(
@@ -83,11 +80,10 @@ fn replaced_by<'a>(
     }
 }
 
-// The Electron app's redactString: the names first, then each pattern in its order.
+// The Electron app masks the names first, so a name inside an email or a token splits it and lets the rest through; here the patterns see the text as it came.
 pub fn redact_string(names: &AccountNames, text: &str) -> String {
     let rules = &*RULES;
-    let text = names.mask(text);
-    // Beyond the Electron app: the app's own messages name an account by the end of a launcher's id, after an ellipsis.
+    let text = Cow::Borrowed(text);
     let text = replaced(text, &rules.id_tail, "\u{2026}[REDACTED]");
     let text = replaced(text, &rules.key_value, "${1}${2}${3}[REDACTED]");
     let text = replaced(text, &rules.ini_data, "${1}[REDACTED]");
@@ -99,7 +95,7 @@ pub fn redact_string(names: &AccountNames, text: &str) -> String {
         let id = &found[0];
         format!("[UUID\u{2026}{}]", &id[id.len() - 4..])
     });
-    let text = replaced(text, &rules.profile_path, "${1}[USER]");
+    let text = replaced(text, &rules.profile_path, &format!("${{1}}{USER_MASK}"));
     let text = replaced_by(text, &rules.long_run, |found| {
         if found[0].bytes().any(|byte| byte.is_ascii_digit()) {
             REDACTED.to_owned()
@@ -107,14 +103,13 @@ pub fn redact_string(names: &AccountNames, text: &str) -> String {
             found[0].to_owned()
         }
     });
-    text.into_owned()
+    names.mask(&text).into_owned()
 }
 
 pub fn is_sensitive_key(key: &str) -> bool {
     RULES.sensitive_key.is_match(key)
 }
 
-// The Electron app's redactValue on what a log field can be: anything under a sensitive key is replaced whole, every string is redacted, and an object or a list deeper than six levels is cut.
 pub fn redact_value(names: &AccountNames, value: &Value, depth: i64) -> Value {
     match value {
         Value::Null | Value::Bool(_) | Value::Number(_) => value.clone(),
@@ -144,7 +139,6 @@ pub fn redact_value(names: &AccountNames, value: &Value, depth: i64) -> Value {
     }
 }
 
-// JSON.stringify of a value without an indent.
 fn stringify(out: &mut String, value: &Value) {
     match value {
         Value::Null => out.push_str("null"),
@@ -186,7 +180,7 @@ fn stringify(out: &mut String, value: &Value) {
     }
 }
 
-// Past the limit the text is cut and says how much was left out. A cut through a surrogate pair leaves U+FFFD, which is what the Electron app's file holds there.
+// U+FFFD where the cut splits a surrogate pair is what the Electron app's UTF-8 file holds there.
 fn clip(text: &str) -> Cow<'_, str> {
     let total = utf16_len(text);
     if total <= MAX_TEXT_LENGTH {
@@ -229,7 +223,6 @@ pub const fn level_label(level: LogLevel) -> &'static str {
     }
 }
 
-// One line of the log: `<time> <LEVEL> [<scope>] <message>`, then a space and the fields as JSON when there are any. The message and the fields are redacted, then cut; the message is kept on one line. The time and the scope are the app's own and written as given.
 pub fn format_line(
     names: &AccountNames,
     timestamp: &str,
@@ -247,8 +240,15 @@ pub fn format_line(
     if let Some(fields) = fields {
         let mut json = String::new();
         stringify(&mut json, &redact_value(names, fields, 0));
+        let mut again = redact_string(names, &json);
+        // A rule that ran over the JSON's own quotes leaves text that no longer reads as JSON; it is kept, as one string.
+        if again != json && serde_json::from_str::<Value>(&again).is_err() {
+            let mut quoted = String::new();
+            quote_text(&mut quoted, &again);
+            again = quoted;
+        }
         line.push(' ');
-        line.push_str(&clip(&redact_string(names, &json)));
+        line.push_str(&clip(&again));
     }
     line.push('\n');
     line

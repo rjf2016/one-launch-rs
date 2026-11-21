@@ -298,7 +298,6 @@ pub struct SwitchOptions<'a> {
     pub cancel: &'a CancelToken,
     // The game a launch follows the switch with. Only Riot's client is started differently for one.
     pub game: Option<GameRef<'a>>,
-    // The app's log; a switch writes under `main:<launcher>`.
     pub log: &'a Log,
 }
 
@@ -310,7 +309,6 @@ fn line(launcher: LauncherId, what: &str) -> String {
     }
 }
 
-// Once the plan is known and nothing has refused it: the line before the first step.
 fn log_started(
     options: &SwitchOptions<'_>,
     launcher: LauncherId,
@@ -330,7 +328,6 @@ fn log_started(
     );
 }
 
-// How the switch ended, as the Electron app's adapters log it.
 fn log_outcome(log: &Log, launcher: LauncherId, account: &AccountRef, switched: &SwitchResult) {
     let log = log.child(launcher.as_str());
     let at = |what: &str| line(launcher, what);

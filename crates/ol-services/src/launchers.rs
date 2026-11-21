@@ -133,7 +133,6 @@ pub struct Launchers {
     pub epic: EpicMachine,
     pub battlenet: BattlenetMachine,
     pub riot: RiotMachine,
-    // Where a scan, a switch and a launch log, under `main:<launcher>`. Off until the backend hands its own in.
     pub log: Log,
 }
 

@@ -237,7 +237,6 @@ enum Command {
 }
 
 impl Command {
-    // The Electron app's name for the request, which its log lines carry.
     const fn channel(&self) -> &'static str {
         match self {
             Self::Library(_) => "library:list",
@@ -292,7 +291,6 @@ impl Command {
     }
 }
 
-// Answers a request, and logs a refusal as a warning and any other failure as an error, with its code and message, as the Electron app's IPC layer does.
 struct Said {
     log: Log,
     channel: &'static str,
@@ -435,7 +433,6 @@ pub struct Backend {
     log: Log,
 }
 
-// A start of the backend whose lines go to a log: `Backend::logging_to(log)`, then one of the starts the backend itself has.
 pub struct BackendStart {
     log: Log,
 }
@@ -515,7 +512,7 @@ fn take(thread: &Thread) -> Option<JoinHandle<()>> {
 }
 
 impl Backend {
-    // Returns at once: the folder is made and the database opened on the new thread, and a failure there is the answer to every request. Without launchers nothing can be scanned, switched or started. Nothing is logged.
+    // Returns at once: the folder is made and the database opened on the new thread, and a failure there is the answer to every request. Without launchers nothing can be scanned, switched or started.
     pub fn start(data_dir: PathBuf, version: &str) -> Self {
         Self::logging_to(Log::off()).start(data_dir, version)
     }
@@ -551,7 +548,6 @@ impl Backend {
         Self::logging_to(Log::off()).start_with(data_dir, version, launchers, on_job)
     }
 
-    // The same starts, with every line of the backend, its launchers and its switches written to `log`, whose level follows the logLevel setting from the database's first read on.
     pub const fn logging_to(log: Log) -> BackendStart {
         BackendStart { log }
     }
@@ -1082,7 +1078,6 @@ impl Serving {
         log.info("exit", ());
     }
 
-    // The level the logLevel setting holds, when it holds one; otherwise the log keeps the level it was opened with.
     fn follow_stored_level(&self, store: &Store) {
         let stored = store
             .setting(SettingKey::LogLevel)

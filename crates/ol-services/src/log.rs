@@ -1,5 +1,3 @@
-// The app's log, `<data folder>\logs\onelaunch.log`, written as the Electron app writes it. A line is made on the thread that logs it, where every message and field goes through the redaction, and a thread of its own appends it: a caller never waits for the disk, and a log that cannot be written loses its lines and nothing else.
-
 pub mod file;
 pub mod redact;
 
@@ -20,11 +18,11 @@ use self::file::FileSink;
 pub use self::file::{KEEP, LOG_NAME, MAX_BYTES};
 use self::redact::format_line;
 
-// Lines waiting for the disk. Past this many a line is dropped and counted, so a caller is never held up.
+// Past this many lines waiting for the disk, a line is dropped and counted rather than hold up its caller.
 const QUEUE: usize = 4096;
 const ROOT_SCOPE: &str = "main";
 
-// The codes of the refusals the app expects and explains before anything is touched. They are logged as warnings, so an error line always means something unexpected.
+// Logged as warnings, so an error line always means something unexpected.
 pub const REFUSAL_CODES: [&str; 14] = [
     "BUSY",
     "CONFIRM_REQUIRED",
@@ -67,10 +65,8 @@ const fn of_rank(rank: u8) -> LogLevel {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LogOptions {
     pub level: LogLevel,
-    // Each line goes to the console too: warnings and errors to stderr, the rest to stdout.
     pub mirror: bool,
     pub max_bytes: u64,
-    // The rotated files kept beside the live one.
     pub keep: u32,
 }
 
@@ -106,7 +102,6 @@ impl Shared {
     }
 }
 
-// The fields of a line: none, or a JSON value that is redacted like the message. Give facts (codes, counts, launcher ids, durations, step names), never the Debug of a whole value.
 pub struct Fields(Option<Value>);
 
 impl From<()> for Fields {
@@ -121,7 +116,6 @@ impl From<Value> for Fields {
     }
 }
 
-// What the app logs through: a scope, and the log it writes to. Cheap to clone and to hand to any thread. A log that is off takes every line and writes none.
 #[derive(Clone)]
 pub struct Log {
     shared: Option<Arc<Shared>>,
@@ -146,7 +140,6 @@ impl Log {
         &self.scope
     }
 
-    // The same log under `<scope>:<sub>`, as the Electron app's child loggers.
     pub fn child(&self, sub: &str) -> Self {
         Self {
             shared: self.shared.clone(),
@@ -164,7 +157,6 @@ impl Log {
             .is_some_and(|shared| rank(level) >= shared.threshold.load(Ordering::Relaxed))
     }
 
-    // From the next line on: what the logLevel setting does, at once.
     pub fn set_level(&self, level: LogLevel) {
         if let Some(shared) = &self.shared {
             shared.threshold.store(rank(level), Ordering::Relaxed);
@@ -197,7 +189,6 @@ impl Log {
         self.write(level, message, fields.into());
     }
 
-    // The one way to the file: the line is made by `format_line`, which redacts it.
     fn write(&self, level: LogLevel, message: &str, fields: Fields) {
         let Some(shared) = &self.shared else {
             return;
@@ -235,7 +226,6 @@ fn mirror(level: LogLevel, line: &str) {
     };
 }
 
-// The time as JavaScript's toISOString writes it, in UTC to the millisecond.
 pub fn timestamp() -> String {
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -243,7 +233,6 @@ pub fn timestamp() -> String {
     iso_from_millis(millis).unwrap_or_default()
 }
 
-// Owns the thread that writes the file. Dropping it writes what is waiting, for two seconds at most, and stops the log; the `Log`s handed out go quiet.
 pub struct Logger {
     log: Log,
     dir: PathBuf,
@@ -255,7 +244,6 @@ impl Logger {
         Self::open(&data_dir.join("logs"), options)
     }
 
-    // Never fails: a folder that cannot be made or written is tried again at each write, and what cannot be written is lost.
     pub fn open(dir: &Path, options: LogOptions) -> Self {
         let (lines, queue) = mpsc::sync_channel(QUEUE);
         let shared = Arc::new(Shared {
@@ -299,7 +287,6 @@ impl Logger {
         self.dir.join(format!("{LOG_NAME}.log"))
     }
 
-    // Waits until every line logged before it is on disk, or `timeout` has passed. False when it gave up or the log is stopped.
     pub fn flush(&self, timeout: Duration) -> bool {
         let Some(shared) = &self.log.shared else {
             return false;
@@ -325,7 +312,6 @@ impl Logger {
             .is_ok()
     }
 
-    // Writes what is waiting, for `timeout` at most, and stops the log for good.
     pub fn close(&self, timeout: Duration) {
         if let Some(shared) = &self.log.shared {
             *shared.lines.write().unwrap_or_else(PoisonError::into_inner) = None;

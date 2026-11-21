@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-// The names a launcher file holds reach the log's redaction the moment the file is read, so a message built from one later is already covered.
-
 use ol_formats::riot::session::{SessionRead, read_session};
 use ol_formats::steam::loginusers::parse_login_users;
 use ol_model::redact::with_registered_names;
@@ -13,13 +11,14 @@ fn masked(text: &str) -> String {
 
 #[test]
 fn every_account_steam_remembers_is_masked_once_its_file_is_read() {
-    let text = format!(
-        "Steam signed in as user_4 (Persona Four, {}) instead of user_2.",
-        format_args!("76561198{:09}", 4)
-    );
+    let file = std::fs::read_to_string(oracle("fixtures/launchers/steam/loginusers.vdf")).unwrap();
+    let last_id = file
+        .rfind("\"7656119")
+        .map(|at| &file[at + 1..at + 18])
+        .unwrap();
+    let text = format!("Steam signed in as user_4 (Persona Four, {last_id}) instead of user_2.");
     let text = text.as_str();
     assert_eq!(masked(text), text);
-    let file = std::fs::read_to_string(oracle("fixtures/launchers/steam/loginusers.vdf")).unwrap();
     assert_eq!(parse_login_users(&file).unwrap().len(), 4);
     assert_eq!(
         masked(text),

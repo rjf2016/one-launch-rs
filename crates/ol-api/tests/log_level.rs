@@ -1,15 +1,22 @@
 #![forbid(unsafe_code)]
 
-// The backend's log follows the logLevel setting: the stored one from its first read of the database, and a change at once. A log that cannot be written changes nothing else.
-
 use std::fs;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use futures_lite::future::block_on;
 use ol_api::Backend;
+use ol_api::accounts::{NewAccount, Secret};
+use ol_api::launchers::Launchers;
 use ol_api::log::{LogLevel, LogOptions, Logger};
-use ol_model::SettingKey;
+use ol_model::{LauncherId, SettingKey};
+use ol_platform_api::{DataProtector, Platform, ProtectError, Zeroizing};
+use ol_platform_fake::{
+    FakeClock, FakeProcesses, FakeRegistry, FakeShell, OpLog, ProcessKnobs, ScratchFiles,
+};
 use ol_testkit::Scratch;
+use ol_vault::FakeVault;
 
 const VERSION: &str = "9.8.7";
 const WAIT: Duration = Duration::from_secs(10);
@@ -70,4 +77,145 @@ fn a_log_that_cannot_be_written_leaves_the_backend_working() {
     backend.shut_down();
     assert!(logger.flush(WAIT));
     assert_eq!(fs::read(&blocked).unwrap(), b"");
+}
+
+// This user's DPAPI stands in as a XOR; another user's wraps its own way and, once `opens` is set, reads this user's too.
+struct Mine;
+
+impl DataProtector for Mine {
+    fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ProtectError> {
+        Ok(plain.iter().map(|byte| byte ^ 0x5a).collect())
+    }
+
+    fn unprotect(&self, protected: &[u8]) -> Result<Zeroizing<Vec<u8>>, ProtectError> {
+        Ok(Zeroizing::new(
+            protected.iter().map(|byte| byte ^ 0x5a).collect(),
+        ))
+    }
+}
+
+struct Theirs(Arc<AtomicBool>);
+
+impl DataProtector for Theirs {
+    fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ProtectError> {
+        Ok([b"theirs".as_slice(), plain].concat())
+    }
+
+    fn unprotect(&self, protected: &[u8]) -> Result<Zeroizing<Vec<u8>>, ProtectError> {
+        match protected.strip_prefix(b"theirs".as_slice()) {
+            Some(plain) => Ok(Zeroizing::new(plain.to_vec())),
+            None if self.0.load(Ordering::SeqCst) => Mine.unprotect(protected),
+            None => Err(ProtectError::Unprotect),
+        }
+    }
+}
+
+fn text(logger: &Logger) -> String {
+    assert!(logger.flush(WAIT));
+    fs::read_to_string(logger.current_path()).unwrap()
+}
+
+fn account_with_password(backend: &Backend) {
+    block_on(backend.create_account(NewAccount {
+        launcher: LauncherId::Steam,
+        display_name: "Vault Keeper".to_owned(),
+        login: "keeper_1".to_owned(),
+        launcher_uid: None,
+        password: Some(Secret::new("placeholder-pw-2".to_owned())),
+        tags: Vec::new(),
+        notes: String::new(),
+    }))
+    .unwrap();
+}
+
+#[test]
+fn a_vault_that_is_not_there_or_a_folder_that_cannot_be_made_is_said_at_start() {
+    let scratch = Scratch::new("api-log-start");
+    let logger = Logger::open(&scratch.join("logs"), LogOptions::default());
+    let backend = Backend::logging_to(logger.log()).start(scratch.join("data"), VERSION);
+    block_on(backend.settings()).unwrap();
+    let copies = scratch.join("data").join("backups").join("db");
+    let _ = fs::remove_dir_all(&copies);
+    fs::write(&copies, "").unwrap();
+    assert!(block_on(backend.back_up_database()).is_err());
+    backend.shut_down();
+    fs::write(scratch.join("not-a-folder"), "").unwrap();
+    let blocked = Backend::logging_to(logger.log()).start(scratch.join("not-a-folder"), VERSION);
+    assert!(block_on(blocked.settings()).is_err());
+    blocked.shut_down();
+    let written = text(&logger);
+    assert!(written.contains(
+        "WARN  [main] secure storage unavailable; secrets cannot be stored on this system"
+    ));
+    assert!(written.contains("ERROR [main] the data folder could not be opened"));
+    assert!(written.contains("ERROR [main:ipc] ipc settings:getAll failed"));
+    assert!(written.contains("WARN  [main] database copy failed"));
+}
+
+#[test]
+fn a_key_file_in_another_shape_is_said_before_the_start_stops() {
+    let scratch = Scratch::new("api-log-key");
+    let data = scratch.join("data");
+    let local_state = ol_vault::local_state_path(&data);
+    fs::create_dir_all(local_state.parent().unwrap()).unwrap();
+    fs::write(&local_state, "not json").unwrap();
+    let log = OpLog::new();
+    let platform = Platform {
+        registry: Arc::new(FakeRegistry::new(log.clone())),
+        processes: Arc::new(FakeProcesses::new(log.clone(), ProcessKnobs::default())),
+        files: Arc::new(ScratchFiles::new(&[scratch.path()], log.clone())),
+        shell: Arc::new(FakeShell::new(log)),
+        clock: Arc::new(FakeClock::starting_at(
+            time::macros::datetime!(2026-11-06 16:46:23 UTC),
+        )),
+    };
+    let logger = Logger::open(&scratch.join("logs"), LogOptions::default());
+    let started = Backend::logging_to(logger.log()).start_on_this_pc(
+        data,
+        VERSION,
+        Launchers::on(platform, Arc::new(FakeVault)),
+        Box::new(Mine),
+        None,
+    );
+    assert!(started.is_err());
+    assert!(text(&logger).contains("ERROR [main] the vault key could not be opened"));
+}
+
+#[test]
+fn a_lost_key_and_its_reset_are_logged() {
+    let scratch = Scratch::new("api-log-reset");
+    let data = scratch.join("data");
+    let first = Backend::start_with_vault_of_data_folder(data.clone(), VERSION, Box::new(Mine));
+    account_with_password(&first);
+    first.shut_down();
+
+    let logger = Logger::open(&scratch.join("logs"), LogOptions::default());
+    let opens = Arc::new(AtomicBool::new(false));
+    let lost = Backend::logging_to(logger.log()).start_with_vault_of_data_folder(
+        data.clone(),
+        VERSION,
+        Box::new(Theirs(Arc::clone(&opens))),
+    );
+    block_on(lost.vault_status()).unwrap();
+    opens.store(true, Ordering::SeqCst);
+    block_on(lost.reset_vault()).unwrap();
+    lost.shut_down();
+
+    let backend = Backend::logging_to(logger.log()).start_with_vault_of_data_folder(
+        data,
+        VERSION,
+        Box::new(Theirs(Arc::new(AtomicBool::new(false)))),
+    );
+    block_on(backend.reset_vault()).unwrap();
+    backend.shut_down();
+    let written = text(&logger);
+    for line in [
+        "ERROR [main] stored secrets cannot be decrypted; the vault key was lost or belongs to another Windows user",
+        "INFO  [main:vault] vault reset: the key opened after all; nothing removed",
+        "WARN  [main:vault] vault reset: all stored secrets removed",
+        "WARN  [main:ipc] vault reset by user",
+    ] {
+        assert!(written.contains(line), "the log has {line:?}");
+    }
+    assert!(!written.contains("placeholder-pw-2"));
 }

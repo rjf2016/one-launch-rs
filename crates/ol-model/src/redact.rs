@@ -1,16 +1,15 @@
-// The names of the accounts on this PC, which the log masks wherever they appear: a login or a display name has no shape a pattern could catch. Whoever reads one from the database or a launcher file hands it over here first, so any line built from it later is already covered. Names are only ever added, as in the Electron app.
-
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::{LazyLock, PoisonError, RwLock};
 
 pub const ACCOUNT_MASK: &str = "[ACCOUNT]";
+pub const USER_MASK: &str = "[USER]";
 
 const MIN_NAME_LENGTH: usize = 3;
+const MIN_USER_LENGTH: usize = 2;
 const MAX_NAME_LENGTH: usize = 256;
 const MAX_ACCOUNT_NAMES: usize = 2000;
 const MIN_ID_LENGTH: usize = 6;
-// Labels that identify nobody and are ordinary log words.
 const NOT_A_NAME: [&str; 16] = [
     "steam",
     "epic",
@@ -30,17 +29,16 @@ const NOT_A_NAME: [&str; 16] = [
     "user",
 ];
 
-// A name as the log compares it: each character as JavaScript's case-insensitive match without the u flag sees it.
 struct Name {
     units: usize,
     chars: Vec<char>,
+    mask: &'static str,
 }
 
-// No Debug: it holds every name it masks.
 #[derive(Default)]
 pub struct AccountNames {
     stored: HashSet<String>,
-    // By the first character, longest first and in the order given among names of one length, as the Electron app's alternation tries them.
+    users: HashSet<String>,
     by_first: HashMap<char, Vec<Name>>,
 }
 
@@ -64,7 +62,7 @@ const fn is_word(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
 
-// JavaScript's Canonicalize for a case-insensitive pattern without the u flag: the upper case of one UTF-16 unit, unless that is more than one unit or takes a character outside ASCII into it.
+// JavaScript's Canonicalize for a case-insensitive pattern without the u flag, which the Electron app's name pattern used.
 fn canonical(c: char) -> char {
     if c.len_utf16() > 1 {
         return c;
@@ -78,27 +76,56 @@ fn canonical(c: char) -> char {
     }
 }
 
+fn folded(text: &str) -> Vec<char> {
+    text.chars().map(canonical).collect()
+}
+
 impl AccountNames {
     pub fn new() -> Self {
         Self::default()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.stored.is_empty()
+        self.by_first.is_empty()
     }
 
     pub fn len(&self) -> usize {
         self.stored.len()
     }
 
-    // Trimmed and lower-cased; a name under 3 or over 256 UTF-16 units, a launcher word, a name already held and any name past the 2000th are passed over.
+    fn insert(&mut self, chars: Vec<char>, mask: &'static str) {
+        let Some(&first) = chars.first() else {
+            return;
+        };
+        let units = chars.iter().map(|c| c.len_utf16()).sum();
+        let bucket = self.by_first.entry(first).or_default();
+        if bucket.iter().any(|held| held.chars == chars) {
+            return;
+        }
+        let at = bucket
+            .iter()
+            .position(|held| held.units < units)
+            .unwrap_or(bucket.len());
+        bucket.insert(at, Name { units, chars, mask });
+    }
+
+    // A name whose lower case does not fold back to its own fold (İ, ẞ, the Kelvin, Ohm and Angstrom signs, ϴ) is also held as written, which the Electron app missed.
+    fn insert_both(&mut self, written: &str, lower: &str, mask: &'static str) {
+        self.insert(folded(lower), mask);
+        let as_written = folded(written);
+        if (1..=MAX_NAME_LENGTH).contains(&written.encode_utf16().count()) {
+            self.insert(as_written, mask);
+        }
+    }
+
     pub fn add<I>(&mut self, names: I)
     where
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
         for raw in names {
-            let name = raw.as_ref().trim_matches(is_js_space).to_lowercase();
+            let written = raw.as_ref().trim_matches(is_js_space);
+            let name = written.to_lowercase();
             let units = name.encode_utf16().count();
             if !(MIN_NAME_LENGTH..=MAX_NAME_LENGTH).contains(&units)
                 || NOT_A_NAME.contains(&name.as_str())
@@ -109,29 +136,31 @@ impl AccountNames {
             if self.stored.len() >= MAX_ACCOUNT_NAMES {
                 return;
             }
-            let chars: Vec<char> = name.chars().map(canonical).collect();
-            let Some(&first) = chars.first() else {
-                continue;
-            };
-            let bucket = self.by_first.entry(first).or_default();
-            let at = bucket
-                .iter()
-                .position(|held| held.units < units)
-                .unwrap_or(bucket.len());
-            bucket.insert(at, Name { units, chars });
+            self.insert_both(written, &name, ACCOUNT_MASK);
             self.stored.insert(name);
         }
     }
 
-    // Every whole name, in any case, as [ACCOUNT]: a name is whole when no ASCII letter, digit or underscore touches it.
+    pub fn add_user(&mut self, user: &str) {
+        let written = user.trim_matches(is_js_space);
+        let name = written.to_lowercase();
+        let units = name.encode_utf16().count();
+        if !(MIN_USER_LENGTH..=MAX_NAME_LENGTH).contains(&units) || !self.users.insert(name.clone())
+        {
+            return;
+        }
+        self.insert_both(written, &name, USER_MASK);
+    }
+
     pub fn mask<'a>(&self, text: &'a str) -> Cow<'a, str> {
-        if self.stored.is_empty() {
+        if self.by_first.is_empty() {
             return Cow::Borrowed(text);
         }
         let chars: Vec<(usize, char)> = text.char_indices().collect();
         let folded: Vec<char> = chars.iter().map(|&(_, c)| canonical(c)).collect();
         let mut out = String::new();
         let mut copied = 0;
+        let mut changed = false;
         let mut at = 0;
         while at < chars.len() {
             let whole_start = at == 0 || !is_word(chars[at - 1].1);
@@ -143,20 +172,21 @@ impl AccountNames {
                         let end = at + name.chars.len();
                         let fits = folded.get(at..end) == Some(name.chars.as_slice());
                         let whole_end = chars.get(end).is_none_or(|&(_, c)| !is_word(c));
-                        (fits && whole_end).then_some(end)
+                        (fits && whole_end).then_some((end, name.mask))
                     })
                 });
             match found {
-                Some(end) => {
+                Some((end, mask)) => {
                     out.push_str(&text[copied..chars[at].0]);
-                    out.push_str(ACCOUNT_MASK);
+                    out.push_str(mask);
                     copied = chars.get(end).map_or(text.len(), |&(byte, _)| byte);
+                    changed = true;
                     at = end;
                 }
                 None => at += 1,
             }
         }
-        if copied == 0 && out.is_empty() {
+        if !changed {
             return Cow::Borrowed(text);
         }
         out.push_str(&text[copied..]);
@@ -164,7 +194,6 @@ impl AccountNames {
     }
 }
 
-// Hands names to the log's redaction for the rest of the run.
 pub fn register_account_names<I>(names: I)
 where
     I: IntoIterator,
@@ -176,7 +205,7 @@ where
         .add(names);
 }
 
-// A launcher's id for an account is masked like a name, beyond what the Electron app does, once it is long enough not to be mistaken for a count.
+// Beyond the Electron app; long enough not to be mistaken for a count.
 pub fn register_account_ids<I>(ids: I)
 where
     I: IntoIterator,
@@ -187,6 +216,19 @@ where
         .filter(|id| id.as_ref().trim().len() >= MIN_ID_LENGTH)
         .collect();
     register_account_names(ids);
+}
+
+// The profile folder is masked by its last part, so it is found in any spelling of the path: raw, JSON-escaped or with forward slashes, on a share or a redirected folder.
+pub fn register_windows_user(profile: Option<&str>, user_name: Option<&str>) {
+    let mut names = REGISTERED.write().unwrap_or_else(PoisonError::into_inner);
+    let leaf = profile.and_then(|profile| {
+        profile
+            .split(['\\', '/'])
+            .rfind(|part| !part.trim().is_empty())
+    });
+    for user in leaf.into_iter().chain(user_name) {
+        names.add_user(user);
+    }
 }
 
 pub fn with_registered_names<R>(read: impl FnOnce(&AccountNames) -> R) -> R {

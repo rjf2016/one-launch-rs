@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-// Every case of oracle/l1/core for the log's redaction and line format, run against the port. Each case starts from its own list of names, as the recording does. A case is left out only for a reason named here, and the test says which cases it left out.
-
 use ol_model::LogLevel;
 use ol_model::redact::AccountNames;
 use ol_services::log::redact::{format_line, is_sensitive_key, redact_string, redact_value};
@@ -13,6 +11,7 @@ const NOT_A_LEVEL: &str = "a level other than the four, which the Rust type rule
 const NOT_FINITE: &str = "NaN or Infinity, which a serde_json value cannot hold";
 const NO_DEPTH: &str = "a depth that is not a whole number, which the Rust type rules out";
 const JS_ONLY: &str = "a JavaScript value a serde_json value has no form for (a cycle, a shared object, bytes, a function, a symbol, a bigint, a Map, a typed array, a boxed string, a Date or a getter)";
+const AS_WRITTEN: &str = "a name is also masked as it was written, where its lower case folds to something else (İ): the Electron app leaves it unmasked";
 const PROTO: &str = "JavaScript's copy drops an own __proto__ key; Rust keeps it, and redacts what is under it like any other field";
 
 fn names(arg: &Value) -> AccountNames {
@@ -31,7 +30,7 @@ fn text(arg: &Value) -> Option<String> {
     plain(arg).as_str().map(str::to_owned)
 }
 
-// What JavaScript's redactValue makes of an Error, before it redacts the strings: its name, message and stack, and its code when that is text. A Rust log line gives an error the same way, as fields.
+// A JavaScript Error is given as the object redactValue makes of one, since Rust has none.
 fn error_object(marker: &Map<String, Value>) -> Value {
     let message = marker["message"].as_str().unwrap_or_default().to_owned();
     let name = marker
@@ -53,7 +52,6 @@ fn error_object(marker: &Map<String, Value>) -> Value {
     Value::Object(error)
 }
 
-// The value a case gives, as a serde_json value, or why it has none.
 fn built(value: &Value) -> Result<Value, &'static str> {
     match value {
         Value::Array(items) => items
@@ -103,6 +101,9 @@ fn level(arg: &Value) -> Option<LogLevel> {
 }
 
 fn redact_string_case(case: &Case) -> Answer {
+    if case.id == "names-dotless-i" {
+        return Answer::Skip(AS_WRITTEN);
+    }
     let Some(input) = text(&case.args[1]) else {
         return Answer::Skip(NOT_TEXT);
     };
@@ -158,6 +159,7 @@ fn redact_string_vectors() {
     run(
         "l1/core/redactString.json",
         &[
+            ("names-dotless-i", AS_WRITTEN),
             ("names-lone-surrogate", UNPAIRED),
             ("lone-surrogates", UNPAIRED),
             ("not-a-string", NOT_TEXT),
@@ -213,7 +215,6 @@ fn format_line_vectors() {
     );
 }
 
-// The one recorded line that ends in half a surrogate pair: the Electron app writes that half to its UTF-8 file as U+FFFD, and so does the port.
 #[test]
 fn a_cut_through_a_surrogate_pair_writes_what_the_electron_file_holds() {
     let vectors = Vectors::load("l1/core/formatLine.json");

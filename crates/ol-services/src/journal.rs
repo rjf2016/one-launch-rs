@@ -127,7 +127,6 @@ impl SwitchJournal {
         }
     }
 
-    // What fails here is logged under `main:journal`, and stops nothing.
     #[must_use]
     pub fn logging_to(mut self, log: &Log) -> Self {
         self.log = log.child("journal");
@@ -247,6 +246,7 @@ impl SwitchJournal {
 #[derive(Default)]
 pub struct Recovery {
     pending: Option<JournalEntry>,
+    log: Log,
 }
 
 impl Recovery {
@@ -257,8 +257,12 @@ impl Recovery {
     pub fn load_logged(data_dir: &Path, log: &Log) -> Self {
         let mut journal = SwitchJournal::new(data_dir).logging_to(log);
         let Some(entry) = journal.read() else {
-            return Self::default();
+            return Self {
+                pending: None,
+                log: log.clone(),
+            };
         };
+        let root = log.clone();
         let log = log.child("recovery");
         if entry.backup_id.is_none() {
             log.info(
@@ -267,7 +271,10 @@ impl Recovery {
             );
             // The snapshot always comes before the first write, so without one nothing was changed.
             journal.clear(Some(&entry.job_id));
-            return Self::default();
+            return Self {
+                pending: None,
+                log: root,
+            };
         }
         log.warn(
             "the last run ended during a switch; offering its snapshot",
@@ -282,6 +289,7 @@ impl Recovery {
         );
         Self {
             pending: Some(entry),
+            log: root,
         }
     }
 
@@ -292,7 +300,9 @@ impl Recovery {
     // The interrupted switch is dealt with, by a restore or by the user's leave: the journal goes.
     pub fn settle(&mut self, data_dir: &Path) {
         if let Some(entry) = self.pending.take() {
-            SwitchJournal::new(data_dir).clear(Some(&entry.job_id));
+            SwitchJournal::new(data_dir)
+                .logging_to(&self.log)
+                .clear(Some(&entry.job_id));
         }
     }
 
@@ -305,7 +315,7 @@ impl Recovery {
         {
             self.settle(data_dir);
         }
-        let mut journal = SwitchJournal::new(data_dir);
+        let mut journal = SwitchJournal::new(data_dir).logging_to(&self.log);
         if let Some(on_disk) = journal.read().filter(|entry| entry.launcher == launcher) {
             journal.clear(Some(&on_disk.job_id));
         }

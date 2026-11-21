@@ -27,10 +27,9 @@ pub mod settings {
     };
 }
 
-// The app's log: `Logger::for_data_folder` opens it, `Backend::logging_to` hands it to the backend, and every line goes through the redaction on its way to the file.
 pub mod log {
     pub use ol_model::LogLevel;
-    pub use ol_model::redact::register_account_names;
+    pub use ol_model::redact::{register_account_names, register_windows_user};
     pub use ol_services::log::{Fields, KEEP, LOG_NAME, Log, LogOptions, Logger, MAX_BYTES};
 }
 

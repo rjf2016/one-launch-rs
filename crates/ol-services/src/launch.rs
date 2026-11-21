@@ -383,7 +383,6 @@ struct JobSink<'a> {
 }
 
 impl JobSink<'_> {
-    // How long each step ran, from when it was first reported running to when it was not.
     fn time_steps(&mut self) {
         for step in &self.job.steps {
             let since = self.step_starts.get(step.id).copied();

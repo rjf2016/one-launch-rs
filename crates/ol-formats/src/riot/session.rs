@@ -407,7 +407,6 @@ fn name_of(value: Option<&JsValue>) -> Option<String> {
         .then(|| name.to_owned())
 }
 
-// Handed to the log's redaction before anything can mention it.
 fn riot_id_of(claims: &JsObject) -> Option<RiotId> {
     let account = claims.get("acct")?.as_object()?;
     let id = RiotId {

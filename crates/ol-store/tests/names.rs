@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-// A login, a display name and a launcher's id that the database already holds reach the log's redaction the first time the row is read, before anything can mention them.
-
 use ol_model::redact::with_registered_names;
 use ol_store::Store;
 use ol_testkit::Scratch;
@@ -12,7 +10,17 @@ fn an_account_read_from_the_database_is_masked_from_then_on() {
     let path = scratch.join("onelaunch.db");
     drop(Store::open(&path).unwrap());
     let conn = rusqlite::Connection::open(&path).unwrap();
-    let steam_id = format!("76561198{:09}", 77);
+    let scenario: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(
+            ol_testkit::oracle("fixtures/dev-only/fake-launchers/all-four").join("scenario.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let steam_id = scenario["seed"]["accounts"][0]["launcherUid"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     conn.execute(
         "INSERT INTO accounts (id, launcher, display_name, login, launcher_uid, created_at, updated_at)
          VALUES ('a1', 'steam', 'Weekend Smurf', 'crowbar_77', ?1, 't', 't')",
