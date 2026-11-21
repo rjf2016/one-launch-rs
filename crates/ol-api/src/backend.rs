@@ -10,7 +10,7 @@ use ol_model::{
     LibrarySort, RecentLaunch, RememberedAccount, RestoreResult, SettingKey, Settings, Sidebar,
     SwitchPlan, SwitchRecovery,
 };
-use ol_platform_api::{Clipboard, DataProtector};
+use ol_platform_api::{Clipboard, DataProtector, Shell};
 use ol_services::accounts::{self, AccountError, AccountPatch, NewAccount};
 use ol_services::capture::{self, Captured};
 use ol_services::clipboard::{self, ClipboardService, CopyError, CopyField, CopyResult, Timer};
@@ -222,6 +222,8 @@ enum Command {
     CaptureSession(String, Reply<Captured>),
     ForgetSession(String, Reply<()>),
     UseClipboard(ClipboardService),
+    UseShell(Arc<dyn Shell>),
+    OpenFolder(Folder, Reply<()>),
     Copy(String, CopyField, Reply<CopyResult>),
     #[cfg(feature = "fake")]
     SeedSession(String, Option<String>, ol_vault::Secret, Reply<()>),
@@ -437,6 +439,7 @@ impl Backend {
             launchers,
             vault: Arc::default(),
             protector: None,
+            shell: None,
             settings_watch: None,
             jobs: jobs.clone(),
             on_job: on_job.unwrap_or_else(|| Arc::new(|_| {})),
@@ -556,6 +559,16 @@ impl Backend {
     // The folder the Diagnostics and Backups panels open.
     pub fn folder(&self, folder: Folder) -> PathBuf {
         folder.path(&self.data_dir)
+    }
+
+    // Until this is called a folder is not opened, so a run that is handed no shell never reaches Explorer.
+    pub fn use_shell(&self, shell: Arc<dyn Shell>) {
+        let _ = self.commands.send_blocking(Command::UseShell(shell));
+    }
+
+    // Shows one of the data folder's own folders in Explorer, through the shell this run was given; no other path can be named.
+    pub async fn open_folder(&self, folder: Folder) -> Result<(), ApiError> {
+        self.ask(|reply| Command::OpenFolder(folder, reply)).await
     }
 
     pub fn app_info(&self) -> AppInfo {
@@ -846,6 +859,7 @@ struct Serving {
     vault: Arc<VaultCell>,
     // Kept for a reset of a lost key: the one way a key that is there is ever replaced.
     protector: Option<Box<dyn DataProtector + Send>>,
+    shell: Option<Arc<dyn Shell>>,
     settings_watch: Option<Sender<SettingChange>>,
     jobs: JobBoard,
     on_job: JobObserver,
@@ -1145,6 +1159,8 @@ impl Serving {
                     Ok(capture::forget(store, &account_id)?)
                 }),
             ),
+            Command::UseShell(shell) => self.shell = Some(shell),
+            Command::OpenFolder(folder, reply) => answer(&reply, self.open_folder(folder)),
             Command::UseClipboard(service) => {
                 if let Some(previous) = self.clipboard.replace(service) {
                     previous.clear_if_unchanged();
@@ -1246,6 +1262,24 @@ impl Serving {
         if opened {
             let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
         }
+    }
+
+    fn open_folder(&self, folder: Folder) -> Result<(), ApiError> {
+        let refused = |message: String| ApiError {
+            code: "OPEN_FAILED",
+            message,
+        };
+        let shell = self
+            .shell
+            .as_ref()
+            .ok_or_else(|| refused("This build of One Launch cannot open folders.".to_owned()))?;
+        let path = folder.path(&self.data_dir);
+        let path = path.to_str().ok_or_else(|| {
+            refused("The folder's path is not text Windows can be handed.".to_owned())
+        })?;
+        shell
+            .open_folder(path)
+            .map_err(|error| refused(error.to_string()))
     }
 
     fn vault(&self) -> &dyn Vault {
@@ -1633,6 +1667,7 @@ mod tests {
             launchers: None,
             vault: Arc::default(),
             protector: None,
+            shell: None,
             settings_watch: None,
             jobs: JobBoard::default(),
             on_job: Arc::new(|_| {}),

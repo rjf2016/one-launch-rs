@@ -34,6 +34,10 @@ pub struct PageScroll {
 }
 
 impl PageScroll {
+    pub fn to_top(&self) {
+        clamped(&self.handle, 0.);
+    }
+
     // As a browser brings the field that takes the keyboard into sight.
     pub fn reveal(&self, target: Bounds<Pixels>) {
         let view = self.handle.bounds();

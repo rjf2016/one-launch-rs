@@ -9,7 +9,7 @@ use std::time::Duration;
 use gpui::prelude::*;
 use gpui::{
     Context, Div, EventEmitter, Keystroke, Pixels, ScrollHandle, SharedString, Size, Stateful,
-    Subscription, Task, Window, anchored, deferred, div, point, px,
+    Task, Window, anchored, deferred, div, point, px,
 };
 use ol_api::clipboard::CopyField;
 use ol_api::launch::in_pick_order;
@@ -40,13 +40,21 @@ pub struct LaunchHost {
     dismissal: Option<(String, Task<()>)>,
     blurred: bool,
     body: ScrollHandle,
-    _keys: Subscription,
 }
 
 // Sent when the job that was followed is no longer running: what the Library shows has changed.
 pub struct JobSettled;
 
 impl EventEmitter<JobSettled> for LaunchHost {}
+
+// A job the app followed has ended, with whether it was a one-click Play from a card or the Recent strip that never showed its dialog: what decides whether the window goes to the tray.
+#[derive(Clone)]
+pub struct PlayEnded {
+    pub job: LaunchJob,
+    pub instant: bool,
+}
+
+impl EventEmitter<PlayEnded> for LaunchHost {}
 
 // The empty picker sends the user to add or import an account, and back to this game's Play after.
 impl EventEmitter<Go> for LaunchHost {}
@@ -55,6 +63,7 @@ impl EventEmitter<Go> for LaunchHost {}
 struct Active {
     job: LaunchJob,
     game: Option<Game>,
+    instant: bool,
 }
 
 struct Request {
@@ -131,15 +140,6 @@ impl Request {
 
 impl LaunchHost {
     pub fn new(backend: Backend, cx: &mut Context<Self>) -> Self {
-        let this = cx.weak_entity();
-        let keys = cx.intercept_keystrokes(move |event, _, cx| {
-            let taken = this
-                .update(cx, |this, cx| this.on_keystroke(&event.keystroke, cx))
-                .unwrap_or(false);
-            if taken {
-                cx.stop_propagation();
-            }
-        });
         cx.spawn({
             let backend = backend.clone();
             async move |this, cx| {
@@ -171,7 +171,6 @@ impl LaunchHost {
             dismissal: None,
             blurred: false,
             body: ScrollHandle::new(),
-            _keys: keys,
         }
     }
 
@@ -461,7 +460,11 @@ impl LaunchHost {
         match outcome {
             Ok(job) => {
                 let (job_id, direct) = (job.id.clone(), job.direct);
-                self.active = Some(Active { job, game });
+                let instant = self
+                    .request
+                    .as_ref()
+                    .is_some_and(|request| request.key == key && request.silent);
+                self.active = Some(Active { job, game, instant });
                 self.follow(job_id, cx);
                 let mut nothing_to_watch = false;
                 if let Some(request) = self.request_mut(key) {
@@ -516,12 +519,17 @@ impl LaunchHost {
         }
         let running = job.state == JobState::Running;
         let handing_over = job.attention.is_some() && running;
+        let ended = (!running).then(|| PlayEnded {
+            job: job.clone(),
+            instant: active.instant,
+        });
         active.job = job;
         if !handing_over && let Some(request) = &mut self.request {
             request.copied = None;
         }
-        if !running {
+        if let Some(ended) = ended {
             cx.emit(JobSettled);
+            cx.emit(ended);
         }
         self.changed(cx);
         running
@@ -754,8 +762,8 @@ impl LaunchHost {
         cx.notify();
     }
 
-    // True when the key is a dialog's: nothing behind the dialog hears it.
-    fn on_keystroke(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
+    // True when the key is a dialog's: nothing behind the dialog hears it. The Shell hands each key here, after its own question.
+    pub(crate) fn on_keystroke(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
         let held = keystroke.modifiers;
         // The window's own keys, Alt+F4 among them, reach Windows only when nothing stops them.
         if !self.is_modal() || held.alt || held.platform {

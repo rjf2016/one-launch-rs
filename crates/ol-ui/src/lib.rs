@@ -21,7 +21,7 @@ use ol_api::library::HourClock;
 
 pub use assets::Assets;
 pub use library::{LibraryFrame, LibraryLoaded, LibraryView, SweepReport};
-pub use shell::Shell;
+pub use shell::{Played, QuitAnyway, Shell};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Presence {
