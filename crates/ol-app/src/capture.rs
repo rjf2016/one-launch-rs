@@ -72,6 +72,7 @@ pub async fn run(
         pause(STEP, cx).await;
     }
 
+    let mut logged = None;
     for step in &plan.keys {
         let step = match Step::parse(step)? {
             Step::Wait(time) => {
@@ -93,9 +94,39 @@ pub async fn run(
                 pause(STEP, cx).await;
                 continue;
             }
+            Step::LogFrames => {
+                in_library(window, cx, |library, _, _| library.log_frames())?;
+                logged = Some(Instant::now());
+                continue;
+            }
+            Step::PrintFrames => {
+                let frames = in_library(window, cx, |library, _, _| library.take_frames())?;
+                let started = logged
+                    .take()
+                    .context("frames:print needs frames:log before it")?;
+                for (index, frame) in frames.iter().enumerate() {
+                    println!(
+                        "OneLaunch: frame {index:>3} at {:>7.1} ms: drawn for {}x{}, pane {:.0} px, {} columns of {:.2} px",
+                        frame.at.duration_since(started).as_secs_f32() * 1000.,
+                        frame.viewport.width.as_f32(),
+                        frame.viewport.height.as_f32(),
+                        frame.pane,
+                        frame.columns,
+                        frame.card,
+                    );
+                }
+                continue;
+            }
             step => step,
         };
+        let at = Instant::now();
         dispatch(window, cx, move |window, cx| step.take(window, cx))?;
+        if let Some(started) = logged {
+            println!(
+                "OneLaunch: step at {:.1} ms",
+                at.duration_since(started).as_secs_f32() * 1000.
+            );
+        }
         pause(STEP, cx).await;
     }
 
@@ -124,7 +155,7 @@ pub async fn run(
     Ok(())
 }
 
-// A step of --capture-keys: a key press; the pointer at a place of the client area, moved there, clicked, dragged from there or turning the wheel there, with Shift held as Windows reports it; a wait for something that takes its time, such as a fake switch; or the client area set to a size, at once or in steps as an edge dragged by hand does.
+// A step of --capture-keys: a key press; the pointer at a place of the client area, moved there, clicked, dragged from there or turning the wheel there, with Shift held as Windows reports it; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
 enum Step {
     Key(Keystroke),
     Move(Point<Pixels>),
@@ -138,6 +169,8 @@ enum Step {
         to: (i32, i32),
         steps: usize,
     },
+    LogFrames,
+    PrintFrames,
 }
 
 impl Step {
@@ -185,6 +218,11 @@ impl Step {
                 .split_once(':')
                 .and_then(|(from, to)| Some(Self::Drag(spot(from)?, spot(to)?))),
             "size" => size(rest).map(Self::Size),
+            "frames" => match rest {
+                "log" => Some(Self::LogFrames),
+                "print" => Some(Self::PrintFrames),
+                _ => None,
+            },
             "resize" => {
                 let mut parts = rest.split(':');
                 match (parts.next(), parts.next(), parts.next(), parts.next()) {
@@ -211,6 +249,7 @@ impl Step {
                 "wheel" | "shift-wheel" => "wheel:<x>x<y>:<lines, minus is down>",
                 "drag" => "drag:<x>x<y>:<x>x<y>",
                 "size" => "size:<width>x<height>",
+                "frames" => "frames:log or frames:print",
                 _ => "resize:<width>x<height>:<width>x<height>:<steps up to 2000>",
             };
             format!("{text} is not {form}")
@@ -252,7 +291,12 @@ impl Step {
                 );
                 return;
             }
-            Self::Drag(..) | Self::Wait(_) | Self::Size(_) | Self::Resize { .. } => return,
+            Self::Drag(..)
+            | Self::Wait(_)
+            | Self::Size(_)
+            | Self::Resize { .. }
+            | Self::LogFrames
+            | Self::PrintFrames => return,
         };
         let modifiers = Modifiers::default();
         window.dispatch_event(
@@ -418,13 +462,14 @@ async fn resize(
             None => layouts.push((drawn, *frame)),
         }
         println!(
-            "OneLaunch: frame {index:>3} at {:>7.1} ms: drawn for {}x{}, last set {}, {} columns of {:.2} px, gap {}{}",
+            "OneLaunch: frame {index:>3} at {:>7.1} ms: drawn for {}x{}, last set {}, pane {:.0} px, {} columns of {:.2} px, gap {}{}",
             frame.at.duration_since(started).as_secs_f32() * 1000.,
             drawn.0,
             drawn.1,
             last_set.map_or("none".to_owned(), |(width, height)| format!(
                 "{width}x{height}"
             )),
+            frame.pane,
             frame.columns,
             frame.card,
             frame.gap,
@@ -476,6 +521,8 @@ mod tests {
         };
         assert_eq!((lines, held.shift), (point(2., 0.), true));
         assert!(matches!(Step::parse("drag:1x2:3x4"), Ok(Step::Drag(..))));
+        assert!(matches!(Step::parse("frames:log"), Ok(Step::LogFrames)));
+        assert!(matches!(Step::parse("frames:print"), Ok(Step::PrintFrames)));
         assert!(matches!(
             Step::parse("size:1000x600"),
             Ok(Step::Size((1000, 600)))
@@ -498,6 +545,7 @@ mod tests {
             "resize:1600x1150:1000x1150:0",
             "resize:1600x1150:1000x1150:5000",
             "wait:61000",
+            "frames:all",
         ] {
             assert!(Step::parse(refused).is_err(), "{refused}");
         }

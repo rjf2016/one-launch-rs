@@ -6,7 +6,7 @@ What is known to be missing, unchecked or unlike the Electron app, and the slice
 
 - The More button of a card and a right-click on it do nothing: there is no card menu ("Play as…", "Refresh artwork", "Choose portrait image…").
 - On the owner's word the Library is sized as they picked it from a prototype of the page (2026-11-21): the width of the pane alone decides how many cards stand in a row, and the cards share out the row. A card is at least 163 px wide with 6 px between, the page has 24 px at its sides, and the page's scrollbar always keeps a strip of 12 px at the right, whether it shows or not. In the Electron app a card is at least 160 px wide with 16 px between (190 px and 20 px from a window 1536 px wide), the page has 32 px at its sides, and the scrollbar takes its 12 px only while the page scrolls, so a drag of the window's edge takes columns away and gives them back. A row here holds more cards than there: six in the window as it first opens, where the Electron app shows five. The Recent strip's scrollbar takes no room: it lies over the gap under the strip.
-- The sidebar is folded to its icons at every window width, on the owner's word (2026-11-21). The Electron app opens it from a window 1100 px wide, and its button and Ctrl+B fold and open it; here they do nothing yet.
+- The sidebar starts folded to its icons at every window width, on the owner's word (2026-11-21), and its button and Ctrl+B open and fold it. The Electron app opens it from a window 1100 px wide and keeps the user's choice between runs in its page storage (`sidebar`); here the choice holds until the app quits, and where it is kept is the owner's to decide (`triage.toml` X-01 planned a row of the settings table). The fold is not animated: the Electron app widens the sidebar over 200 ms and fades the labels over 150 ms, and an animated width would have the grid laid out afresh at every frame of it.
 - The Recent strip goes back to its start when the list is shown again (a search, a filter, a reload), and Shift with the wheel does nothing over the grid.
 - "No launchers found" comes from the last scan alone. Nothing reports a launcher's status (`launchers:status`), so a start whose scan fails says "No games found".
 - The scan a start runs is asked for by the window, after the Library was first read. The Electron app's main process runs it; the result on screen is the same.
@@ -229,7 +229,12 @@ Since the real ports. The first four are the ones a user could meet, and are the
 
 ## All screens (slice 5)
 
-- Accessible names and roles.
+- Accessible names and roles, among them the sidebar's (`aria-current` on the item shown, `aria-expanded` on its button).
+- Accounts and Settings show their header and nothing under it. Still to come: the Accounts list, its empty state and its Import and Add account menus; the Settings tabs and their panels; the scroll of either page. Settings keeps no tab yet, and Accounts has no other route than its list.
+- Not built: the Back gesture (the mouse's Back button and Alt+Left, which leave an account's page for the list) and Ctrl+S (save an account), both for the account pages; the sidebar's Preview mode and Update ready cards; the "unsaved changes" question before a screen is left.
+- The sidebar's version reads `v0.0.0`, the version of the workspace, until slice 6 gives the app its version.
+- A tooltip is drawn by the app in its own colours, under the pointer, 500 ms after the pointer stops over the item (GPUI's own delay). The Electron app's `title` tooltips are the system's.
+- Ctrl+1, Ctrl+2, Ctrl+3 and Ctrl+B were driven with keystrokes the capture harness hands to the window, not with a real keyboard.
 - The app's own yes or no question (the confirm dialog, "Leave" and "Stay") is not built. Only the account forms and the restart for an update ask it; nothing in the Play flow does.
 
 ## Performance (slice 7)
