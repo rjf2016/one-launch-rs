@@ -17,6 +17,7 @@ use gpui::{
     App, SharedString, TitlebarOptions, WindowBounds, WindowHandle, WindowOptions, px, size,
 };
 use ol_api::Backend;
+use ol_api::library::HourClock;
 
 pub use assets::Assets;
 pub use library::{LibraryFrame, LibraryLoaded, LibraryView, SweepReport};
@@ -29,21 +30,24 @@ pub enum Presence {
     Background,
 }
 
-// Seconds east of UTC on this PC at a moment given in seconds since 1970, for the dates the screens show.
-pub type LocalOffset = fn(i64) -> Option<i32>;
-
-struct LocalTime(LocalOffset);
+#[derive(Clone, Copy)]
+pub struct LocalTime {
+    pub offset: fn(i64) -> Option<i32>,
+    pub clock: HourClock,
+}
 
 impl gpui::Global for LocalTime {}
 
-pub fn init(cx: &mut App, local_offset: LocalOffset) {
+pub fn init(cx: &mut App, local_time: LocalTime) {
     ol_ui_kit::init(cx);
-    cx.set_global(LocalTime(local_offset));
+    cx.set_global(local_time);
 }
 
-pub(crate) fn local_offset(cx: &App) -> LocalOffset {
-    cx.try_global::<LocalTime>()
-        .map_or(|_| None, |local| local.0)
+pub(crate) fn local_time(cx: &App) -> LocalTime {
+    cx.try_global::<LocalTime>().copied().unwrap_or(LocalTime {
+        offset: |_| None,
+        clock: HourClock::Twelve,
+    })
 }
 
 // `fake_launchers` says so in the title bar, so that no picture of a fake run passes for a real one.

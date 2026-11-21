@@ -1,3 +1,6 @@
+use std::cell::Cell;
+use std::rc::Rc;
+
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Bounds, Context, Div, ElementId, Entity, FocusHandle, Focusable as _,
@@ -10,6 +13,7 @@ use crate::theme::{self, alpha, color};
 #[derive(Clone)]
 pub struct TextField {
     state: Entity<InputState>,
+    limit: Rc<Cell<Option<usize>>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -48,7 +52,10 @@ impl TextField {
             state.set_editor_style(editor_style());
             state
         });
-        Self { state }
+        Self {
+            state,
+            limit: Rc::default(),
+        }
     }
 
     pub fn clearing_on_escape(self, cx: &mut App) -> Self {
@@ -58,20 +65,37 @@ impl TextField {
     }
 
     pub fn limited_to(self, most: usize, cx: &mut App) -> Self {
+        self.limit.set(Some(most));
+        let limit = Rc::clone(&self.limit);
         self.state.update(cx, |state, cx| {
-            state.set_validator(move |text, _| utf16_len(text) <= most, cx);
+            state.set_validator(
+                move |text, _| limit.get().is_none_or(|most| utf16_len(text) <= most),
+                cx,
+            );
         });
         self
+    }
+
+    pub fn is_empty(&self, cx: &App) -> bool {
+        self.state.read(cx).text().len() == 0
+    }
+
+    // One copy of the text and no other, for a caller that wipes it.
+    pub fn owned_text(&self, cx: &App) -> String {
+        self.state.read(cx).text().to_string()
     }
 
     pub fn text(&self, cx: &App) -> SharedString {
         self.state.read(cx).value()
     }
 
+    // What is stored shows whole: the limit holds for what is typed.
     pub fn set_text(&self, text: impl Into<SharedString>, window: &mut Window, cx: &mut App) {
         let text: SharedString = text.into();
+        let limit = self.limit.take();
         self.state
             .update(cx, |state, cx| state.set_value(text, window, cx));
+        self.limit.set(limit);
     }
 
     pub fn set_placeholder(

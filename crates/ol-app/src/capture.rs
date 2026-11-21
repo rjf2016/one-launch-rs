@@ -160,13 +160,14 @@ pub async fn run(
     Ok(())
 }
 
-// A step of --capture-keys: a key press; text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
+// A step of --capture-keys, or several joined by & and taken in one go: a key press; text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
 enum Step {
     Key(Keystroke),
     Type(String),
     Move(Point<Pixels>),
     Click(Point<Pixels>),
     Back(Point<Pixels>),
+    Together(Vec<Step>),
     Wheel(Point<Pixels>, Point<f32>, Modifiers),
     Drag(Point<Pixels>, Point<Pixels>),
     Wait(Duration),
@@ -182,6 +183,18 @@ enum Step {
 
 impl Step {
     fn parse(text: &str) -> anyhow::Result<Self> {
+        if text.contains('&') {
+            let steps = text
+                .split('&')
+                .map(Self::parse)
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            if steps.iter().any(|step| !step.at_once()) {
+                anyhow::bail!(
+                    "{text}: only keys, clicks, moves, the wheel and Back go together with &"
+                );
+            }
+            return Ok(Self::Together(steps));
+        }
         let Some((kind, rest)) = text.split_once(':') else {
             return Self::key(text);
         };
@@ -272,8 +285,21 @@ impl Step {
             .with_context(|| format!("{text} is not a keystroke"))
     }
 
+    fn at_once(&self) -> bool {
+        matches!(
+            self,
+            Self::Key(_) | Self::Move(_) | Self::Click(_) | Self::Back(_) | Self::Wheel(..)
+        )
+    }
+
     fn take(self, window: &mut Window, cx: &mut App) {
         let (position, button) = match self {
+            Self::Together(steps) => {
+                for step in steps {
+                    step.take(window, cx);
+                }
+                return;
+            }
             Self::Key(keystroke) => {
                 window.dispatch_keystroke(keystroke, cx);
                 return;
@@ -537,6 +563,10 @@ mod tests {
         assert_eq!((lines, held.shift), (point(2., 0.), true));
         assert!(matches!(Step::parse("drag:1x2:3x4"), Ok(Step::Drag(..))));
         assert!(matches!(Step::parse("back:5x6"), Ok(Step::Back(_))));
+        assert!(matches!(
+            Step::parse("click:1x2&escape"),
+            Ok(Step::Together(steps)) if steps.len() == 2
+        ));
         let Ok(Step::Type(text)) = Step::parse("type:gold%2C smurf") else {
             panic!("a step that types");
         };
@@ -566,6 +596,7 @@ mod tests {
             "resize:1600x1150:1000x1150:5000",
             "wait:61000",
             "type:",
+            "click:1x2&wait:5",
             "back:5",
             "frames:all",
         ] {

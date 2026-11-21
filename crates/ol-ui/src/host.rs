@@ -651,10 +651,11 @@ impl LaunchHost {
 
     // True when the key is a dialog's: nothing behind the dialog hears it.
     fn on_keystroke(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
-        if !self.is_modal() {
+        let held = keystroke.modifiers;
+        // The window's own keys, Alt+F4 among them, reach Windows only when nothing stops them.
+        if !self.is_modal() || held.alt || held.platform {
             return false;
         }
-        let held = keystroke.modifiers;
         let plain = !held.control && !held.alt && !held.shift && !held.platform && !held.function;
         match keystroke.key.as_str() {
             "enter" if plain => self.press_leading(cx),

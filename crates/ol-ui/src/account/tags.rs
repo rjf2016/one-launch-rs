@@ -45,9 +45,8 @@ pub fn with_pending(tags: &[String], pending: &str) -> Vec<String> {
 impl AccountPage {
     pub(super) fn commit_tag(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let pending = self.tag_field.text(cx);
-        let next = with_pending(&self.tags, &pending);
-        if next != self.tags {
-            self.tags = next;
+        if !super::blank(&pending) {
+            self.tags = with_pending(&self.tags, &pending);
         }
         if !pending.is_empty() {
             self.tag_field.set_text("", window, cx);

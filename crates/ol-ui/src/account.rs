@@ -15,7 +15,7 @@ use ol_ui_kit::theme::{self, color};
 use ol_ui_kit::{FieldEvent, TextArea, TextField};
 
 use crate::assets;
-use crate::local_offset;
+use crate::local_time;
 use crate::page::{PageScroll, scroll_page};
 use crate::shell::{Go, Question, Route};
 use crate::widgets::{Button, Flash, FlashTone, Tone, field, icon, launcher_badge, panel};
@@ -338,12 +338,18 @@ impl AccountPage {
         self.tags_changed(window, cx);
     }
 
+    // A tag typed and not yet added counts, as the Electron app's field adds it when the pointer goes to a button.
     fn draft(&self, cx: &App) -> Draft {
+        let pending = self.tag_field.text(cx);
         Draft {
             name: self.name.text(cx).to_string(),
             login: self.login.text(cx).to_string(),
             uid: self.uid.text(cx).to_string(),
-            tags: self.tags.clone(),
+            tags: if blank(&pending) {
+                self.tags.clone()
+            } else {
+                tags::with_pending(&self.tags, &pending)
+            },
             notes: self.notes.text(cx).to_string(),
         }
     }
@@ -351,7 +357,7 @@ impl AccountPage {
     fn typed_password(&self, cx: &App) -> bool {
         self.password
             .as_ref()
-            .is_some_and(|password| !password.text(cx).is_empty())
+            .is_some_and(|password| !password.is_empty(cx))
     }
 
     fn dirty(&self, cx: &App) -> bool {
@@ -423,13 +429,14 @@ impl AccountPage {
         });
     }
 
-    fn create_account(&mut self, cx: &mut Context<Self>) {
+    fn create_account(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(launcher) = self.launcher else {
             return;
         };
         if self.busy {
             return;
         }
+        self.commit_tag(window, cx);
         self.touched = true;
         let draft = self.draft(cx);
         if validate(&draft).any() {
@@ -438,9 +445,8 @@ impl AccountPage {
         let password = self
             .password
             .as_ref()
-            .map(|field| field.text(cx))
-            .filter(|password| !password.is_empty())
-            .map(|password| Secret::new(password.to_string()));
+            .filter(|field| !field.is_empty(cx))
+            .map(|field| Secret::new(field.owned_text(cx)));
         let account = NewAccount {
             launcher,
             display_name: draft.name,
@@ -478,8 +484,12 @@ impl AccountPage {
             return;
         };
         let id = id.clone();
+        if self.busy {
+            return;
+        }
+        self.commit_tag(window, cx);
         let draft = self.draft(cx);
-        if self.account.is_none() || !self.dirty(cx) || self.busy || validate(&draft).any() {
+        if self.account.is_none() || !self.dirty(cx) || validate(&draft).any() {
             return;
         }
         let was = &self.baseline;
@@ -592,6 +602,7 @@ impl AccountPage {
             }
             "backspace"
                 if in_tags
+                    && !self.busy
                     && !held.shift
                     && self.tag_field.text(cx).is_empty()
                     && !self.tags.is_empty() =>
@@ -620,7 +631,7 @@ impl AccountPage {
         }
     }
 
-    fn render_header(&self, window: &Window, cx: &mut Context<Self>) -> Div {
+    fn render_header(&self, cx: &mut Context<Self>) -> Div {
         let launcher = self.launcher;
         let title: SharedString = match (&self.kind, &self.account, launcher) {
             (Kind::Edit { .. }, Some(account), _) => account.display_name.clone().into(),
@@ -639,7 +650,9 @@ impl AccountPage {
                     || "Never used from One Launch".to_owned(),
                     |at| format!("Last used {}", relative(at, now).unwrap_or_default()),
                 );
-            let added = date_time(&account.created_at, local_offset(cx)).unwrap_or_default();
+            let local = local_time(cx);
+            let added =
+                date_time(&account.created_at, local.offset, local.clock).unwrap_or_default();
             div()
                 .mt(px(2.))
                 .text_size(px(12.))
@@ -705,7 +718,7 @@ impl AccountPage {
                     )
                     .glyph(assets::CHECK)
                     .disabled(busy)
-                    .on_click(cx.listener(|this, _, _, cx| this.create_account(cx))),
+                    .on_click(cx.listener(|this, _, window, cx| this.create_account(window, cx))),
                 );
             }
             Kind::Edit { .. } => {
@@ -739,7 +752,6 @@ impl AccountPage {
                 );
             }
         }
-        let _ = window;
         div()
             .flex()
             .items_end()
@@ -1017,12 +1029,6 @@ impl Render for AccountPage {
             .children(self.render_password(window, cx))
             .child(self.render_advanced(launcher, window, cx))
             .children(self.render_danger(cx));
-        scroll_page(
-            "account-page",
-            &self.scroll,
-            self.render_header(window, cx),
-            body,
-        )
-        .into_any_element()
+        scroll_page("account-page", &self.scroll, self.render_header(cx), body).into_any_element()
     }
 }

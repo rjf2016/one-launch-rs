@@ -5,7 +5,9 @@ mod backend;
 pub use backend::{ApiError, Backend, JobObserver, Library, SavedSignIn, StartLaunch};
 
 pub mod library {
-    pub use ol_services::library::{LibraryGame, caption, date_time, monogram, relative, visible};
+    pub use ol_services::library::{
+        HourClock, LibraryGame, caption, date_time, monogram, relative, visible,
+    };
 }
 
 pub mod accounts {

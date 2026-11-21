@@ -48,7 +48,6 @@ pub(crate) enum Route {
     Settings,
 }
 
-// A guarded move asks first when the page has unsaved changes.
 pub(crate) struct Go {
     pub route: Route,
     pub guarded: bool,
@@ -169,10 +168,13 @@ impl Shell {
         self.go(route, true, window, cx);
     }
 
-    // Every way to another page comes through here, so a page with unsaved changes is asked first.
+    // An unguarded move is one a page makes when a create or a delete has finished: it wins over a question still open.
     fn go(&mut self, route: Route, guarded: bool, window: &mut Window, cx: &mut Context<Self>) {
         if self.asking.is_some() {
-            return;
+            if guarded {
+                return;
+            }
+            self.asking = None;
         }
         if guarded && let Some(question) = self.question(cx) {
             self.asking = Some(Asking {
@@ -294,6 +296,10 @@ impl Shell {
         let held = keystroke.modifiers;
         let none = !held.control && !held.alt && !held.shift && !held.platform && !held.function;
         if let Some(asking) = &mut self.asking {
+            // The window's own keys, Alt+F4 among them, reach Windows only when nothing stops them.
+            if held.alt || held.platform {
+                return false;
+            }
             match keystroke.key.as_str() {
                 "escape" if none => self.answer(false, window, cx),
                 "enter" if none => {

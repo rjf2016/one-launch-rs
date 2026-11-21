@@ -15,6 +15,7 @@ use std::time::Duration;
 
 use gpui::{App, AsyncApp, Window};
 use ol_api::Backend;
+use ol_api::library::HourClock;
 use ol_platform_win::data_folder::refuse_real_data_folder;
 use ol_platform_win::dpapi::Dpapi;
 use ol_platform_win::own_process;
@@ -207,7 +208,18 @@ fn start(
     tray: TraySlot,
     cx: &mut App,
 ) -> anyhow::Result<()> {
-    ol_ui::init(cx, ol_platform_win::clock::local_offset);
+    let clock = if ol_platform_win::clock::uses_24_hour_clock() {
+        HourClock::TwentyFour
+    } else {
+        HourClock::Twelve
+    };
+    ol_ui::init(
+        cx,
+        ol_ui::LocalTime {
+            offset: ol_platform_win::clock::local_offset,
+            clock,
+        },
+    );
     let title = match machine {
         Machine::None => TITLE,
         #[cfg(feature = "fake")]
