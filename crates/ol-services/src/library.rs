@@ -162,13 +162,41 @@ pub fn date_time(
     offset_of: impl Fn(i64) -> Option<i32>,
     clock: HourClock,
 ) -> Option<String> {
+    let local = local(at, offset_of)?;
+    Some(format!(
+        "{} {}, {}, {}",
+        MONTHS[usize::from(u8::from(local.month())) - 1],
+        local.day(),
+        local.year(),
+        clock_time(&local, clock, false),
+    ))
+}
+
+// The time alone, with its seconds, as the Launchers tab's "Checked" line gives it.
+pub fn time_of_day(
+    at: &str,
+    offset_of: impl Fn(i64) -> Option<i32>,
+    clock: HourClock,
+) -> Option<String> {
+    Some(clock_time(&local(at, offset_of)?, clock, true))
+}
+
+fn local(at: &str, offset_of: impl Fn(i64) -> Option<i32>) -> Option<OffsetDateTime> {
     let utc = OffsetDateTime::parse(at, &Rfc3339).ok()?;
     let offset = offset_of(utc.unix_timestamp())
         .and_then(|seconds| UtcOffset::from_whole_seconds(seconds).ok())
         .unwrap_or(UtcOffset::UTC);
-    let local = utc.to_offset(offset);
-    let time = match (clock, local.hour()) {
-        (HourClock::TwentyFour, hour) => format!("{hour:02}:{:02}", local.minute()),
+    Some(utc.to_offset(offset))
+}
+
+fn clock_time(local: &OffsetDateTime, clock: HourClock, seconds: bool) -> String {
+    let minutes = if seconds {
+        format!("{:02}:{:02}", local.minute(), local.second())
+    } else {
+        format!("{:02}", local.minute())
+    };
+    match (clock, local.hour()) {
+        (HourClock::TwentyFour, hour) => format!("{hour:02}:{minutes}"),
         (HourClock::Twelve, hour) => {
             let (hour, half) = match hour {
                 0 => (12, "AM"),
@@ -176,15 +204,9 @@ pub fn date_time(
                 12 => (12, "PM"),
                 hour => (hour - 12, "PM"),
             };
-            format!("{hour}:{:02}\u{202f}{half}", local.minute())
+            format!("{hour}:{minutes}\u{202f}{half}")
         }
-    };
-    Some(format!(
-        "{} {}, {}, {time}",
-        MONTHS[usize::from(u8::from(local.month())) - 1],
-        local.day(),
-        local.year(),
-    ))
+    }
 }
 
 // Halves go up, as the Electron app rounds them: -1.5 is -1.
@@ -487,5 +509,28 @@ mod tests {
             Some("Nov 6, 2026, 4:46\u{202f}PM")
         );
         assert_eq!(date_time("not a time", utc, twelve), None);
+    }
+
+    #[test]
+    fn a_time_of_day_keeps_its_seconds() {
+        let utc = |_| Some(0);
+        assert_eq!(
+            time_of_day("2026-11-06T16:46:24.000Z", utc, HourClock::Twelve).as_deref(),
+            Some("4:46:24\u{202f}PM")
+        );
+        assert_eq!(
+            time_of_day("2026-11-06T00:05:09Z", utc, HourClock::Twelve).as_deref(),
+            Some("12:05:09\u{202f}AM")
+        );
+        assert_eq!(
+            time_of_day(
+                "2026-11-06T16:46:24Z",
+                |_| Some(3600),
+                HourClock::TwentyFour
+            )
+            .as_deref(),
+            Some("17:46:24")
+        );
+        assert_eq!(time_of_day("not a time", utc, HourClock::Twelve), None);
     }
 }

@@ -17,7 +17,7 @@ use crate::accounts::AccountsView;
 use crate::assets;
 use crate::host::{LaunchHost, PlayEnded, overlay};
 use crate::library::LibraryView;
-use crate::settings::{SettingsTab, SettingsView};
+use crate::settings::{KnownStatuses, SettingsTab, SettingsView};
 use crate::widgets::{Button, Tone, panel_shadow, spinner, tip};
 
 const SIDEBAR: f32 = 224.;
@@ -155,6 +155,7 @@ pub struct Shell {
     toggled: bool,
     fake_launchers: bool,
     settings_tab: Rc<Cell<SettingsTab>>,
+    launcher_statuses: KnownStatuses,
     preview: bool,
     _page: Option<Subscription>,
     _keys: Subscription,
@@ -236,6 +237,7 @@ impl Shell {
             toggled: false,
             fake_launchers,
             settings_tab: Rc::default(),
+            launcher_statuses: KnownStatuses::default(),
             preview: false,
             _page: None,
             _keys: keys,
@@ -427,7 +429,8 @@ impl Shell {
                     self.settings_tab.set(tab);
                 }
                 let tab = Rc::clone(&self.settings_tab);
-                Page::Settings(cx.new(|cx| SettingsView::new(backend, tab, cx)))
+                let known = Rc::clone(&self.launcher_statuses);
+                Page::Settings(cx.new(|cx| SettingsView::new(backend, tab, known, cx)))
             }
             Route::Accounts => {
                 let page = cx.new(|cx| AccountsView::new(backend, None, None, cx));
@@ -489,11 +492,18 @@ impl Shell {
     }
 
     fn modal(&self, cx: &Context<Self>) -> bool {
-        self.asking.is_some() || self.host.read(cx).is_modal() || self.importing(cx)
+        self.asking.is_some()
+            || self.host.read(cx).is_modal()
+            || self.importing(cx)
+            || self.restoring(cx)
     }
 
     fn importing(&self, cx: &Context<Self>) -> bool {
         matches!(&self.page, Page::Accounts(page) if page.read(cx).importing())
+    }
+
+    fn restoring(&self, cx: &Context<Self>) -> bool {
+        matches!(&self.page, Page::Settings(page) if page.read(cx).restoring())
     }
 
     fn typing(&self, window: &Window, cx: &Context<Self>) -> bool {
@@ -565,6 +575,15 @@ impl Shell {
                 return false;
             }
             page.update(cx, |page, cx| page.on_import_key(keystroke, cx));
+            return true;
+        }
+        if let Page::Settings(page) = &self.page
+            && page.read(cx).restoring()
+        {
+            if held.alt || held.platform {
+                return false;
+            }
+            page.update(cx, |page, cx| page.on_restore_key(keystroke, cx));
             return true;
         }
         let only_alt = held.alt && !held.control && !held.shift && !held.platform && !held.function;

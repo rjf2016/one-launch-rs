@@ -28,7 +28,7 @@ pub mod settings {
 
 pub mod library {
     pub use ol_services::library::{
-        HourClock, LibraryGame, caption, date_time, monogram, relative, visible,
+        HourClock, LibraryGame, caption, date_time, monogram, relative, time_of_day, visible,
     };
 }
 
