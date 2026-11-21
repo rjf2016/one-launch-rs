@@ -11,8 +11,8 @@ use time::macros::datetime;
 use crate::migrations::MIGRATIONS;
 use crate::open::migrate;
 use crate::{
-    BACKUPS_TO_KEEP, DATABASE_FILE, MigrationReport, SCHEMA_VERSION, Store, StoreError,
-    database_backups_dir, database_path, iso_timestamp,
+    AccountUpdate, BACKUPS_TO_KEEP, DATABASE_FILE, MigrationReport, SCHEMA_VERSION, Store,
+    StoreError, database_backups_dir, database_path, iso_timestamp,
 };
 
 type Master = Vec<(String, String, String, Option<String>)>;
@@ -970,4 +970,210 @@ fn a_copy_that_fails_leaves_no_file_and_takes_none_away() {
         before == snapshot(&folder),
         "a failed copy changed the folder"
     );
+}
+
+const EDITED_AT: &str = "2026-11-21T10:00:00.000Z";
+
+fn id_of(store: &Store, launcher: LauncherId, login: &str) -> String {
+    store
+        .account_by_login(launcher, login)
+        .unwrap()
+        .expect("the fixture has this account")
+        .id
+}
+
+fn last_played_as(store: &Store, account_id: &str) -> String {
+    store
+        .installed_games()
+        .unwrap()
+        .into_iter()
+        .find(|game| {
+            game.last_launch
+                .as_ref()
+                .is_some_and(|last| last.account_id == account_id)
+        })
+        .expect("the fixture played a game as this account")
+        .id
+}
+
+fn account_rows(conn: &Connection) -> Vec<Vec<Value>> {
+    rows(
+        conn,
+        "SELECT id, launcher, display_name, login, secret_enc, launcher_uid, tags, notes, last_used_at, created_at, updated_at
+         FROM accounts ORDER BY id",
+    )
+}
+
+// The rows as they were, with the named columns of one account set to what is given.
+fn with_changed(before: &[Vec<Value>], id: &str, changes: &[(usize, Value)]) -> Vec<Vec<Value>> {
+    let mut after = before.to_vec();
+    let row = after
+        .iter_mut()
+        .find(|row| row[0] == Value::Text(id.to_owned()))
+        .expect("the fixture has this account");
+    for (column, value) in changes {
+        row[*column] = value.clone();
+    }
+    after
+}
+
+fn text(value: &str) -> Value {
+    Value::Text(value.to_owned())
+}
+
+#[test]
+fn an_edit_writes_the_columns_the_electron_app_writes_and_leaves_every_other_byte() {
+    let scratch = data_folder();
+    let (store, _) = Store::open(&database_path(scratch.path())).unwrap();
+    let persona_one = id_of(&store, LauncherId::Steam, "user_1");
+    let before = account_rows(&store.conn);
+    let tags = [
+        "quote\"d".to_owned(),
+        r"back\slash".to_owned(),
+        "é".to_owned(),
+        "tab\there".to_owned(),
+    ];
+    store
+        .update_account(
+            &persona_one,
+            &AccountUpdate {
+                display_name: "Edited",
+                login: "user_1b",
+                launcher_uid: None,
+                tags: &tags,
+                notes: "",
+                now: EDITED_AT,
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        account_rows(&store.conn),
+        with_changed(
+            &before,
+            &persona_one,
+            &[
+                (2, text("Edited")),
+                (3, text("user_1b")),
+                (5, Value::Null),
+                (6, text(r#"["quote\"d","back\\slash","é","tab\there"]"#)),
+                (7, text("")),
+                (10, text(EDITED_AT)),
+            ],
+        )
+    );
+
+    store
+        .update_account(
+            &persona_one,
+            &AccountUpdate {
+                display_name: "Edited",
+                login: "user_1b",
+                launcher_uid: Some("uid-one"),
+                tags: &[],
+                notes: "line one\nline two",
+                now: EDITED_AT,
+            },
+        )
+        .unwrap();
+    let [row] = &rows(
+        &store.conn,
+        &format!("SELECT launcher_uid, tags, notes FROM accounts WHERE id = '{persona_one}'"),
+    )[..] else {
+        panic!("one row");
+    };
+    assert_eq!(
+        row,
+        &[text("uid-one"), text("[]"), text("line one\nline two")]
+    );
+}
+
+#[test]
+fn a_password_is_set_and_cleared_in_its_column_alone() {
+    let scratch = data_folder();
+    let (store, _) = Store::open(&database_path(scratch.path())).unwrap();
+    let persona_one = id_of(&store, LauncherId::Steam, "user_1");
+    let before = account_rows(&store.conn);
+    let sealed = Ciphertext::new(vec![0x76, 0x31, 0x30, 0x00, 0xff]);
+    store
+        .set_account_password(&persona_one, Some(&sealed), EDITED_AT)
+        .unwrap();
+    assert_eq!(
+        account_rows(&store.conn),
+        with_changed(
+            &before,
+            &persona_one,
+            &[
+                (4, Value::Blob(sealed.as_bytes().to_vec())),
+                (10, text(EDITED_AT)),
+            ],
+        )
+    );
+    assert!(store.account_password(&persona_one).unwrap() == Some(sealed));
+    assert!(store.account(&persona_one).unwrap().unwrap().has_secret);
+
+    let cleared_at = "2026-11-21T10:00:01.000Z";
+    store
+        .set_account_password(&persona_one, None, cleared_at)
+        .unwrap();
+    assert_eq!(
+        account_rows(&store.conn),
+        with_changed(&before, &persona_one, &[(10, text(cleared_at))])
+    );
+    assert!(store.account_password(&persona_one).unwrap().is_none());
+}
+
+#[test]
+fn a_deleted_account_takes_its_saved_sign_in_and_leaves_its_launches() {
+    let scratch = data_folder();
+    let (store, _) = Store::open(&database_path(scratch.path())).unwrap();
+    let epic_alt = id_of(&store, LauncherId::Epic, "alt@example.com");
+    let game = last_played_as(&store, &epic_alt);
+    let before = account_rows(&store.conn);
+    let history = rows(&store.conn, "SELECT * FROM launch_history ORDER BY id");
+    let sessions = rows(
+        &store.conn,
+        &format!(
+            "SELECT * FROM launcher_sessions WHERE account_id <> '{epic_alt}' ORDER BY account_id"
+        ),
+    );
+    assert_eq!(sessions.len(), 2);
+    assert!(store.session(&epic_alt).unwrap().is_some());
+    let played = store.game(&game).unwrap().unwrap().last_launch.unwrap();
+    assert_eq!(played.account_name.as_deref(), Some("Alt"));
+    assert!(
+        store
+            .recent_launches(50)
+            .unwrap()
+            .iter()
+            .any(|recent| recent.account_id == epic_alt)
+    );
+
+    assert!(store.delete_account(&epic_alt).unwrap());
+
+    let mut expected = before;
+    expected.retain(|row| row[0] != text(&epic_alt));
+    assert_eq!(account_rows(&store.conn), expected);
+    assert_eq!(
+        rows(
+            &store.conn,
+            "SELECT * FROM launcher_sessions ORDER BY account_id"
+        ),
+        sessions
+    );
+    assert!(store.session_blob(&epic_alt).unwrap().is_none());
+    assert_eq!(
+        rows(&store.conn, "SELECT * FROM launch_history ORDER BY id"),
+        history
+    );
+    let played = store.game(&game).unwrap().unwrap().last_launch.unwrap();
+    assert_eq!(played.account_id, epic_alt);
+    assert_eq!(played.account_name, None);
+    assert!(
+        store
+            .recent_launches(50)
+            .unwrap()
+            .iter()
+            .all(|recent| recent.account_id != epic_alt)
+    );
+    assert!(!store.delete_account(&epic_alt).unwrap());
 }

@@ -8,6 +8,12 @@ pub mod library {
     pub use ol_services::library::{LibraryGame, caption, monogram, relative, visible};
 }
 
+// What the Accounts screen hands the backend: a new account, an edit of one, and a password.
+pub mod accounts {
+    pub use ol_services::accounts::{AccountPatch, NewAccount};
+    pub use ol_vault::Secret;
+}
+
 // What the launch dialog, its banner and the recovery dialog say about a switch.
 pub mod launch {
     pub use ol_services::accounts::in_pick_order;

@@ -13,7 +13,7 @@ pub use ports::{
 };
 
 use thiserror::Error;
-use zeroize::Zeroizing;
+pub use zeroize::Zeroizing;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
 pub enum ProtectError {
