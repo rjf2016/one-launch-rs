@@ -12,7 +12,8 @@ use crate::library::LibraryView;
 
 const SIDEBAR: f32 = 224.;
 const SIDEBAR_COLLAPSED: f32 = 60.;
-const NARROW: f32 = 1100.;
+// Folded at every width, on the owner's word of 2026-11-21: a sidebar that folded at a window width gave the page 164 px at once. Its button and Ctrl+B are to open it.
+const COLLAPSED: bool = true;
 
 pub struct Shell {
     host: Entity<LaunchHost>,
@@ -20,8 +21,8 @@ pub struct Shell {
     fake_launchers: bool,
 }
 
-pub fn sidebar_width(viewport: Pixels) -> Pixels {
-    px(if viewport < px(NARROW) {
+pub fn sidebar_width() -> Pixels {
+    px(if COLLAPSED {
         SIDEBAR_COLLAPSED
     } else {
         SIDEBAR
@@ -50,7 +51,6 @@ impl Shell {
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let collapsed = window.viewport_size().width < px(NARROW);
         div()
             .size_full()
             .flex()
@@ -67,7 +67,7 @@ impl Render for Shell {
                     .flex()
                     .flex_1()
                     .min_h_0()
-                    .child(sidebar(collapsed))
+                    .child(sidebar(COLLAPSED))
                     .child(
                         div()
                             .flex_1()

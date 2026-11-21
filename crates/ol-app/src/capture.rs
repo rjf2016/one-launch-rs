@@ -418,7 +418,7 @@ async fn resize(
             None => layouts.push((drawn, *frame)),
         }
         println!(
-            "OneLaunch: frame {index:>3} at {:>7.1} ms: drawn for {}x{}, last set {}, {} columns of {:.2} px, gap {}, scrollbar strip {}{}",
+            "OneLaunch: frame {index:>3} at {:>7.1} ms: drawn for {}x{}, last set {}, {} columns of {:.2} px, gap {}{}",
             frame.at.duration_since(started).as_secs_f32() * 1000.,
             drawn.0,
             drawn.1,
@@ -428,7 +428,6 @@ async fn resize(
             frame.columns,
             frame.card,
             frame.gap,
-            frame.strip,
             if behind { " BEHIND" } else { "" },
         );
     }

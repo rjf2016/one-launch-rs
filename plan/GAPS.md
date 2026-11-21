@@ -5,7 +5,9 @@ What is known to be missing, unchecked or unlike the Electron app, and the slice
 ## Library (slices 3 and 5)
 
 - The More button of a card and a right-click on it do nothing: there is no card menu ("Play as…", "Refresh artwork", "Choose portrait image…").
-- The Recent strip has no edge fades and no scrollbar; past four cards it scrolls sideways with a touchpad or a tilted wheel only.
+- On the owner's word the Library is sized as they picked it from a prototype of the page (2026-11-21): the width of the pane alone decides how many cards stand in a row, and the cards share out the row. A card is at least 163 px wide with 6 px between, the page has 24 px at its sides, and the page's scrollbar always keeps a strip of 12 px at the right, whether it shows or not. In the Electron app a card is at least 160 px wide with 16 px between (190 px and 20 px from a window 1536 px wide), the page has 32 px at its sides, and the scrollbar takes its 12 px only while the page scrolls, so a drag of the window's edge takes columns away and gives them back. A row here holds more cards than there: six in the window as it first opens, where the Electron app shows five. The Recent strip's scrollbar takes no room: it lies over the gap under the strip.
+- The sidebar is folded to its icons at every window width, on the owner's word (2026-11-21). The Electron app opens it from a window 1100 px wide, and its button and Ctrl+B fold and open it; here they do nothing yet.
+- The Recent strip goes back to its start when the list is shown again (a search, a filter, a reload), and Shift with the wheel does nothing over the grid.
 - "No launchers found" comes from the last scan alone. Nothing reports a launcher's status (`launchers:status`), so a start whose scan fails says "No games found".
 - The scan a start runs is asked for by the window, after the Library was first read. The Electron app's main process runs it; the result on screen is the same.
 - Nothing reloads the Library after an artwork fetch, because nothing fetches artwork yet. A scan and a launch do.
@@ -17,7 +19,7 @@ What is known to be missing, unchecked or unlike the Electron app, and the slice
 - A poster appears at once, without the 200 ms fade, and the Update badge and the More button have no blur behind them.
 - A poster is decoded into a box of 240 by 360 px times the display scale, whatever the card's size.
 - The search field has no accessible name or role.
-- The grid has no draggable scrollbar.
+- A click on the empty track of the page's scrollbar does not page, and its thumb shows only while the pointer is below the header.
 
 ## Launch dialog, banner and recovery dialog (slices 3 to 5)
 
@@ -237,7 +239,7 @@ Since the real ports. The first four are the ones a user could meet, and are the
 ## Only the owner can check
 
 - The snap flyout, mouse drags and resizes, real tray clicks, the clipboard keys, another display scale.
-- With the mouse, which the capture steps cannot stand in for: the wheel over a long plan in the launch dialog and over the Recent strip, and a double-click on a card.
+- With the mouse, not yet driven by a capture step: the wheel over a long plan in the launch dialog, a double-click on a card, and how a drag of the window's edge feels.
 - `--doctor` on a copy of the real data folder.
 - One real Steam switch, one real Epic switch, one real Battle.net switch and one real Riot switch, with `--real-launchers` on a copy of the data folder. For Battle.net that is also the first time a token written by the registry port is read by the client. For Riot the real channel for the launch request is the owner's to ask for.
 - The Play flow of an Epic game in the window, on fake launchers; of a Battle.net game with the client running, and as an account without a saved token; and of a Riot game as an account that signs in by hand.
