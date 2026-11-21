@@ -253,6 +253,9 @@ impl Shell {
         cx: &mut Context<Self>,
     ) {
         let left = self.page.screen();
+        if let Page::Account(page) = &self.page {
+            page.update(cx, |page, cx| page.leave(window, cx));
+        }
         let backend = self.backend.clone();
         let mut play = None;
         self._page = None;
