@@ -157,6 +157,27 @@ fn game_for(
     Ok(Some(game))
 }
 
+// A switch that needs the vault and cannot have it would close the launcher, take its snapshot and stop at the first seal or open: it is refused before anything is touched. Steam needs it only to hand over a stored password; Epic, Battle.net and Riot seal their snapshots and saved sign-ins.
+fn vault_closed(
+    store: &Store,
+    launchers: &Launchers,
+    account: &Account,
+) -> Result<Option<ServiceError>, ServiceError> {
+    let needs = match account.launcher {
+        ol_model::LauncherId::Steam => {
+            account.has_secret
+                && store
+                    .settings()?
+                    .get_bool(SettingKey::SteamAutoLogin, false)
+        }
+        _ => true,
+    };
+    Ok(
+        (needs && !launchers.vault.has_key())
+            .then_some(ServiceError::VaultClosed(account.launcher)),
+    )
+}
+
 fn dry_run(store: &Store) -> Result<bool, ServiceError> {
     Ok(store.settings()?.get_bool(SettingKey::DryRun, false))
 }
@@ -192,6 +213,12 @@ pub fn preflight(
     let account = accounts::require(store, account_id)?;
     let game = game_for(store, &account, game_id)?;
     let taken = take_preflight(store, launchers, data_dir, &account, game.as_ref())?;
+    let direct = game.is_some() && taken.already_active && taken.launcher_running;
+    let closed = if direct {
+        None
+    } else {
+        vault_closed(store, launchers, &account)?
+    };
     let needs_confirmation = taken.launcher_running && !taken.already_active;
     let answer = LaunchPreflight {
         plan: taken.plan.clone(),
@@ -201,14 +228,16 @@ pub fn preflight(
         already_active: taken.already_active,
         needs_confirmation,
         close_message: needs_confirmation.then(|| taken.close_message.clone()),
-        blocked: (!taken.plan.executable).then(|| {
-            taken
-                .plan
-                .warnings
-                .first()
-                .cloned()
-                .unwrap_or_else(|| "This switch cannot run.".to_owned())
-        }),
+        blocked: (!taken.plan.executable)
+            .then(|| {
+                taken
+                    .plan
+                    .warnings
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "This switch cannot run.".to_owned())
+            })
+            .or_else(|| closed.map(|refusal| refusal.to_string())),
     };
     last.0 = Some((account.id, launchers.platform.clock.now(), taken));
     Ok(answer)
@@ -337,6 +366,11 @@ pub fn prepare(
         started_at: ol_store::iso_timestamp(clock.now()),
         finished_at: None,
     };
+    if direct.is_none()
+        && let Some(refusal) = vault_closed(store, launchers, &account)?
+    {
+        return Err(refusal);
+    }
     // What can still fail is read before the job takes the board: a job that was begun and never run would refuse every later one.
     let password = if account.has_secret {
         store.account_password(&account.id)?

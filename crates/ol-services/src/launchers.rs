@@ -460,6 +460,11 @@ pub enum ServiceError {
     NotALauncher(LauncherId),
     #[error(r"Choose the program by its full path on a lettered drive, such as C:\Program Files\{}.", .0.exe_name())]
     NotAPlainPath(LauncherId),
+    #[error(
+        "One Launch cannot read or store passwords and saved sign-ins right now, so it does not start this switch: it would close {} and stop halfway. Settings › Advanced › Encryption says why.",
+        .0.display_name()
+    )]
+    VaultClosed(LauncherId),
 }
 
 impl ServiceError {
@@ -479,6 +484,7 @@ impl ServiceError {
             Self::DryRun => "DRY_RUN",
             Self::NotALauncher(_) => "NOT_A_LAUNCHER",
             Self::NotAPlainPath(_) => "BAD_REQUEST",
+            Self::VaultClosed(_) => "VAULT_UNAVAILABLE",
         }
     }
 

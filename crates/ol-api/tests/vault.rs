@@ -100,12 +100,15 @@ impl DataProtector for Moody {
     }
 }
 
-// This user's DPAPI while Windows unwraps nothing at all, its own values included, until `down` is off.
+// This user's DPAPI while Windows wraps and unwraps nothing at all, its own values included, until `down` is off.
 #[derive(Clone)]
 struct Down(Arc<AtomicBool>);
 
 impl DataProtector for Down {
     fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ProtectError> {
+        if self.0.load(Ordering::SeqCst) {
+            return Err(ProtectError::Protect);
+        }
         Reversible.protect(plain)
     }
 
@@ -205,7 +208,7 @@ fn assert_reset(
 }
 
 #[test]
-fn a_reset_on_the_stand_in_vault_removes_what_the_electron_app_removes_and_nothing_else() {
+fn a_reset_on_the_stand_in_vault_removes_only_what_it_cannot_open() {
     let scratch = Scratch::with_copy_of("api-vault", &oracle("fixtures/data-folder"));
     let data_dir = scratch.path().to_path_buf();
     let before = rows(&data_dir);
@@ -271,20 +274,35 @@ fn a_reset_on_the_stand_in_vault_removes_what_the_electron_app_removes_and_nothi
     assert_eq!(
         removed,
         VaultResetSummary {
-            passwords: 3,
-            sessions: 3,
-            secrets: 3,
+            passwords: 0,
+            sessions: 0,
+            secrets: 1,
+            kept: 8,
         }
     );
     assert_eq!(
         removed.note(),
-        "Removed 3 passwords, 3 saved sign-ins, 3 other secrets."
+        "Removed 0 passwords, 0 saved sign-ins, 1 other secret. Kept 8 that can still be read."
     );
     let status = block_on(backend.vault_status()).unwrap();
     assert_eq!(status.state(), EncryptionState::Working);
     backend.shut_down();
 
-    assert_reset(&before, &rows(&data_dir), &backups, &data_dir, &FakeVault);
+    let after = rows(&data_dir);
+    for (id, (_, sealed)) in &before.accounts {
+        assert_eq!(
+            after.accounts[id].1, *sealed,
+            "{id} lost a password that opens"
+        );
+    }
+    assert_eq!(after.sessions, before.sessions);
+    assert_eq!(
+        after.secrets.keys().collect::<Vec<_>>(),
+        before.secrets.keys().collect::<Vec<_>>()
+    );
+    let probe = Ciphertext::new(after.secrets[SecretKey::VaultProbe.as_str()].clone());
+    assert!(FakeVault.decrypt(&probe).unwrap().expose() == PROBE_VALUE);
+    assert!(snapshot(&data_dir.join("backups")) == backups);
     assert!(
         snapshot(&data_dir.join("chromium")) == chromium,
         "chromium changed"
@@ -346,7 +364,14 @@ fn a_reset_of_a_data_folders_own_vault_that_reads_is_refused_and_removes_nothing
         Backend::start_with_vault_of_data_folder(data_dir.clone(), VERSION, Box::new(Reversible));
     let status = block_on(backend.vault_status()).unwrap();
     assert_eq!((status.available, status.readable), (true, Some(true)));
-    assert_eq!(refusal(block_on(backend.reset_vault())).0, "BAD_REQUEST");
+    assert_eq!(
+        refusal(block_on(backend.reset_vault())),
+        (
+            "BAD_REQUEST",
+            "Your stored passwords and saved sign-ins can be read, so nothing was removed."
+                .to_owned()
+        )
+    );
     backend.shut_down();
 
     assert!(
@@ -360,15 +385,6 @@ fn a_reset_of_a_data_folders_own_vault_that_reads_is_refused_and_removes_nothing
     }
     assert_eq!(after.secrets, before.secrets);
     assert!(snapshot(&data_dir.join("backups")) == backups);
-    assert_eq!(
-        VaultResetSummary {
-            passwords: 2,
-            sessions: 0,
-            secrets: 1,
-        }
-        .note(),
-        "Removed 2 passwords, 0 saved sign-ins, 1 other secret."
-    );
 }
 
 #[test]
@@ -431,6 +447,7 @@ fn a_key_that_does_not_unwrap_is_replaced_by_a_reset_and_by_nothing_else() {
             passwords: 1,
             sessions: 0,
             secrets: 1,
+            kept: 0,
         }
     );
     assert_eq!(
@@ -711,6 +728,7 @@ fn a_start_on_this_pc_with_a_key_that_does_not_unwrap_comes_up_with_the_key_lost
             passwords: 1,
             sessions: 1,
             secrets: 1,
+            kept: 0,
         }
     );
     assert_eq!(
@@ -1005,4 +1023,173 @@ fn after_a_reset_the_switchs_own_thread_seals_with_the_new_key() {
     }
     assert_eq!(sealed.passwords.len(), 1);
     assert!(new.decrypt(&sealed.passwords[0]).unwrap().expose() == "placeholder-new");
+}
+
+// The key file went missing and a start made a new key: the old probe reads as lost and the banner shows, while what was stored since is sealed with the new key. A reset removes what the old key sealed and keeps what the new one did.
+#[test]
+fn a_reset_after_the_key_file_went_missing_keeps_what_the_new_key_sealed() {
+    let scratch = Scratch::new("api-vault");
+    let data_dir = scratch.join("data");
+    let fake = fake_machine(&scratch);
+    let start = || {
+        Backend::start_on_this_pc(
+            data_dir.clone(),
+            VERSION,
+            ol_api::launchers::on_this_pc(fake.platform.clone()),
+            Box::new(Reversible),
+            None,
+        )
+        .unwrap()
+    };
+    // The scenario saves one Epic sign-in, Alt's; both accounts are given it.
+    let epic = |_: &str| {
+        fake.seed
+            .sessions
+            .iter()
+            .find(|session| session.launcher == LauncherId::Epic)
+            .unwrap()
+    };
+    let store_both = |backend: &Backend, login: &str| {
+        let account = block_on(backend.create_account(new_account(login, "placeholder"))).unwrap();
+        let session = epic(login);
+        block_on(backend.seed_session(
+            &account.id,
+            Some(session.launcher_uid.clone()),
+            Secret::new(session.blob.clone()),
+        ))
+        .unwrap();
+        account
+    };
+
+    let backend = start();
+    let old = store_both(&backend, "main@example.com");
+    backend.shut_down();
+    fs::remove_dir_all(data_dir.join("chromium")).unwrap();
+
+    let backend = start();
+    assert_eq!(
+        block_on(backend.vault_status()).unwrap().state(),
+        EncryptionState::KeyLost
+    );
+    let new = store_both(&backend, "alt@example.com");
+    let removed = block_on(backend.reset_vault()).unwrap().summary().unwrap();
+    assert_eq!(
+        removed,
+        VaultResetSummary {
+            passwords: 1,
+            sessions: 1,
+            secrets: 1,
+            kept: 2,
+        }
+    );
+    assert_eq!(
+        block_on(backend.vault_status()).unwrap().state(),
+        EncryptionState::Working
+    );
+    let old = block_on(backend.account(&old.id)).unwrap();
+    assert!(
+        !old.has_secret && !old.has_session,
+        "what the lost key sealed stays"
+    );
+    let new = block_on(backend.account(&new.id)).unwrap();
+    assert!(
+        new.has_secret && new.has_session,
+        "what the new key sealed went"
+    );
+    backend.shut_down();
+
+    let vault = OsCryptVault::open(&data_dir, &Reversible).unwrap();
+    let sealed = Store::open_read_only(&database_path(&data_dir))
+        .unwrap()
+        .store
+        .ciphertexts()
+        .unwrap();
+    assert!(vault.decrypt(&sealed.passwords[0]).unwrap().expose() == "placeholder");
+    assert!(vault.decrypt(&sealed.sessions[0]).unwrap().expose() == epic("alt@example.com").blob);
+}
+
+// A folder without a key while Windows wraps nothing: the start comes up with the vault unavailable and nothing written, and the next look makes the key once Windows works.
+#[test]
+fn a_start_on_this_pc_while_windows_wraps_nothing_comes_up_and_makes_the_key_later() {
+    let scratch = Scratch::new("api-vault");
+    let data_dir = scratch.join("data");
+    let fake = fake_machine(&scratch);
+    let down = Arc::new(AtomicBool::new(true));
+    let backend = Backend::start_on_this_pc(
+        data_dir.clone(),
+        VERSION,
+        ol_api::launchers::on_this_pc(fake.platform.clone()),
+        Box::new(Down(Arc::clone(&down))),
+        None,
+    )
+    .expect("a Windows that wraps nothing stops the start");
+    let status = block_on(backend.vault_status()).unwrap();
+    assert_eq!(status.state(), EncryptionState::Unavailable);
+    assert!(!status.shows_reset());
+    assert!(
+        !local_state_path(&data_dir).exists(),
+        "a key file was written"
+    );
+    down.store(false, Ordering::SeqCst);
+    assert_eq!(
+        block_on(backend.vault_status()).unwrap().state(),
+        EncryptionState::Working
+    );
+    backend.shut_down();
+    OsCryptVault::open(&data_dir, &Reversible).unwrap();
+}
+
+// A switch that needs the vault while its key is lost is refused before anything of the launcher is closed, started or written.
+#[test]
+fn a_switch_that_needs_the_vault_is_refused_before_the_launcher_is_touched_while_it_is_shut() {
+    let scratch = Scratch::new("api-vault");
+    let data_dir = scratch.join("data");
+    let fake = fake_machine(&scratch);
+    let start = |protector: Box<dyn DataProtector + Send>| {
+        let mut launchers = ol_api::launchers::on_this_pc(fake.platform.clone());
+        launchers.epic = EpicMachine {
+            timing: EpicTiming::with(&fake.epic_timing),
+            default_dir: fake.epic_default_dir.clone(),
+            local_app_data: fake.local_app_data.clone(),
+            program_data: fake.program_data.clone(),
+        };
+        Backend::start_on_this_pc(data_dir.clone(), VERSION, launchers, protector, None).unwrap()
+    };
+    let backend = start(Box::new(Reversible));
+    let account =
+        block_on(backend.create_account(new_account("alt@example.com", "placeholder"))).unwrap();
+    block_on(backend.rescan()).unwrap();
+    backend.shut_down();
+
+    let backend = start(Box::new(AnotherUser));
+    let game = block_on(backend.library())
+        .unwrap()
+        .games
+        .into_iter()
+        .map(|entry| entry.game)
+        .find(|game| game.launcher == LauncherId::Epic)
+        .unwrap();
+    let before = fake.log.snapshot().len();
+    let preflight = block_on(backend.launch_preflight(&account.id, Some(&game.id))).unwrap();
+    let blocked = preflight
+        .blocked
+        .expect("the preflight lets the switch through");
+    assert!(blocked.contains("Settings › Advanced"), "{blocked}");
+    let refused = block_on(backend.start_launch(StartLaunch {
+        account_id: account.id.clone(),
+        game_id: Some(game.id.clone()),
+        confirm_close: true,
+    }));
+    assert_eq!(
+        refused.err().map(|error| error.code),
+        Some("VAULT_UNAVAILABLE")
+    );
+    assert!(!backend.is_busy());
+    let acted: Vec<String> = fake.log.snapshot()[before..]
+        .iter()
+        .filter_map(|event| event["op"].as_str().map(str::to_owned))
+        .filter(|op| op.starts_with("proc.") || op.starts_with("reg."))
+        .collect();
+    assert_eq!(acted, Vec::<String>::new());
+    backend.shut_down();
 }

@@ -51,22 +51,63 @@ impl Store {
             > 0)
     }
 
-    // The Electron app's vault reset: every account keeps its row without its password, and every saved sign-in and every named secret is deleted, the probe among them. All of it or nothing.
-    pub fn clear_secrets(&self, at: &str) -> Result<ClearedSecrets, StoreError> {
+    // A vault reset: each sealed value `opens` says cannot be opened goes, an account keeping its row without its password; every other stays. All of it or nothing.
+    pub fn clear_unopened(
+        &self,
+        at: &str,
+        opens: impl Fn(Sealed<'_>, &Ciphertext) -> bool,
+    ) -> Result<ClearedSecrets, StoreError> {
         let transaction = self.conn.unchecked_transaction()?;
-        let passwords = transaction.execute(
-            "UPDATE accounts SET secret_enc = NULL, updated_at = ?1 WHERE secret_enc IS NOT NULL",
-            [at],
-        )?;
-        let sessions = transaction.execute("DELETE FROM launcher_sessions", [])?;
-        let secrets = transaction.execute("DELETE FROM secrets", [])?;
+        let rows = |sql: &str| -> Result<Vec<(String, Vec<u8>)>, StoreError> {
+            let mut statement = transaction.prepare(sql)?;
+            let rows = statement.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+            Ok(rows.collect::<Result<_, _>>()?)
+        };
+        let passwords = rows("SELECT id, secret_enc FROM accounts WHERE secret_enc IS NOT NULL")?;
+        let sessions = rows("SELECT account_id, blob_enc FROM launcher_sessions")?;
+        let secrets = rows("SELECT key, value_enc FROM secrets")?;
+        let mut cleared = ClearedSecrets::default();
+        for (id, sealed) in passwords {
+            if opens(Sealed::Password, &Ciphertext::new(sealed)) {
+                cleared.kept += 1;
+            } else {
+                transaction.execute(
+                    "UPDATE accounts SET secret_enc = NULL, updated_at = ?1 WHERE id = ?2",
+                    params![at, id],
+                )?;
+                cleared.passwords += 1;
+            }
+        }
+        for (account_id, sealed) in sessions {
+            if opens(Sealed::Session, &Ciphertext::new(sealed)) {
+                cleared.kept += 1;
+            } else {
+                transaction.execute(
+                    "DELETE FROM launcher_sessions WHERE account_id = ?1",
+                    [account_id],
+                )?;
+                cleared.sessions += 1;
+            }
+        }
+        for (key, sealed) in secrets {
+            if opens(Sealed::Secret(&key), &Ciphertext::new(sealed)) {
+                cleared.kept += 1;
+            } else {
+                transaction.execute("DELETE FROM secrets WHERE key = ?1", [&key])?;
+                cleared.secrets += 1;
+            }
+        }
         transaction.commit()?;
-        Ok(ClearedSecrets {
-            passwords,
-            sessions,
-            secrets,
-        })
+        Ok(cleared)
     }
+}
+
+// Which sealed value a reset is looking at.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sealed<'a> {
+    Password,
+    Session,
+    Secret(&'a str),
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -74,4 +115,5 @@ pub struct ClearedSecrets {
     pub passwords: usize,
     pub sessions: usize,
     pub secrets: usize,
+    pub kept: usize,
 }
