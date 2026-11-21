@@ -35,7 +35,7 @@ const COPY_DELAY: Duration = Duration::from_millis(250);
 
 type TraySlot = Rc<RefCell<Option<Tray>>>;
 
-// The clipboard a run copies to. A capture or a probe is run by agents, so it never reaches the real one.
+// The clipboard a run copies to. A capture or a probe is run by agents, so it never reaches the real one, neither through the backend nor through a text field's keys.
 #[derive(Debug, PartialEq, Eq)]
 enum Board {
     Windows,
@@ -53,28 +53,51 @@ impl Board {
             _ => Self::None,
         }
     }
+
+    fn keys_reach_it(&self) -> bool {
+        matches!(self, Self::Windows)
+    }
+
+    fn give(&self) -> Given {
+        match self {
+            Self::Windows => Given::Windows(ol_platform_win::clipboard::WindowsClipboard),
+            #[cfg(feature = "fake")]
+            Self::Recording => {
+                let log = ol_platform_fake::OpLog::new();
+                Given::Recording(
+                    Arc::new(ol_platform_fake::RecordingClipboard::new(log.clone())),
+                    log,
+                )
+            }
+            Self::None => Given::None,
+        }
+    }
 }
 
-// Hands the backend its clipboard. Answers with what the recording one heard, to print when the run ends.
-fn use_clipboard(board: &Board, backend: &Backend) -> Option<Box<dyn FnOnce()>> {
+enum Given {
+    Windows(ol_platform_win::clipboard::WindowsClipboard),
+    #[cfg(feature = "fake")]
+    Recording(
+        Arc<ol_platform_fake::RecordingClipboard>,
+        ol_platform_fake::OpLog,
+    ),
+    None,
+}
+
+fn use_clipboard(given: Given, backend: &Backend) -> Option<Box<dyn FnOnce()>> {
     let timer = || {
         Arc::new(ol_api::clipboard::SleepingTimer::new(Arc::new(
             ol_platform_win::clock::SystemClock,
         )))
     };
-    match board {
-        Board::Windows => {
-            backend.use_clipboard(
-                Arc::new(ol_platform_win::clipboard::WindowsClipboard),
-                timer(),
-            );
+    match given {
+        Given::Windows(clipboard) => {
+            backend.use_clipboard(Arc::new(clipboard), timer());
             None
         }
         #[cfg(feature = "fake")]
-        Board::Recording => {
-            let log = ol_platform_fake::OpLog::new();
-            let clipboard = ol_platform_fake::RecordingClipboard::new(log.clone());
-            backend.use_clipboard(Arc::new(clipboard), timer());
+        Given::Recording(clipboard, log) => {
+            backend.use_clipboard(clipboard, timer());
             println!("OneLaunch: clipboard: a recording one, in this process only");
             Some(Box::new(move || {
                 for event in log.snapshot() {
@@ -82,7 +105,7 @@ fn use_clipboard(board: &Board, backend: &Backend) -> Option<Box<dyn FnOnce()>> 
                 }
             }))
         }
-        Board::None => None,
+        Given::None => None,
     }
 }
 
@@ -128,7 +151,7 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let heard = use_clipboard(&Board::for_run(&args), &backend);
+    let heard = use_clipboard(Board::for_run(&args).give(), &backend);
     let failed = Rc::new(Cell::new(false));
     let tray = TraySlot::default();
     gpui_platform::application()
@@ -276,6 +299,9 @@ fn start(
             clock,
         },
     );
+    if !Board::for_run(&args).keys_reach_it() {
+        ol_ui_kit::refuse_clipboard_keys(cx);
+    }
     let title = match machine {
         Machine::None => TITLE,
         #[cfg(feature = "fake")]
@@ -447,6 +473,12 @@ mod tests {
         for check in checks {
             let board = board(check);
             assert_ne!(board, Board::Windows, "{check:?}");
+            assert!(!board.keys_reach_it(), "{check:?}");
+            assert!(!matches!(board.give(), Given::Windows(_)), "{check:?}");
+            #[cfg(feature = "fake")]
+            assert!(matches!(board.give(), Given::Recording(..)), "{check:?}");
+            #[cfg(not(feature = "fake"))]
+            assert!(matches!(board.give(), Given::None), "{check:?}");
             #[cfg(feature = "fake")]
             assert_eq!(board, Board::Recording, "{check:?}");
             #[cfg(not(feature = "fake"))]
@@ -458,6 +490,8 @@ mod tests {
     #[test]
     fn a_run_a_person_uses_gets_the_windows_clipboard() {
         assert_eq!(board(&[]), Board::Windows);
+        assert!(board(&[]).keys_reach_it());
+        assert!(matches!(board(&[]).give(), Given::Windows(_)));
         #[cfg(not(feature = "fake"))]
         assert_eq!(board(&["--real-launchers"]), Board::Windows);
         #[cfg(feature = "fake")]

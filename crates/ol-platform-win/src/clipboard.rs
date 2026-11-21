@@ -159,7 +159,7 @@ fn private_formats() -> Result<[u32; 3], ClipboardError> {
     let mut formats = [0; 3];
     for (format, name) in formats.iter_mut().zip(PRIVATE_FORMATS) {
         *format = private_format(name).ok_or_else(|| {
-            ClipboardError::Refused(format!("Windows does not know the clipboard format {name}"))
+            ClipboardError::Unmarked(format!("Windows does not know the clipboard format {name}"))
         })?;
     }
     Ok(formats)
@@ -174,6 +174,12 @@ impl Clipboard for WindowsClipboard {
         let written = formats
             .iter()
             .try_for_each(|format| clipboard.set(*format, 4, |_| {}))
+            .map_err(|_| {
+                ClipboardError::Unmarked(
+                    "Windows would not take the marks that keep the copy out of the clipboard history"
+                        .to_owned(),
+                )
+            })
             .and_then(|()| clipboard.set_text(text));
         if written.is_err() {
             let _ = clipboard.empty();
@@ -305,6 +311,12 @@ mod tests {
         Some(clipboard.text().expect("the clipboard's text reads"))
     }
 
+    fn holds_made_up(board: &WindowsClipboard) -> bool {
+        board
+            .read_text()
+            .is_ok_and(|held| held.is_some_and(|held| held.as_str() == MADE_UP))
+    }
+
     fn private_marks() -> [bool; 3] {
         let formats = private_formats().unwrap();
         let _clipboard = Opened::open().unwrap();
@@ -323,17 +335,11 @@ mod tests {
         let length = MADE_UP.encode_utf16().count();
 
         board.write_private(MADE_UP).unwrap();
-        assert_eq!(
-            board.read_text().unwrap().as_deref().map(String::as_str),
-            Some(MADE_UP)
-        );
+        assert!(holds_made_up(&board), "the private write did not read back");
         assert_eq!(private_marks(), [true; 3]);
 
         board.write_text(MADE_UP).unwrap();
-        assert_eq!(
-            board.read_text().unwrap().as_deref().map(String::as_str),
-            Some(MADE_UP)
-        );
+        assert!(holds_made_up(&board), "the plain write did not read back");
         assert_eq!(private_marks(), [false; 3]);
 
         assert!(!board.clear_if(length, &|held| held == "another").unwrap());

@@ -15,6 +15,7 @@ pub enum Kept {
 struct State {
     held: Option<(Zeroizing<String>, Kept)>,
     refuse_private: bool,
+    refuse_text: bool,
     refuse_all: bool,
     calls: usize,
     busy_calls: Vec<usize>,
@@ -41,6 +42,12 @@ impl RecordingClipboard {
         clipboard
     }
 
+    pub fn refusing_the_private_text(log: OpLog) -> Self {
+        let clipboard = Self::new(log);
+        clipboard.state().refuse_text = true;
+        clipboard
+    }
+
     pub fn held_by_another_program(log: OpLog) -> Self {
         let clipboard = Self::new(log);
         clipboard.state().refuse_all = true;
@@ -58,7 +65,8 @@ impl RecordingClipboard {
     }
 
     pub fn user_copies(&self, text: &str) {
-        self.state().held = Some((Zeroizing::new(text.to_owned()), Kept::ByTheUser));
+        let mut state = self.state();
+        state.held = Some((Zeroizing::new(text.to_owned()), Kept::ByTheUser));
     }
 
     pub fn holds(&self, text: &str) -> bool {
@@ -94,9 +102,14 @@ impl RecordingClipboard {
 
     fn write(&self, text: &str, kept: Kept) -> Result<(), ClipboardError> {
         let mut state = self.open()?;
-        if kept == Kept::Private && state.refuse_private {
+        if kept == Kept::Private && state.refuse_text {
             return Err(ClipboardError::Refused(
-                "the clipboard refused the write".to_owned(),
+                "the clipboard refused the text".to_owned(),
+            ));
+        }
+        if kept == Kept::Private && state.refuse_private {
+            return Err(ClipboardError::Unmarked(
+                "the clipboard refused the marks".to_owned(),
             ));
         }
         state.held = Some((Zeroizing::new(text.to_owned()), kept));
@@ -167,6 +180,7 @@ mod tests {
                 .clear_if(18, &|held| held == "placeholder-secret")
                 .unwrap()
         );
+        assert_eq!(clipboard.reads(), 2);
         assert!(clipboard.is_empty());
         let events = serde_json::to_string(&log.snapshot()).unwrap();
         assert!(!events.contains("placeholder"));

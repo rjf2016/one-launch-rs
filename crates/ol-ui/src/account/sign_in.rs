@@ -16,7 +16,6 @@ use crate::widgets::{Button, Tone, icon, panel, row};
 const DESCRIPTION: &str =
     "Saved the first time you play on this account, and put back whenever you switch to it.";
 
-// The launchers that sign in from a session One Launch can save: the account's page shows the panel for these alone.
 pub(super) fn launcher_name(launcher: LauncherId) -> Option<&'static str> {
     match launcher {
         LauncherId::Steam => None,

@@ -139,18 +139,18 @@ impl ClipboardService {
         }
     }
 
-    // The marks that keep the text out of the history are left off only when Windows turns the marked write itself down. A clipboard another program holds is an error the user can try again, and the earlier copy stays due to be cleared.
+    // The marks that keep the text out of the history are left off only when Windows will not take the marks themselves. Any other failure is an error the user can try again, and the earlier copy stays due to be cleared.
     pub fn copy_sensitive(&self, text: &Secret) -> Result<CopyResult, ClipboardError> {
         let inner = &self.inner;
         let mut state = inner.state();
         let text = text.expose();
         let history_excluded = match inner.board.write_private(text) {
             Ok(()) => true,
-            Err(ClipboardError::Refused(_)) => {
+            Err(ClipboardError::Unmarked(_)) => {
                 inner.board.write_text(text)?;
                 false
             }
-            Err(busy) => return Err(busy),
+            Err(failed) => return Err(failed),
         };
         if let Some(earlier) = state.pending.take() {
             earlier.cancel.cancel();

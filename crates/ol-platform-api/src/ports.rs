@@ -193,7 +193,9 @@ pub enum ClipboardError {
     // Another program held the clipboard open: a later try may succeed.
     #[error("another program holds the clipboard open")]
     Busy,
-    // Windows turned the write or the read itself down.
+    // Windows would not take the marks that keep a copy out of the clipboard history: a plain copy may still be made.
+    #[error("{0}")]
+    Unmarked(String),
     #[error("{0}")]
     Refused(String),
 }

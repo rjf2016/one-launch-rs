@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use gpui::prelude::*;
-use gpui::{AnyElement, ClickEvent, Context, Div, SharedString, Window, div, px};
+use gpui::{AnyElement, ClickEvent, Context, Div, Keystroke, SharedString, Window, div, px};
 use ol_api::accounts::Secret;
 use ol_api::clipboard::{CopyField, CopyResult};
 use ol_api::{ApiError, Backend};
@@ -31,6 +31,12 @@ pub(crate) fn copy_note(field: CopyField, copied: &CopyResult) -> String {
 // The first click of a double click opened the question; the second must not answer it.
 pub(super) fn single(click: &ClickEvent) -> bool {
     click.click_count() == 1
+}
+
+// Ctrl+C and Ctrl+X, which copy or cut a password while the eye shows it.
+pub(super) fn copies_or_cuts(keystroke: &Keystroke) -> bool {
+    let held = keystroke.modifiers;
+    held.control && !held.alt && !held.platform && matches!(keystroke.key.as_str(), "c" | "x")
 }
 
 #[derive(Default)]
@@ -86,14 +92,14 @@ impl AccountPage {
         cx.notify();
     }
 
-    // Also when the page is left: nothing typed outlives the edit.
     pub(super) fn close_password(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.keeping.editing = false;
         self.keeping.error = None;
         self.show_password = false;
         if let Some(password) = &self.password {
             let focused = password.is_focused(window, cx);
-            password.clear(window, cx);
+            // Emptied without an undo step and with the undo history dropped, so Ctrl+Z cannot bring a typed password back.
+            password.set_text("", window, cx);
             password.set_masked(true, window, cx);
             if focused {
                 window.blur(cx);
@@ -421,6 +427,16 @@ impl AccountPage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn copy_and_cut_are_the_keys_a_password_field_refuses() {
+        for key in ["ctrl-c", "ctrl-x", "ctrl-shift-c", "ctrl-shift-x"] {
+            assert!(copies_or_cuts(&Keystroke::parse(key).unwrap()), "{key}");
+        }
+        for key in ["c", "shift-x", "ctrl-v", "ctrl-a", "ctrl-alt-c", "alt-x"] {
+            assert!(!copies_or_cuts(&Keystroke::parse(key).unwrap()), "{key}");
+        }
+    }
 
     #[test]
     fn the_line_after_a_copy_has_the_electron_apps_words() {
