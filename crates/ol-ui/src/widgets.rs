@@ -2,8 +2,9 @@ use std::time::Duration;
 
 use gpui::prelude::*;
 use gpui::{
-    Animation, AnimationExt as _, AnyElement, AnyView, App, ClickEvent, Context, Div, ElementId,
-    FontWeight, SharedString, Stateful, Svg, Transformation, Window, div, percentage, px, svg,
+    Animation, AnimationExt as _, AnyElement, AnyView, App, BoxShadow, ClickEvent, Context, Div,
+    ElementId, FontWeight, SharedString, Stateful, Svg, Task, Transformation, Window, div, hsla,
+    percentage, px, svg,
 };
 use ol_model::LauncherId;
 use ol_ui_kit::theme::{self, alpha, color};
@@ -11,6 +12,8 @@ use ol_ui_kit::theme::{self, alpha, color};
 use crate::assets;
 
 const TURN: Duration = Duration::from_secs(1);
+const FLASH_STAYS: Duration = Duration::from_secs(3);
+const ERROR_FLASH_STAYS: Duration = Duration::from_secs(6);
 
 pub fn icon(path: &'static str, size: f32, hex: u32) -> Svg {
     svg()
@@ -90,7 +93,10 @@ impl Render for Tip {
 }
 
 pub fn tip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
-    let text = text.into();
+    tip_of(text.into())
+}
+
+fn tip_of(text: SharedString) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     move |_, cx| cx.new(|_| Tip(text.clone())).into()
 }
 
@@ -144,6 +150,9 @@ pub struct Button {
     tone: Tone,
     label: SharedString,
     glyph: Option<&'static str>,
+    trailing: Option<AnyElement>,
+    text: Option<u32>,
+    tip: Option<SharedString>,
     turns: bool,
     disabled: bool,
     leads: bool,
@@ -156,6 +165,9 @@ impl Button {
             tone,
             label: label.into(),
             glyph: None,
+            trailing: None,
+            text: None,
+            tip: None,
             turns: false,
             disabled: false,
             leads: false,
@@ -164,6 +176,21 @@ impl Button {
 
     pub fn glyph(mut self, glyph: &'static str) -> Self {
         self.glyph = Some(glyph);
+        self
+    }
+
+    pub fn trailing(mut self, trailing: AnyElement) -> Self {
+        self.trailing = Some(trailing);
+        self
+    }
+
+    pub fn text(mut self, hex: u32) -> Self {
+        self.text = Some(hex);
+        self
+    }
+
+    pub fn tip(mut self, tip: impl Into<SharedString>) -> Self {
+        self.tip = Some(tip.into());
         self
     }
 
@@ -206,11 +233,12 @@ impl Button {
     }
 
     fn face(self) -> Stateful<Div> {
-        let (text, glyph_hover) = match self.tone {
-            Tone::Primary => (theme::TEXT_STRONG, theme::TEXT_STRONG),
-            Tone::Secondary => (theme::TEXT, theme::TEXT),
-            Tone::Ghost => (theme::MUTED, theme::TEXT),
-            Tone::Danger => (theme::DANGER, theme::DANGER),
+        let (text, glyph_hover) = match (self.text, self.tone) {
+            (Some(hex), _) => (hex, hex),
+            (None, Tone::Primary) => (theme::TEXT_STRONG, theme::TEXT_STRONG),
+            (None, Tone::Secondary) => (theme::TEXT, theme::TEXT),
+            (None, Tone::Ghost) => (theme::MUTED, theme::TEXT),
+            (None, Tone::Danger) => (theme::DANGER, theme::DANGER),
         };
         let bordered = matches!(self.tone, Tone::Secondary | Tone::Danger);
         let (tone, disabled) = (self.tone, self.disabled);
@@ -271,7 +299,165 @@ impl Button {
                         .border_color(alpha(theme::DANGER, 0.7)),
                 })
             })
+            .when_some(self.tip, |button, tip| button.tooltip(tip_of(tip)))
             .children(glyph)
             .child(self.label)
+            .children(self.trailing)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum FlashTone {
+    Success,
+    Error,
+}
+
+pub struct Flash {
+    text: SharedString,
+    tone: FlashTone,
+    _timer: Task<()>,
+}
+
+impl Flash {
+    pub fn new<T: 'static>(
+        text: impl Into<SharedString>,
+        tone: FlashTone,
+        stays: Option<Duration>,
+        slot: fn(&mut T) -> &mut Option<Flash>,
+        cx: &mut Context<T>,
+    ) -> Self {
+        let stays = stays.unwrap_or(if tone == FlashTone::Error {
+            ERROR_FLASH_STAYS
+        } else {
+            FLASH_STAYS
+        });
+        let timer = cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(stays).await;
+            this.update(cx, |this, cx| {
+                *slot(this) = None;
+                cx.notify();
+            })
+            .ok();
+        });
+        Self {
+            text: text.into(),
+            tone,
+            _timer: timer,
+        }
+    }
+
+    pub fn render(&self) -> Div {
+        div()
+            .min_w_0()
+            .text_size(px(12.))
+            .line_height(px(16.))
+            .text_color(color(match self.tone {
+                FlashTone::Success => theme::SUCCESS,
+                FlashTone::Error => theme::DANGER,
+            }))
+            .child(self.text.clone())
+    }
+}
+
+pub fn panel_shadow() -> Vec<BoxShadow> {
+    vec![
+        BoxShadow::new(px(0.), px(1.), hsla(0., 0., 1., 0.03)).inset(),
+        BoxShadow::new(px(0.), px(8.), hsla(0., 0., 0., 0.35)).blur_radius(px(24.)),
+    ]
+}
+
+pub fn panel(
+    title: &'static str,
+    description: Option<SharedString>,
+    actions: Option<AnyElement>,
+    body: impl IntoElement,
+) -> Div {
+    div()
+        .rounded(px(12.))
+        .border_1()
+        .border_color(color(theme::BORDER))
+        .bg(color(theme::SURFACE))
+        .shadow(panel_shadow())
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .justify_between()
+                .gap(px(16.))
+                .border_b_1()
+                .border_color(color(theme::BORDER))
+                .px(px(20.))
+                .py(px(16.))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .child(
+                            div()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(color(theme::TEXT_STRONG))
+                                .child(title),
+                        )
+                        .children(description.map(|line| {
+                            div()
+                                .mt(px(2.))
+                                .text_size(px(12.))
+                                .line_height(px(16.))
+                                .text_color(color(theme::MUTED))
+                                .child(line)
+                        })),
+                )
+                .children(actions),
+        )
+        .child(div().p(px(20.)).child(body))
+}
+
+pub fn field(
+    label: impl Into<SharedString>,
+    hint: Option<SharedString>,
+    error: Option<SharedString>,
+    control: impl IntoElement,
+) -> Div {
+    let (line, hex) = match (error, hint) {
+        (Some(error), _) => (Some(error), theme::DANGER),
+        (None, hint) => (hint, theme::FAINT),
+    };
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(6.))
+        .min_w_0()
+        .child(
+            div()
+                .text_size(px(12.))
+                .line_height(px(16.))
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(color(theme::MUTED))
+                .child(label.into()),
+        )
+        .child(control)
+        .children(line.map(|line| {
+            div()
+                .text_size(px(12.))
+                .line_height(px(16.))
+                .text_color(color(hex))
+                .child(line)
+        }))
+}
+
+pub fn menu_shadow() -> Vec<BoxShadow> {
+    vec![BoxShadow::new(px(0.), px(8.), hsla(0., 0., 0., 0.35)).blur_radius(px(24.))]
+}
+
+pub fn menu_chevron(open: bool, hex: u32, opacity: f32) -> AnyElement {
+    let chevron = icon(assets::CHEVRON_DOWN, 14., hex)
+        .opacity(opacity)
+        .mr(px(-2.));
+    if open {
+        chevron
+            .with_transformation(Transformation::rotate(percentage(0.5)))
+            .into_any_element()
+    } else {
+        chevron.into_any_element()
     }
 }

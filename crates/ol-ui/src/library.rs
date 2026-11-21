@@ -8,8 +8,8 @@ use gpui::{
     AnyElement, App, BoxShadow, ClickEvent, Context, DispatchPhase, Div, Entity, EventEmitter,
     FontWeight, Keystroke, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ObjectFit,
     Pixels, Point, RenderImage, ScrollHandle, ScrollStrategy, SharedString, Size, Stateful,
-    Subscription, Task, UniformListScrollHandle, Window, anchored, canvas, deferred, div, hsla,
-    img, linear_color_stop, linear_gradient, point, px, uniform_list,
+    Subscription, UniformListScrollHandle, Window, anchored, canvas, deferred, div, hsla, img,
+    linear_color_stop, linear_gradient, point, px, uniform_list,
 };
 use ol_api::library::{LibraryGame, caption, monogram, relative, visible};
 use ol_api::{ApiError, Backend, Library};
@@ -22,7 +22,7 @@ use crate::follow::{Follow, follow};
 use crate::host::{JobSettled, LaunchHost};
 use crate::posters::{self, Lookup, Posters, Shape};
 use crate::shell::sidebar_width;
-use crate::widgets::{Button, Tone, icon, launcher_dot, page_title, spinner};
+use crate::widgets::{Button, Flash, FlashTone, Tone, icon, launcher_dot, page_title, spinner};
 
 // The owner's pick of 2026-11-21, from a prototype of the page: the padding at its sides, the least width of a card and the room between two.
 const PAGE_PADDING: f32 = 24.;
@@ -47,8 +47,6 @@ const RECENT_GAP: f32 = 8.;
 const RECENT_FADE: f32 = 40.;
 const THUMB_LEAST: f32 = 32.;
 const THUMB_INSET: f32 = 3.;
-const FLASH_STAYS: Duration = Duration::from_secs(3);
-const ERROR_FLASH_STAYS: Duration = Duration::from_secs(6);
 
 pub struct LibraryView {
     backend: Backend,
@@ -105,13 +103,6 @@ enum Load {
     Pending,
     Failed(SharedString),
     Ready,
-}
-
-// A line beside Rescan that goes by itself.
-struct Flash {
-    text: SharedString,
-    failed: bool,
-    _timer: Task<()>,
 }
 
 // Sent once, when the games or the reason there are none are about to be drawn.
@@ -492,24 +483,18 @@ impl LibraryView {
     }
 
     fn say(&mut self, text: String, failed: bool, cx: &mut Context<Self>) {
-        let stays = if failed {
-            ERROR_FLASH_STAYS
+        let tone = if failed {
+            FlashTone::Error
         } else {
-            FLASH_STAYS
+            FlashTone::Success
         };
-        let timer = cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(stays).await;
-            this.update(cx, |this, cx| {
-                this.flash = None;
-                cx.notify();
-            })
-            .ok();
-        });
-        self.flash = Some(Flash {
-            text: text.into(),
-            failed,
-            _timer: timer,
-        });
+        self.flash = Some(Flash::new(
+            text,
+            tone,
+            None,
+            |this: &mut Self| &mut this.flash,
+            cx,
+        ));
         cx.notify();
     }
 
@@ -633,12 +618,15 @@ impl LibraryView {
         self.search.is_focused(window, cx)
     }
 
-    // As the Electron app's page, which is made afresh each time it is shown: no search, no filter, the top of the grid and of the Recent strip, the sort kept.
+    // As the Electron app's page, which is made afresh each time it is shown: no search, no filter, the top of the grid and of the Recent strip, the sort kept, and the games read again.
     pub fn arrive(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.on_screen = true;
         self.flash = None;
         self.menu = None;
         self.clear_search_and_filter(window, cx);
+        if matches!(self.load, Load::Ready) {
+            self.reload(cx);
+        }
     }
 
     pub fn leave(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1011,18 +999,7 @@ impl LibraryView {
                     .items_center()
                     .gap(px(8.))
                     .max_w(px(480.))
-                    .children(self.flash.as_ref().map(|flash| {
-                        div()
-                            .min_w_0()
-                            .text_size(px(12.))
-                            .line_height(px(16.))
-                            .text_color(color(if flash.failed {
-                                theme::DANGER
-                            } else {
-                                theme::SUCCESS
-                            }))
-                            .child(flash.text.clone())
-                    }))
+                    .children(self.flash.as_ref().map(Flash::render))
                     .child(
                         Button::new(
                             "rescan",

@@ -1,10 +1,12 @@
 #![forbid(unsafe_code)]
 
+mod account;
 mod accounts;
 mod assets;
 mod follow;
 mod host;
 mod library;
+mod page;
 mod posters;
 mod settings;
 mod shell;
@@ -27,8 +29,21 @@ pub enum Presence {
     Background,
 }
 
-pub fn init(cx: &mut App) {
+// Seconds east of UTC on this PC at a moment given in seconds since 1970, for the dates the screens show.
+pub type LocalOffset = fn(i64) -> Option<i32>;
+
+struct LocalTime(LocalOffset);
+
+impl gpui::Global for LocalTime {}
+
+pub fn init(cx: &mut App, local_offset: LocalOffset) {
     ol_ui_kit::init(cx);
+    cx.set_global(LocalTime(local_offset));
+}
+
+pub(crate) fn local_offset(cx: &App) -> LocalOffset {
+    cx.try_global::<LocalTime>()
+        .map_or(|_| None, |local| local.0)
 }
 
 // `fake_launchers` says so in the title bar, so that no picture of a fake run passes for a real one.

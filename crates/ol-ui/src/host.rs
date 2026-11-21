@@ -691,7 +691,11 @@ impl LaunchHost {
     }
 }
 
-fn overlay(viewport: Size<Pixels>, priority: usize, backdrop: Stateful<Div>) -> impl IntoElement {
+pub(crate) fn overlay(
+    viewport: Size<Pixels>,
+    priority: usize,
+    backdrop: Stateful<Div>,
+) -> impl IntoElement + use<> {
     deferred(
         anchored()
             .position(point(px(0.), px(TITLE_BAR)))

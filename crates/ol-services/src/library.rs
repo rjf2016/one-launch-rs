@@ -4,8 +4,8 @@ use std::time::SystemTime;
 
 use ol_model::{Game, LauncherId, LibrarySort};
 use ol_store::{Store, StoreError};
-use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
+use time::{OffsetDateTime, UtcOffset};
 
 const ARTWORK_FOLDER: &str = "artwork";
 const KINDS: [&str; 3] = ["grid", "hero", "logo"];
@@ -144,6 +144,32 @@ pub fn relative(at: &str, now: SystemTime) -> Option<String> {
             format!("in {count} {unit}{plural}")
         }
     }))
+}
+
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// As the Electron app shows a date and time on a PC set to American English, in the zone `offset_of` gives for that moment, in seconds east of UTC.
+pub fn date_time(at: &str, offset_of: impl Fn(i64) -> Option<i32>) -> Option<String> {
+    let utc = OffsetDateTime::parse(at, &Rfc3339).ok()?;
+    let offset = offset_of(utc.unix_timestamp())
+        .and_then(|seconds| UtcOffset::from_whole_seconds(seconds).ok())
+        .unwrap_or(UtcOffset::UTC);
+    let local = utc.to_offset(offset);
+    let (hour, half) = match local.hour() {
+        0 => (12, "AM"),
+        hour @ 1..=11 => (hour, "AM"),
+        12 => (12, "PM"),
+        hour => (hour - 12, "PM"),
+    };
+    Some(format!(
+        "{} {}, {}, {hour}:{:02}\u{202f}{half}",
+        MONTHS[usize::from(u8::from(local.month())) - 1],
+        local.day(),
+        local.year(),
+        local.minute(),
+    ))
 }
 
 // Halves go up, as the Electron app rounds them: -1.5 is -1.
@@ -411,5 +437,31 @@ mod tests {
         ] {
             assert_eq!(artwork_file(folder, &stored), None, "{stored:?}");
         }
+    }
+
+    #[test]
+    fn a_date_and_time_read_as_in_american_english_in_the_zone_given() {
+        let utc = |_| Some(0);
+        assert_eq!(
+            date_time("2026-11-06T16:46:23.000Z", utc).as_deref(),
+            Some("Nov 6, 2026, 4:46\u{202f}PM")
+        );
+        assert_eq!(
+            date_time("2026-01-01T00:05:00.000Z", utc).as_deref(),
+            Some("Jan 1, 2026, 12:05\u{202f}AM")
+        );
+        assert_eq!(
+            date_time("2026-07-04T12:00:00Z", |_| Some(-4 * 3600)).as_deref(),
+            Some("Jul 4, 2026, 8:00\u{202f}AM")
+        );
+        assert_eq!(
+            date_time("2026-12-31T23:30:00Z", |_| Some(3600)).as_deref(),
+            Some("Jan 1, 2027, 12:30\u{202f}AM")
+        );
+        assert_eq!(
+            date_time("2026-11-06T16:46:23Z", |_| None).as_deref(),
+            Some("Nov 6, 2026, 4:46\u{202f}PM")
+        );
+        assert_eq!(date_time("not a time", utc), None);
     }
 }

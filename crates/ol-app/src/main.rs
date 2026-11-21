@@ -138,7 +138,11 @@ fn fake_folder(_: &Args) -> Option<(&'static str, &Path)> {
 fn start_backend(args: &Args) -> anyhow::Result<(Backend, Machine)> {
     if !args.real_launchers {
         return Ok((
-            Backend::start(args.data_dir.clone(), VERSION),
+            Backend::start_with_vault_of_data_folder(
+                args.data_dir.clone(),
+                VERSION,
+                Box::new(Dpapi),
+            ),
             Machine::None,
         ));
     }
@@ -183,7 +187,11 @@ fn real_launchers(data_dir: &Path) -> anyhow::Result<ol_api::launchers::Launcher
 fn start_backend(args: &Args) -> anyhow::Result<(Backend, Machine)> {
     let Some(machine) = &args.fake else {
         return Ok((
-            Backend::start(args.data_dir.clone(), VERSION),
+            Backend::start_with_vault_of_data_folder(
+                args.data_dir.clone(),
+                VERSION,
+                Box::new(Dpapi),
+            ),
             Machine::None,
         ));
     };
@@ -199,7 +207,7 @@ fn start(
     tray: TraySlot,
     cx: &mut App,
 ) -> anyhow::Result<()> {
-    ol_ui::init(cx);
+    ol_ui::init(cx, ol_platform_win::clock::local_offset);
     let title = match machine {
         Machine::None => TITLE,
         #[cfg(feature = "fake")]

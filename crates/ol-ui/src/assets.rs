@@ -35,6 +35,14 @@ pub const ARCHIVE: &str = "icons/archive.svg";
 pub const FILE: &str = "icons/file.svg";
 pub const HOURGLASS: &str = "icons/hourglass.svg";
 pub const SLIDERS: &str = "icons/sliders.svg";
+pub const CHEVRON_DOWN: &str = "icons/chevron-down.svg";
+pub const CHEVRON_RIGHT: &str = "icons/chevron-right.svg";
+pub const PLUS: &str = "icons/plus.svg";
+pub const BACK: &str = "icons/back.svg";
+pub const TRASH: &str = "icons/trash.svg";
+pub const NOTE: &str = "icons/note.svg";
+pub const EYE: &str = "icons/eye.svg";
+pub const PERSON: &str = "icons/person.svg";
 pub const MINIMIZE: &str = "icons/minimize.svg";
 pub const MAXIMIZE: &str = "icons/maximize.svg";
 pub const RESTORE: &str = "icons/restore.svg";
@@ -91,6 +99,14 @@ const FILES: &[(&str, &[u8])] = &[
     (FILE, oracle_icon!("lucide/FileText.svg")),
     (HOURGLASS, oracle_icon!("lucide/Hourglass.svg")),
     (SLIDERS, oracle_icon!("lucide/SlidersHorizontal.svg")),
+    (CHEVRON_DOWN, oracle_icon!("lucide/ChevronDown.svg")),
+    (CHEVRON_RIGHT, oracle_icon!("lucide/ChevronRight.svg")),
+    (PLUS, oracle_icon!("lucide/Plus.svg")),
+    (BACK, oracle_icon!("lucide/ArrowLeft.svg")),
+    (TRASH, oracle_icon!("lucide/Trash2.svg")),
+    (NOTE, oracle_icon!("lucide/StickyNote.svg")),
+    (EYE, oracle_icon!("lucide/Eye.svg")),
+    (PERSON, oracle_icon!("lucide/UserRound.svg")),
     (MINIMIZE, caption_icon!(r#"<path d="M0 5.5h10"/>"#)),
     (
         MAXIMIZE,

@@ -8,6 +8,7 @@ What is known to be missing, unchecked or unlike the Electron app, and the slice
 - On the owner's word the Library is sized as they picked it from a prototype of the page (2026-11-21): the width of the pane alone decides how many cards stand in a row, and the cards share out the row. A card is at least 163 px wide with 6 px between, the page has 24 px at its sides, and the page's scrollbar always keeps a strip of 12 px at the right, whether it shows or not. In the Electron app a card is at least 160 px wide with 16 px between (190 px and 20 px from a window 1536 px wide), the page has 32 px at its sides, and the scrollbar takes its 12 px only while the page scrolls, so a drag of the window's edge takes columns away and gives them back. A row here holds more cards than there: six in the window as it first opens, where the Electron app shows five. The Recent strip's scrollbar takes no room: it lies over the gap under the strip.
 - The sidebar starts folded to its icons at every window width, on the owner's word (2026-11-21), and its button and Ctrl+B open and fold it. The Electron app opens it from a window 1100 px wide and keeps the user's choice in its page storage (`sidebar`). Here a toggle stores the choice in the row `sidebar` of the settings table (`expanded` or `collapsed`), as `triage.toml` X-01 decides, and a start reads it; no row, or any other value, is folded. The choice made in the Electron app is not taken over: it resets once. The stored choice is asked of the database while the window opens, before the Library's games, so a sidebar stored open can show folded in the frames drawn before the answer, which have no games in them yet; this was not seen in a capture. The fold is not animated: the Electron app widens the sidebar over 200 ms and fades the labels over 150 ms, and an animated width would have the grid laid out afresh at every frame of it.
 - The Recent strip goes back to its start when the list is shown again (a search, a filter, a reload), and Shift with the wheel does nothing over the grid.
+- The Library reads its games and the Recent strip again each time it is shown, so an account renamed or deleted on the Accounts screen shows at once on the cards ("removed account" for a deleted one). Its posters stay decoded when the list is the same.
 - "No launchers found" comes from the last scan alone. Nothing reports a launcher's status (`launchers:status`), so a start whose scan fails says "No games found".
 - The scan a start runs is asked for by the window, after the Library was first read. The Electron app's main process runs it; the result on screen is the same.
 - Nothing reloads the Library after an artwork fetch, because nothing fetches artwork yet. A scan and a launch do.
@@ -31,12 +32,12 @@ What is there: a click on a card or on an entry of the Recent strip opens the Pl
 - The Play flow of a Battle.net game was run in the window on fake launchers, in captures: Rescan shows Overwatch, a click on it lists the three accounts, Play as Alt ends in "Launched as Alt", and the details name each step with no token in them. `ol-ui` was not changed for Battle.net. Not seen in the window: the confirm stage for a client that runs, the hand-over of an account without a saved token, and a game the client refuses.
 - Without a way to reach the launcher of an unfinished switch, nothing is asked at start and the journal stays where it is. The app without the feature `fake` therefore asks only when started with `--real-launchers`.
 - The hand-over panel has no "Copy login" and no "Copy password": the copy to the clipboard is not built (`accounts:copy`).
-- An empty account list says "No Steam accounts yet." and offers Close. "Import Steam accounts" and "Add … account" wait for the import dialog and the Accounts screen, and so does the sentence that points to them.
+- An empty account list says "No Steam accounts yet." and offers Close. "Import Steam accounts" waits for the import dialog; "Add … account", which opens the form and comes back to the game's Play with the new account picked (`returnTo`), is not built, and neither is the sentence that points to them.
 - A switch without a game ("Switch account", from an account's page) has no way in.
 - The dialogs take the mouse, Enter and Escape. Enter presses the button drawn with the ring. There is no Tab order, no focus trap, and the keyboard does not go back to what opened the dialog.
 - No tooltips: the launcher's game id on the badge, Stop, Hide, an entry of the Recent strip.
 - The text of a plan and of a step's detail cannot be selected or copied.
-- The plan behind "Details" ends with "This is a preview: nothing was changed." and leaves out "Generated <date and time>": the app has no way to the local time zone yet.
+- The plan behind "Details" ends with "This is a preview: nothing was changed." and leaves out "Generated <date and time>". The window now knows the PC's time zone (`ol_platform_win::clock::local_offset`, handed to `ol_ui::init`), which the line can use.
 - Preview mode can be turned off from the dialog. The sidebar's "Preview mode is on" card and the setting itself wait for the Settings screen.
 - No line for a screen reader says what the job is doing.
 - Not seen in a capture, because each lasts a few milliseconds on fake launchers: "Checking Steam…" and "Stopping…".
@@ -46,7 +47,7 @@ What is there: a click on a card or on an entry of the Recent strip opens the Pl
 - Neither build has read a vault key the other wrapped. The Rust vault is checked against the recorded vectors in `oracle/takeover/vault/` and against a key of its own under real DPAPI. The owner's `--doctor` run on a copy of real data settles reading; `oracle/takeover/vault/make-local-fixture.mjs` would settle both directions.
 - A vault key that does not unwrap is never replaced. The "clear stored secrets" flow has to decide what happens then.
 - Two first starts at once on a fresh folder can each write a vault key. The single-instance lock closes this.
-- Not done at start: storing the vault probe when it is absent. The vault opens at start with `--real-launchers`, with fake launchers (the stand-in), and when the backend is started with `Backend::start_with_vault_of_data_folder`; a backend started with `Backend::start` has none and refuses to store a password (`VAULT_UNAVAILABLE`).
+- Not done at start: storing the vault probe when it is absent. The vault opens at start with `--real-launchers`, with fake launchers (the stand-in), and otherwise with the data folder's own key under DPAPI (`Backend::start_with_vault_of_data_folder`), which a first run makes; a backend started with `Backend::start`, which the app no longer does, has none and refuses to store a password (`VAULT_UNAVAILABLE`).
 - Nothing is written to `logs\` yet. `database copied` and `database copy failed` go to the console; `starting` and `database migrated` are not written at all.
 - The check that refuses the real data folder does not look at links inside an allowed folder: `onelaunch.db` as a hard link to the real database, or `chromium` as a junction into the real folder. A mapped network drive and a `subst` drive were not tried.
 - That check and its plain-path rule go away in the installed build (slice 6), which runs on the real folder.
@@ -227,15 +228,31 @@ Since the real ports. The first four are the ones a user could meet, and are the
 - A close request that arrives while GPUI is in the middle of an update closes the window instead of hiding it.
 - The window handle is found by GPUI's class name `Zed::Window`. Check it when the GPUI pin moves.
 
+## Accounts (slice 5)
+
+What is there: the list grouped by launcher with its rows, the empty state and the Add account menu; the form that adds an account (Details, Password, Advanced with the launcher's id); an account's page (Details with Save, Discard and Ctrl+S, Advanced, the Danger zone and its two-step delete); the question before a changed form is left (a sidebar click, Ctrl+1/2/3, the Accounts button, Cancel, the mouse's Back button and Alt+Left), and the Back gesture itself. All of it was driven in captures, on fake launchers and on a run without launchers.
+
+- Not built yet, and left out rather than shown doing nothing: the Import menu and its dialog (the empty state's text still names importing); on an account's page the Password panel, the Saved sign-in panel, the switch preview and "Switch to this account". The hint beside Advanced on an account's page says "Launcher account id" alone until the switch preview comes.
+- The date of "Added …" is written as on a PC set to American English ("Nov 21, 2026, 12:04 PM"), in the PC's time zone and its summer time for that date. The Electron app writes it in the system language's format.
+- The notes field grows with what is typed from 5 lines to 12 and scrolls past that. The Electron app's is 128 px high with a handle to drag it taller, and scrolls past that. The look of the field's own scrollbar is `gpui-base`'s, not the page's. A choice for the owner.
+- A single-line field refuses an edit that would take it past its limit (name 120, login 256, launcher id 64, password 1024, tag 40 characters, counted as UTF-16 as a browser's `maxlength` counts), as the Electron app's fields do; a paste that would go past is refused whole, where a browser keeps the part that fits. The notes field takes more than 20,000 characters and then says "Notes must be at most 20000 characters." and refuses Create and Save; the Electron app's field stops at 20,000. At 32 tags the tag field closes and says "Tag limit reached", as there.
+- Tab and Shift+Tab move between the text fields alone, the launcher's id while Advanced is open, and a field Tab reaches is scrolled into sight. The Electron app's Tab also stops at the buttons, the eye and Advanced. With no field holding the keyboard Tab does nothing. The keys that scroll a page (Page Down, the arrows, Home, End, Space) do not scroll these pages.
+- The page's scrollbar runs the height of the pane, header included, as the Electron app's does, its thumb shows while the pointer is over the page or the thumb is held, and the wheel over the header scrolls the page too. A click on the track moves 87.5 % of a page at a time, once per click. Unlike the Electron app, its 12 px strip is kept whether the page scrolls or not, as the owner chose for the Library.
+- The Add account menu takes the mouse, the arrows, Home, End, Enter, Space, Escape and Tab, but stays open while the window is resized or the page scrolled.
+- A click on a tag's x also puts the keyboard in the tag field. Discard also empties the tag field's unfinished text.
+- After "Stay" the keyboard is with nothing; the Electron app gives it back to what had it. Tab moves the ring between Stay and Leave; Enter presses the one with the ring.
+- A typed password stays in the text field's memory, not wiped, until the form closes; the `Secret` handed to the backend is wiped after use. The relative times of the list ("Used 3 minutes ago") are those of the moment the list was read, as in the Electron app.
+- The mouse's Back button, Alt+Left and the typing were driven with events the capture harness hands to the window (`back:`, `type:` steps), not with a real mouse and keyboard.
+
 ## All screens (slice 5)
 
 - Accessible names and roles, among them the sidebar's (`aria-current` on the item shown, `aria-expanded` on its button).
-- Accounts and Settings show their header and nothing under it. Still to come: the Accounts list, its empty state and its Import and Add account menus; the Settings tabs and their panels; the scroll of either page. Settings keeps no tab yet, and Accounts has no other route than its list.
-- Not built: the Back gesture (the mouse's Back button and Alt+Left, which leave an account's page for the list) and Ctrl+S (save an account), both for the account pages; the sidebar's Preview mode and Update ready cards; the "unsaved changes" question before a screen is left.
+- Settings shows its header and nothing under it. Still to come: the Settings tabs and their panels and the scroll of the page. Settings keeps no tab yet.
+- Not built: the sidebar's Preview mode and Update ready cards.
 - The sidebar's version reads `v0.0.0`, the version of the workspace, until slice 6 gives the app its version.
 - A tooltip is drawn by the app in its own colours, under the pointer, 500 ms after the pointer stops over the item (GPUI's own delay). The Electron app's `title` tooltips are the system's.
 - Ctrl+1, Ctrl+2, Ctrl+3 and Ctrl+B were driven with keystrokes the capture harness hands to the window, not with a real keyboard.
-- The app's own yes or no question (the confirm dialog, "Leave" and "Stay") is not built. Only the account forms and the restart for an update ask it; nothing in the Play flow does.
+- The app's own yes or no question ("Leave" and "Stay") is asked by the account forms. The restart for an update (slice 6) is to ask it through the same `Shell::go`.
 
 ## Performance (slice 7)
 
