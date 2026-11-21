@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use ol_model::{LauncherId, RecoveryPhase};
 use serde_json::{Value, json};
 
+use crate::log::Log;
+
 pub const JOURNAL_FILE: &str = "switch.json";
 
 // Steps that run only once the launcher's files are written and it is being started or is signing in.
@@ -113,6 +115,7 @@ fn is_date(text: &str) -> bool {
 pub struct SwitchJournal {
     file: PathBuf,
     current: Option<JournalEntry>,
+    log: Log,
 }
 
 impl SwitchJournal {
@@ -120,7 +123,15 @@ impl SwitchJournal {
         Self {
             file: data_dir.join(JOURNAL_FILE),
             current: None,
+            log: Log::off(),
         }
+    }
+
+    // What fails here is logged under `main:journal`, and stops nothing.
+    #[must_use]
+    pub fn logging_to(mut self, log: &Log) -> Self {
+        self.log = log.child("journal");
+        self
     }
 
     pub fn begin(&mut self, job_id: &str, launcher: LauncherId, account_id: &str, now: &str) {
@@ -179,7 +190,14 @@ impl SwitchJournal {
         {
             return;
         }
-        let _ = fs::remove_file(&self.file);
+        if let Err(error) = fs::remove_file(&self.file)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            self.log.warn(
+                "could not remove the switch journal",
+                json!({ "error": error.to_string() }),
+            );
+        }
     }
 
     // The entry on disk, if there is one. A file that cannot be understood is moved aside, so it is met once and not at every start.
@@ -191,9 +209,16 @@ impl SwitchJournal {
             .ok()
             .and_then(|text| JournalEntry::parse(&text));
         if entry.is_none() {
+            self.log
+                .warn("the switch journal could not be read; moving it aside", ());
             let mut aside = self.file.clone().into_os_string();
             aside.push(".unreadable");
-            let _ = fs::rename(&self.file, aside);
+            if let Err(error) = fs::rename(&self.file, aside) {
+                self.log.warn(
+                    "could not move the unreadable switch journal aside",
+                    json!({ "error": error.to_string() }),
+                );
+            }
         }
         entry
     }
@@ -208,7 +233,11 @@ impl SwitchJournal {
                 file.sync_all()
             })
             .and_then(|()| fs::rename(&temporary, &self.file));
-        if written.is_err() {
+        if let Err(error) = written {
+            self.log.warn(
+                "could not write the switch journal",
+                json!({ "error": error.to_string() }),
+            );
             let _ = fs::remove_file(&temporary);
         }
     }
@@ -222,15 +251,35 @@ pub struct Recovery {
 
 impl Recovery {
     pub fn load(data_dir: &Path) -> Self {
-        let mut journal = SwitchJournal::new(data_dir);
+        Self::load_logged(data_dir, &Log::off())
+    }
+
+    pub fn load_logged(data_dir: &Path, log: &Log) -> Self {
+        let mut journal = SwitchJournal::new(data_dir).logging_to(log);
         let Some(entry) = journal.read() else {
             return Self::default();
         };
+        let log = log.child("recovery");
         if entry.backup_id.is_none() {
+            log.info(
+                "the last run ended during a switch before anything was written; nothing to recover",
+                json!({ "jobId": entry.job_id, "stepId": entry.step_id }),
+            );
             // The snapshot always comes before the first write, so without one nothing was changed.
             journal.clear(Some(&entry.job_id));
             return Self::default();
         }
+        log.warn(
+            "the last run ended during a switch; offering its snapshot",
+            json!({
+                "jobId": entry.job_id,
+                "launcher": entry.launcher.as_str(),
+                "accountId": entry.account_id,
+                "backupId": entry.backup_id,
+                "stepId": entry.step_id,
+                "rollbackFailed": entry.rollback_failed,
+            }),
+        );
         Self {
             pending: Some(entry),
         }

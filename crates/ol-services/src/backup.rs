@@ -16,6 +16,8 @@ use thiserror::Error;
 use time::OffsetDateTime;
 use zeroize::Zeroizing;
 
+use crate::log::Log;
+
 pub const DEFAULT_BACKUPS_TO_KEEP: i64 = 20;
 // Pinned snapshots are kept beside the ordinary ones, the newest ten of them.
 const PINNED_BACKUPS_TO_KEEP: usize = 10;
@@ -112,6 +114,8 @@ pub struct BackupService<'a> {
     files: &'a dyn Files,
     clock: &'a dyn Clock,
     vault: &'a dyn Vault,
+    log: Log,
+    launcher_log: Log,
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -187,7 +191,42 @@ impl<'a> BackupService<'a> {
             files,
             clock,
             vault,
+            log: Log::off(),
+            launcher_log: Log::off(),
         }
+    }
+
+    // Snapshots taken, pruned, found unreadable and put back are logged under `main:backup`.
+    #[must_use]
+    pub fn logging_to(mut self, log: &Log) -> Self {
+        self.log = log.child("backup");
+        self.launcher_log = log.clone();
+        self
+    }
+
+    // After a snapshot's files were written back, by a restore or a rollback: the two lines the Electron app's backup service and adapter write. Riot and Epic keep nothing in the registry, and their line says nothing of it.
+    pub fn log_restored(
+        &self,
+        launcher: LauncherId,
+        id: &str,
+        files: usize,
+        registry: Option<usize>,
+    ) {
+        self.log.warn(
+            "restored launcher files from backup",
+            json!({ "launcher": launcher.as_str(), "id": id, "files": files }),
+        );
+        let line = match launcher {
+            LauncherId::Steam => "backup restored".to_owned(),
+            other => format!("{} backup restored", other.as_str()),
+        };
+        let mut fields = json!({ "id": id, "files": files });
+        if let Some(registry) = registry {
+            fields["registry"] = registry.into();
+        }
+        self.launcher_log
+            .child(launcher.as_str())
+            .warn(&line, fields);
     }
 
     pub fn root(&self) -> &str {
@@ -309,6 +348,15 @@ impl<'a> BackupService<'a> {
         self.files
             .write_atomic(&[(&manifest_path, text.as_bytes())])?;
 
+        self.log.info(
+            "backup snapshot written",
+            json!({
+                "launcher": request.launcher.as_str(),
+                "id": id,
+                "files": manifest.files.len(),
+                "pinned": manifest.pinned.is_some(),
+            }),
+        );
         self.prune(request.launcher, &[Some(id.as_str()), request.protect])?;
         Ok(self.to_snapshot(request.launcher, &id, &folder, &manifest))
     }
@@ -326,8 +374,14 @@ impl<'a> BackupService<'a> {
                 continue;
             }
             let id = entry.file_name().to_string_lossy().into_owned();
-            if let Some(manifest) = Self::read_manifest(&entry.path()) {
-                snapshots.push(self.to_snapshot(launcher, &id, &entry.path(), &manifest));
+            match Self::read_manifest(&entry.path()) {
+                Some(manifest) => {
+                    snapshots.push(self.to_snapshot(launcher, &id, &entry.path(), &manifest));
+                }
+                None => self.log.warn(
+                    "unreadable backup manifest",
+                    json!({ "dir": entry.path().to_string_lossy() }),
+                ),
             }
         }
         snapshots.sort_by(|a, b| b.id.cmp(&a.id));
@@ -377,10 +431,23 @@ impl<'a> BackupService<'a> {
             .iter()
             .filter(|snapshot| snapshot.pinned.is_some())
             .skip(PINNED_BACKUPS_TO_KEEP);
+        let mut removed = 0;
         for snapshot in ordinary.chain(pinned) {
             if !protect.contains(&Some(snapshot.id.as_str())) {
-                let _ = fs::remove_dir_all(self.launcher_dir(launcher).join(&snapshot.id));
+                match fs::remove_dir_all(self.launcher_dir(launcher).join(&snapshot.id)) {
+                    Ok(()) => removed += 1,
+                    Err(error) => self.log.warn(
+                        "could not remove an old backup",
+                        json!({ "launcher": launcher.as_str(), "id": snapshot.id, "error": error.to_string() }),
+                    ),
+                }
             }
+        }
+        if removed > 0 {
+            self.log.info(
+                "pruned backups",
+                json!({ "launcher": launcher.as_str(), "removed": removed, "keep": limit }),
+            );
         }
         Ok(())
     }

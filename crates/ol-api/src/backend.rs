@@ -22,6 +22,7 @@ use ol_services::launchers::{
     self, Adapter, Configs, ImportResult, Launchers, ServiceError, require_implemented,
 };
 use ol_services::library::{self, LibraryGame};
+use ol_services::log::{Log, is_refusal};
 use ol_services::sessions::{StoreThread, StoreWork};
 use ol_services::settings::{self as setting, SettingError};
 use ol_services::switch;
@@ -32,6 +33,7 @@ use ol_services::vault_health::{
 use ol_services::window::{self, QuitQuestion};
 use ol_store::{Store, StoreError};
 use ol_vault::{KeyError, OsCryptVault, Recovered, Secret, Vault, VaultError};
+use serde_json::json;
 use thiserror::Error;
 
 const RECENT_LAUNCHES_MOST: u32 = 50;
@@ -234,6 +236,84 @@ enum Command {
     Drain(Reply<()>),
 }
 
+impl Command {
+    // The Electron app's name for the request, which its log lines carry.
+    const fn channel(&self) -> &'static str {
+        match self {
+            Self::Library(_) => "library:list",
+            Self::Accounts(_) => "accounts:list",
+            Self::SetLibrarySort(..) => "library:setSort",
+            Self::Sidebar(_) => "sidebar:get",
+            Self::SetSidebar(..) => "sidebar:set",
+            Self::BackUpDatabase(_) => "database:backUp",
+            Self::Settings(_) => "settings:getAll",
+            Self::SetSetting(..) => "settings:set",
+            #[cfg(feature = "fake")]
+            Self::SeedSetting(..) => "settings:seed",
+            Self::WatchSettings(_) => "settings:watch",
+            Self::VaultStatus(_) => "vault:status",
+            Self::ResetVault(_) => "vault:reset",
+            Self::TestVault(_) => "vault:test",
+            Self::LauncherStatuses(_) => "launchers:status",
+            Self::LocateLauncher(..) => "launchers:locate",
+            Self::ResetLauncherPath(..) => "launchers:resetPath",
+            Self::CreateAccount(..) => "accounts:create",
+            Self::Account(..) => "accounts:get",
+            Self::UpdateAccount(..) => "accounts:update",
+            Self::DeleteAccount(..) => "accounts:delete",
+            Self::SetAccountPassword(..) => "accounts:setPassword",
+            Self::ClearAccountPassword(..) => "accounts:clearPassword",
+            Self::Rescan(_) => "library:rescan",
+            Self::InstalledGames(..) => "launchers:games",
+            Self::RememberedAccounts(..) => "launchers:rememberedAccounts",
+            Self::ImportAccounts(..) => "launchers:importAccounts",
+            Self::SwitchPlan(..) => "launchers:switchPlan",
+            Self::LaunchPreflight(..) => "launch:preflight",
+            Self::StartLaunch(..) => "launch:start",
+            Self::RecentLaunches(..) => "launch:recent",
+            Self::Backups(..) => "backups:list",
+            Self::RestoreBackup(..) => "backups:restore",
+            Self::Recovery(_) => "recovery:get",
+            Self::RestoreRecovery(_) => "recovery:restore",
+            Self::DismissRecovery(_) => "recovery:dismiss",
+            Self::Session(..) => "sessions:get",
+            Self::CaptureSession(..) => "sessions:capture",
+            Self::ForgetSession(..) => "sessions:forget",
+            Self::UseClipboard(_) => "clipboard:use",
+            Self::UseShell(_) => "shell:use",
+            Self::OpenFolder(..) => "app:openPath",
+            Self::Copy(..) => "accounts:copy",
+            #[cfg(feature = "fake")]
+            Self::SeedSession(..) => "sessions:seed",
+            Self::OnStore(_) => "store:work",
+            Self::Settle(_) => "launch:settle",
+            Self::Drain(_) => "backend:drain",
+        }
+    }
+}
+
+// Answers a request, and logs a refusal as a warning and any other failure as an error, with its code and message, as the Electron app's IPC layer does.
+struct Said {
+    log: Log,
+    channel: &'static str,
+}
+
+impl Said {
+    fn answer<T>(&self, reply: &Reply<T>, result: Result<T, ApiError>) {
+        if let Err(error) = &result {
+            let fields = json!({ "code": error.code, "message": error.message });
+            if is_refusal(error.code) {
+                self.log
+                    .warn(&format!("ipc {} refused", self.channel), fields);
+            } else {
+                self.log
+                    .error(&format!("ipc {} failed", self.channel), fields);
+            }
+        }
+        answer(reply, result);
+    }
+}
+
 // The database's thread as a switch reaches it.
 struct DatabaseThread(Option<Sender<Command>>);
 
@@ -352,6 +432,79 @@ pub struct Backend {
     has_launchers: bool,
     data_dir: PathBuf,
     version: String,
+    log: Log,
+}
+
+// A start of the backend whose lines go to a log: `Backend::logging_to(log)`, then one of the starts the backend itself has.
+pub struct BackendStart {
+    log: Log,
+}
+
+impl BackendStart {
+    pub fn start(self, data_dir: PathBuf, version: &str) -> Backend {
+        Backend::start_on(data_dir, version, None, VaultSource::None, None, self.log)
+    }
+
+    pub fn start_with_vault_of_data_folder(
+        self,
+        data_dir: PathBuf,
+        version: &str,
+        protector: Box<dyn DataProtector + Send>,
+    ) -> Backend {
+        Backend::start_on(
+            data_dir,
+            version,
+            None,
+            VaultSource::DataFolder(protector),
+            None,
+            self.log,
+        )
+    }
+
+    pub fn start_on_this_pc(
+        self,
+        data_dir: PathBuf,
+        version: &str,
+        launchers: Launchers,
+        protector: Box<dyn DataProtector + Send>,
+        on_job: Option<JobObserver>,
+    ) -> Result<Backend, KeyError> {
+        let opened = match OsCryptVault::open_or_create(&data_dir, &*protector) {
+            Err(error) if !matches!(error, KeyError::Unwrap | KeyError::WindowsUnavailable) => {
+                self.log.error(
+                    "the vault key could not be opened",
+                    json!({ "error": error.to_string() }),
+                );
+                return Err(error);
+            }
+            opened => opened,
+        };
+        Ok(Backend::start_on(
+            data_dir,
+            version,
+            Some(launchers),
+            VaultSource::Opened(opened, protector),
+            on_job,
+            self.log,
+        ))
+    }
+
+    pub fn start_with(
+        self,
+        data_dir: PathBuf,
+        version: &str,
+        launchers: Launchers,
+        on_job: Option<JobObserver>,
+    ) -> Backend {
+        Backend::start_on(
+            data_dir,
+            version,
+            Some(launchers),
+            VaultSource::Launchers,
+            on_job,
+            self.log,
+        )
+    }
 }
 
 fn take(thread: &Thread) -> Option<JoinHandle<()>> {
@@ -362,9 +515,9 @@ fn take(thread: &Thread) -> Option<JoinHandle<()>> {
 }
 
 impl Backend {
-    // Returns at once: the folder is made and the database opened on the new thread, and a failure there is the answer to every request. Without launchers nothing can be scanned, switched or started.
+    // Returns at once: the folder is made and the database opened on the new thread, and a failure there is the answer to every request. Without launchers nothing can be scanned, switched or started. Nothing is logged.
     pub fn start(data_dir: PathBuf, version: &str) -> Self {
-        Self::start_on(data_dir, version, None, VaultSource::None, None)
+        Self::logging_to(Log::off()).start(data_dir, version)
     }
 
     // A key that does not unwrap is never replaced: it may be another Windows user's, and what it sealed would be lost with it.
@@ -373,13 +526,7 @@ impl Backend {
         version: &str,
         protector: Box<dyn DataProtector + Send>,
     ) -> Self {
-        Self::start_on(
-            data_dir,
-            version,
-            None,
-            VaultSource::DataFolder(protector),
-            None,
-        )
+        Self::logging_to(Log::off()).start_with_vault_of_data_folder(data_dir, version, protector)
     }
 
     // The launchers of this PC on the data folder's own vault. Its key is opened, or made for a folder that has none, before the thread starts. A key Windows does not unwrap leaves the vault in its Key lost state, and a Windows that unwraps nothing just now leaves it unavailable, with the accounts readable either way; any other fault of the key file stops the start.
@@ -390,19 +537,8 @@ impl Backend {
         protector: Box<dyn DataProtector + Send>,
         on_job: Option<JobObserver>,
     ) -> Result<Self, KeyError> {
-        let opened = match OsCryptVault::open_or_create(&data_dir, &*protector) {
-            Err(error) if !matches!(error, KeyError::Unwrap | KeyError::WindowsUnavailable) => {
-                return Err(error);
-            }
-            opened => opened,
-        };
-        Ok(Self::start_on(
-            data_dir,
-            version,
-            Some(launchers),
-            VaultSource::Opened(opened, protector),
-            on_job,
-        ))
+        Self::logging_to(Log::off())
+            .start_on_this_pc(data_dir, version, launchers, protector, on_job)
     }
 
     // As `start`, on the machine `launchers` describes. `on_job` hears every change of a launch job.
@@ -412,22 +548,25 @@ impl Backend {
         launchers: Launchers,
         on_job: Option<JobObserver>,
     ) -> Self {
-        Self::start_on(
-            data_dir,
-            version,
-            Some(launchers),
-            VaultSource::Launchers,
-            on_job,
-        )
+        Self::logging_to(Log::off()).start_with(data_dir, version, launchers, on_job)
+    }
+
+    // The same starts, with every line of the backend, its launchers and its switches written to `log`, whose level follows the logLevel setting from the database's first read on.
+    pub const fn logging_to(log: Log) -> BackendStart {
+        BackendStart { log }
     }
 
     fn start_on(
         data_dir: PathBuf,
         version: &str,
-        launchers: Option<Launchers>,
+        mut launchers: Option<Launchers>,
         vault: VaultSource,
         on_job: Option<JobObserver>,
+        log: Log,
     ) -> Self {
+        if let Some(launchers) = &mut launchers {
+            launchers.log = log.clone();
+        }
         let (commands, requests) = async_channel::unbounded();
         let version = version.to_owned();
         let jobs = JobBoard::default();
@@ -448,6 +587,7 @@ impl Backend {
             last_preflight: LastPreflight::default(),
             recovery: Recovery::default(),
             clipboard: None,
+            log: log.clone(),
         };
         let running_version = version.clone();
         let thread = thread::Builder::new()
@@ -462,6 +602,7 @@ impl Backend {
             has_launchers,
             data_dir: folder,
             version,
+            log,
         }
     }
 
@@ -590,7 +731,11 @@ impl Backend {
     }
 
     pub fn set_autostart(&self, open_at_login: bool) -> Result<AutostartStatus, ApiError> {
-        Ok(install::set_autostart(open_at_login)?)
+        let status = install::set_autostart(open_at_login)?;
+        self.log
+            .child("ipc")
+            .info("autostart updated", json!({ "openAtLogin": open_at_login }));
+        Ok(status)
     }
 
     // Whether a switch or a launch runs now: what a close of the window and a quit ask about.
@@ -716,7 +861,13 @@ impl Backend {
 
     // Stops the running job. Before the launcher was started again, what was written is put back; after that the writes stand and the launcher finishes signing in.
     pub fn cancel_launch(&self, job_id: &str) -> Result<LaunchJob, ApiError> {
-        Ok(self.jobs.cancel(job_id)?)
+        let job = self.jobs.cancel(job_id)?;
+        if job.state == ol_model::JobState::Running {
+            self.log
+                .child("launch")
+                .info("launch job cancel requested", json!({ "jobId": job_id }));
+        }
+        Ok(job)
     }
 
     // Game and account pairs that were launched before, newest first. Anything but 1 to 50 asks for ten.
@@ -806,6 +957,14 @@ impl Backend {
 
     // Stops a running switch and waits for it, then waits for the request in hand and for the database to close, which folds its journal back into the one file.
     pub fn shut_down(&self) {
+        if let Some(job) = self.jobs.current() {
+            self.log
+                .warn("stopping the running switch", json!({ "reason": "quit" }));
+            self.log.child("launch").info(
+                "launch service stopping; aborting the running job",
+                json!({ "jobId": job.id }),
+            );
+        }
         self.jobs.close();
         // A start the database's thread had in hand when the board closed has its thread in the slot once this is answered.
         let (reply, drained) = async_channel::bounded(1);
@@ -868,62 +1027,166 @@ struct Serving {
     last_preflight: LastPreflight,
     recovery: Recovery,
     clipboard: Option<ClipboardService>,
+    log: Log,
 }
 
 impl Serving {
     fn serve(mut self, version: &str, vault: VaultSource, requests: &Receiver<Command>) {
         let _answered = Unanswered(requests);
+        let log = self.log.clone();
+        log.info(
+            "starting",
+            json!({
+                "version": version,
+                "dataDir": self.data_dir.to_string_lossy(),
+                "build": install::build_label(),
+                "launchers": self.launchers.is_some(),
+            }),
+        );
         let opened = data_folder::open(&self.data_dir, version)
-            .map(|(store, _)| store)
+            .map(|(store, migrated)| {
+                if !migrated.applied.is_empty() {
+                    log.info(
+                        "database migrated",
+                        json!({ "from": migrated.from, "to": migrated.to, "applied": migrated.applied }),
+                    );
+                }
+                store
+            })
             .map_err(ApiError::from);
-        if let Ok(store) = &opened {
-            self.recovery = Recovery::load(&self.data_dir);
-            self.open_vault(vault);
-            let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
+        match &opened {
+            Ok(store) => {
+                self.follow_stored_level(store);
+                // Every name the database holds goes to the redaction before anything can mention it.
+                if let Err(error) = store.accounts() {
+                    log.warn(
+                        "the accounts could not be read",
+                        json!({ "code": error.code(), "error": error.to_string() }),
+                    );
+                }
+                self.recovery = Recovery::load_logged(&self.data_dir, &log);
+                self.open_vault(vault);
+                self.store_probe(store);
+                self.log_vault(store);
+            }
+            Err(error) => log.error(
+                "the data folder could not be opened",
+                json!({ "code": error.code, "error": error.message }),
+            ),
         }
         while let Ok(command) = requests.recv_blocking() {
             let store = opened.as_ref().map_err(ApiError::clone);
             self.handle(command, store);
         }
+        drop(opened);
+        log.info("exit", ());
+    }
+
+    // The level the logLevel setting holds, when it holds one; otherwise the log keeps the level it was opened with.
+    fn follow_stored_level(&self, store: &Store) {
+        let stored = store
+            .setting(SettingKey::LogLevel)
+            .ok()
+            .flatten()
+            .and_then(|level| ol_model::LogLevel::parse(&level));
+        if let Some(level) = stored {
+            self.log.set_level(level);
+        }
+    }
+
+    fn store_probe(&self, store: &Store) {
+        match vault_health::ensure_probe(store, self.vault_access(), &self.stamp()) {
+            Ok(true) => self.log.child("vault").info("vault probe stored", ()),
+            Ok(false) => {}
+            Err(error) => self.log.child("vault").warn(
+                "the vault probe could not be stored",
+                json!({ "code": error.code(), "error": error.to_string() }),
+            ),
+        }
+    }
+
+    fn log_vault(&self, store: &Store) {
+        let Ok(health) = vault_health::status(store, self.vault_access()) else {
+            return;
+        };
+        self.log.info(
+            "vault",
+            json!({ "available": health.available, "readable": health.readable }),
+        );
+        if !health.available {
+            self.log.warn(
+                "secure storage unavailable; secrets cannot be stored on this system",
+                (),
+            );
+        }
+        if health.readable == Some(false) {
+            self.log.error(
+                "stored secrets cannot be decrypted; the vault key was lost or belongs to another Windows user",
+                (),
+            );
+        }
     }
 
     fn handle(&mut self, command: Command, store: Result<&Store, ApiError>) {
+        let ipc = self.log.child("ipc");
+        let said = Said {
+            log: ipc.clone(),
+            channel: command.channel(),
+        };
         match command {
-            Command::Library(reply) => answer(
+            Command::Library(reply) => said.answer(
                 &reply,
                 store.and_then(|store| read_library(store, &self.data_dir)),
             ),
             Command::Accounts(reply) => {
-                answer(&reply, store.and_then(|store| Ok(store.accounts()?)));
+                said.answer(&reply, store.and_then(|store| Ok(store.accounts()?)));
             }
-            Command::SetLibrarySort(sort, reply) => answer(
+            Command::SetLibrarySort(sort, reply) => said.answer(
                 &reply,
                 store.and_then(|store| Ok(store.set_library_sort(sort)?)),
             ),
-            Command::Sidebar(reply) => answer(&reply, store.and_then(|store| Ok(store.sidebar()?))),
-            Command::SetSidebar(sidebar, reply) => answer(
+            Command::Sidebar(reply) => {
+                said.answer(&reply, store.and_then(|store| Ok(store.sidebar()?)))
+            }
+            Command::SetSidebar(sidebar, reply) => said.answer(
                 &reply,
                 store.and_then(|store| Ok(store.set_sidebar(sidebar)?)),
             ),
-            Command::BackUpDatabase(reply) => answer(
-                &reply,
-                store.and_then(|store| {
-                    data_folder::back_up(store, &self.data_dir)?;
-                    Ok(())
-                }),
-            ),
+            Command::BackUpDatabase(reply) => {
+                let copied =
+                    store.and_then(|store| Ok(data_folder::back_up(store, &self.data_dir)?));
+                match &copied {
+                    Ok(dest) => self
+                        .log
+                        .info("database copied", json!({ "dest": dest.to_string_lossy() })),
+                    Err(error) => self.log.warn(
+                        "database copy failed",
+                        json!({ "code": error.code, "error": error.message }),
+                    ),
+                }
+                answer(&reply, copied.map(|_| ()));
+            }
             Command::Settings(reply) => {
-                answer(&reply, store.and_then(|store| Ok(store.settings()?)));
+                said.answer(&reply, store.and_then(|store| Ok(store.settings()?)));
             }
             Command::SetSetting(key, value, reply) => {
                 let changed = store.and_then(|store| Ok(setting::change(store, key, &value)?));
                 if changed.is_ok() {
+                    if key == SettingKey::LogLevel
+                        && let Some(level) = ol_model::LogLevel::parse(&value)
+                    {
+                        self.log.set_level(level);
+                    }
+                    ipc.info(
+                        "setting updated",
+                        json!({ "key": key.as_str(), "value": value }),
+                    );
                     self.changed(key, Some(&value));
                 }
-                answer(&reply, changed.map(|_| ()));
+                said.answer(&reply, changed.map(|_| ()));
             }
             #[cfg(feature = "fake")]
-            Command::SeedSetting(key, value, reply) => answer(
+            Command::SeedSetting(key, value, reply) => said.answer(
                 &reply,
                 store.and_then(|store| {
                     if !key.is_main_only() {
@@ -933,7 +1196,7 @@ impl Serving {
                 }),
             ),
             Command::WatchSettings(changes) => self.settings_watch = Some(changes),
-            Command::VaultStatus(reply) => answer(
+            Command::VaultStatus(reply) => said.answer(
                 &reply,
                 store.and_then(|store| {
                     self.recheck_vault(store);
@@ -941,9 +1204,22 @@ impl Serving {
                 }),
             ),
             Command::ResetVault(reply) => {
-                answer(&reply, store.and_then(|store| self.reset_vault(store)));
+                let reset = store.and_then(|store| self.reset_vault(store));
+                if let Ok(reset) = &reset {
+                    match reset.summary() {
+                        Some(removed) => self.log.child("vault").warn(
+                            "vault reset: all stored secrets removed",
+                            json!({ "passwords": removed.passwords, "sessions": removed.sessions, "secrets": removed.secrets }),
+                        ),
+                        None => self
+                            .log
+                            .child("vault")
+                            .info("vault reset: the key opened after all; nothing removed", ()),
+                    }
+                }
+                said.answer(&reply, reset);
             }
-            Command::TestVault(reply) => answer(
+            Command::TestVault(reply) => said.answer(
                 &reply,
                 store.and_then(|store| {
                     Ok(vault_health::self_test(
@@ -954,7 +1230,7 @@ impl Serving {
                 }),
             ),
             Command::LauncherStatuses(reply) => {
-                answer(
+                said.answer(
                     &reply,
                     store.and_then(|store| self.launcher_statuses(store)),
                 );
@@ -965,9 +1241,15 @@ impl Serving {
                     .map_err(ApiError::clone)
                     .and_then(|store| self.locate_launcher(store, launcher, &exe));
                 let rescan = located.is_ok();
-                answer(&reply, located);
+                if rescan {
+                    ipc.info(
+                        "launcher folder chosen by user",
+                        json!({ "launcher": launcher.as_str() }),
+                    );
+                }
+                said.answer(&reply, located);
                 if rescan && let Ok(store) = store {
-                    let _ = self.rescan(store);
+                    self.rescan_after_folder_change(store, launcher);
                 }
             }
             Command::ResetLauncherPath(launcher, reply) => {
@@ -976,40 +1258,65 @@ impl Serving {
                     .map_err(ApiError::clone)
                     .and_then(|store| self.reset_launcher_path(store, launcher));
                 let rescan = reset.is_ok();
-                answer(&reply, reset);
+                if rescan {
+                    ipc.info(
+                        "launcher folder reset to automatic detection",
+                        json!({ "launcher": launcher.as_str() }),
+                    );
+                }
+                said.answer(&reply, reset);
                 if rescan && let Ok(store) = store {
-                    let _ = self.rescan(store);
+                    self.rescan_after_folder_change(store, launcher);
                 }
             }
             Command::CreateAccount(account, reply) => {
-                answer(
-                    &reply,
-                    store.and_then(|store| self.create_account(store, &account)),
-                );
+                let created = store.and_then(|store| self.create_account(store, &account));
+                if let Ok(created) = &created {
+                    ipc.info(
+                        "account created",
+                        json!({ "id": created.id, "launcher": created.launcher.as_str(), "hasSecret": created.has_secret }),
+                    );
+                }
+                said.answer(&reply, created);
             }
             Command::Account(id, reply) => {
-                answer(
+                said.answer(
                     &reply,
                     store.and_then(|store| Ok(accounts::require(store, &id)?)),
                 );
             }
-            Command::UpdateAccount(id, patch, reply) => answer(
-                &reply,
-                store.and_then(|store| {
+            Command::UpdateAccount(id, patch, reply) => {
+                let updated = store.and_then(|store| {
                     self.require_idle()?;
                     Ok(accounts::update(store, &id, &patch, &self.stamp())?)
-                }),
-            ),
-            Command::DeleteAccount(id, reply) => answer(
-                &reply,
-                store.and_then(|store| {
+                });
+                if updated.is_ok() {
+                    let fields: Vec<&str> = [
+                        ("displayName", patch.display_name.is_some()),
+                        ("login", patch.login.is_some()),
+                        ("launcherUid", patch.launcher_uid.is_some()),
+                        ("tags", patch.tags.is_some()),
+                        ("notes", patch.notes.is_some()),
+                    ]
+                    .into_iter()
+                    .filter_map(|(field, given)| given.then_some(field))
+                    .collect();
+                    ipc.info("account updated", json!({ "id": id, "fields": fields }));
+                }
+                said.answer(&reply, updated);
+            }
+            Command::DeleteAccount(id, reply) => {
+                let deleted = store.and_then(|store| {
                     self.require_idle()?;
                     Ok(accounts::delete(store, &id)?)
-                }),
-            ),
-            Command::SetAccountPassword(id, password, reply) => answer(
-                &reply,
-                store.and_then(|store| {
+                });
+                if deleted.is_ok() {
+                    ipc.info("account deleted", json!({ "id": id }));
+                }
+                said.answer(&reply, deleted);
+            }
+            Command::SetAccountPassword(id, password, reply) => {
+                let set = store.and_then(|store| {
                     self.require_idle()?;
                     Ok(accounts::set_password(
                         store,
@@ -1018,17 +1325,26 @@ impl Serving {
                         &password,
                         &self.stamp(),
                     )?)
-                }),
-            ),
-            Command::ClearAccountPassword(id, reply) => answer(
-                &reply,
-                store.and_then(|store| {
+                });
+                if set.is_ok() {
+                    ipc.info("account password updated", json!({ "id": id }));
+                }
+                said.answer(&reply, set);
+            }
+            Command::ClearAccountPassword(id, reply) => {
+                let cleared = store.and_then(|store| {
                     self.require_idle()?;
                     Ok(accounts::clear_password(store, &id, &self.stamp())?)
-                }),
-            ),
-            Command::Rescan(reply) => answer(&reply, store.and_then(|store| self.rescan(store))),
-            Command::InstalledGames(launcher, reply) => answer(
+                });
+                if cleared.is_ok() {
+                    ipc.info("account password removed", json!({ "id": id }));
+                }
+                said.answer(&reply, cleared);
+            }
+            Command::Rescan(reply) => {
+                said.answer(&reply, store.and_then(|store| self.rescan(store)))
+            }
+            Command::InstalledGames(launcher, reply) => said.answer(
                 &reply,
                 store.and_then(|store| {
                     self.with_adapter(store, launcher, |_, _, adapter| {
@@ -1036,7 +1352,7 @@ impl Serving {
                     })
                 }),
             ),
-            Command::RememberedAccounts(launcher, reply) => answer(
+            Command::RememberedAccounts(launcher, reply) => said.answer(
                 &reply,
                 store.and_then(|store| {
                     self.with_adapter(store, launcher, |_, _, adapter| {
@@ -1044,9 +1360,8 @@ impl Serving {
                     })
                 }),
             ),
-            Command::ImportAccounts(launcher, keys, reply) => answer(
-                &reply,
-                store.and_then(|store| {
+            Command::ImportAccounts(launcher, keys, reply) => {
+                let imported = store.and_then(|store| {
                     self.with_adapter(store, launcher, |launchers, _, adapter| {
                         Ok(launchers::import_accounts(
                             store,
@@ -1056,20 +1371,42 @@ impl Serving {
                             &self.now(launchers),
                         )?)
                     })
-                }),
-            ),
-            Command::SwitchPlan(account_id, reply) => answer(
-                &reply,
-                store.and_then(|store| {
+                });
+                if let Ok(imported) = &imported {
+                    ipc.info(
+                        "imported launcher accounts",
+                        json!({
+                            "launcher": launcher.as_str(),
+                            "created": imported.accounts.len(),
+                            "skipped": imported.skipped.len(),
+                        }),
+                    );
+                }
+                said.answer(&reply, imported);
+            }
+            Command::SwitchPlan(account_id, reply) => {
+                let planned = store.and_then(|store| {
                     let account = accounts::require(store, &account_id)?;
                     self.with_adapter(store, account.launcher, |_, _, adapter| {
                         Ok(adapter
                             .plan_switch(&launch::account_ref(&account))
                             .map_err(ServiceError::adapter(account.launcher))?)
                     })
-                }),
-            ),
-            Command::LaunchPreflight(account_id, game_id, reply) => answer(
+                });
+                if let Ok(plan) = &planned {
+                    ipc.info(
+                        "switch plan generated",
+                        json!({
+                            "accountId": account_id,
+                            "launcher": plan.launcher.as_str(),
+                            "strategy": plan.strategy.as_str(),
+                            "steps": plan.steps.len(),
+                        }),
+                    );
+                }
+                said.answer(&reply, planned);
+            }
+            Command::LaunchPreflight(account_id, game_id, reply) => said.answer(
                 &reply,
                 store.and_then(|store| {
                     let launchers = self.launchers.as_ref().ok_or_else(no_launchers)?;
@@ -1084,16 +1421,27 @@ impl Serving {
                 }),
             ),
             Command::StartLaunch(start, reply) => {
-                answer(
-                    &reply,
-                    store.and_then(|store| self.start_launch(store, start)),
-                );
+                let confirm_close = start.confirm_close;
+                let started = store.and_then(|store| self.start_launch(store, start));
+                if let Ok(job) = &started {
+                    self.log.child("launch").info(
+                        "launch job accepted",
+                        json!({
+                            "jobId": job.id,
+                            "accountId": job.account.id,
+                            "gameId": job.game.as_ref().map(|game| &game.id),
+                            "confirmClose": confirm_close,
+                            "direct": job.direct,
+                        }),
+                    );
+                }
+                said.answer(&reply, started);
             }
-            Command::RecentLaunches(limit, reply) => answer(
+            Command::RecentLaunches(limit, reply) => said.answer(
                 &reply,
                 store.and_then(|store| Ok(store.recent_launches(limit)?)),
             ),
-            Command::Backups(launcher, reply) => answer(
+            Command::Backups(launcher, reply) => said.answer(
                 &reply,
                 store.and_then(|store| {
                     self.with_adapter(store, launcher, |launchers, configs, _| {
@@ -1107,14 +1455,23 @@ impl Serving {
             Command::RestoreBackup(launcher, id, reply) => {
                 let restored =
                     store.and_then(|store| self.restore_backup(store, launcher, &id, true));
-                if restored.is_ok() {
+                if let Ok(restored) = &restored {
+                    ipc.warn(
+                        "backup restored by user",
+                        json!({
+                            "launcher": launcher.as_str(),
+                            "id": id,
+                            "files": restored.files.len(),
+                            "registry": restored.registry.len(),
+                        }),
+                    );
                     self.recovery
                         .restored_from_backups(&self.data_dir, launcher);
                 }
-                answer(&reply, restored);
+                said.answer(&reply, restored);
             }
             Command::Recovery(reply) => {
-                answer(&reply, store.and_then(|store| self.pending_recovery(store)));
+                said.answer(&reply, store.and_then(|store| self.pending_recovery(store)));
             }
             Command::RestoreRecovery(reply) => {
                 let restored = store.and_then(|store| {
@@ -1130,45 +1487,67 @@ impl Serving {
                     self.restore_backup(store, launcher, &id, false)
                 });
                 if restored.is_ok() {
+                    if let Some(entry) = self.recovery.pending() {
+                        self.log.child("recovery").warn(
+                            "interrupted switch recovered from its snapshot",
+                            json!({ "jobId": entry.job_id, "launcher": entry.launcher.as_str(), "backupId": entry.backup_id }),
+                        );
+                    }
                     self.recovery.settle(&self.data_dir);
                 }
-                answer(&reply, restored);
+                said.answer(&reply, restored);
             }
             Command::DismissRecovery(reply) => {
+                if let Some(entry) = self.recovery.pending() {
+                    self.log.child("recovery").info(
+                        "interrupted switch left as it is",
+                        json!({ "jobId": entry.job_id, "launcher": entry.launcher.as_str() }),
+                    );
+                }
                 self.recovery.settle(&self.data_dir);
-                answer(&reply, Ok(()));
+                said.answer(&reply, Ok(()));
             }
-            Command::Session(account_id, reply) => answer(
+            Command::Session(account_id, reply) => said.answer(
                 &reply,
                 store.and_then(|store| self.saved_sign_in(store, &account_id)),
             ),
-            Command::CaptureSession(account_id, reply) => answer(
-                &reply,
-                store.and_then(|store| {
+            Command::CaptureSession(account_id, reply) => {
+                let captured = store.and_then(|store| {
                     self.require_idle()?;
                     let account = accounts::require(store, &account_id)?;
                     self.with_adapter(store, account.launcher, |_, _, adapter| {
                         Ok(capture::capture(store, adapter, &account)?)
                     })
-                }),
-            ),
-            Command::ForgetSession(account_id, reply) => answer(
-                &reply,
-                store.and_then(|store| {
+                });
+                if let Ok(captured) = &captured {
+                    ipc.info(
+                        "session captured by user",
+                        json!({ "accountId": account_id, "launcher": captured.account.launcher.as_str() }),
+                    );
+                }
+                said.answer(&reply, captured);
+            }
+            Command::ForgetSession(account_id, reply) => {
+                let forgotten = store.and_then(|store| {
                     self.require_idle()?;
                     Ok(capture::forget(store, &account_id)?)
-                }),
-            ),
+                });
+                if forgotten.is_ok() {
+                    self.log
+                        .child("launchers")
+                        .info("session forgotten", json!({ "accountId": account_id }));
+                }
+                said.answer(&reply, forgotten);
+            }
             Command::UseShell(shell) => self.shell = Some(shell),
-            Command::OpenFolder(folder, reply) => answer(&reply, self.open_folder(folder)),
+            Command::OpenFolder(folder, reply) => said.answer(&reply, self.open_folder(folder)),
             Command::UseClipboard(service) => {
                 if let Some(previous) = self.clipboard.replace(service) {
                     previous.clear_if_unchanged();
                 }
             }
-            Command::Copy(account_id, field, reply) => answer(
-                &reply,
-                store.and_then(|store| {
+            Command::Copy(account_id, field, reply) => {
+                let copied = store.and_then(|store| {
                     Ok(clipboard::copy_account_field(
                         store,
                         self.vault(),
@@ -1176,10 +1555,25 @@ impl Serving {
                         &account_id,
                         field,
                     )?)
-                }),
-            ),
+                });
+                if let Ok(copied) = &copied {
+                    ipc.info(
+                        "copied to clipboard",
+                        json!({
+                            "id": account_id,
+                            "field": match field {
+                                CopyField::Login => "login",
+                                CopyField::Password => "password",
+                            },
+                            "clearAfterMs": copied.clear_after.as_millis(),
+                            "historyExcluded": copied.history_excluded,
+                        }),
+                    );
+                }
+                said.answer(&reply, copied);
+            }
             #[cfg(feature = "fake")]
-            Command::SeedSession(account_id, launcher_uid, blob, reply) => answer(
+            Command::SeedSession(account_id, launcher_uid, blob, reply) => said.answer(
                 &reply,
                 store.and_then(|store| {
                     let account = accounts::require(store, &account_id)?;
@@ -1198,7 +1592,7 @@ impl Serving {
                     work(store);
                 }
             }
-            Command::Drain(reply) => answer(&reply, Ok(())),
+            Command::Drain(reply) => said.answer(&reply, Ok(())),
             Command::Settle(finished) => {
                 let on_job = Arc::clone(&self.on_job);
                 match (store, &self.launchers) {
@@ -1445,12 +1839,41 @@ impl Serving {
             return Ok(Vec::new());
         };
         let configs = launchers.configs(&store.settings()?, &self.data_dir);
-        Ok(launchers::scan_library(
-            store,
-            launchers,
-            &configs,
-            &self.now(launchers),
-        ))
+        let scanned = launchers::scan_library(store, launchers, &configs, &self.now(launchers));
+        let log = self.log.child("scan");
+        for result in &scanned {
+            let launcher = result.launcher.as_str();
+            match &result.error {
+                Some(error) => log.warn(
+                    "library scan failed for launcher",
+                    json!({ "launcher": launcher, "error": error }),
+                ),
+                None if !result.installed => log.info(
+                    "launcher not installed; library scan skipped",
+                    json!({ "launcher": launcher, "removed": result.removed }),
+                ),
+                None => log.info(
+                    "library rescanned",
+                    json!({
+                        "launcher": launcher,
+                        "added": result.added,
+                        "updated": result.updated,
+                        "removed": result.removed,
+                        "installed": result.installed,
+                    }),
+                ),
+            }
+        }
+        Ok(scanned)
+    }
+
+    fn rescan_after_folder_change(&self, store: &Store, launcher: LauncherId) {
+        if let Err(error) = self.rescan(store) {
+            self.log.child("ipc").warn(
+                "rescan after a launcher folder change failed",
+                json!({ "launcher": launcher.as_str(), "code": error.code, "error": error.message }),
+            );
+        }
     }
 
     fn start_launch(&mut self, store: &Store, start: StartLaunch) -> Result<LaunchJob, ApiError> {
@@ -1528,12 +1951,11 @@ impl Serving {
             {
                 return Err(ServiceError::SnapshotGone.into());
             }
-            Ok(switch::restore_backup(
-                adapter,
-                &launchers.platform,
-                &backups,
-                id,
-            )?)
+            let restored = switch::restore_backup(adapter, &launchers.platform, &backups, id);
+            if let Err(error) = &restored {
+                launchers::log_adapter_failure(&launchers.log, error, "restoreBackup");
+            }
+            Ok(restored?)
         })
     }
 
@@ -1676,6 +2098,7 @@ mod tests {
             last_preflight: LastPreflight::default(),
             recovery: Recovery::default(),
             clipboard: None,
+            log: Log::off(),
         };
         serving.open_vault(VaultSource::DataFolder(Box::new(Theirs)));
         let database = ol_store::database_path(&data_dir);

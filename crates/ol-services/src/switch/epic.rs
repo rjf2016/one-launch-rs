@@ -25,11 +25,12 @@ use serde_json::Map;
 use time::OffsetDateTime;
 
 use super::{
-    SwitchOptions, SwitchResult, SwitchSink, Thrown, job_steps, restore_epic,
+    SwitchOptions, SwitchResult, SwitchSink, Thrown, job_steps, log_started, restore_epic,
     write_game_user_settings,
 };
 use crate::backup::{BackupError, BackupFile, BackupService, SnapshotRequest};
 use crate::launchers::ServiceError;
+use crate::log::Log;
 
 // Every settings file there is, as a snapshot takes it: encrypted, because it holds the session.
 fn snapshot(
@@ -187,6 +188,7 @@ pub(crate) fn store_session(
 }
 
 struct Switch<'a> {
+    log: Log,
     epic: &'a EpicAdapter<'a>,
     platform: &'a Platform,
     backups: &'a BackupService<'a>,
@@ -752,6 +754,7 @@ impl Switch<'_> {
         self.stop_if_aborted()?;
         if running && !self.already_active {
             self.mark(STEP.close, JobStepStatus::Running, "");
+            self.log.info("asking Epic Games Launcher to close", ());
             self.epic.shutdown(None, self.cancel)?;
             self.mark(STEP.close, JobStepStatus::Done, "Launcher closed.");
         }
@@ -837,6 +840,7 @@ impl Switch<'_> {
     fn roll_back(&self, backup_id: &str) -> Result<(), String> {
         let text = |error: AdapterError| error.to_string();
         if self.epic.is_running().map_err(text)? {
+            self.log.info("asking Epic Games Launcher to close", ());
             let closed = self.epic.shutdown(None, &CancelToken::new());
             if self.epic.is_running().map_err(text)? {
                 return Err(closed.err().map_or_else(
@@ -879,8 +883,17 @@ pub fn run_switch(
         }));
     }
 
+    log_started(
+        options,
+        LauncherId::Epic,
+        account,
+        plan.strategy,
+        context.already_active,
+        context.running,
+    );
     let (steps, index) = job_steps(&plan);
     let mut switch = Switch {
+        log: options.log.child("epic"),
         epic,
         platform,
         backups,

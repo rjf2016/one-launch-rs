@@ -20,11 +20,13 @@ use ol_model::{
 use ol_platform_api::{CancelToken, Platform, RiotLocalLaunch};
 use ol_store::{Store, StoreError};
 use ol_vault::Vault;
+use serde_json::json;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::{self, AccountError, NewAccount};
 use crate::backup::{BackupError, BackupService, DEFAULT_BACKUPS_TO_KEEP};
+use crate::log::{Log, is_refusal};
 use crate::sessions::StoreDirectory;
 
 // Where the Epic Games Launcher keeps its files on this PC, and how long a switch waits for it.
@@ -131,6 +133,8 @@ pub struct Launchers {
     pub epic: EpicMachine,
     pub battlenet: BattlenetMachine,
     pub riot: RiotMachine,
+    // Where a scan, a switch and a launch log, under `main:<launcher>`. Off until the backend hands its own in.
+    pub log: Log,
 }
 
 // What the settings say to each launcher's adapter, read once for the call in hand.
@@ -310,6 +314,7 @@ impl Launchers {
             epic: EpicMachine::default(),
             battlenet: BattlenetMachine::default(),
             riot: RiotMachine::default(),
+            log: Log::off(),
         }
     }
 
@@ -418,6 +423,7 @@ impl Launchers {
             self.platform.clock.as_ref(),
             self.vault.as_ref(),
         )
+        .logging_to(&self.log)
     }
 }
 
@@ -495,6 +501,31 @@ impl ServiceError {
 impl fmt::Debug for ServiceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ServiceError({})", self.code())
+    }
+}
+
+// A launcher that is not installed is the normal state on most PCs, so it is a debug line; a refusal is a warning, anything else an error.
+pub fn log_adapter_failure(log: &Log, error: &ServiceError, operation: &str) {
+    let ServiceError::Adapter { launcher, source } = error else {
+        return;
+    };
+    let log = log.child("launchers");
+    let (launcher, code) = (launcher.as_str(), source.code());
+    if code == "NOT_INSTALLED" {
+        log.debug(
+            "launcher not installed",
+            json!({ "launcher": launcher, "operation": operation }),
+        );
+    } else if is_refusal(code) {
+        log.warn(
+            "adapter call refused",
+            json!({ "launcher": launcher, "operation": operation, "code": code, "message": error.to_string() }),
+        );
+    } else {
+        log.error(
+            "adapter call failed",
+            json!({ "launcher": launcher, "operation": operation, "code": code, "error": error.to_string() }),
+        );
     }
 }
 

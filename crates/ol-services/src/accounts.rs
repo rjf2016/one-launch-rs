@@ -1,6 +1,7 @@
 use std::fmt;
 
 use ol_formats::js;
+use ol_model::redact::register_account_names;
 use ol_model::{Account, LauncherId};
 use ol_store::{AccountUpdate, NewAccount as NewRow, Store, StoreError};
 use ol_vault::{Secret, Vault, VaultError};
@@ -210,6 +211,7 @@ pub fn create(
     input: &NewAccount,
     now: &str,
 ) -> Result<Account, AccountError> {
+    register_account_names([&input.login, &input.display_name]);
     let display_name = require_text(&input.display_name, "Display name", DISPLAY_NAME_MAX)?;
     let login = require_text(&input.login, "Login", LOGIN_MAX)?;
     let launcher_uid = optional_uid(input.launcher_uid.as_deref())?;
@@ -248,6 +250,7 @@ pub fn update(
     patch: &AccountPatch,
     now: &str,
 ) -> Result<Account, AccountError> {
+    register_account_names(patch.login.iter().chain(&patch.display_name));
     let current = require(store, id)?;
     let display_name = match &patch.display_name {
         Some(name) => require_text(name, "Display name", DISPLAY_NAME_MAX)?,

@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use ol_model::redact::{register_account_ids, register_account_names};
 use ol_model::{Account, Ciphertext, Game, InstalledGame, LaunchResult, LauncherId, RecentLaunch};
 use rusqlite::{OptionalExtension, params};
 
@@ -195,6 +196,8 @@ impl Store {
     }
 
     pub fn insert_account(&self, new: &NewAccount<'_>) -> Result<(), StoreError> {
+        register_account_names([new.login, new.display_name]);
+        register_account_ids(new.launcher_uid);
         let tags = tags_json(new.tags);
         self.conn.execute(
             "INSERT INTO accounts (id, launcher, display_name, login, secret_enc, launcher_uid, tags, notes, created_at, updated_at)
@@ -228,6 +231,8 @@ impl Store {
     }
 
     pub fn update_account(&self, id: &str, update: &AccountUpdate<'_>) -> Result<(), StoreError> {
+        register_account_names([update.login, update.display_name]);
+        register_account_ids(update.launcher_uid);
         self.conn.execute(
             "UPDATE accounts SET display_name = ?1, login = ?2, launcher_uid = ?3, tags = COALESCE(?4, tags), notes = ?5, updated_at = ?6 WHERE id = ?7",
             params![

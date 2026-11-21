@@ -1,9 +1,9 @@
 // A launch job: switch the launcher to an account, then start a game. One job at a time. `prepare` and `settle` run where the database lives; `run` has no database, so it can wait for a launcher on a thread of its own, and asks the database's thread for what a switch needs of the accounts and their saved sign-ins.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use ol_adapters::steam::SwitchPreflight;
 use ol_adapters::{AccountRef, AdapterError, GameRef};
@@ -14,12 +14,14 @@ use ol_model::{
 use ol_platform_api::CancelToken;
 use ol_store::Store;
 use ol_vault::Secret;
+use serde_json::json;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::accounts;
 use crate::journal::SwitchJournal;
 use crate::launchers::{Adapter, Configs, Launchers, ServiceError, require_implemented};
+use crate::log::{Log, is_refusal};
 pub use crate::sessions::account_ref;
 use crate::sessions::{RemoteDirectory, StoreThread};
 use crate::switch::{SwitchOptions, SwitchSink, run_switch};
@@ -365,6 +367,7 @@ pub struct FinishedJob {
     board: JobBoard,
     touch_last_used: bool,
     result: LaunchResult,
+    log: Log,
 }
 
 struct JobSink<'a> {
@@ -375,14 +378,42 @@ struct JobSink<'a> {
     password: Option<&'a Ciphertext>,
     board: &'a JobBoard,
     changed: &'a dyn Fn(&LaunchJob),
+    log: Log,
+    step_starts: HashMap<&'static str, Instant>,
 }
 
 impl JobSink<'_> {
+    // How long each step ran, from when it was first reported running to when it was not.
+    fn time_steps(&mut self) {
+        for step in &self.job.steps {
+            let since = self.step_starts.get(step.id).copied();
+            match (step.status, since) {
+                (JobStepStatus::Running, None) => {
+                    self.step_starts.insert(step.id, Instant::now());
+                }
+                (JobStepStatus::Running, Some(_)) | (_, None) => {}
+                (status, Some(since)) => {
+                    self.step_starts.remove(step.id);
+                    self.log.info(
+                        "launch step finished",
+                        json!({
+                            "jobId": self.job.id,
+                            "step": step.id,
+                            "status": status.as_str(),
+                            "ms": since.elapsed().as_millis(),
+                        }),
+                    );
+                }
+            }
+        }
+    }
+
     fn now(&self) -> String {
         ol_store::iso_timestamp(self.launchers.platform.clock.now())
     }
 
-    fn publish(&self) {
+    fn publish(&mut self) {
+        self.time_steps();
         self.board.update(self.job);
         (self.changed)(self.job);
     }
@@ -431,6 +462,17 @@ impl SwitchSink for JobSink<'_> {
     }
 
     fn attention(&mut self, attention: Option<&LaunchAttention>) {
+        if attention.is_some() && self.job.attention.is_none() {
+            let launcher = self.job.launcher;
+            let line = match launcher {
+                ol_model::LauncherId::Steam => "switch waiting for manual sign-in".to_owned(),
+                other => format!("{} switch waiting for manual sign-in", other.as_str()),
+            };
+            self.launchers.log.child(launcher.as_str()).warn(
+                &line,
+                json!({ "accountId": self.job.account.id, "backupId": self.job.backup_id }),
+            );
+        }
         self.job.attention = attention.cloned();
         self.publish();
     }
@@ -469,7 +511,7 @@ pub fn run(
     };
     let clock = launchers.platform.clock.as_ref();
     let now = || ol_store::iso_timestamp(clock.now());
-    let mut journal = SwitchJournal::new(&data_dir);
+    let mut journal = SwitchJournal::new(&data_dir).logging_to(&launchers.log);
     let launch_step = job
         .steps
         .last()
@@ -478,6 +520,17 @@ pub fn run(
     let game = job.game.clone();
     let direct = job.direct;
     let job_id = job.id.clone();
+    let log = launchers.log.child("launch");
+    let started = Instant::now();
+    log.info(
+        "launch job started",
+        json!({
+            "jobId": job_id,
+            "accountId": job.account.id,
+            "gameId": game.as_ref().map(|game| &game.id),
+            "direct": direct,
+        }),
+    );
     let mut sink = JobSink {
         job: &mut job,
         launch_step,
@@ -486,6 +539,8 @@ pub fn run(
         password: password.as_ref(),
         board: &board,
         changed,
+        log: log.clone(),
+        step_starts: HashMap::new(),
     };
     let mut touch_last_used = false;
     let mut result = LaunchResult::Failed;
@@ -499,7 +554,10 @@ pub fn run(
         sink.publish();
         let launched = adapter
             .launch_game(game, started_by_switch, &cancel)
-            .map_err(ServiceError::adapter(launcher))?;
+            .map_err(ServiceError::adapter(launcher))
+            .inspect_err(|error| {
+                crate::launchers::log_adapter_failure(&launchers.log, error, "launchGame");
+            })?;
         if let Some(step) = &mut sink.launch_step {
             step.detail = format!("Sent {}", launched.command);
         }
@@ -523,6 +581,10 @@ pub fn run(
             touch_last_used = true;
             result = LaunchResult::Ok;
             sink.job.state = JobState::Done;
+            log.info(
+                "launch job direct",
+                json!({ "jobId": job_id, "ms": started.elapsed().as_millis() }),
+            );
             return Ok(());
         }
         let account_id = account.id.clone().unwrap_or_default();
@@ -535,6 +597,7 @@ pub fn run(
                 launcher_game_id: &game.launcher_game_id,
                 name: &game.name,
             }),
+            log: &launchers.log,
         };
         let switched = match run_switch(
             &adapter,
@@ -611,6 +674,13 @@ pub fn run(
     })();
 
     if let Err(failed) = ran {
+        let code = failed.code();
+        let fields = json!({ "jobId": job_id, "code": code, "error": failed.to_string() });
+        if is_refusal(code) {
+            log.warn("launch job refused", fields);
+        } else {
+            log.error("launch job failed", fields);
+        }
         sink.job.attention = None;
         sink.job.error = Some(failed.to_string());
         let was_running = sink
@@ -624,12 +694,23 @@ pub fn run(
         });
         sink.job.state = JobState::Failed;
     }
+    sink.time_steps();
+    log.info(
+        "launch job finished",
+        json!({
+            "jobId": job_id,
+            "state": sink.job.state.as_str(),
+            "restored": sink.job.restored,
+            "ms": started.elapsed().as_millis(),
+        }),
+    );
     job.finished_at = Some(now());
     FinishedJob {
         job,
         board,
         touch_last_used,
         result,
+        log,
     }
 }
 
@@ -640,17 +721,26 @@ pub fn settle(store: &Store, finished: FinishedJob, now: &str, changed: &dyn Fn(
         board,
         touch_last_used,
         result,
+        log,
     } = finished;
-    if touch_last_used {
-        let _ = store.touch_account(&job.account.id, now);
+    if touch_last_used && let Err(error) = store.touch_account(&job.account.id, now) {
+        log.warn(
+            "could not record the account's last use",
+            json!({ "code": error.code(), "error": error.to_string() }),
+        );
     }
-    if let Some(game) = &job.game {
-        let _ = store.record_launch(
+    if let Some(game) = &job.game
+        && let Err(error) = store.record_launch(
             &Uuid::new_v4().to_string(),
             &game.id,
             &job.account.id,
             now,
             result,
+        )
+    {
+        log.warn(
+            "could not record launch history",
+            json!({ "code": error.code(), "error": error.to_string() }),
         );
     }
     board.finish(&job);
