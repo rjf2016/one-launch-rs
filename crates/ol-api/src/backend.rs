@@ -1207,10 +1207,13 @@ impl Serving {
                 let reset = store.and_then(|store| self.reset_vault(store));
                 if let Ok(reset) = &reset {
                     match reset.summary() {
-                        Some(removed) => self.log.child("vault").warn(
-                            "vault reset: all stored secrets removed",
-                            json!({ "passwords": removed.passwords, "sessions": removed.sessions, "secrets": removed.secrets }),
-                        ),
+                        Some(removed) => {
+                            let counts = json!({ "passwords": removed.passwords, "sessions": removed.sessions, "secrets": removed.secrets });
+                            self.log
+                                .child("vault")
+                                .warn("vault reset: all stored secrets removed", counts.clone());
+                            ipc.warn("vault reset by user", counts);
+                        }
                         None => self
                             .log
                             .child("vault")
@@ -1424,7 +1427,7 @@ impl Serving {
                 let confirm_close = start.confirm_close;
                 let started = store.and_then(|store| self.start_launch(store, start));
                 if let Ok(job) = &started {
-                    self.log.child("launch").info(
+                    ipc.info(
                         "launch job accepted",
                         json!({
                             "jobId": job.id,
