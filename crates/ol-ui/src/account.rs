@@ -177,7 +177,6 @@ struct Preview {
 pub struct AccountPage {
     backend: Backend,
     host: Option<Entity<LaunchHost>>,
-    // On the form that adds an account: the game whose Play sent the user here, which a new account of its launcher goes back to.
     return_to: Option<Game>,
     preview: Preview,
     kind: Kind,
@@ -516,7 +515,6 @@ impl AccountPage {
         cx.spawn(async move |this, cx| {
             let made = backend.create_account(account).await;
             this.update(cx, |this, cx| match made {
-                // Sent here by a game's Play: back to that game, with the new account picked.
                 Ok(account) => cx.emit(Go::done(match this.return_to.take() {
                     Some(game) => Route::Play {
                         game: Box::new(game),

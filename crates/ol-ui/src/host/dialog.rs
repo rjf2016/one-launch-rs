@@ -131,7 +131,6 @@ fn text_button(id: &'static str, label: &'static str) -> Stateful<Div> {
         .child(label)
 }
 
-// What a switch would do, step by step; `generated` is when the plan was made, in the user's own time.
 pub(crate) fn plan_view(plan: &SwitchPlan, generated: Option<String>) -> Div {
     let active = plan.steps.iter().filter(|step| !step.skipped).count();
     let strategy = if plan.strategy == SwitchStrategy::Remembered {
@@ -1059,7 +1058,13 @@ impl LaunchHost {
                     .glyph(action_glyph)
                     .disabled(!ready)
                     .leading(true)
-                    .on_click(cx.listener(|this, _, _, cx| this.check(cx))),
+                    .on_click(cx.listener(
+                        |this, click: &ClickEvent, _, cx| {
+                            if click.click_count() == 1 {
+                                this.check(cx);
+                            }
+                        },
+                    )),
                 );
             }
             Stage::Confirm(preflight) => {
@@ -1086,7 +1091,13 @@ impl LaunchHost {
                     )
                     .glyph(glyph)
                     .disabled(request.starting)
-                    .on_click(cx.listener(move |this, _, _, cx| this.start(confirm_close, cx))),
+                    .on_click(cx.listener(
+                        move |this, click: &ClickEvent, _, cx| {
+                            if click.click_count() == 1 {
+                                this.start(confirm_close, cx);
+                            }
+                        },
+                    )),
                 );
             }
             Stage::Preview(_) => {
@@ -1103,7 +1114,13 @@ impl LaunchHost {
                     )
                     .glyph(action_glyph)
                     .disabled(request.starting)
-                    .on_click(cx.listener(|this, _, _, cx| this.switch_now(cx))),
+                    .on_click(cx.listener(
+                        |this, click: &ClickEvent, _, cx| {
+                            if click.click_count() == 1 {
+                                this.switch_now(cx);
+                            }
+                        },
+                    )),
                 );
             }
             Stage::Blocked(_) => actions.push(back(Tone::Secondary, true, cx)),
