@@ -11,7 +11,7 @@ mod switching;
 pub use account::Account;
 pub use game::{ArtworkSource, Game, GameArtwork, LastLaunch};
 pub use launcher::LauncherId;
-pub use preference::LibrarySort;
+pub use preference::{LibrarySort, Sidebar};
 pub use secret::{Ciphertext, SecretKey};
 pub use settings::{SettingKey, Settings};
 pub use switching::{

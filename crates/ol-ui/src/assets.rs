@@ -7,6 +7,7 @@ pub const LIBRARY: &str = "icons/library.svg";
 pub const ACCOUNTS: &str = "icons/accounts.svg";
 pub const SETTINGS: &str = "icons/settings.svg";
 pub const COLLAPSE: &str = "icons/collapse.svg";
+pub const EXPAND: &str = "icons/expand.svg";
 pub const SEARCH: &str = "icons/search.svg";
 pub const FILTER: &str = "icons/filter.svg";
 pub const SORT: &str = "icons/sort.svg";
@@ -62,6 +63,7 @@ const FILES: &[(&str, &[u8])] = &[
     (ACCOUNTS, oracle_icon!("lucide/Users.svg")),
     (SETTINGS, oracle_icon!("lucide/Settings.svg")),
     (COLLAPSE, oracle_icon!("lucide/PanelLeftClose.svg")),
+    (EXPAND, oracle_icon!("lucide/PanelLeftOpen.svg")),
     (SEARCH, oracle_icon!("lucide/Search.svg")),
     (FILTER, oracle_icon!("lucide/Filter.svg")),
     (SORT, oracle_icon!("lucide/ArrowDownUp.svg")),

@@ -1,10 +1,12 @@
 #![forbid(unsafe_code)]
 
+mod accounts;
 mod assets;
 mod follow;
 mod host;
 mod library;
 mod posters;
+mod settings;
 mod shell;
 mod widgets;
 

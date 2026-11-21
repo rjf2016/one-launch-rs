@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use gpui::prelude::*;
 use gpui::{
-    Animation, AnimationExt as _, AnyElement, App, ClickEvent, Div, ElementId, FontWeight,
-    SharedString, Stateful, Svg, Transformation, Window, div, percentage, px, svg,
+    Animation, AnimationExt as _, AnyElement, AnyView, App, ClickEvent, Context, Div, ElementId,
+    FontWeight, SharedString, Stateful, Svg, Transformation, Window, div, percentage, px, svg,
 };
 use ol_model::LauncherId;
 use ol_ui_kit::theme::{self, alpha, color};
@@ -30,6 +30,68 @@ fn turning(id: impl Into<ElementId>, glyph: Svg) -> AnyElement {
 
 pub fn spinner(id: impl Into<ElementId>, size: f32, hex: u32) -> AnyElement {
     turning(id, icon(assets::SPINNER, size, hex))
+}
+
+pub fn page_title(title: &'static str, line: Option<&'static str>) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .min_w_0()
+        .child(
+            div()
+                .text_size(px(20.))
+                .line_height(px(28.))
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(color(theme::TEXT_STRONG))
+                .child(title),
+        )
+        .children(line.map(|line| {
+            div()
+                .mt(px(2.))
+                .truncate()
+                .text_color(color(theme::MUTED))
+                .child(line)
+        }))
+}
+
+pub fn narrow_page(header: Div) -> Div {
+    div().size_full().px(px(32.)).child(
+        div()
+            .mx_auto()
+            .w_full()
+            .max_w(px(1040.))
+            .pt(px(28.))
+            .pb(px(20.))
+            .child(header),
+    )
+}
+
+struct Tip(SharedString);
+
+impl Render for Tip {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        // Below the pointer and not under it, where the Electron app's tooltips stand.
+        div().pt(px(18.)).child(
+            div()
+                .px(px(8.))
+                .py(px(4.))
+                .rounded(px(6.))
+                .border_1()
+                .border_color(color(theme::BORDER_STRONG))
+                .bg(color(theme::SURFACE_2))
+                .font_family(theme::FONT)
+                .text_size(px(12.))
+                .line_height(px(16.))
+                .text_color(color(theme::TEXT))
+                .whitespace_nowrap()
+                .child(self.0.clone()),
+        )
+    }
+}
+
+pub fn tip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
+    let text = text.into();
+    move |_, cx| cx.new(|_| Tip(text.clone())).into()
 }
 
 pub fn launcher_hex(launcher: LauncherId) -> u32 {

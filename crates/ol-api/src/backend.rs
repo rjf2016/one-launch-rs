@@ -6,7 +6,7 @@ use async_channel::{Receiver, Sender, WeakSender};
 use ol_model::{
     Account, BackupSnapshot, Ciphertext, InstalledGame, LaunchJob, LaunchPreflight, LauncherId,
     LauncherSession, LauncherSessionState, LibraryScanResult, LibrarySort, RecentLaunch,
-    RememberedAccount, RestoreResult, SettingKey, SwitchPlan, SwitchRecovery,
+    RememberedAccount, RestoreResult, SettingKey, Sidebar, SwitchPlan, SwitchRecovery,
 };
 use ol_platform_api::DataProtector;
 use ol_services::accounts::{self, AccountError, AccountPatch, NewAccount};
@@ -108,6 +108,8 @@ enum Command {
     Library(Reply<Library>),
     Accounts(Reply<Vec<Account>>),
     SetLibrarySort(LibrarySort, Reply<()>),
+    Sidebar(Reply<Sidebar>),
+    SetSidebar(Sidebar, Reply<()>),
     BackUpDatabase(Reply<()>),
     SetSetting(SettingKey, String, Reply<()>),
     CreateAccount(Box<NewAccount>, Reply<Account>),
@@ -279,6 +281,14 @@ impl Backend {
 
     pub async fn set_library_sort(&self, sort: LibrarySort) -> Result<(), ApiError> {
         self.ask(|reply| Command::SetLibrarySort(sort, reply)).await
+    }
+
+    pub async fn sidebar(&self) -> Result<Sidebar, ApiError> {
+        self.ask(Command::Sidebar).await
+    }
+
+    pub async fn set_sidebar(&self, sidebar: Sidebar) -> Result<(), ApiError> {
+        self.ask(|reply| Command::SetSidebar(sidebar, reply)).await
     }
 
     pub async fn back_up_database(&self) -> Result<(), ApiError> {
@@ -537,6 +547,11 @@ impl Serving {
             Command::SetLibrarySort(sort, reply) => answer(
                 &reply,
                 store.and_then(|store| Ok(store.set_library_sort(sort)?)),
+            ),
+            Command::Sidebar(reply) => answer(&reply, store.and_then(|store| Ok(store.sidebar()?))),
+            Command::SetSidebar(sidebar, reply) => answer(
+                &reply,
+                store.and_then(|store| Ok(store.set_sidebar(sidebar)?)),
             ),
             Command::BackUpDatabase(reply) => answer(
                 &reply,
