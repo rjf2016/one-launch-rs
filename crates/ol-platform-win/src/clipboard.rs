@@ -271,4 +271,76 @@ mod tests {
         assert_ne!(first[0], first[1]);
         assert_ne!(first[1], first[2]);
     }
+
+    const MADE_UP: &str = "one-launch-clipboard-check-example";
+    // Text and what Windows makes of it by itself: anything else could not be put back.
+    const PLAIN: [u32; 4] = [1, 7, CF_UNICODETEXT, 16];
+
+    // What the clipboard held, put back however the test ends. It is never printed or compared.
+    struct PutBack(Option<Zeroizing<String>>);
+
+    impl Drop for PutBack {
+        fn drop(&mut self) {
+            let put_back = match &self.0 {
+                Some(earlier) => WindowsClipboard.write_text(earlier),
+                None => Opened::open().and_then(|clipboard| clipboard.empty()),
+            };
+            assert!(put_back.is_ok(), "the clipboard could not be put back");
+        }
+    }
+
+    // None when the clipboard holds more than plain text.
+    fn plain_text_or_nothing() -> Option<Option<Zeroizing<String>>> {
+        let clipboard = Opened::open().expect("the clipboard opens");
+        let mut format = 0;
+        loop {
+            format = unsafe { windows::Win32::System::DataExchange::EnumClipboardFormats(format) };
+            if format == 0 {
+                break;
+            }
+            if !PLAIN.contains(&format) {
+                return None;
+            }
+        }
+        Some(clipboard.text().expect("the clipboard's text reads"))
+    }
+
+    fn private_marks() -> [bool; 3] {
+        let formats = private_formats().unwrap();
+        let _clipboard = Opened::open().unwrap();
+        formats.map(|format| unsafe { IsClipboardFormatAvailable(format) }.is_ok())
+    }
+
+    #[test]
+    #[ignore = "writes the clipboard of this PC: run once by hand with --ignored"]
+    fn the_real_clipboard_takes_a_private_and_a_plain_copy_and_clears_one() {
+        let Some(earlier) = plain_text_or_nothing() else {
+            println!("skipped: the clipboard holds more than plain text, and was left alone");
+            return;
+        };
+        let _put_back = PutBack(earlier);
+        let board = WindowsClipboard;
+        let length = MADE_UP.encode_utf16().count();
+
+        board.write_private(MADE_UP).unwrap();
+        assert_eq!(
+            board.read_text().unwrap().as_deref().map(String::as_str),
+            Some(MADE_UP)
+        );
+        assert_eq!(private_marks(), [true; 3]);
+
+        board.write_text(MADE_UP).unwrap();
+        assert_eq!(
+            board.read_text().unwrap().as_deref().map(String::as_str),
+            Some(MADE_UP)
+        );
+        assert_eq!(private_marks(), [false; 3]);
+
+        assert!(!board.clear_if(length, &|held| held == "another").unwrap());
+        assert!(!board.clear_if(length + 1, &|_| true).unwrap());
+        assert!(board.read_text().unwrap().is_some());
+        assert!(board.clear_if(length, &|held| held == MADE_UP).unwrap());
+        assert!(board.read_text().unwrap().is_none());
+        println!("passed: private and plain writes, their marks, and a clear");
+    }
 }
