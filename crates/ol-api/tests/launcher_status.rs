@@ -4,14 +4,14 @@
 
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use futures_lite::future::block_on;
 use ol_api::launchers::{
     BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, Launchers, RiotMachine, RiotTiming,
     SteamTiming,
 };
-use ol_api::{ApiError, Backend};
+use ol_api::{ApiError, Backend, SettingChange};
 use ol_model::{HealthStatus, InstallSource, LauncherId, LauncherStatus, SettingKey};
 use ol_sim::FakeLaunchers;
 use ol_testkit::{Scratch, oracle};
@@ -21,7 +21,14 @@ use time::macros::datetime;
 
 const VERSION: &str = "9.8.7";
 
-type Heard = Arc<Mutex<Vec<(SettingKey, Option<String>)>>>;
+// What the backend said it changed, taken when the test looks.
+struct Heard(async_channel::Receiver<SettingChange>);
+
+impl Heard {
+    fn taken(&self) -> Vec<SettingChange> {
+        std::iter::from_fn(|| self.0.try_recv().ok()).collect()
+    }
+}
 
 struct Fakes {
     scratch: Scratch,
@@ -321,11 +328,7 @@ fn locate_takes_the_launchers_own_program_and_reset_goes_back_to_detection() {
         fs::write(launchers.join("moved/Steam/steam.exe"), "").unwrap();
         fs::write(launchers.join("steam/other.exe"), "").unwrap();
     });
-    let heard: Heard = Arc::default();
-    let into = Arc::clone(&heard);
-    fakes.backend.observe_settings(Arc::new(move |key, value| {
-        into.lock().unwrap().push((key, value.map(str::to_owned)));
-    }));
+    let heard = Heard(fakes.backend.setting_changes());
     let launchers = fakes.launchers_dir();
     let path = |relative: &str| {
         launchers
@@ -362,8 +365,31 @@ fn locate_takes_the_launchers_own_program_and_reset_goes_back_to_detection() {
             "That file is not Riot Games. Choose RiotClientServices.exe in the folder Riot Games is installed in.".to_owned()
         )
     );
+    let not_plain = (
+        "BAD_REQUEST",
+        r"Choose the program by its full path on a lettered drive, such as C:\Program Files\steam.exe.".to_owned(),
+    );
+    let picked = path("steam/steam.exe");
+    let drive = &picked[..2];
+    for refused in [
+        "steam.exe".to_owned(),
+        r".\steam.exe".to_owned(),
+        r"steam\steam.exe".to_owned(),
+        format!("{drive}steam.exe"),
+        format!(r"\?\{picked}"),
+        r"\server\share\steam.exe".to_owned(),
+        r"\steam\steam.exe".to_owned(),
+    ] {
+        assert_eq!(
+            refusal(block_on(
+                fakes.backend.locate_launcher(LauncherId::Steam, &refused)
+            )),
+            not_plain,
+            "{refused}"
+        );
+    }
     assert_eq!(fakes.setting(SettingKey::SteamPath), None);
-    assert!(heard.lock().unwrap().is_empty());
+    assert!(heard.taken().is_empty());
 
     let install = block_on(
         fakes
@@ -414,7 +440,7 @@ fn locate_takes_the_launchers_own_program_and_reset_goes_back_to_detection() {
     assert_eq!(steam.chosen_path, None);
     assert_eq!(steam.location_note(), "Found automatically.");
     assert_eq!(
-        *heard.lock().unwrap(),
+        heard.taken(),
         [
             (SettingKey::SteamPath, Some(folder)),
             (SettingKey::BattlenetPath, Some(path("battlenet"))),

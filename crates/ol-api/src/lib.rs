@@ -3,7 +3,7 @@
 mod backend;
 
 pub use backend::{
-    ApiError, AppInfo, Backend, JobObserver, Library, SavedSignIn, SettingsObserver, StartLaunch,
+    ApiError, AppInfo, Backend, JobObserver, Library, SavedSignIn, SettingChange, StartLaunch,
 };
 pub use ol_services::capture::Captured as CapturedSignIn;
 
@@ -17,7 +17,8 @@ pub mod settings {
     pub use ol_services::data_folder::Folder;
     pub use ol_services::install::{AutostartStatus, UpdateStatus, UpdateStep, UpdateUnavailable};
     pub use ol_services::vault_health::{
-        EncryptionState, RESET_BANNER, VaultBackend, VaultHealth, VaultResetSummary,
+        EncryptionState, KEY_READABLE, RESET_BANNER, RESET_WARNING, VaultBackend, VaultHealth,
+        VaultReset, VaultResetRefusal, VaultResetSummary,
     };
     pub use ol_services::window::{
         AfterPlay, CloseAction, QuitQuestion, START_HIDDEN_FLAG, close_request_action,
@@ -63,14 +64,9 @@ pub mod launchers {
         Launchers::on(platform, std::sync::Arc::new(ol_vault::FakeVault))
     }
 
-    // The launchers on this PC, with the data folder's own vault: its key is opened, or made for a folder that has none, as the Electron app does at its first start.
-    pub fn on_this_pc(
-        platform: ol_platform_api::Platform,
-        data_dir: &std::path::Path,
-        protector: &dyn ol_platform_api::DataProtector,
-    ) -> Result<Launchers, ol_vault::KeyError> {
-        let vault = ol_vault::OsCryptVault::open_or_create(data_dir, protector)?;
-        Ok(Launchers::on(platform, std::sync::Arc::new(vault)))
+    // The launchers on this PC. They get the data folder's own vault from `Backend::start_on_this_pc`, which opens its key, or makes one for a folder that has none, as the Electron app does at its first start.
+    pub fn on_this_pc(platform: ol_platform_api::Platform) -> Launchers {
+        Launchers::on(platform, std::sync::Arc::new(crate::backend::NoVault))
     }
 }
 

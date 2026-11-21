@@ -145,7 +145,7 @@ pub async fn seed(backend: &Backend, seed: Seed) -> Result<(), ApiError> {
     }
     for (key, value) in seed.settings {
         if let Some(key) = SettingKey::parse(&key) {
-            backend.set_setting(key, value).await?;
+            backend.seed_setting(key, value).await?;
         }
     }
     Ok(())

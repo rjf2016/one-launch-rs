@@ -11,7 +11,7 @@ use thiserror::Error;
 
 pub use fake::FakeVault;
 pub use local_state::local_state_path;
-pub use os_crypt::{KeyError, OsCryptVault};
+pub use os_crypt::{KeyError, OsCryptVault, Recovered};
 pub use secret::Secret;
 
 pub const PROBE_VALUE: &str = "one-launch-vault-probe-v1";

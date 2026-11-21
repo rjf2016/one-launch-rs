@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -26,11 +26,12 @@ use ol_services::sessions::{StoreThread, StoreWork};
 use ol_services::settings::{self as setting, SettingError};
 use ol_services::switch;
 use ol_services::vault_health::{
-    self, VaultAccess, VaultHealth, VaultHealthError, VaultResetSummary,
+    self, EncryptionState, VaultAccess, VaultHealth, VaultHealthError, VaultReset,
+    VaultResetRefusal,
 };
 use ol_services::window::{self, QuitQuestion};
 use ol_store::{Store, StoreError};
-use ol_vault::{KeyError, OsCryptVault, Secret, Vault, VaultError};
+use ol_vault::{KeyError, OsCryptVault, Recovered, Secret, Vault, VaultError};
 use thiserror::Error;
 
 const RECENT_LAUNCHES_MOST: u32 = 50;
@@ -113,6 +114,15 @@ impl From<VaultHealthError> for ApiError {
     }
 }
 
+impl From<VaultResetRefusal> for ApiError {
+    fn from(refusal: VaultResetRefusal) -> Self {
+        Self {
+            code: refusal.code(),
+            message: refusal.to_string(),
+        }
+    }
+}
+
 impl From<AutostartError> for ApiError {
     fn from(error: AutostartError) -> Self {
         Self {
@@ -155,8 +165,8 @@ pub struct SavedSignIn {
 // Hears the launch job each time it changes, on the thread that changed it.
 pub type JobObserver = Arc<dyn Fn(&LaunchJob) + Send + Sync>;
 
-// Hears each setting the backend has just stored or removed, with its new value, on the database's thread: the Electron app's onSettingChanged, which turns the tray icon on and off.
-pub type SettingsObserver = Arc<dyn Fn(SettingKey, Option<&str>) + Send + Sync>;
+// A setting the backend has just stored, or removed (None): the Electron app's onSettingChanged, which turns the tray icon on and off.
+pub type SettingChange = (SettingKey, Option<String>);
 
 // What the Diagnostics panel shows of this copy.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -182,9 +192,9 @@ enum Command {
     SetSetting(SettingKey, String, Reply<()>),
     #[cfg(feature = "fake")]
     SeedSetting(SettingKey, String, Reply<()>),
-    ObserveSettings(SettingsObserver),
+    WatchSettings(Sender<SettingChange>),
     VaultStatus(Reply<VaultHealth>),
-    ResetVault(Reply<VaultResetSummary>),
+    ResetVault(Reply<VaultReset>),
     TestVault(Reply<Duration>),
     LauncherStatuses(Reply<Vec<LauncherStatus>>),
     LocateLauncher(LauncherId, String, Reply<LauncherInstall>),
@@ -241,16 +251,33 @@ enum VaultSource {
     None,
     Launchers,
     DataFolder(Box<dyn DataProtector + Send>),
+    // The data folder's key as a start on this PC found it.
+    Opened(
+        Result<OsCryptVault, KeyError>,
+        Box<dyn DataProtector + Send>,
+    ),
 }
 
+#[derive(Clone, Default)]
 enum VaultSlot {
+    #[default]
     Unavailable,
     Open(SharedVault),
-    // The data folder's key is there and Windows does not unwrap it for this user. It is replaced only by a reset the user asked for.
+    // The data folder's key is there, Windows works, and it does not unwrap the key for this user. It is replaced only by a reset the user asked for.
     KeyLost,
 }
 
-struct NoVault;
+impl VaultSlot {
+    fn of(opened: Result<OsCryptVault, KeyError>) -> Self {
+        match opened {
+            Ok(vault) => Self::Open(Arc::new(vault)),
+            Err(KeyError::Unwrap) => Self::KeyLost,
+            Err(_) => Self::Unavailable,
+        }
+    }
+}
+
+pub(crate) struct NoVault;
 
 impl Vault for NoVault {
     fn encrypt(&self, _: &Secret) -> Result<Ciphertext, VaultError> {
@@ -272,6 +299,44 @@ impl Vault for LostKey {
 
     fn decrypt(&self, _: &Ciphertext) -> Result<Secret, VaultError> {
         Err(VaultError::Unreadable)
+    }
+}
+
+// The one vault the backend and the launchers seal and open with, so that a key a reset or a re-check puts in is the key of every seal from then on, on the switch's thread too.
+#[derive(Default)]
+struct VaultCell(RwLock<VaultSlot>);
+
+impl VaultCell {
+    fn slot(&self) -> VaultSlot {
+        match self.0.read() {
+            Ok(slot) => slot.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
+    }
+
+    fn put(&self, slot: VaultSlot) {
+        match self.0.write() {
+            Ok(mut held) => *held = slot,
+            Err(poisoned) => *poisoned.into_inner() = slot,
+        }
+    }
+}
+
+impl Vault for VaultCell {
+    fn encrypt(&self, plaintext: &Secret) -> Result<Ciphertext, VaultError> {
+        match self.slot() {
+            VaultSlot::Open(vault) => vault.encrypt(plaintext),
+            VaultSlot::KeyLost => LostKey.encrypt(plaintext),
+            VaultSlot::Unavailable => NoVault.encrypt(plaintext),
+        }
+    }
+
+    fn decrypt(&self, ciphertext: &Ciphertext) -> Result<Secret, VaultError> {
+        match self.slot() {
+            VaultSlot::Open(vault) => vault.decrypt(ciphertext),
+            VaultSlot::KeyLost => LostKey.decrypt(ciphertext),
+            VaultSlot::Unavailable => NoVault.decrypt(ciphertext),
+        }
     }
 }
 
@@ -315,6 +380,29 @@ impl Backend {
         )
     }
 
+    // The launchers of this PC on the data folder's own vault. Its key is opened, or made for a folder that has none, before the thread starts. A key Windows does not unwrap leaves the vault in its Key lost state, and a Windows that unwraps nothing just now leaves it unavailable, with the accounts readable either way; any other fault of the key file stops the start.
+    pub fn start_on_this_pc(
+        data_dir: PathBuf,
+        version: &str,
+        launchers: Launchers,
+        protector: Box<dyn DataProtector + Send>,
+        on_job: Option<JobObserver>,
+    ) -> Result<Self, KeyError> {
+        let opened = match OsCryptVault::open_or_create(&data_dir, &*protector) {
+            Err(error) if !matches!(error, KeyError::Unwrap | KeyError::WindowsUnavailable) => {
+                return Err(error);
+            }
+            opened => opened,
+        };
+        Ok(Self::start_on(
+            data_dir,
+            version,
+            Some(launchers),
+            VaultSource::Opened(opened, protector),
+            on_job,
+        ))
+    }
+
     // As `start`, on the machine `launchers` describes. `on_job` hears every change of a launch job.
     pub fn start_with(
         data_dir: PathBuf,
@@ -347,9 +435,9 @@ impl Backend {
         let serving = Serving {
             data_dir,
             launchers,
-            vault: VaultSlot::Unavailable,
+            vault: Arc::default(),
             protector: None,
-            settings_observer: None,
+            settings_watch: None,
             jobs: jobs.clone(),
             on_job: on_job.unwrap_or_else(|| Arc::new(|_| {})),
             commands: commands.downgrade(),
@@ -414,18 +502,18 @@ impl Backend {
             .await
     }
 
-    // Stores a setting as the fake launchers' seed gives it, without the rules, as the Electron app's seed does.
+    // Stores a setting as the fake launchers' seed gives it, as the Electron app's seed does: a key only the app sets is passed over, and any other is stored without its rule.
     #[cfg(feature = "fake")]
     pub async fn seed_setting(&self, key: SettingKey, value: String) -> Result<(), ApiError> {
         self.ask(|reply| Command::SeedSetting(key, value, reply))
             .await
     }
 
-    // From now on `observer` hears every setting this backend stores or removes. A later call takes the place of an earlier one.
-    pub fn observe_settings(&self, observer: SettingsObserver) {
-        let _ = self
-            .commands
-            .send_blocking(Command::ObserveSettings(observer));
+    // From now on the answer hears every setting this backend stores or removes, each before the request that changed it is answered. A later call takes the place of an earlier one. The changes come over a channel, so nothing that hears them runs on the database's thread or can hold it up.
+    pub fn setting_changes(&self) -> Receiver<SettingChange> {
+        let (changes, heard) = async_channel::unbounded();
+        let _ = self.commands.send_blocking(Command::WatchSettings(changes));
+        heard
     }
 
     // The Encryption panel's Status row and the banner above the tabs.
@@ -433,8 +521,8 @@ impl Backend {
         self.ask(Command::VaultStatus).await
     }
 
-    // Clears every stored password, saved sign-in and named secret, and puts a new probe in. Refused while a switch runs. A key Windows does not unwrap for this user is replaced first, and nothing else ever replaces one.
-    pub async fn reset_vault(&self) -> Result<VaultResetSummary, ApiError> {
+    // Clears every stored password, saved sign-in and named secret, and puts a new probe in: only while they cannot be read, and never while a switch runs. A key Windows does not unwrap for this user is tried once more and, failing that, replaced first; nothing else ever replaces one. A key that unwraps on that try clears nothing.
+    pub async fn reset_vault(&self) -> Result<VaultReset, ApiError> {
         self.ask(Command::ResetVault).await
     }
 
@@ -755,10 +843,10 @@ impl Drop for Serving {
 struct Serving {
     data_dir: PathBuf,
     launchers: Option<Launchers>,
-    vault: VaultSlot,
+    vault: Arc<VaultCell>,
     // Kept for a reset of a lost key: the one way a key that is there is ever replaced.
     protector: Option<Box<dyn DataProtector + Send>>,
-    settings_observer: Option<SettingsObserver>,
+    settings_watch: Option<Sender<SettingChange>>,
     jobs: JobBoard,
     on_job: JobObserver,
     commands: WeakSender<Command>,
@@ -776,7 +864,7 @@ impl Serving {
             .map_err(ApiError::from);
         if let Ok(store) = &opened {
             self.recovery = Recovery::load(&self.data_dir);
-            self.vault = self.open_vault(vault);
+            self.open_vault(vault);
             let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
         }
         while let Ok(command) = requests.recv_blocking() {
@@ -823,12 +911,20 @@ impl Serving {
             #[cfg(feature = "fake")]
             Command::SeedSetting(key, value, reply) => answer(
                 &reply,
-                store.and_then(|store| Ok(store.set_setting(key, &value)?)),
+                store.and_then(|store| {
+                    if !key.is_main_only() {
+                        store.set_setting(key, &value)?;
+                    }
+                    Ok(())
+                }),
             ),
-            Command::ObserveSettings(observer) => self.settings_observer = Some(observer),
+            Command::WatchSettings(changes) => self.settings_watch = Some(changes),
             Command::VaultStatus(reply) => answer(
                 &reply,
-                store.and_then(|store| Ok(vault_health::status(store, self.vault_access())?)),
+                store.and_then(|store| {
+                    self.recheck_vault(store);
+                    Ok(vault_health::status(store, self.vault_access())?)
+                }),
             ),
             Command::ResetVault(reply) => {
                 answer(&reply, store.and_then(|store| self.reset_vault(store)));
@@ -1110,8 +1206,9 @@ impl Serving {
             .map_or_else(ol_store::iso_now, |launchers| self.now(launchers))
     }
 
-    fn open_vault(&mut self, source: VaultSource) -> VaultSlot {
-        match source {
+    // Whatever the source, the launchers seal with the backend's own vault from here on.
+    fn open_vault(&mut self, source: VaultSource) {
+        let slot = match source {
             VaultSource::None => VaultSlot::Unavailable,
             VaultSource::Launchers => self
                 .launchers
@@ -1122,57 +1219,92 @@ impl Serving {
             VaultSource::DataFolder(protector) => {
                 let opened = OsCryptVault::open_or_create(&self.data_dir, &*protector);
                 self.protector = Some(protector);
-                match opened {
-                    Ok(vault) => VaultSlot::Open(Arc::new(vault)),
-                    Err(KeyError::Unwrap) => VaultSlot::KeyLost,
-                    Err(_) => VaultSlot::Unavailable,
-                }
+                VaultSlot::of(opened)
             }
+            VaultSource::Opened(opened, protector) => {
+                self.protector = Some(protector);
+                VaultSlot::of(opened)
+            }
+        };
+        self.vault.put(slot);
+        if let Some(launchers) = &mut self.launchers {
+            launchers.vault = Arc::clone(&self.vault) as SharedVault;
+        }
+    }
+
+    // A key that did not open is tried again, so a fault of Windows that cleared, or a key that unwraps after all, shows as it is now. One that opened is never opened again.
+    fn recheck_vault(&self, store: &Store) {
+        let Some(protector) = &self.protector else {
+            return;
+        };
+        if matches!(self.vault.slot(), VaultSlot::Open(_)) {
+            return;
+        }
+        let slot = VaultSlot::of(OsCryptVault::open_or_create(&self.data_dir, &**protector));
+        let opened = matches!(slot, VaultSlot::Open(_));
+        self.vault.put(slot);
+        if opened {
+            let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
         }
     }
 
     fn vault(&self) -> &dyn Vault {
-        match &self.vault {
-            VaultSlot::Open(vault) => &**vault,
-            VaultSlot::Unavailable => &NoVault,
-            VaultSlot::KeyLost => &LostKey,
-        }
+        &*self.vault
     }
 
     fn vault_access(&self) -> VaultAccess<'_> {
-        match &self.vault {
-            VaultSlot::Open(vault) => VaultAccess::Open(&**vault),
+        match self.vault.slot() {
+            VaultSlot::Open(_) => VaultAccess::Open(&*self.vault),
             VaultSlot::Unavailable => VaultAccess::Unavailable,
             VaultSlot::KeyLost => VaultAccess::KeyLost,
         }
     }
 
     fn changed(&self, key: SettingKey, value: Option<&str>) {
-        if let Some(observer) = &self.settings_observer {
-            observer(key, value);
+        if let Some(changes) = &self.settings_watch {
+            let _ = changes.try_send((key, value.map(str::to_owned)));
         }
     }
 
-    // A lost key is replaced first, so a reset that cannot make a new one removes nothing. Then every password, saved sign-in and named secret goes, and a new probe is stored.
-    fn reset_vault(&mut self, store: &Store) -> Result<VaultResetSummary, ApiError> {
+    // Only a vault whose secrets cannot be read is reset. A lost key is tried once more and then replaced first, so a reset that cannot make a new one removes nothing; a clear that fails after it leaves the old secrets beside the new key, which reads as needing a reset again. The probe is put in last, and a reset whose clear went through has succeeded whether or not it could be.
+    fn reset_vault(&self, store: &Store) -> Result<VaultReset, ApiError> {
         self.require_idle()?;
-        if matches!(self.vault, VaultSlot::KeyLost)
-            && let Some(protector) = &self.protector
-        {
-            let replaced =
-                OsCryptVault::replace_lost_key(&self.data_dir, &**protector).map_err(|error| {
-                    ApiError {
+        let was_lost = matches!(self.vault.slot(), VaultSlot::KeyLost);
+        self.recheck_vault(store);
+        match vault_health::status(store, self.vault_access())?.state() {
+            EncryptionState::KeyLost => {}
+            EncryptionState::Working if was_lost => return Ok(VaultReset::KeyReadable),
+            EncryptionState::Working => return Err(VaultResetRefusal::Readable.into()),
+            EncryptionState::Unavailable => return Err(VaultResetRefusal::Unavailable.into()),
+        }
+        if matches!(self.vault.slot(), VaultSlot::KeyLost) {
+            let protector = self
+                .protector
+                .as_ref()
+                .ok_or(VaultResetRefusal::Unavailable)?;
+            match OsCryptVault::replace_lost_key(&self.data_dir, &**protector) {
+                Ok(Recovered::Opened(vault)) => {
+                    self.vault.put(VaultSlot::Open(Arc::new(vault)));
+                    let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
+                    return Ok(VaultReset::KeyReadable);
+                }
+                Ok(Recovered::Replaced(vault)) => self.vault.put(VaultSlot::Open(Arc::new(vault))),
+                Err(error) => {
+                    if matches!(error, KeyError::WindowsUnavailable) {
+                        self.vault.put(VaultSlot::Unavailable);
+                    }
+                    return Err(ApiError {
                         code: VaultError::Unavailable.code(),
                         message: format!(
                             "No new vault key could be made, so nothing was removed: {error}"
                         ),
-                    }
-                })?;
-            self.vault = VaultSlot::Open(Arc::new(replaced));
+                    });
+                }
+            }
         }
         let removed = vault_health::clear_stored_secrets(store, &self.stamp())?;
-        vault_health::ensure_probe(store, self.vault_access(), &self.stamp())?;
-        Ok(removed)
+        let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
+        Ok(VaultReset::Cleared(removed))
     }
 
     fn launcher_statuses(&self, store: &Store) -> Result<Vec<LauncherStatus>, ApiError> {
@@ -1438,6 +1570,97 @@ mod tests {
     use super::*;
 
     type Trip = Box<dyn FnOnce() + Send>;
+
+    // This user's DPAPI, and another user's, which unwraps only what it wrapped itself.
+    struct Mine;
+
+    impl DataProtector for Mine {
+        fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ol_platform_api::ProtectError> {
+            Ok(plain.iter().map(|byte| byte ^ 0x5a).collect())
+        }
+
+        fn unprotect(
+            &self,
+            protected: &[u8],
+        ) -> Result<ol_platform_api::Zeroizing<Vec<u8>>, ol_platform_api::ProtectError> {
+            Ok(ol_platform_api::Zeroizing::new(
+                protected.iter().map(|byte| byte ^ 0x5a).collect(),
+            ))
+        }
+    }
+
+    struct Theirs;
+
+    impl DataProtector for Theirs {
+        fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ol_platform_api::ProtectError> {
+            Ok([b"theirs".as_slice(), plain].concat())
+        }
+
+        fn unprotect(
+            &self,
+            protected: &[u8],
+        ) -> Result<ol_platform_api::Zeroizing<Vec<u8>>, ol_platform_api::ProtectError> {
+            protected
+                .strip_prefix(b"theirs".as_slice())
+                .map(|plain| ol_platform_api::Zeroizing::new(plain.to_vec()))
+                .ok_or(ol_platform_api::ProtectError::Unprotect)
+        }
+    }
+
+    // The key is replaced and then the clear cannot write: the old secrets stay beside the new key, which reads as a lost key again, and a second reset finishes the job.
+    #[test]
+    fn a_reset_whose_clear_fails_after_the_key_was_replaced_is_finished_by_a_second_one() {
+        let scratch = Scratch::new("api-reset");
+        let data_dir = scratch.join("data");
+        let backend =
+            Backend::start_with_vault_of_data_folder(data_dir.clone(), "9.8.7", Box::new(Mine));
+        block_on(backend.create_account(NewAccount {
+            launcher: LauncherId::Steam,
+            display_name: "Main".to_owned(),
+            login: "user_main".to_owned(),
+            launcher_uid: None,
+            password: Some(Secret::new("placeholder".to_owned())),
+            tags: Vec::new(),
+            notes: String::new(),
+        }))
+        .unwrap();
+        backend.shut_down();
+        let key = std::fs::read(ol_vault::local_state_path(&data_dir)).unwrap();
+
+        let (commands, _requests) = async_channel::unbounded();
+        let mut serving = Serving {
+            data_dir: data_dir.clone(),
+            launchers: None,
+            vault: Arc::default(),
+            protector: None,
+            settings_watch: None,
+            jobs: JobBoard::default(),
+            on_job: Arc::new(|_| {}),
+            commands: commands.downgrade(),
+            job_thread: Arc::default(),
+            last_preflight: LastPreflight::default(),
+            recovery: Recovery::default(),
+            clipboard: None,
+        };
+        serving.open_vault(VaultSource::DataFolder(Box::new(Theirs)));
+        let database = ol_store::database_path(&data_dir);
+        let read_only = Store::open_read_only(&database).unwrap().store;
+        assert!(serving.reset_vault(&read_only).is_err());
+        assert!(
+            std::fs::read(ol_vault::local_state_path(&data_dir)).unwrap() != key,
+            "the key was not replaced before the clear"
+        );
+        let status = vault_health::status(&read_only, serving.vault_access()).unwrap();
+        assert_eq!(status.state(), EncryptionState::KeyLost);
+        drop(read_only);
+
+        let (store, _) = Store::open(&database).unwrap();
+        let removed = serving.reset_vault(&store).unwrap().summary().unwrap();
+        assert_eq!((removed.passwords, removed.secrets), (1, 1));
+        let status = vault_health::status(&store, serving.vault_access()).unwrap();
+        assert_eq!(status.state(), EncryptionState::Working);
+        assert_eq!(status.readable, Some(true));
+    }
 
     // A clock that runs something once, the next time it is read.
     struct Tripwire {

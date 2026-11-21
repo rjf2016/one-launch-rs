@@ -4,17 +4,23 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 
 use futures_lite::future::block_on;
-use ol_api::{ApiError, Backend};
+use ol_api::{ApiError, Backend, SettingChange};
 use ol_model::{LauncherId, LibrarySort, LogLevel, SettingKey, Sidebar};
 use ol_store::{Store, database_path};
 use ol_testkit::{Scratch, oracle};
 
 const VERSION: &str = "9.8.7";
 
-type Heard = Arc<Mutex<Vec<(SettingKey, Option<String>)>>>;
+// What the backend said it changed, taken when the test looks.
+struct Heard(async_channel::Receiver<SettingChange>);
+
+impl Heard {
+    fn taken(&self) -> Vec<SettingChange> {
+        std::iter::from_fn(|| self.0.try_recv().ok()).collect()
+    }
+}
 
 fn rows(data_dir: &Path) -> BTreeMap<String, String> {
     Store::open_read_only(&database_path(data_dir))
@@ -37,12 +43,7 @@ fn fixture() -> Scratch {
 }
 
 fn listening(backend: &Backend) -> Heard {
-    let heard: Heard = Arc::default();
-    let into = Arc::clone(&heard);
-    backend.observe_settings(Arc::new(move |key, value| {
-        into.lock().unwrap().push((key, value.map(str::to_owned)));
-    }));
-    heard
+    Heard(backend.setting_changes())
 }
 
 fn refusal<T>(answer: Result<T, ApiError>) -> (&'static str, String) {
@@ -85,7 +86,7 @@ fn each_write_stores_the_row_the_electron_app_stores_and_changes_no_other() {
     assert_eq!(expected["library.sort"], "name");
     assert_eq!(expected["sidebar"], "expanded");
     assert_eq!(
-        *heard.lock().unwrap(),
+        heard.taken(),
         writes
             .iter()
             .map(|(key, value)| (*key, Some((*value).to_owned())))
@@ -185,7 +186,7 @@ fn each_rule_refuses_in_the_electron_apps_words_and_nothing_is_stored() {
     );
     backend.shut_down();
     assert_eq!(rows(&data_dir), before);
-    assert!(heard.lock().unwrap().is_empty());
+    assert!(heard.taken().is_empty());
 }
 
 #[test]
@@ -215,7 +216,8 @@ fn a_fresh_folder_reads_every_default() {
 }
 
 #[test]
-fn the_fake_launchers_seed_is_stored_as_it_is_given() {
+// As the Electron app's seedableSettingKey: a key only the app sets is passed over, any other is stored as it is given.
+fn the_fake_launchers_seed_is_stored_as_it_is_given_but_for_the_keys_only_the_app_sets() {
     let scratch = fixture();
     let data_dir = scratch.path().to_path_buf();
     let mut expected = rows(&data_dir);
@@ -225,9 +227,8 @@ fn the_fake_launchers_seed_is_stored_as_it_is_given() {
     block_on(backend.seed_setting(SettingKey::DryRun, "1".to_owned())).unwrap();
     let settings = block_on(backend.settings()).unwrap();
     backend.shut_down();
-    expected.insert("epic.path".to_owned(), r"D:\Seeded".to_owned());
     expected.insert("dryRun".to_owned(), "1".to_owned());
     assert_eq!(rows(&data_dir), expected);
-    assert!(heard.lock().unwrap().is_empty());
+    assert!(heard.taken().is_empty());
     assert!(settings.toggle(SettingKey::DryRun));
 }

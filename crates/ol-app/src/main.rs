@@ -226,23 +226,26 @@ fn start_backend(args: &Args) -> anyhow::Result<(Backend, Machine)> {
             Machine::None,
         ));
     }
-    let backend = Backend::start_with(
+    use anyhow::Context as _;
+
+    // A key Windows does not unwrap does not stop the start: the vault comes up with its key lost, for the Encryption panel's reset.
+    let backend = Backend::start_on_this_pc(
         args.data_dir.clone(),
         VERSION,
-        real_launchers(&args.data_dir)?,
+        real_launchers(),
+        Box::new(Dpapi),
         None,
-    );
+    )
+    .context("the vault of --data-dir could not be opened")?;
     Ok((backend, Machine::None))
 }
 
 // This PC behind the launchers. The Riot Client is given no way to its local server: Play is left to the user, as the hand-over says.
 #[cfg(not(feature = "fake"))]
-fn real_launchers(data_dir: &Path) -> anyhow::Result<ol_api::launchers::Launchers> {
-    use anyhow::Context as _;
+fn real_launchers() -> ol_api::launchers::Launchers {
     use ol_platform_win::machine;
 
-    let mut launchers = ol_api::launchers::on_this_pc(machine::platform(), data_dir, &Dpapi)
-        .context("the vault of --data-dir could not be opened")?;
+    let mut launchers = ol_api::launchers::on_this_pc(machine::platform());
     let folders = machine::folders();
     if let Some(app_data) = folders.app_data {
         launchers.battlenet.app_data = app_data;
@@ -260,7 +263,7 @@ fn real_launchers(data_dir: &Path) -> anyhow::Result<ol_api::launchers::Launcher
         launchers.battlenet.program_data.clone_from(&program_data);
         launchers.riot.program_data = program_data;
     }
-    Ok(launchers)
+    launchers
 }
 
 #[cfg(feature = "fake")]

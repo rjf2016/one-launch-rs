@@ -458,6 +458,8 @@ pub enum ServiceError {
     NothingToRecover,
     #[error("That file is not {}. Choose {} in the folder {} is installed in.", .0.display_name(), .0.exe_name(), .0.display_name())]
     NotALauncher(LauncherId),
+    #[error(r"Choose the program by its full path on a lettered drive, such as C:\Program Files\{}.", .0.exe_name())]
+    NotAPlainPath(LauncherId),
 }
 
 impl ServiceError {
@@ -476,6 +478,7 @@ impl ServiceError {
             Self::Busy => "BUSY",
             Self::DryRun => "DRY_RUN",
             Self::NotALauncher(_) => "NOT_A_LAUNCHER",
+            Self::NotAPlainPath(_) => "BAD_REQUEST",
         }
     }
 
@@ -794,7 +797,21 @@ fn backups_check(
 
 // The install a program the user picked belongs to, or the refusal that names the program to pick. Reads only; storing the folder is the caller's.
 pub fn locate(adapter: &Adapter<'_>, exe: &str) -> Result<LauncherInstall, ServiceError> {
+    if !on_a_lettered_drive(exe) {
+        return Err(ServiceError::NotAPlainPath(adapter.launcher()));
+    }
     adapter
         .install_from_exe(exe)
         .ok_or(ServiceError::NotALauncher(adapter.launcher()))
+}
+
+// The folder found is stored and its program started later, from wherever the app then runs: a relative path, a share or a device path is refused, as for the app's own folders.
+fn on_a_lettered_drive(exe: &str) -> bool {
+    use std::path::{Component, Prefix};
+    let mut parts = Path::new(exe).components();
+    matches!(
+        (parts.next(), parts.next()),
+        (Some(Component::Prefix(prefix)), Some(Component::RootDir))
+            if matches!(prefix.kind(), Prefix::Disk(_))
+    )
 }

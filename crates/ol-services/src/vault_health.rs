@@ -154,6 +154,54 @@ impl VaultResetSummary {
     }
 }
 
+// What a reset did: cleared what could not be read, or found the key unwraps after all and cleared nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VaultReset {
+    Cleared(VaultResetSummary),
+    KeyReadable,
+}
+
+impl VaultReset {
+    pub fn note(self) -> String {
+        match self {
+            Self::Cleared(removed) => removed.note(),
+            Self::KeyReadable => KEY_READABLE.to_owned(),
+        }
+    }
+
+    pub const fn summary(self) -> Option<VaultResetSummary> {
+        match self {
+            Self::Cleared(removed) => Some(removed),
+            Self::KeyReadable => None,
+        }
+    }
+}
+
+pub const KEY_READABLE: &str = "Windows unwrapped the vault key this time, so nothing was removed: your stored passwords and saved sign-ins can be read again.";
+
+// Beside the confirmation: Windows gives no sure sign that the key belongs to another user or PC, so the user is told what a reset loses if it does not.
+pub const RESET_WARNING: &str = "This deletes every stored password and saved sign-in for good. If Windows could read them again later, for example once your PC reaches your work network again, they are gone all the same.";
+
+// Why a reset is not carried out: it exists only for secrets that cannot be read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+pub enum VaultResetRefusal {
+    #[error("Your stored passwords and saved sign-ins can be read, so nothing was removed.")]
+    Readable,
+    #[error(
+        "Windows cannot encrypt or decrypt anything just now, so nothing was removed. Try again later."
+    )]
+    Unavailable,
+}
+
+impl VaultResetRefusal {
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::Readable => "BAD_REQUEST",
+            Self::Unavailable => "VAULT_UNAVAILABLE",
+        }
+    }
+}
+
 // Every account's password, every saved sign-in and every named secret go; the accounts, their other fields and the copies of launcher files under backups stay. The caller puts a new probe in once the vault it holds can seal one.
 pub fn clear_stored_secrets(store: &Store, now: &str) -> Result<VaultResetSummary, StoreError> {
     Ok(store.clear_secrets(now)?.into())

@@ -1,4 +1,4 @@
-// What the health checks of the four adapters share. A check reads and never writes; a detail names files and folders, never an account's name, login or session.
+// What the health checks of the four adapters share. A check reads and never writes, and never shows a session. A detail is in the Electron app's words, and so can name an account (Battle.net's "belongs to <display name>"), give the last four characters of a launcher's id, and give a folder that holds the Windows user name: it is redacted like any other text before it is logged.
 
 use ol_formats::winpath::file_name;
 use ol_model::{HealthCheck, HealthStatus, InstallSource, LauncherInstall};

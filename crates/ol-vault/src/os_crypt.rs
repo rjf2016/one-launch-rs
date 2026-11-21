@@ -34,6 +34,18 @@ pub enum KeyError {
     Wrap,
     #[error("chromium\\Local State could not be written: {0}")]
     Write(#[source] io::Error),
+    #[error(
+        "Windows did not unwrap the vault key, and could not wrap and unwrap a value of its own either just now"
+    )]
+    WindowsUnavailable,
+    #[error("chromium\\Local State changed while the vault key was being replaced")]
+    Changed,
+}
+
+// What a reset found: the key unwraps after all, or a new one took the place of one that does not.
+pub enum Recovered {
+    Opened(OsCryptVault),
+    Replaced(OsCryptVault),
 }
 
 // The vault of the Electron app: Chromium's os_crypt. One AES-256 key, wrapped by DPAPI in chromium\Local State, seals every value as "v10", a nonce, the ciphertext and the tag.
@@ -57,37 +69,47 @@ impl OsCryptVault {
         if let Some(wrapped) = local_state::read_key(&file)? {
             return Self::unwrap(&wrapped, protector);
         }
-        Self::create(&file, protector, false)
+        Self::create(&file, protector, None)
     }
 
-    // What a reset of the stored secrets does to a key Windows will not unwrap for this user: a new key takes its place, and what the old one sealed is lost for good. A key that unwraps is kept and opened, and a file in another shape is left alone.
+    // What a reset of the stored secrets does to a key Windows will not unwrap for this user: a new key takes its place, and what the old one sealed is lost for good. A key that unwraps now is kept and opened, a Windows that unwraps nothing at all now replaces nothing, and a file in another shape, or one that changed since it was read, is left alone.
     pub fn replace_lost_key(
         data_dir: &Path,
         protector: &dyn DataProtector,
-    ) -> Result<Self, KeyError> {
+    ) -> Result<Recovered, KeyError> {
         let file = local_state_path(data_dir);
         match local_state::read_key(&file)? {
-            None => Self::create(&file, protector, false),
+            None => Self::create(&file, protector, None).map(Recovered::Replaced),
             Some(wrapped) => match Self::unwrap(&wrapped, protector) {
-                Err(KeyError::Unwrap) => Self::create(&file, protector, true),
-                opened => opened,
+                Err(KeyError::Unwrap) => {
+                    Self::create(&file, protector, Some(&wrapped)).map(Recovered::Replaced)
+                }
+                opened => opened.map(Recovered::Opened),
             },
         }
     }
 
-    fn create(file: &Path, protector: &dyn DataProtector, replace: bool) -> Result<Self, KeyError> {
+    fn create(
+        file: &Path,
+        protector: &dyn DataProtector,
+        replacing: Option<&[u8]>,
+    ) -> Result<Self, KeyError> {
         let mut key = Zeroizing::new([0_u8; KEY_BYTES]);
         getrandom::fill(key.as_mut_slice()).map_err(|_| KeyError::Random)?;
         let wrapped = protector
             .protect(key.as_slice())
             .map_err(|_| KeyError::Wrap)?;
-        local_state::write_key(file, &wrapped, replace)?;
+        local_state::write_key(file, &wrapped, replacing)?;
         Self::with_key(key.as_slice())
     }
 
+    // Windows names no error for a key of another user or PC (Microsoft's CryptUnprotectData page: do not "rely on a specific error code"), so it counts as lost only while Windows wraps and unwraps a value of its own.
     fn unwrap(wrapped: &[u8], protector: &dyn DataProtector) -> Result<Self, KeyError> {
-        let key = protector.unprotect(wrapped).map_err(|_| KeyError::Unwrap)?;
-        Self::with_key(&key)
+        match protector.unprotect(wrapped) {
+            Ok(key) => Self::with_key(&key),
+            Err(_) if protector_works(protector) => Err(KeyError::Unwrap),
+            Err(_) => Err(KeyError::WindowsUnavailable),
+        }
     }
 
     fn with_key(key: &[u8]) -> Result<Self, KeyError> {
@@ -97,6 +119,17 @@ impl OsCryptVault {
             })
             .map_err(|_| KeyError::WrongLength)
     }
+}
+
+fn protector_works(protector: &dyn DataProtector) -> bool {
+    let mut probe = Zeroizing::new([0_u8; KEY_BYTES]);
+    if getrandom::fill(probe.as_mut_slice()).is_err() {
+        return false;
+    }
+    protector
+        .protect(probe.as_slice())
+        .and_then(|wrapped| protector.unprotect(&wrapped))
+        .is_ok_and(|back| back.as_slice() == probe.as_slice())
 }
 
 impl Vault for OsCryptVault {
@@ -146,10 +179,28 @@ mod tests {
         }
     }
 
-    // Wraps a key of its own as DPAPI does for any user, so a code path that replaced a key it cannot unwrap would succeed.
+    const OWN_MARK: &[u8] = b"another-user";
+
+    // Another Windows user's DPAPI: it wraps and unwraps what is its own, so a code path that replaced a key it cannot unwrap would succeed, and unwraps nothing wrapped for the user the folder came from.
     struct AnotherUser;
 
     impl DataProtector for AnotherUser {
+        fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ProtectError> {
+            Ok([OWN_MARK, plain].concat())
+        }
+
+        fn unprotect(&self, protected: &[u8]) -> Result<Zeroizing<Vec<u8>>, ProtectError> {
+            protected
+                .strip_prefix(OWN_MARK)
+                .map(|plain| Zeroizing::new(plain.to_vec()))
+                .ok_or(ProtectError::Unprotect)
+        }
+    }
+
+    // A DPAPI that unwraps nothing just now, its own values among them: a fault of Windows, which may clear.
+    struct UnwrapsNothing;
+
+    impl DataProtector for UnwrapsNothing {
         fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ProtectError> {
             Ok(plain.to_vec())
         }
@@ -327,14 +378,37 @@ mod tests {
         let sealed = first.encrypt(&secret("placeholder")).unwrap();
         let before = snapshot(scratch.path());
 
-        let kept = OsCryptVault::replace_lost_key(scratch.path(), &Reversible).unwrap();
+        let Ok(Recovered::Opened(kept)) =
+            OsCryptVault::replace_lost_key(scratch.path(), &Reversible)
+        else {
+            panic!("a key that unwraps is not reported as opened");
+        };
         assert!(kept.decrypt(&sealed).unwrap().expose() == "placeholder");
         assert!(
             before == snapshot(scratch.path()),
             "a key that unwraps was replaced"
         );
 
-        let replaced = OsCryptVault::replace_lost_key(scratch.path(), &AnotherUser).unwrap();
+        for refused in [
+            OsCryptVault::open(scratch.path(), &UnwrapsNothing),
+            OsCryptVault::open_or_create(scratch.path(), &UnwrapsNothing),
+        ] {
+            assert!(matches!(refused, Err(KeyError::WindowsUnavailable)));
+        }
+        assert!(matches!(
+            OsCryptVault::replace_lost_key(scratch.path(), &UnwrapsNothing),
+            Err(KeyError::WindowsUnavailable)
+        ));
+        assert!(
+            before == snapshot(scratch.path()),
+            "a key was replaced while Windows unwrapped nothing"
+        );
+
+        let Ok(Recovered::Replaced(replaced)) =
+            OsCryptVault::replace_lost_key(scratch.path(), &AnotherUser)
+        else {
+            panic!("a key that does not unwrap is not reported as replaced");
+        };
         assert_eq!(
             replaced.decrypt(&sealed).err(),
             Some(VaultError::Unreadable)
@@ -350,7 +424,10 @@ mod tests {
         );
         let wrapped = bytes(&state["os_crypt"]["encrypted_key"]);
         assert_eq!(&wrapped[..5], b"DPAPI");
-        assert_eq!(AnotherUser.protect(&wrapped[5..]).unwrap().len(), KEY_BYTES);
+        assert_eq!(
+            AnotherUser.unprotect(&wrapped[5..]).unwrap().len(),
+            KEY_BYTES
+        );
         assert!(
             before != snapshot(scratch.path()),
             "the key that does not unwrap is still there"
