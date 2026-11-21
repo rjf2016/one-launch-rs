@@ -261,6 +261,72 @@ fn a_clear_never_reads_a_text_of_another_length() {
     assert!(board.clipboard.holds(&same_length));
 }
 
+#[test]
+fn a_write_refused_for_anything_but_the_marks_is_an_error_and_never_a_plain_copy() {
+    let board = board_with(RecordingClipboard::refusing_the_private_text);
+    let refused = board.service.copy_sensitive(&secret(PASSWORD)).unwrap_err();
+    assert!(matches!(refused, ClipboardError::Refused(_)));
+    assert!(board.clipboard.is_empty());
+    assert!(board.log.snapshot().is_empty());
+}
+
+#[test]
+fn a_clipboard_unchanged_since_the_copy_is_emptied_without_being_read() {
+    let board = board();
+    board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
+    board.wait(30);
+    assert!(board.clipboard.is_empty());
+    assert_eq!(board.clipboard.reads(), 0);
+
+    let board = self::board();
+    board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
+    assert!(board.service.clear_if_unchanged());
+    assert_eq!(board.clipboard.reads(), 0);
+}
+
+#[test]
+fn a_password_of_any_letters_is_cleared_after_the_clipboard_changed_and_holds_it_again() {
+    let letters = "h\u{e4}rse-b\u{f6}ttery-\u{1f600}-made-up";
+    let board = board();
+    board.service.copy_sensitive(&secret(letters)).unwrap();
+    board.clipboard.user_copies(letters);
+    board.wait(30);
+    assert!(
+        board.clipboard.is_empty(),
+        "a copy of letters outside ASCII was left on the clipboard"
+    );
+    assert_eq!(board.clipboard.reads(), 1);
+}
+
+// Runs what is due even after it was put off, as a timer whose thread was already past its look at the token would.
+struct Late(Arc<FakeClock>);
+
+impl Timer for Late {
+    fn after(&self, delay: Duration, _: CancelToken, run: Box<dyn FnOnce() + Send>) {
+        self.0.schedule(delay, run);
+    }
+}
+
+#[test]
+fn a_timer_that_fires_late_leaves_a_newer_copy_alone() {
+    let clock = Arc::new(FakeClock::starting_at(datetime!(2026-11-21 10:00:00 UTC)));
+    let clipboard = Arc::new(RecordingClipboard::new(OpLog::new()));
+    let service = ClipboardService::new(
+        Arc::clone(&clipboard) as _,
+        Arc::new(Late(Arc::clone(&clock))),
+    );
+    service.copy_sensitive(&secret("the-login")).unwrap();
+    clock.sleep(Duration::from_secs(20), &CancelToken::new());
+    service.copy_sensitive(&secret(PASSWORD)).unwrap();
+    clock.sleep(Duration::from_secs(10), &CancelToken::new());
+    assert!(
+        clipboard.holds(PASSWORD),
+        "the first copy's timer took the second copy off"
+    );
+    clock.sleep(Duration::from_secs(20), &CancelToken::new());
+    assert!(clipboard.is_empty());
+}
+
 struct Unavailable;
 
 impl Vault for Unavailable {

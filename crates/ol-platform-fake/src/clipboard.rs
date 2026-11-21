@@ -1,6 +1,6 @@
 use std::sync::{Mutex, MutexGuard};
 
-use ol_platform_api::{Clipboard, ClipboardError, Zeroizing};
+use ol_platform_api::{Clipboard, ClipboardError, ClipboardSequence, Zeroizing};
 
 use crate::OpLog;
 
@@ -15,7 +15,9 @@ pub enum Kept {
 struct State {
     held: Option<(Zeroizing<String>, Kept)>,
     refuse_private: bool,
+    refuse_text: bool,
     refuse_all: bool,
+    sequence: ClipboardSequence,
     calls: usize,
     busy_calls: Vec<usize>,
     reads: usize,
@@ -41,6 +43,12 @@ impl RecordingClipboard {
         clipboard
     }
 
+    pub fn refusing_the_private_text(log: OpLog) -> Self {
+        let clipboard = Self::new(log);
+        clipboard.state().refuse_text = true;
+        clipboard
+    }
+
     pub fn held_by_another_program(log: OpLog) -> Self {
         let clipboard = Self::new(log);
         clipboard.state().refuse_all = true;
@@ -58,7 +66,9 @@ impl RecordingClipboard {
     }
 
     pub fn user_copies(&self, text: &str) {
-        self.state().held = Some((Zeroizing::new(text.to_owned()), Kept::ByTheUser));
+        let mut state = self.state();
+        state.held = Some((Zeroizing::new(text.to_owned()), Kept::ByTheUser));
+        state.sequence += 1;
     }
 
     pub fn holds(&self, text: &str) -> bool {
@@ -92,27 +102,34 @@ impl RecordingClipboard {
         Ok(state)
     }
 
-    fn write(&self, text: &str, kept: Kept) -> Result<(), ClipboardError> {
+    fn write(&self, text: &str, kept: Kept) -> Result<ClipboardSequence, ClipboardError> {
         let mut state = self.open()?;
-        if kept == Kept::Private && state.refuse_private {
+        if kept == Kept::Private && state.refuse_text {
             return Err(ClipboardError::Refused(
-                "the clipboard refused the write".to_owned(),
+                "the clipboard refused the text".to_owned(),
+            ));
+        }
+        if kept == Kept::Private && state.refuse_private {
+            return Err(ClipboardError::Unmarked(
+                "the clipboard refused the marks".to_owned(),
             ));
         }
         state.held = Some((Zeroizing::new(text.to_owned()), kept));
+        state.sequence += 1;
+        let written = state.sequence;
         drop(state);
         let private = kept == Kept::Private;
         self.log.record("clip.write", [("private", private.into())]);
-        Ok(())
+        Ok(written)
     }
 }
 
 impl Clipboard for RecordingClipboard {
-    fn write_private(&self, text: &str) -> Result<(), ClipboardError> {
+    fn write_private(&self, text: &str) -> Result<ClipboardSequence, ClipboardError> {
         self.write(text, Kept::Private)
     }
 
-    fn write_text(&self, text: &str) -> Result<(), ClipboardError> {
+    fn write_text(&self, text: &str) -> Result<ClipboardSequence, ClipboardError> {
         self.write(text, Kept::Plain)
     }
 
@@ -126,10 +143,18 @@ impl Clipboard for RecordingClipboard {
 
     fn clear_if(
         &self,
+        written: ClipboardSequence,
         length: usize,
         holds: &dyn Fn(&str) -> bool,
     ) -> Result<bool, ClipboardError> {
         let mut state = self.open()?;
+        if state.sequence == written {
+            state.held = None;
+            state.sequence += 1;
+            drop(state);
+            self.log.record("clip.clear", []);
+            return Ok(true);
+        }
         let same_length = state
             .held
             .as_ref()
@@ -142,6 +167,7 @@ impl Clipboard for RecordingClipboard {
             return Ok(false);
         }
         state.held = None;
+        state.sequence += 1;
         drop(state);
         self.log.record("clip.clear", []);
         Ok(true)
@@ -156,17 +182,19 @@ mod tests {
     fn a_write_is_written_down_without_its_text_and_a_clear_needs_the_same_text() {
         let log = OpLog::new();
         let clipboard = RecordingClipboard::new(log.clone());
-        clipboard.write_private("placeholder-secret").unwrap();
+        let written = clipboard.write_private("placeholder-secret").unwrap();
         assert_eq!(clipboard.kept(), Some(Kept::Private));
-        assert!(!clipboard.clear_if(18, &|held| held == "another").unwrap());
-        assert!(!clipboard.clear_if(7, &|_| true).unwrap());
-        assert_eq!(clipboard.reads(), 1);
-        assert!(clipboard.holds("placeholder-secret"));
+        let changed = written - 1;
         assert!(
-            clipboard
-                .clear_if(18, &|held| held == "placeholder-secret")
+            !clipboard
+                .clear_if(changed, 18, &|held| held == "another")
                 .unwrap()
         );
+        assert!(!clipboard.clear_if(changed, 7, &|_| true).unwrap());
+        assert_eq!(clipboard.reads(), 1);
+        assert!(clipboard.holds("placeholder-secret"));
+        assert!(clipboard.clear_if(written, 18, &|_| false).unwrap());
+        assert_eq!(clipboard.reads(), 1);
         assert!(clipboard.is_empty());
         let events = serde_json::to_string(&log.snapshot()).unwrap();
         assert!(!events.contains("placeholder"));

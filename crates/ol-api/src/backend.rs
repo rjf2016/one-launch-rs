@@ -551,6 +551,15 @@ impl Drop for Unanswered<'_> {
     }
 }
 
+// However the database's thread ends, a panic included, a copy still on the clipboard is taken off.
+impl Drop for Serving {
+    fn drop(&mut self) {
+        if let Some(clipboard) = &self.clipboard {
+            clipboard.clear_if_unchanged();
+        }
+    }
+}
+
 struct Serving {
     data_dir: PathBuf,
     launchers: Option<Launchers>,
@@ -577,9 +586,6 @@ impl Serving {
         while let Ok(command) = requests.recv_blocking() {
             let store = opened.as_ref().map_err(ApiError::clone);
             self.handle(command, store);
-        }
-        if let Some(clipboard) = &self.clipboard {
-            clipboard.clear_if_unchanged();
         }
     }
 

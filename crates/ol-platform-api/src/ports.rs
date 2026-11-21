@@ -185,19 +185,28 @@ pub enum ClipboardError {
     // Another program held the clipboard open: a later try may succeed.
     #[error("another program holds the clipboard open")]
     Busy,
-    // Windows turned the write or the read itself down.
+    // Windows would not take the marks that keep a copy out of the clipboard history: a plain copy may still be made.
+    #[error("{0}")]
+    Unmarked(String),
     #[error("{0}")]
     Refused(String),
 }
 
+// Windows' count of the changes to the clipboard, as it stood when a write was finished.
+pub type ClipboardSequence = u32;
+
 pub trait Clipboard: Send + Sync {
     // With the formats that keep the text out of Windows' clipboard history and the cloud clipboard.
-    fn write_private(&self, text: &str) -> Result<(), ClipboardError>;
-    fn write_text(&self, text: &str) -> Result<(), ClipboardError>;
+    fn write_private(&self, text: &str) -> Result<ClipboardSequence, ClipboardError>;
+    fn write_text(&self, text: &str) -> Result<ClipboardSequence, ClipboardError>;
     fn read_text(&self) -> Result<Option<Zeroizing<String>>, ClipboardError>;
-    // Reads and empties in one hold of the clipboard, so that nothing copied in between is emptied. A text whose length in UTF-16 units is not `length` is not read at all.
-    fn clear_if(&self, length: usize, holds: &dyn Fn(&str) -> bool)
-    -> Result<bool, ClipboardError>;
+    // Empties the clipboard in one hold of it, so that nothing copied in between is emptied: at once while it has not changed since `written`, else only when it holds a text of `length` UTF-16 units that `holds` accepts. A text of another length is not read at all.
+    fn clear_if(
+        &self,
+        written: ClipboardSequence,
+        length: usize,
+        holds: &dyn Fn(&str) -> bool,
+    ) -> Result<bool, ClipboardError>;
 }
 
 // The launch request the Riot Client's own Play button sends, to be sent to the client's local server on this PC once the client shows the game's page. Nothing else is ever asked of that server, and nothing at all of Riot's.
