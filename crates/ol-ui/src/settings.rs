@@ -194,6 +194,10 @@ impl SettingsView {
             self.scroll.to_top();
             self.menu = None;
         }
+        // A control of the tab that was shown is no longer drawn: the keyboard leaves it, unless it is on the tabs themselves.
+        if self.focus != Some(Control::Tabs) {
+            self.focus = None;
+        }
         cx.notify();
     }
 
@@ -564,6 +568,10 @@ impl SettingsView {
         let Some(focus) = self.focus else {
             return false;
         };
+        // A key acts only on a control that is drawn and can be used.
+        if !self.controls().contains(&focus) {
+            return false;
+        }
         let press = matches!(key, "enter" | "space");
         match focus {
             Control::Tabs => {
@@ -744,8 +752,30 @@ impl SettingsView {
 
     fn render_banner(&self, cx: &mut Context<Self>) -> Option<Div> {
         let shows = self.shows_reset();
-        if !shows && self.reset_note.is_none() {
-            return None;
+        if !shows {
+            // Once the secrets read again, the reset's answer stands alone: the banner's sentence would say the opposite.
+            return self.reset_note.clone().map(|note| {
+                div()
+                    .flex()
+                    .items_start()
+                    .gap(px(8.))
+                    .rounded(px(8.))
+                    .border_1()
+                    .border_color(color(theme::BORDER))
+                    .bg(color(theme::SURFACE))
+                    .px(px(16.))
+                    .py(px(12.))
+                    .text_color(color(theme::TEXT))
+                    .child(
+                        if self.vault_works() {
+                            icon(assets::SHIELD_CHECK, 16., theme::SUCCESS)
+                        } else {
+                            icon(assets::SHIELD_OFF, 16., theme::FAINT)
+                        }
+                        .mt(px(2.)),
+                    )
+                    .child(div().flex_1().min_w_0().child(note))
+            });
         }
         let (before, after) = RESET_BANNER
             .split_once("chromium")

@@ -18,7 +18,7 @@ use crate::assets;
 use crate::host::{LaunchHost, PlayEnded, overlay};
 use crate::library::LibraryView;
 use crate::settings::{SettingsTab, SettingsView};
-use crate::widgets::{Button, Tone, panel_shadow, tip};
+use crate::widgets::{Button, Tone, panel_shadow, spinner, tip};
 
 const SIDEBAR: f32 = 224.;
 const SIDEBAR_COLLAPSED: f32 = 60.;
@@ -102,6 +102,8 @@ enum Asked {
     },
     // A quit while a switch runs; its first answer keeps the app running.
     Quit,
+    // "Quit anyway" was answered: no answer is left, only the line that the switch is being stopped.
+    Stopping,
 }
 
 struct Asking {
@@ -270,7 +272,7 @@ impl Shell {
         if matches!(
             self.asking,
             Some(Asking {
-                asked: Asked::Quit,
+                asked: Asked::Quit | Asked::Stopping,
                 ..
             })
         ) {
@@ -321,6 +323,9 @@ impl Shell {
 
     // An unguarded move is one a page makes when a create, a delete or an import has finished: it wins over a question still open.
     fn go(&mut self, go: Go, window: &mut Window, cx: &mut Context<Self>) {
+        if self.stopping() {
+            return;
+        }
         if self.asking.is_some() {
             if go.guarded {
                 return;
@@ -356,7 +361,20 @@ impl Shell {
         }
     }
 
+    fn stopping(&self) -> bool {
+        matches!(
+            self.asking,
+            Some(Asking {
+                asked: Asked::Stopping,
+                ..
+            })
+        )
+    }
+
     fn answer(&mut self, act: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.stopping() {
+            return;
+        }
         let Some(asking) = self.asking.take() else {
             return;
         };
@@ -364,7 +382,20 @@ impl Shell {
             Asked::Leave { then, return_to } if act => {
                 self.enter(then, return_to.map(|game| *game), window, cx);
             }
-            Asked::Quit if act => cx.emit(QuitAnyway),
+            Asked::Quit if act => {
+                self.asking = Some(Asking {
+                    title: "Stopping the switch".into(),
+                    message:
+                        "One Launch quits once the switch has stopped and put back what it had to."
+                            .into(),
+                    detail: None,
+                    keep: "",
+                    act: "",
+                    asked: Asked::Stopping,
+                    act_leads: false,
+                });
+                cx.emit(QuitAnyway);
+            }
             _ => {}
         }
         cx.notify();
@@ -806,7 +837,16 @@ impl Shell {
                     .gap(px(12.))
                     .px(px(20.))
                     .py(px(16.))
-                    .child(icon(assets::UPDATE, 20., theme::WARNING).mt(px(2.)))
+                    .child(if matches!(asking.asked, Asked::Stopping) {
+                        div()
+                            .mt(px(2.))
+                            .child(spinner("stopping", 20., theme::WARNING))
+                            .into_any_element()
+                    } else {
+                        icon(assets::UPDATE, 20., theme::WARNING)
+                            .mt(px(2.))
+                            .into_any_element()
+                    })
                     .child(
                         div()
                             .min_w_0()
@@ -834,34 +874,36 @@ impl Shell {
                             })),
                     ),
             )
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_end()
-                    .gap(px(8.))
-                    .border_t_1()
-                    .border_color(color(theme::BORDER))
-                    .px(px(20.))
-                    .py(px(12.))
-                    .child(
-                        Button::new("stay", Tone::Ghost, asking.keep)
-                            .leading(!asking.act_leads)
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.answer(false, window, cx);
-                            })),
-                    )
-                    .child(
-                        Button::new("leave", Tone::Danger, asking.act)
-                            .leading(asking.act_leads)
-                            .on_click(cx.listener(|this, click: &ClickEvent, window, cx| {
-                                // The second click of a double click is not an answer.
-                                if click.click_count() == 1 {
-                                    this.answer(true, window, cx);
-                                }
-                            })),
-                    ),
-            );
+            .when(!matches!(asking.asked, Asked::Stopping), |card| {
+                card.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_end()
+                        .gap(px(8.))
+                        .border_t_1()
+                        .border_color(color(theme::BORDER))
+                        .px(px(20.))
+                        .py(px(12.))
+                        .child(
+                            Button::new("stay", Tone::Ghost, asking.keep)
+                                .leading(!asking.act_leads)
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.answer(false, window, cx);
+                                })),
+                        )
+                        .child(
+                            Button::new("leave", Tone::Danger, asking.act)
+                                .leading(asking.act_leads)
+                                .on_click(cx.listener(|this, click: &ClickEvent, window, cx| {
+                                    // The second click of a double click is not an answer.
+                                    if click.click_count() == 1 {
+                                        this.answer(true, window, cx);
+                                    }
+                                })),
+                        ),
+                )
+            });
         Some(
             div()
                 .id("confirm-backdrop")
