@@ -2,6 +2,7 @@
 //
 // Riot's rules come before convenience. A Riot game and Vanguard are known by image name alone and are never closed, ended, opened or asked for a path; a running game refuses a switch, a restore and a launch, and a process listing that fails refuses too; nothing goes to Riot's servers, and the one request to the client's own local server is the launch request its Play button sends.
 
+mod health;
 mod plan;
 mod processes;
 

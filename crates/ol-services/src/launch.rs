@@ -62,6 +62,11 @@ impl JobBoard {
         self.board().current.is_some()
     }
 
+    // The job that runs now, as it stands.
+    pub fn current(&self) -> Option<LaunchJob> {
+        self.board().current.clone()
+    }
+
     pub fn status(&self, job_id: &str) -> Result<LaunchJob, ServiceError> {
         let board = self.board();
         board

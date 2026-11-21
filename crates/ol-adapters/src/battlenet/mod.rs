@@ -1,5 +1,6 @@
 // The Battle.net adapter: everything it reads, and the three things it does to a process (ask the client's window to close, end the client, hand it a launch command). The client signs in from one token, a value under HKCU\Software\Blizzard Entertainment\Battle.net\UnifiedAuth that it writes again at every sign-in, and takes it only for the login that is first in Battle.net.config's SavedAccountNames. This module writes neither; the switch pipeline does that with what it plans.
 
+mod health;
 mod plan;
 
 use std::sync::LazyLock;

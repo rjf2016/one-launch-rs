@@ -178,6 +178,14 @@ pub struct ShellError(pub String);
 pub trait Shell: Send + Sync {
     // Hands a link such as steam://rungameid/1 to whatever program Windows opens it with.
     fn open_url(&self, url: &str) -> Result<(), ShellError>;
+
+    // Shows a folder of the data folder in Explorer. A port that cannot refuses.
+    fn open_folder(&self, folder: &str) -> Result<(), ShellError> {
+        let _ = folder;
+        Err(ShellError(
+            "This build of One Launch cannot open folders.".to_owned(),
+        ))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]

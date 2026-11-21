@@ -57,12 +57,31 @@ impl OsCryptVault {
         if let Some(wrapped) = local_state::read_key(&file)? {
             return Self::unwrap(&wrapped, protector);
         }
+        Self::create(&file, protector, false)
+    }
+
+    // What a reset of the stored secrets does to a key Windows will not unwrap for this user: a new key takes its place, and what the old one sealed is lost for good. A key that unwraps is kept and opened, and a file in another shape is left alone.
+    pub fn replace_lost_key(
+        data_dir: &Path,
+        protector: &dyn DataProtector,
+    ) -> Result<Self, KeyError> {
+        let file = local_state_path(data_dir);
+        match local_state::read_key(&file)? {
+            None => Self::create(&file, protector, false),
+            Some(wrapped) => match Self::unwrap(&wrapped, protector) {
+                Err(KeyError::Unwrap) => Self::create(&file, protector, true),
+                opened => opened,
+            },
+        }
+    }
+
+    fn create(file: &Path, protector: &dyn DataProtector, replace: bool) -> Result<Self, KeyError> {
         let mut key = Zeroizing::new([0_u8; KEY_BYTES]);
         getrandom::fill(key.as_mut_slice()).map_err(|_| KeyError::Random)?;
         let wrapped = protector
             .protect(key.as_slice())
             .map_err(|_| KeyError::Wrap)?;
-        local_state::write_key(&file, &wrapped)?;
+        local_state::write_key(file, &wrapped, replace)?;
         Self::with_key(key.as_slice())
     }
 
@@ -295,6 +314,66 @@ mod tests {
             before == snapshot(scratch.path()),
             "a key that does not unwrap was replaced"
         );
+    }
+
+    #[test]
+    fn a_reset_replaces_only_a_key_that_does_not_unwrap() {
+        let scratch = Scratch::new("vault");
+        write_local_state(
+            scratch.path(),
+            r#"{"zeta":{"b":1},"os_crypt":{"audit_enabled":true}}"#,
+        );
+        let first = OsCryptVault::open_or_create(scratch.path(), &Reversible).unwrap();
+        let sealed = first.encrypt(&secret("placeholder")).unwrap();
+        let before = snapshot(scratch.path());
+
+        let kept = OsCryptVault::replace_lost_key(scratch.path(), &Reversible).unwrap();
+        assert!(kept.decrypt(&sealed).unwrap().expose() == "placeholder");
+        assert!(
+            before == snapshot(scratch.path()),
+            "a key that unwraps was replaced"
+        );
+
+        let replaced = OsCryptVault::replace_lost_key(scratch.path(), &AnotherUser).unwrap();
+        assert_eq!(
+            replaced.decrypt(&sealed).err(),
+            Some(VaultError::Unreadable)
+        );
+        let text = fs::read_to_string(local_state_path(scratch.path())).unwrap();
+        let state: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(state["zeta"]["b"], 1);
+        assert_eq!(state["os_crypt"]["audit_enabled"], true);
+        assert!(
+            text.starts_with(
+                r#"{"zeta":{"b":1},"os_crypt":{"audit_enabled":true,"encrypted_key":""#
+            )
+        );
+        let wrapped = bytes(&state["os_crypt"]["encrypted_key"]);
+        assert_eq!(&wrapped[..5], b"DPAPI");
+        assert_eq!(AnotherUser.protect(&wrapped[5..]).unwrap().len(), KEY_BYTES);
+        assert!(
+            before != snapshot(scratch.path()),
+            "the key that does not unwrap is still there"
+        );
+        assert_eq!(
+            snapshot(scratch.path()).len(),
+            2,
+            "no unfinished file is left"
+        );
+
+        for text in ["not json", r#"{"os_crypt":{"encrypted_key":"***"}}"#] {
+            let other = Scratch::new("vault");
+            write_local_state(other.path(), text);
+            let before = snapshot(other.path());
+            assert!(matches!(
+                OsCryptVault::replace_lost_key(other.path(), &AnotherUser),
+                Err(KeyError::Malformed)
+            ));
+            assert!(
+                before == snapshot(other.path()),
+                "{text}: the folder changed"
+            );
+        }
     }
 
     #[test]

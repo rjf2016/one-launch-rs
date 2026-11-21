@@ -43,4 +43,35 @@ impl Store {
         )?;
         Ok(())
     }
+
+    pub fn delete_secret(&self, key: SecretKey) -> Result<bool, StoreError> {
+        Ok(self
+            .conn
+            .execute("DELETE FROM secrets WHERE key = ?1", [key.as_str()])?
+            > 0)
+    }
+
+    // The Electron app's vault reset: every account keeps its row without its password, and every saved sign-in and every named secret is deleted, the probe among them. All of it or nothing.
+    pub fn clear_secrets(&self, at: &str) -> Result<ClearedSecrets, StoreError> {
+        let transaction = self.conn.unchecked_transaction()?;
+        let passwords = transaction.execute(
+            "UPDATE accounts SET secret_enc = NULL, updated_at = ?1 WHERE secret_enc IS NOT NULL",
+            [at],
+        )?;
+        let sessions = transaction.execute("DELETE FROM launcher_sessions", [])?;
+        let secrets = transaction.execute("DELETE FROM secrets", [])?;
+        transaction.commit()?;
+        Ok(ClearedSecrets {
+            passwords,
+            sessions,
+            secrets,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ClearedSecrets {
+    pub passwords: usize,
+    pub sessions: usize,
+    pub secrets: usize,
 }

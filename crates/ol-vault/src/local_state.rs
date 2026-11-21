@@ -38,8 +38,8 @@ pub(crate) fn read_key(file: &Path) -> Result<Option<Vec<u8>>, KeyError> {
     }
 }
 
-// Whatever else the file holds is Chromium's and is written back as it was. A key that is already there is never replaced: everything stored so far opens with it alone.
-pub(crate) fn write_key(file: &Path, wrapped: &[u8]) -> Result<(), KeyError> {
+// Whatever else the file holds is Chromium's and is written back as it was. A key that is already there is replaced only when `replace` says so: everything stored so far opens with it alone.
+pub(crate) fn write_key(file: &Path, wrapped: &[u8], replace: bool) -> Result<(), KeyError> {
     let mut state = read(file)?.unwrap_or_default();
     let os_crypt = state
         .entry("os_crypt")
@@ -47,7 +47,7 @@ pub(crate) fn write_key(file: &Path, wrapped: &[u8]) -> Result<(), KeyError> {
     let Value::Object(os_crypt) = os_crypt else {
         return Err(KeyError::Malformed);
     };
-    if os_crypt.contains_key("encrypted_key") {
+    if os_crypt.contains_key("encrypted_key") && !replace {
         return Err(KeyError::Write(io::ErrorKind::AlreadyExists.into()));
     }
     let key = [WRAPPED_PREFIX.as_slice(), wrapped].concat();
@@ -107,11 +107,11 @@ mod tests {
     fn a_key_that_is_there_is_not_written_over() {
         let scratch = Scratch::new("vault");
         let file = local_state_path(scratch.path());
-        write_key(&file, &[1; 40]).unwrap();
+        write_key(&file, &[1; 40], false).unwrap();
         let before = snapshot(scratch.path());
         assert_eq!(read_key(&file).unwrap(), Some(vec![1; 40]));
 
-        let refused = write_key(&file, &[2; 40]);
+        let refused = write_key(&file, &[2; 40], false);
         assert!(
             matches!(&refused, Err(KeyError::Write(error)) if error.kind() == io::ErrorKind::AlreadyExists),
             "{refused:?}"
@@ -131,7 +131,7 @@ mod tests {
         assert_eq!(read_key(&file).unwrap(), None);
         let before = snapshot(scratch.path());
 
-        let refused = write_key(&file, &[1; 40]);
+        let refused = write_key(&file, &[1; 40], false);
         assert!(matches!(refused, Err(KeyError::Malformed)), "{refused:?}");
         assert!(before == snapshot(scratch.path()), "the folder changed");
     }

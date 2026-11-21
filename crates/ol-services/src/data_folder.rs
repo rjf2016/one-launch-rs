@@ -42,6 +42,24 @@ pub fn open(data_dir: &Path, version: &str) -> Result<(Store, MigrationReport), 
     Ok((store, migrated))
 }
 
+// The folders Settings opens in Explorer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Folder {
+    Data,
+    Logs,
+    Backups,
+}
+
+impl Folder {
+    pub fn path(self, data_dir: &Path) -> PathBuf {
+        match self {
+            Self::Data => data_dir.to_path_buf(),
+            Self::Logs => data_dir.join("logs"),
+            Self::Backups => data_dir.join("backups"),
+        }
+    }
+}
+
 pub fn back_up(store: &Store, data_dir: &Path) -> Result<PathBuf, StoreError> {
     store.backup(
         &database_backups_dir(data_dir),

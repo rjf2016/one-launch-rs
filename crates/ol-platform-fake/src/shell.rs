@@ -18,4 +18,9 @@ impl Shell for FakeShell {
         self.log.record("shell.open", [("url", url.into())]);
         Ok(())
     }
+
+    fn open_folder(&self, folder: &str) -> Result<(), ShellError> {
+        self.log.record("shell.folder", [("path", folder.into())]);
+        Ok(())
+    }
 }

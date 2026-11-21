@@ -1,5 +1,6 @@
 // The Epic Games Launcher adapter: everything it reads, and the three things it does to a process (ask the launcher to close, end it, hand a game link to the shell). Epic keeps no list of accounts: it signs in from the session it remembers in GameUserSettings.ini. This module writes no launcher file; the switch pipeline does that with what it plans.
 
+mod health;
 mod plan;
 
 use std::time::Duration;

@@ -2,12 +2,27 @@
 
 mod backend;
 
-pub use backend::{ApiError, Backend, JobObserver, Library, SavedSignIn, StartLaunch};
+pub use backend::{
+    ApiError, AppInfo, Backend, JobObserver, Library, SavedSignIn, SettingsObserver, StartLaunch,
+};
 pub use ol_services::capture::Captured as CapturedSignIn;
 
 pub mod clipboard {
     pub use ol_platform_api::{Clipboard, ClipboardError};
     pub use ol_services::clipboard::{CLEAR_AFTER, CopyField, CopyResult, SleepingTimer, Timer};
+}
+
+// What the Settings screen needs beside the settings themselves, which are `ol_model::Settings`.
+pub mod settings {
+    pub use ol_services::data_folder::Folder;
+    pub use ol_services::install::{AutostartStatus, UpdateStatus, UpdateStep, UpdateUnavailable};
+    pub use ol_services::vault_health::{
+        EncryptionState, RESET_BANNER, VaultBackend, VaultHealth, VaultResetSummary,
+    };
+    pub use ol_services::window::{
+        AfterPlay, CloseAction, QuitQuestion, START_HIDDEN_FLAG, close_request_action,
+        hide_after_instant_play, start_hidden,
+    };
 }
 
 pub mod library {

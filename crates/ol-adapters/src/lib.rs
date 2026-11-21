@@ -5,6 +5,7 @@ mod directory;
 pub mod epic;
 mod error;
 pub mod files;
+pub mod health;
 pub mod riot;
 mod running;
 pub mod steam;

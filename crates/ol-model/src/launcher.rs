@@ -33,6 +33,16 @@ impl LauncherId {
         }
     }
 
+    // The program Locate asks the user to pick, by the name of its file.
+    pub const fn exe_name(self) -> &'static str {
+        match self {
+            Self::Steam => "steam.exe",
+            Self::Epic => "EpicGamesLauncher.exe",
+            Self::Battlenet => "Battle.net.exe",
+            Self::Riot => "RiotClientServices.exe",
+        }
+    }
+
     // The program a switch closes and starts, as it reads in the middle of a sentence: Riot Games is the company, the client is what closes.
     pub const fn client_name(self) -> &'static str {
         match self {

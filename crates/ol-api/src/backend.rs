@@ -1,18 +1,21 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 use async_channel::{Receiver, Sender, WeakSender};
 use ol_model::{
     Account, BackupSnapshot, Ciphertext, InstalledGame, LaunchJob, LaunchPreflight, LauncherId,
-    LauncherSession, LauncherSessionState, LibraryScanResult, LibrarySort, RecentLaunch,
-    RememberedAccount, RestoreResult, SettingKey, Sidebar, SwitchPlan, SwitchRecovery,
+    LauncherInstall, LauncherSession, LauncherSessionState, LauncherStatus, LibraryScanResult,
+    LibrarySort, RecentLaunch, RememberedAccount, RestoreResult, SettingKey, Settings, Sidebar,
+    SwitchPlan, SwitchRecovery,
 };
 use ol_platform_api::{Clipboard, DataProtector};
 use ol_services::accounts::{self, AccountError, AccountPatch, NewAccount};
 use ol_services::capture::{self, Captured};
 use ol_services::clipboard::{self, ClipboardService, CopyError, CopyField, CopyResult, Timer};
-use ol_services::data_folder::{self, OpenError};
+use ol_services::data_folder::{self, Folder, OpenError};
+use ol_services::install::{self, AutostartError, AutostartStatus, UpdateStatus};
 use ol_services::journal::Recovery;
 use ol_services::launch::{self, FinishedJob, JobBoard, LastPreflight, StartInput};
 use ol_services::launchers::{
@@ -20,9 +23,14 @@ use ol_services::launchers::{
 };
 use ol_services::library::{self, LibraryGame};
 use ol_services::sessions::{StoreThread, StoreWork};
+use ol_services::settings::{self as setting, SettingError};
 use ol_services::switch;
+use ol_services::vault_health::{
+    self, VaultAccess, VaultHealth, VaultHealthError, VaultResetSummary,
+};
+use ol_services::window::{self, QuitQuestion};
 use ol_store::{Store, StoreError};
-use ol_vault::{OsCryptVault, Secret, Vault, VaultError};
+use ol_vault::{KeyError, OsCryptVault, Secret, Vault, VaultError};
 use thiserror::Error;
 
 const RECENT_LAUNCHES_MOST: u32 = 50;
@@ -87,6 +95,33 @@ impl From<AccountError> for ApiError {
     }
 }
 
+impl From<SettingError> for ApiError {
+    fn from(error: SettingError) -> Self {
+        Self {
+            code: error.code(),
+            message: error.to_string(),
+        }
+    }
+}
+
+impl From<VaultHealthError> for ApiError {
+    fn from(error: VaultHealthError) -> Self {
+        Self {
+            code: error.code(),
+            message: error.to_string(),
+        }
+    }
+}
+
+impl From<AutostartError> for ApiError {
+    fn from(error: AutostartError) -> Self {
+        Self {
+            code: error.code(),
+            message: error.to_string(),
+        }
+    }
+}
+
 impl From<CopyError> for ApiError {
     fn from(error: CopyError) -> Self {
         Self {
@@ -120,6 +155,20 @@ pub struct SavedSignIn {
 // Hears the launch job each time it changes, on the thread that changed it.
 pub type JobObserver = Arc<dyn Fn(&LaunchJob) + Send + Sync>;
 
+// Hears each setting the backend has just stored or removed, with its new value, on the database's thread: the Electron app's onSettingChanged, which turns the tray icon on and off.
+pub type SettingsObserver = Arc<dyn Fn(SettingKey, Option<&str>) + Send + Sync>;
+
+// What the Diagnostics panel shows of this copy.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AppInfo {
+    pub version: String,
+    pub data_dir: PathBuf,
+    pub log_dir: PathBuf,
+    pub db_path: PathBuf,
+    // "Development" or "Packaged", as the Build row says.
+    pub build: &'static str,
+}
+
 type Reply<T> = Sender<Result<T, ApiError>>;
 
 enum Command {
@@ -129,7 +178,17 @@ enum Command {
     Sidebar(Reply<Sidebar>),
     SetSidebar(Sidebar, Reply<()>),
     BackUpDatabase(Reply<()>),
+    Settings(Reply<Settings>),
     SetSetting(SettingKey, String, Reply<()>),
+    #[cfg(feature = "fake")]
+    SeedSetting(SettingKey, String, Reply<()>),
+    ObserveSettings(SettingsObserver),
+    VaultStatus(Reply<VaultHealth>),
+    ResetVault(Reply<VaultResetSummary>),
+    TestVault(Reply<Duration>),
+    LauncherStatuses(Reply<Vec<LauncherStatus>>),
+    LocateLauncher(LauncherId, String, Reply<LauncherInstall>),
+    ResetLauncherPath(LauncherId, Reply<()>),
     CreateAccount(Box<NewAccount>, Reply<Account>),
     Account(String, Reply<Account>),
     UpdateAccount(String, Box<AccountPatch>, Reply<Account>),
@@ -184,6 +243,13 @@ enum VaultSource {
     DataFolder(Box<dyn DataProtector + Send>),
 }
 
+enum VaultSlot {
+    Unavailable,
+    Open(SharedVault),
+    // The data folder's key is there and Windows does not unwrap it for this user. It is replaced only by a reset the user asked for.
+    KeyLost,
+}
+
 struct NoVault;
 
 impl Vault for NoVault {
@@ -196,6 +262,19 @@ impl Vault for NoVault {
     }
 }
 
+// While the key is lost nothing new is sealed, because no other key may take its place but by the reset; what was sealed cannot be read, as the reset's banner says.
+struct LostKey;
+
+impl Vault for LostKey {
+    fn encrypt(&self, _: &Secret) -> Result<Ciphertext, VaultError> {
+        Err(VaultError::Unavailable)
+    }
+
+    fn decrypt(&self, _: &Ciphertext) -> Result<Secret, VaultError> {
+        Err(VaultError::Unreadable)
+    }
+}
+
 // The database lives on one thread of its own. A handle only sends that thread a request and waits for the answer, so it can be held and cloned anywhere. A switch waits for a launcher on a second thread, which has no database: what it needs of the accounts and their saved sign-ins it asks of the first.
 #[derive(Clone)]
 pub struct Backend {
@@ -204,6 +283,8 @@ pub struct Backend {
     job_thread: Thread,
     jobs: JobBoard,
     has_launchers: bool,
+    data_dir: PathBuf,
+    version: String,
 }
 
 fn take(thread: &Thread) -> Option<JoinHandle<()>> {
@@ -262,10 +343,13 @@ impl Backend {
         let jobs = JobBoard::default();
         let job_thread: Thread = Arc::default();
         let has_launchers = launchers.is_some();
+        let folder = data_dir.clone();
         let serving = Serving {
             data_dir,
             launchers,
-            vault: None,
+            vault: VaultSlot::Unavailable,
+            protector: None,
+            settings_observer: None,
             jobs: jobs.clone(),
             on_job: on_job.unwrap_or_else(|| Arc::new(|_| {})),
             commands: commands.downgrade(),
@@ -274,9 +358,10 @@ impl Backend {
             recovery: Recovery::default(),
             clipboard: None,
         };
+        let running_version = version.clone();
         let thread = thread::Builder::new()
             .name("backend".to_owned())
-            .spawn(move || serving.serve(&version, vault, &requests))
+            .spawn(move || serving.serve(&running_version, vault, &requests))
             .ok();
         Self {
             commands,
@@ -284,6 +369,8 @@ impl Backend {
             job_thread,
             jobs,
             has_launchers,
+            data_dir: folder,
+            version,
         }
     }
 
@@ -316,10 +403,115 @@ impl Backend {
         self.ask(Command::BackUpDatabase).await
     }
 
-    // Stores a setting as it is given: the rules for what each setting may hold come with the Settings screen.
+    // Every row of the settings table that is one of the Electron app's nineteen keys, as its settings:getAll answers. The typed reads of `Settings` give each key with its default.
+    pub async fn settings(&self) -> Result<Settings, ApiError> {
+        self.ask(Command::Settings).await
+    }
+
+    // The Electron app's settings:set: the key's rule first (refused with BAD_REQUEST and its message), then the row, then the settings observer.
     pub async fn set_setting(&self, key: SettingKey, value: String) -> Result<(), ApiError> {
         self.ask(|reply| Command::SetSetting(key, value, reply))
             .await
+    }
+
+    // Stores a setting as the fake launchers' seed gives it, without the rules, as the Electron app's seed does.
+    #[cfg(feature = "fake")]
+    pub async fn seed_setting(&self, key: SettingKey, value: String) -> Result<(), ApiError> {
+        self.ask(|reply| Command::SeedSetting(key, value, reply))
+            .await
+    }
+
+    // From now on `observer` hears every setting this backend stores or removes. A later call takes the place of an earlier one.
+    pub fn observe_settings(&self, observer: SettingsObserver) {
+        let _ = self
+            .commands
+            .send_blocking(Command::ObserveSettings(observer));
+    }
+
+    // The Encryption panel's Status row and the banner above the tabs.
+    pub async fn vault_status(&self) -> Result<VaultHealth, ApiError> {
+        self.ask(Command::VaultStatus).await
+    }
+
+    // Clears every stored password, saved sign-in and named secret, and puts a new probe in. Refused while a switch runs. A key Windows does not unwrap for this user is replaced first, and nothing else ever replaces one.
+    pub async fn reset_vault(&self) -> Result<VaultResetSummary, ApiError> {
+        self.ask(Command::ResetVault).await
+    }
+
+    // Run test: a random value stored, read back and deleted. Answers how long it took.
+    pub async fn test_vault(&self) -> Result<Duration, ApiError> {
+        self.ask(Command::TestVault).await
+    }
+
+    // The Launchers tab: each of the four launchers in order. A build that cannot reach a launcher answers it as not implemented.
+    pub async fn launcher_statuses(&self) -> Result<Vec<LauncherStatus>, ApiError> {
+        self.ask(Command::LauncherStatuses).await
+    }
+
+    // Locate: `exe` is the file the user picked in the window's own dialog. The adapter only reads; the launcher's folder is stored when it holds the launcher, and the Library is scanned again before the next request is answered.
+    pub async fn locate_launcher(
+        &self,
+        launcher: LauncherId,
+        exe: &str,
+    ) -> Result<LauncherInstall, ApiError> {
+        let exe = exe.to_owned();
+        self.ask(|reply| Command::LocateLauncher(launcher, exe, reply))
+            .await
+    }
+
+    // Reset: the folder chosen with Locate is forgotten and detection takes over, with a scan of the Library after it.
+    pub async fn reset_launcher_path(&self, launcher: LauncherId) -> Result<(), ApiError> {
+        self.ask(|reply| Command::ResetLauncherPath(launcher, reply))
+            .await
+    }
+
+    // The folder the Diagnostics and Backups panels open.
+    pub fn folder(&self, folder: Folder) -> PathBuf {
+        folder.path(&self.data_dir)
+    }
+
+    pub fn app_info(&self) -> AppInfo {
+        AppInfo {
+            version: self.version.clone(),
+            data_dir: self.data_dir.clone(),
+            log_dir: Folder::Logs.path(&self.data_dir),
+            db_path: ol_store::database_path(&self.data_dir),
+            build: install::build_label(),
+        }
+    }
+
+    pub fn update_status(&self) -> UpdateStatus {
+        install::update_status()
+    }
+
+    pub fn autostart_status(&self) -> AutostartStatus {
+        install::autostart_status()
+    }
+
+    pub fn set_autostart(&self, open_at_login: bool) -> Result<AutostartStatus, ApiError> {
+        Ok(install::set_autostart(open_at_login)?)
+    }
+
+    // Whether a switch or a launch runs now: what a close of the window and a quit ask about.
+    pub fn is_busy(&self) -> bool {
+        self.jobs.is_busy()
+    }
+
+    // The refusal of the Electron app's requireIdle, for a step that comes before a request, such as the file dialog of Locate.
+    pub fn require_idle(&self) -> Result<(), ApiError> {
+        if self.jobs.is_busy() {
+            return Err(ServiceError::Busy.into());
+        }
+        Ok(())
+    }
+
+    pub fn running_job(&self) -> Option<LaunchJob> {
+        self.jobs.current()
+    }
+
+    // The question to ask before a quit stops the running switch. None when nothing runs.
+    pub fn quit_question(&self) -> Option<QuitQuestion> {
+        self.jobs.current().as_ref().map(window::quit_question)
     }
 
     // Makes an account. Its password, when it has one, is encrypted before the database is touched.
@@ -554,7 +746,10 @@ impl Drop for Unanswered<'_> {
 struct Serving {
     data_dir: PathBuf,
     launchers: Option<Launchers>,
-    vault: Option<SharedVault>,
+    vault: VaultSlot,
+    // Kept for a reset of a lost key: the one way a key that is there is ever replaced.
+    protector: Option<Box<dyn DataProtector + Send>>,
+    settings_observer: Option<SettingsObserver>,
     jobs: JobBoard,
     on_job: JobObserver,
     commands: WeakSender<Command>,
@@ -570,9 +765,10 @@ impl Serving {
         let opened = data_folder::open(&self.data_dir, version)
             .map(|(store, _)| store)
             .map_err(ApiError::from);
-        if opened.is_ok() {
+        if let Ok(store) = &opened {
             self.recovery = Recovery::load(&self.data_dir);
             self.vault = self.open_vault(vault);
+            let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
         }
         while let Ok(command) = requests.recv_blocking() {
             let store = opened.as_ref().map_err(ApiError::clone);
@@ -608,10 +804,67 @@ impl Serving {
                     Ok(())
                 }),
             ),
-            Command::SetSetting(key, value, reply) => answer(
+            Command::Settings(reply) => {
+                answer(&reply, store.and_then(|store| Ok(store.settings()?)));
+            }
+            Command::SetSetting(key, value, reply) => {
+                let changed = store.and_then(|store| Ok(setting::change(store, key, &value)?));
+                if changed.is_ok() {
+                    self.changed(key, Some(&value));
+                }
+                answer(&reply, changed.map(|_| ()));
+            }
+            #[cfg(feature = "fake")]
+            Command::SeedSetting(key, value, reply) => answer(
                 &reply,
                 store.and_then(|store| Ok(store.set_setting(key, &value)?)),
             ),
+            Command::ObserveSettings(observer) => self.settings_observer = Some(observer),
+            Command::VaultStatus(reply) => answer(
+                &reply,
+                store.and_then(|store| Ok(vault_health::status(store, self.vault_access())?)),
+            ),
+            Command::ResetVault(reply) => {
+                answer(&reply, store.and_then(|store| self.reset_vault(store)));
+            }
+            Command::TestVault(reply) => answer(
+                &reply,
+                store.and_then(|store| {
+                    Ok(vault_health::self_test(
+                        store,
+                        self.vault_access(),
+                        &self.stamp(),
+                    )?)
+                }),
+            ),
+            Command::LauncherStatuses(reply) => {
+                answer(
+                    &reply,
+                    store.and_then(|store| self.launcher_statuses(store)),
+                );
+            }
+            Command::LocateLauncher(launcher, exe, reply) => {
+                let located = store
+                    .as_ref()
+                    .map_err(ApiError::clone)
+                    .and_then(|store| self.locate_launcher(store, launcher, &exe));
+                let rescan = located.is_ok();
+                answer(&reply, located);
+                if rescan && let Ok(store) = store {
+                    let _ = self.rescan(store);
+                }
+            }
+            Command::ResetLauncherPath(launcher, reply) => {
+                let reset = store
+                    .as_ref()
+                    .map_err(ApiError::clone)
+                    .and_then(|store| self.reset_launcher_path(store, launcher));
+                let rescan = reset.is_ok();
+                answer(&reply, reset);
+                if rescan && let Ok(store) = store {
+                    let _ = self.rescan(store);
+                }
+            }
             Command::CreateAccount(account, reply) => {
                 answer(
                     &reply,
@@ -851,26 +1104,114 @@ impl Serving {
             .map_or_else(ol_store::iso_now, |launchers| self.now(launchers))
     }
 
-    fn open_vault(&self, source: VaultSource) -> Option<SharedVault> {
+    fn open_vault(&mut self, source: VaultSource) -> VaultSlot {
         match source {
-            VaultSource::None => None,
+            VaultSource::None => VaultSlot::Unavailable,
             VaultSource::Launchers => self
                 .launchers
                 .as_ref()
-                .map(|launchers| Arc::clone(&launchers.vault)),
+                .map_or(VaultSlot::Unavailable, |launchers| {
+                    VaultSlot::Open(Arc::clone(&launchers.vault))
+                }),
             VaultSource::DataFolder(protector) => {
-                OsCryptVault::open_or_create(&self.data_dir, &*protector)
-                    .ok()
-                    .map(|vault| Arc::new(vault) as SharedVault)
+                let opened = OsCryptVault::open_or_create(&self.data_dir, &*protector);
+                self.protector = Some(protector);
+                match opened {
+                    Ok(vault) => VaultSlot::Open(Arc::new(vault)),
+                    Err(KeyError::Unwrap) => VaultSlot::KeyLost,
+                    Err(_) => VaultSlot::Unavailable,
+                }
             }
         }
     }
 
     fn vault(&self) -> &dyn Vault {
         match &self.vault {
-            Some(vault) => &**vault,
-            None => &NoVault,
+            VaultSlot::Open(vault) => &**vault,
+            VaultSlot::Unavailable => &NoVault,
+            VaultSlot::KeyLost => &LostKey,
         }
+    }
+
+    fn vault_access(&self) -> VaultAccess<'_> {
+        match &self.vault {
+            VaultSlot::Open(vault) => VaultAccess::Open(&**vault),
+            VaultSlot::Unavailable => VaultAccess::Unavailable,
+            VaultSlot::KeyLost => VaultAccess::KeyLost,
+        }
+    }
+
+    fn changed(&self, key: SettingKey, value: Option<&str>) {
+        if let Some(observer) = &self.settings_observer {
+            observer(key, value);
+        }
+    }
+
+    // A lost key is replaced first, so a reset that cannot make a new one removes nothing. Then every password, saved sign-in and named secret goes, and a new probe is stored.
+    fn reset_vault(&mut self, store: &Store) -> Result<VaultResetSummary, ApiError> {
+        self.require_idle()?;
+        if matches!(self.vault, VaultSlot::KeyLost)
+            && let Some(protector) = &self.protector
+        {
+            let replaced =
+                OsCryptVault::replace_lost_key(&self.data_dir, &**protector).map_err(|error| {
+                    ApiError {
+                        code: VaultError::Unavailable.code(),
+                        message: format!(
+                            "No new vault key could be made, so nothing was removed: {error}"
+                        ),
+                    }
+                })?;
+            self.vault = VaultSlot::Open(Arc::new(replaced));
+        }
+        let removed = vault_health::clear_stored_secrets(store, &self.stamp())?;
+        vault_health::ensure_probe(store, self.vault_access(), &self.stamp())?;
+        Ok(removed)
+    }
+
+    fn launcher_statuses(&self, store: &Store) -> Result<Vec<LauncherStatus>, ApiError> {
+        let Some(launchers) = &self.launchers else {
+            return Ok(LauncherId::ALL
+                .into_iter()
+                .map(LauncherStatus::unreachable)
+                .collect());
+        };
+        let configs = launchers.configs(&store.settings()?, &self.data_dir);
+        Ok(LauncherId::ALL
+            .into_iter()
+            .map(|launcher| {
+                if Launchers::IMPLEMENTED.contains(&launcher) {
+                    launchers::status(store, launchers, &configs, &self.data_dir, launcher)
+                } else {
+                    LauncherStatus::unreachable(launcher)
+                }
+            })
+            .collect())
+    }
+
+    // The folder of a program the user picked becomes the launcher's, once the adapter has found the launcher there.
+    fn locate_launcher(
+        &self,
+        store: &Store,
+        launcher: LauncherId,
+        exe: &str,
+    ) -> Result<LauncherInstall, ApiError> {
+        self.require_idle()?;
+        let install = self.with_adapter(store, launcher, |_, _, adapter| {
+            Ok(launchers::locate(adapter, exe)?)
+        })?;
+        let key = SettingKey::launcher_path(launcher);
+        store.set_setting(key, &install.install_dir)?;
+        self.changed(key, Some(&install.install_dir));
+        Ok(install)
+    }
+
+    fn reset_launcher_path(&self, store: &Store, launcher: LauncherId) -> Result<(), ApiError> {
+        self.require_idle()?;
+        let key = SettingKey::launcher_path(launcher);
+        store.delete_setting(key)?;
+        self.changed(key, None);
+        Ok(())
     }
 
     // A switch works from the accounts as they were when it began: what changes one waits until it is done.
