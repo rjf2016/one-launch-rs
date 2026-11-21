@@ -1,4 +1,4 @@
-use ol_model::{Ciphertext, LibrarySort, SecretKey, SettingKey};
+use ol_model::{Ciphertext, LibrarySort, SecretKey, SettingKey, Sidebar};
 use rusqlite::params;
 
 use crate::{Store, StoreError};
@@ -10,6 +10,10 @@ impl Store {
 
     pub fn set_library_sort(&self, sort: LibrarySort) -> Result<(), StoreError> {
         self.store_value(LibrarySort::KEY, sort.as_str())
+    }
+
+    pub fn set_sidebar(&self, sidebar: Sidebar) -> Result<(), StoreError> {
+        self.store_value(Sidebar::KEY, sidebar.as_str())
     }
 
     fn store_value(&self, key: &str, value: &str) -> Result<(), StoreError> {

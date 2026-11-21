@@ -4,6 +4,7 @@ use gpui::{
     Window, WindowControlArea, div, px, svg,
 };
 use ol_api::Backend;
+use ol_model::Sidebar;
 use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::accounts::AccountsView;
@@ -53,11 +54,13 @@ impl Page {
 }
 
 pub struct Shell {
+    backend: Backend,
     host: Entity<LaunchHost>,
     library: Entity<LibraryView>,
     page: Page,
-    // Folded at every width until the user opens it, on the owner's word of 2026-11-21; the choice holds for this run only.
     sidebar_open: bool,
+    // The user has toggled the sidebar in this run: the stored choice, should it arrive later, does not undo that.
+    toggled: bool,
     fake_launchers: bool,
     _keys: Subscription,
 }
@@ -73,6 +76,22 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        // Asked before the Library asks for its games, so a stored open sidebar is in place before the first grid is laid out.
+        cx.spawn({
+            let backend = backend.clone();
+            async move |this, cx| {
+                let Ok(stored) = backend.sidebar().await else {
+                    return;
+                };
+                this.update(cx, |this, cx| {
+                    if !this.toggled && stored.is_open() != this.sidebar_open {
+                        this.lay_out(stored.is_open(), cx);
+                    }
+                })
+                .ok();
+            }
+        })
+        .detach();
         let this = cx.weak_entity();
         let keys = cx.intercept_keystrokes(move |event, window, cx| {
             let taken = this
@@ -86,10 +105,12 @@ impl Shell {
         });
         let host = cx.new(|cx| LaunchHost::new(backend.clone(), cx));
         Self {
-            library: cx.new(|cx| LibraryView::new(backend, host.clone(), window, cx)),
+            library: cx.new(|cx| LibraryView::new(backend.clone(), host.clone(), window, cx)),
+            backend,
             host,
             page: Page::Library,
             sidebar_open: false,
+            toggled: false,
             fake_launchers,
             _keys: keys,
         }
@@ -120,10 +141,23 @@ impl Shell {
         cx.notify();
     }
 
-    // The Library learns the width it lays out for in the same update as the sidebar, so the next frame draws both for it.
     fn toggle_sidebar(&mut self, cx: &mut Context<Self>) {
-        self.sidebar_open = !self.sidebar_open;
-        let width = sidebar_width(self.sidebar_open);
+        self.toggled = true;
+        let open = !self.sidebar_open;
+        self.lay_out(open, cx);
+        let sidebar = if open { Sidebar::Open } else { Sidebar::Folded };
+        let backend = self.backend.clone();
+        // A choice that could not be stored still holds for this run, as the Library's sort does.
+        cx.spawn(async move |_, _| {
+            let _ = backend.set_sidebar(sidebar).await;
+        })
+        .detach();
+    }
+
+    // The Library learns the width it lays out for in the same update as the sidebar, so the next frame draws both for it.
+    fn lay_out(&mut self, open: bool, cx: &mut Context<Self>) {
+        self.sidebar_open = open;
+        let width = sidebar_width(open);
         self.library
             .update(cx, |library, cx| library.set_sidebar(width, cx));
         cx.notify();

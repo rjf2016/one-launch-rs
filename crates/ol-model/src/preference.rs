@@ -33,10 +33,61 @@ impl LibrarySort {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Sidebar {
+    // The owner's default of 2026-11-21, at every window width.
+    #[default]
+    Folded,
+    Open,
+}
+
+impl Sidebar {
+    // The other row of `triage.toml` X-01, named and valued as the Electron app's page storage has it; that stored choice is not taken over.
+    pub const KEY: &'static str = "sidebar";
+
+    pub fn from_stored(stored: Option<&str>) -> Self {
+        if stored == Some(Self::Open.as_str()) {
+            Self::Open
+        } else {
+            Self::Folded
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Folded => "collapsed",
+            Self::Open => "expanded",
+        }
+    }
+
+    pub const fn is_open(self) -> bool {
+        matches!(self, Self::Open)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::SettingKey;
+
+    #[test]
+    fn anything_but_expanded_reads_as_a_folded_sidebar() {
+        assert_eq!(Sidebar::from_stored(Some("expanded")), Sidebar::Open);
+        for stored in [
+            None,
+            Some("collapsed"),
+            Some("Expanded"),
+            Some(""),
+            Some("open"),
+        ] {
+            assert_eq!(Sidebar::from_stored(stored), Sidebar::Folded, "{stored:?}");
+        }
+        for sidebar in [Sidebar::Folded, Sidebar::Open] {
+            assert_eq!(Sidebar::from_stored(Some(sidebar.as_str())), sidebar);
+        }
+        assert_eq!(Sidebar::default(), Sidebar::Folded);
+        assert_eq!(SettingKey::parse(Sidebar::KEY), None);
+    }
 
     #[test]
     fn anything_but_name_reads_as_last_played() {
