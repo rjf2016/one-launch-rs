@@ -1,5 +1,3 @@
-// The import dialog: the accounts a launcher remembers, ticked to be made One Launch accounts, names and ids only.
-
 use std::time::SystemTime;
 
 use gpui::prelude::*;
@@ -21,7 +19,6 @@ pub(super) struct Import {
     key: u64,
     launcher: LauncherId,
     remembered: Remembered,
-    // The keys of the entries ticked, in the order the launcher lists them.
     selected: Vec<String>,
     busy: bool,
     error: Option<SharedString>,
@@ -58,13 +55,34 @@ fn copy(launcher: LauncherId) -> Copy {
     }
 }
 
-// What names an entry: the launcher's id for the account, or its login where the launcher records none.
 fn key_of(entry: &RememberedAccount) -> &str {
     if entry.launcher_uid.is_empty() {
         &entry.login
     } else {
         &entry.launcher_uid
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Detail {
+    Login(String),
+    Id(String),
+    SignedIn(String),
+}
+
+fn details_of(entry: &RememberedAccount, now: SystemTime) -> Vec<Detail> {
+    let mut details = vec![Detail::Login(entry.login.clone())];
+    if !entry.launcher_uid.is_empty() {
+        details.push(Detail::Id(entry.launcher_uid.clone()));
+    }
+    if let Some(when) = entry
+        .last_login_at
+        .as_deref()
+        .and_then(|at| relative(at, now))
+    {
+        details.push(Detail::SignedIn(when));
+    }
+    details
 }
 
 impl Import {
@@ -163,7 +181,6 @@ impl AccountsView {
         cx.notify();
     }
 
-    // A second press, or Enter with a click, finds the import under way and does nothing.
     fn run_import(&mut self, cx: &mut Context<Self>) {
         let Some(import) = self.import.as_mut() else {
             return;
@@ -184,7 +201,6 @@ impl AccountsView {
         cx.notify();
     }
 
-    // The answer counts whether or not the dialog is still up: it may have been closed while the import ran, as the Electron app allows.
     fn imported(
         &mut self,
         key: u64,
@@ -207,15 +223,17 @@ impl AccountsView {
                 return;
             }
         };
-        if open.is_some() {
+        let still_up = open.is_some();
+        if still_up {
             self.import = None;
         }
-        // Sent here by a game's Play: back to that game, with the one imported account picked, or the picker when there are several.
-        let returns = self.return_to.as_ref().is_some_and(|game| {
-            imported
-                .iter()
-                .any(|account| account.launcher == game.launcher)
-        });
+        // An import whose dialog the user closed moves no page: another dialog may be up by now.
+        let returns = still_up
+            && self.return_to.as_ref().is_some_and(|game| {
+                imported
+                    .iter()
+                    .any(|account| account.launcher == game.launcher)
+            });
         if returns && let Some(game) = self.return_to.take() {
             let account = match imported.as_slice() {
                 [only] => Some(only.id.clone()),
@@ -248,14 +266,13 @@ impl AccountsView {
         self.reload(cx);
     }
 
-    // As in the Electron app, also while an import runs: its answer still comes to this page.
+    // Allowed while an import runs, as in the Electron app.
     fn close_import(&mut self, cx: &mut Context<Self>) {
         if self.import.take().is_some() {
             cx.notify();
         }
     }
 
-    // Every key is the dialog's while it is up; the shell lets those held with Alt or the Windows key go on to Windows.
     pub fn on_import_key(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) {
         let held = keystroke.modifiers;
         let plain = !held.control && !held.alt && !held.shift && !held.platform && !held.function;
@@ -314,30 +331,24 @@ impl AccountsView {
                 .text_color(color(theme::FAINT))
                 .child("\u{b7}")
         };
-        let mut details = vec![div().min_w_0().truncate().child(entry.login.clone())];
-        if entry.launcher_uid.is_empty() {
-            details.push(dot());
-            details.push(
-                div()
-                    .flex_none()
-                    .font_family(theme::MONO)
-                    .text_color(color(theme::FAINT))
-                    .child(entry.launcher_uid.clone()),
-            );
-        }
-        if let Some(when) = entry
-            .last_login_at
-            .as_deref()
-            .and_then(|at| relative(at, now))
-        {
-            details.push(dot());
-            details.push(
-                div()
-                    .flex_none()
-                    .text_color(color(theme::FAINT))
-                    .child(format!("last sign-in {when}")),
-            );
-        }
+        let details = details_of(entry, now)
+            .into_iter()
+            .enumerate()
+            .flat_map(|(at, detail)| {
+                let part = match detail {
+                    Detail::Login(login) => div().min_w_0().truncate().child(login),
+                    Detail::Id(id) => div()
+                        .flex_none()
+                        .font_family(theme::MONO)
+                        .text_color(color(theme::FAINT))
+                        .child(id),
+                    Detail::SignedIn(when) => div()
+                        .flex_none()
+                        .text_color(color(theme::FAINT))
+                        .child(format!("last sign-in {when}")),
+                };
+                (at > 0).then(dot).into_iter().chain([part])
+            });
         let checkbox = div()
             .flex()
             .flex_none()
@@ -554,7 +565,14 @@ impl AccountsView {
                         })
                         .disabled(busy || count == 0)
                         .leading(leads && import.import_leads())
-                        .on_click(cx.listener(|this, _, _, cx| this.run_import(cx))),
+                        // The second click of the double-click that opened the dialog is no press on Import.
+                        .on_click(cx.listener(
+                            |this, click: &ClickEvent, _, cx| {
+                                if click.click_count() == 1 {
+                                    this.run_import(cx);
+                                }
+                            },
+                        )),
                     ),
             );
         let card = div()
@@ -618,6 +636,22 @@ mod tests {
             session_may_be_expired: false,
             linked_account_id: None,
         }
+    }
+
+    #[test]
+    fn a_row_names_the_launchers_id_only_when_the_launcher_keeps_one() {
+        let now = SystemTime::now();
+        assert_eq!(
+            details_of(&remembered("launcher-id-2", "user_2"), now),
+            [
+                Detail::Login("user_2".to_owned()),
+                Detail::Id("launcher-id-2".to_owned())
+            ]
+        );
+        assert_eq!(
+            details_of(&remembered("", "saved2@example.com"), now),
+            [Detail::Login("saved2@example.com".to_owned())]
+        );
     }
 
     #[test]

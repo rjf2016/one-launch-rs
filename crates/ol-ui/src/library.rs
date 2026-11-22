@@ -82,7 +82,7 @@ pub struct LibraryView {
     frames: Option<Vec<LibraryFrame>>,
     sidebar: Pixels,
     on_screen: bool,
-    _subscriptions: [Subscription; 4],
+    _subscriptions: [Subscription; 3],
 }
 
 // What a frame was drawn for and how its grid was laid out, for a capture to tell a layout that changes its mind from one drawn late.
@@ -133,7 +133,7 @@ struct OpenMenu {
     highlight: usize,
 }
 
-// The menu of a card, at the place it was asked for; a scroll or a resize of the window closes it. Its one item, Play as, has the keyboard from the start: Refresh artwork and Choose portrait image come with the artwork fetching.
+// Refresh artwork and Choose portrait image come with the artwork fetching.
 struct CardMenu {
     game: String,
     at: Point<Pixels>,
@@ -308,19 +308,13 @@ impl LibraryView {
                 this.update(cx, |this, cx| this.set_query(text, cx)).ok();
             }
         });
-        // Before the bindings of whatever has the keyboard: a text field has its own for Ctrl+F.
-        let keys = cx.intercept_keystrokes(move |event, window, cx| {
-            let taken = this
-                .update(cx, |this, cx| {
-                    this.on_keystroke(&event.keystroke, window, cx)
-                })
-                .unwrap_or(false);
-            if taken {
-                cx.stop_propagation();
+        let host_changed = cx.observe(&host, |this, host, cx| {
+            if host.read(cx).is_modal() {
+                this.card_menu = None;
+                this.menu = None;
             }
+            cx.notify();
         });
-
-        let host_changed = cx.observe(&host, |_, _, cx| cx.notify());
         let job_settled = cx.subscribe(&host, |this, _, _: &JobSettled, cx| this.reload(cx));
         cx.spawn({
             let backend = backend.clone();
@@ -375,7 +369,7 @@ impl LibraryView {
             frames: None,
             sidebar: sidebar_width(false),
             on_screen: true,
-            _subscriptions: [search_changed, keys, host_changed, job_settled],
+            _subscriptions: [search_changed, host_changed, job_settled],
         }
     }
 
@@ -571,7 +565,6 @@ impl LibraryView {
         }
     }
 
-    // The account list, never a one-click Play.
     fn play_as(&mut self, cx: &mut Context<Self>) {
         let Some(menu) = self.card_menu.take() else {
             return;
@@ -725,7 +718,7 @@ impl LibraryView {
         cx.notify();
     }
 
-    fn on_keystroke(
+    pub fn on_keystroke(
         &mut self,
         keystroke: &Keystroke,
         window: &mut Window,
