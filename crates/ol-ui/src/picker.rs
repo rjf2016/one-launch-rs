@@ -58,6 +58,15 @@ fn ask(picker: Option<&FilePicker>) -> Ask {
 }
 
 pub(crate) fn pick_program(cx: &App) -> Task<Picked> {
+    pick_file(cx)
+}
+
+// The picture for "Choose portrait image…". GPUI's dialog takes no filter, so it lists every file; what is chosen is checked as a picture before it is kept.
+pub(crate) fn pick_image(cx: &App) -> Task<Picked> {
+    pick_file(cx)
+}
+
+fn pick_file(cx: &App) -> Task<Picked> {
     match ask(cx.try_global::<FilePicker>()) {
         Ask::Answered(picked) => Task::ready(picked),
         Ask::Dialog => {

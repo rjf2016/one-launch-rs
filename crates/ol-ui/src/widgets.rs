@@ -14,6 +14,7 @@ use ol_ui_kit::theme::{self, alpha, color};
 use crate::assets;
 
 const TURN: Duration = Duration::from_secs(1);
+const PULSE: Duration = Duration::from_secs(2);
 const FLASH_STAYS: Duration = Duration::from_secs(3);
 const ERROR_FLASH_STAYS: Duration = Duration::from_secs(6);
 // Windows' double-click time as it ships, read from no setting.
@@ -31,6 +32,15 @@ fn turning(id: impl Into<ElementId>, glyph: Svg) -> AnyElement {
     glyph
         .with_animation(id, Animation::new(TURN).repeat(), |glyph, turned| {
             glyph.with_transformation(Transformation::rotate(percentage(turned)))
+        })
+        .into_any_element()
+}
+
+// Fades to half and back every two seconds, as the Electron app's pulse does.
+pub fn pulsing(id: impl Into<ElementId>, glyph: Svg) -> AnyElement {
+    glyph
+        .with_animation(id, Animation::new(PULSE).repeat(), |glyph, beat| {
+            glyph.opacity(0.5 + (2. * beat - 1.).abs() / 2.)
         })
         .into_any_element()
 }

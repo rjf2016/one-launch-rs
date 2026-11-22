@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, ClickEvent, Context, Div, EventEmitter, Keystroke, MouseDownEvent, Pixels,
+    AnyElement, App, ClickEvent, Context, Div, EventEmitter, Keystroke, MouseDownEvent, Pixels,
     SharedString, Size, StyledText, TextRun, Window, anchored, deferred, div, font, px,
 };
 use ol_api::settings::{
@@ -27,29 +27,32 @@ use crate::widgets::{
     icon, page_title, panel, setting_row, spot_of, switch, tab_strip,
 };
 
+mod artwork;
 mod backups;
 mod launchers;
 
 pub use launchers::KnownStatuses;
 
-// The tabs this build shows, in the Electron app's order. Artwork comes with its screen.
+// The tabs, in the Electron app's order.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SettingsTab {
     #[default]
     General,
     Launchers,
+    Artwork,
     Backups,
     Advanced,
 }
 
 impl SettingsTab {
-    const SHOWN: [Self; 4] = [
+    const SHOWN: [Self; 5] = [
         Self::General,
         Self::Launchers,
+        Self::Artwork,
         Self::Backups,
         Self::Advanced,
     ];
-    const LABELS: [&'static str; 4] = ["General", "Launchers", "Backups", "Advanced"];
+    const LABELS: [&'static str; 5] = ["General", "Launchers", "Artwork", "Backups", "Advanced"];
 
     fn index(self) -> usize {
         Self::SHOWN.iter().position(|tab| *tab == self).unwrap_or(0)
@@ -152,6 +155,12 @@ enum Control {
     ShowGuide,
     ShowWhatsNew,
     PreviewWhatsNew,
+    ArtworkRescan,
+    ArtworkRefreshAll,
+    GetKey,
+    // The field the SteamGridDB key is pasted into: while the keyboard is on it, it is the field's.
+    KeyField,
+    RemoveKey,
 }
 
 pub enum SettingsAsk {
@@ -208,6 +217,7 @@ pub struct SettingsView {
     known: KnownStatuses,
     launchers: launchers::Launchers,
     backups: backups::Backups,
+    artwork: artwork::Artwork,
     developer: bool,
 }
 
@@ -219,9 +229,27 @@ impl SettingsView {
         tab: Rc<Cell<SettingsTab>>,
         known: KnownStatuses,
         developer: bool,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        // The backend tells the queue's state as it changes, for as long as this page lives.
+        cx.spawn({
+            let changes = backend.artwork_changes();
+            async move |this, cx| {
+                while let Ok(status) = changes.recv().await {
+                    let heard = this.update(cx, |this, cx| {
+                        this.artwork.heard(status);
+                        cx.notify();
+                    });
+                    if heard.is_err() {
+                        break;
+                    }
+                }
+            }
+        })
+        .detach();
         let mut view = Self {
+            artwork: artwork::Artwork::new(window, cx),
             info: backend.app_info(),
             update: backend.update_status(),
             autostart: backend.autostart_status(),
@@ -263,7 +291,7 @@ impl SettingsView {
         match self.tab.get() {
             SettingsTab::Launchers => self.enter_launchers(cx),
             SettingsTab::Backups => self.enter_backups(cx),
-            SettingsTab::General | SettingsTab::Advanced => {}
+            SettingsTab::General | SettingsTab::Artwork | SettingsTab::Advanced => {}
         }
     }
 
@@ -342,6 +370,7 @@ impl SettingsView {
                         backend: VaultBackend::None,
                         readable: None,
                     }));
+                    this.sync_key_field(cx);
                     cx.notify();
                 }
             })
@@ -589,6 +618,10 @@ impl SettingsView {
                     SettingKey::PlayHideToTray,
                 ]));
             }
+            SettingsTab::Artwork => {
+                self.artwork.controls(self.vault_works(), &mut controls);
+                controls.extend(toggles(&[SettingKey::ArtworkAutoFetch]));
+            }
             SettingsTab::Backups => {
                 controls.extend([Control::Refresh, Control::Open(Folder::Backups)]);
                 if loaded {
@@ -636,13 +669,31 @@ impl SettingsView {
         self.reveal = true;
     }
 
+    // Whether the keyboard is in the key field: its keys are the field's, the shell's shortcuts among them.
+    pub fn typing(&self, window: &Window, cx: &App) -> bool {
+        self.tab.get() == SettingsTab::Artwork && self.artwork.typing(window, cx)
+    }
+
     // Keys held with Ctrl, Alt or the Windows key are the window's or the shell's.
-    pub fn on_key(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
+    pub fn on_key(
+        &mut self,
+        keystroke: &Keystroke,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         let held = keystroke.modifiers;
         if held.control || held.alt || held.platform || held.function {
             return false;
         }
         let key = keystroke.key.as_str();
+        // Only Tab leaves the field; every other key is typed into it.
+        let typing = self.typing(window, cx);
+        if typing {
+            self.focus = Some(Control::KeyField);
+            if key != "tab" {
+                return false;
+            }
+        }
         if let Some((pick, lit)) = self.menu {
             let last = self
                 .settings
@@ -666,6 +717,13 @@ impl SettingsView {
         }
         if key == "tab" {
             self.step_focus(held.shift);
+            if self.focus == Some(Control::KeyField) {
+                self.artwork.focus_field(window, cx);
+            } else if typing {
+                // As the field's own blur does; a window that is not the active one is told of no blur.
+                self.leave_key_field(window, cx);
+                window.blur(cx);
+            }
             cx.notify();
             return true;
         }
@@ -694,6 +752,10 @@ impl SettingsView {
                 self.ring = true;
                 self.select_tab(SettingsTab::SHOWN[to], cx);
             }
+            Control::ArtworkRescan if press => self.rescan_for_artwork(cx),
+            Control::ArtworkRefreshAll if press => self.refresh_all_artwork(cx),
+            Control::GetKey if press => self.get_key(cx),
+            Control::RemoveKey if press => self.remove_key(cx),
             Control::Toggle(setting) if press => self.toggle(setting, cx),
             Control::Pick(pick) if press || matches!(key, "down" | "up") => {
                 if press || self.menu.is_none() {
@@ -897,7 +959,10 @@ impl SettingsView {
                 &SettingsTab::LABELS,
                 at,
                 self.ringed_on(Control::Tabs),
-                cx.listener(|this, index: &usize, _, cx| {
+                cx.listener(|this, index: &usize, window, cx| {
+                    if this.typing(window, cx) {
+                        window.blur(cx);
+                    }
                     this.clicked(Control::Tabs);
                     this.select_tab(SettingsTab::SHOWN[*index], cx);
                 }),
@@ -1389,6 +1454,7 @@ impl Render for SettingsView {
         let panels = match self.tab.get() {
             SettingsTab::General => self.render_general(cx),
             SettingsTab::Launchers => self.render_launchers(cx),
+            SettingsTab::Artwork => self.render_artwork(window, cx),
             SettingsTab::Backups => self.render_backups(cx),
             SettingsTab::Advanced => self.render_advanced(cx),
         };

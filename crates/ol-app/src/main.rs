@@ -24,7 +24,7 @@ use ol_api::settings::{
     hide_after_instant_play, placement_from, start_hidden,
 };
 use ol_model::{SettingKey, Settings};
-use ol_platform_api::{Shell as FolderShell, ShellError};
+use ol_platform_api::{Shell as FolderShell, ShellError, WebPage};
 use ol_platform_win::data_folder::refuse_real_data_folder;
 use ol_platform_win::dpapi::Dpapi;
 use ol_platform_win::instance::{self, Claim, Instance};
@@ -51,6 +51,8 @@ const SECOND_START_WAIT: Duration = Duration::from_secs(10);
 const RELAUNCH_WAIT: Duration = Duration::from_secs(60);
 const BOUNDS_SETTLE: Duration = Duration::from_millis(500);
 const DEFAULT_SIZE: (f32, f32) = (1280., 800.);
+#[cfg(feature = "fake")]
+const FAKE_ANSWER: Duration = Duration::from_millis(250);
 
 type TraySlot = Rc<RefCell<Option<Tray>>>;
 
@@ -144,6 +146,59 @@ impl Opener {
     }
 }
 
+// What answers the artwork lookups. Only a run on this PC's launchers, which nobody but the owner starts, is handed the client that reaches the internet. A run on fake launchers is answered in this process, and every other run, a capture, a probe and a plain start among them, is handed nothing and looks nothing up.
+#[derive(Debug, PartialEq, Eq)]
+enum Net {
+    #[cfg(not(feature = "fake"))]
+    Internet,
+    #[cfg(feature = "fake")]
+    InProcess,
+    Nothing,
+}
+
+impl Net {
+    fn for_run(args: &Args) -> Self {
+        #[cfg(not(feature = "fake"))]
+        if args.real_launchers && args.check.is_none() && args.doctor.is_none() {
+            return Self::Internet;
+        }
+        #[cfg(feature = "fake")]
+        if args.fake.is_some() && args.doctor.is_none() {
+            return Self::InProcess;
+        }
+        Self::Nothing
+    }
+}
+
+// The one place a run's backend is handed what its artwork lookups ask. `ol_net::HttpsClient` is named here and nowhere else in the app.
+#[cfg(not(feature = "fake"))]
+fn hand_net(args: &Args, backend: &Backend) -> Option<Box<dyn FnOnce()>> {
+    if Net::for_run(args) == Net::Internet {
+        backend.use_http(Arc::new(ol_net::HttpsClient::new()));
+    }
+    None
+}
+
+// A build with the fake launchers has no way to the internet at all: its lookups are answered by the scenario's own, and the run says at its end what was asked.
+#[cfg(feature = "fake")]
+fn hand_net(args: &Args, backend: &Backend) -> Option<Box<dyn FnOnce()>> {
+    if Net::for_run(args) != Net::InProcess {
+        return None;
+    }
+    // Each answer takes a moment, as a real one does, so "Fetching artwork" can be seen.
+    let http = Arc::new(ol_platform_fake::RecordingHttp::new(|request| {
+        std::thread::sleep(FAKE_ANSWER);
+        ol_sim::artwork::respond(request)
+    }));
+    backend.use_http(Arc::clone(&http) as Arc<dyn ol_platform_api::http::HttpClient>);
+    println!("OneLaunch: artwork: answered in this process; no request leaves it");
+    Some(Box::new(move || {
+        for asked in http.asked() {
+            println!("OneLaunch: artwork asked {}", asked.url);
+        }
+    }))
+}
+
 // The one place a run's backend is handed its shell. Answers the recording shell when that is the one given.
 fn hand_shell(args: &Args, backend: &Backend) -> Option<Arc<RecordingShell>> {
     match Opener::for_run(args) {
@@ -161,6 +216,7 @@ fn hand_shell(args: &Args, backend: &Backend) -> Option<Arc<RecordingShell>> {
                 .map(|(folder, name)| (backend.folder(folder), name))
                 .to_vec(),
                 asked: std::sync::Mutex::default(),
+                pages: std::sync::Mutex::default(),
             });
             backend.use_shell(Arc::clone(&shell) as Arc<dyn FolderShell>);
             Some(shell)
@@ -172,11 +228,20 @@ fn hand_shell(args: &Args, backend: &Backend) -> Option<Arc<RecordingShell>> {
 struct RecordingShell {
     folders: Vec<(PathBuf, &'static str)>,
     asked: std::sync::Mutex<Vec<&'static str>>,
+    pages: std::sync::Mutex<Vec<WebPage>>,
 }
 
 impl FolderShell for RecordingShell {
     fn open_url(&self, _: &str) -> Result<(), ShellError> {
         Err(ShellError("This run opens no links.".to_owned()))
+    }
+
+    fn open_page(&self, page: WebPage) -> Result<(), ShellError> {
+        println!("OneLaunch: page recorded and not opened: {}", page.url());
+        if let Ok(mut pages) = self.pages.lock() {
+            pages.push(page);
+        }
+        Ok(())
     }
 
     fn open_folder(&self, folder: &str) -> Result<(), ShellError> {
@@ -366,6 +431,7 @@ fn run(args: Args, logger: &Arc<Logger>, instance: Rc<Instance>) -> (ExitCode, O
     boxes::attach(backend.clone(), Arc::clone(logger));
     let heard = use_clipboard(Board::for_run(&args).give(), &backend);
     let _recorded = hand_shell(&args, &backend);
+    let asked = hand_net(&args, &backend);
     let picker = Rc::new(RefCell::new(None));
     let failed = Rc::new(Cell::new(false));
     let failure = Rc::new(RefCell::new(None));
@@ -397,6 +463,9 @@ fn run(args: Args, logger: &Arc<Logger>, instance: Rc<Instance>) -> (ExitCode, O
     backend.shut_down();
     if let Some(heard) = heard {
         heard();
+    }
+    if let Some(asked) = asked {
+        asked();
     }
     if let Some(picker) = picker.borrow().as_ref() {
         report_picks(picker);
@@ -1161,6 +1230,75 @@ mod tests {
         }
         assert_eq!(Opener::for_run(&parsed(&["--doctor"])), Opener::Recording);
         assert_eq!(Opener::for_run(&parsed(&[])), Opener::Windows);
+    }
+
+    // The app's one way to the internet is the client `hand_net` hands over, and a capture or a probe is never handed it: what main gives such a run's backend refuses every lookup, or, on fake launchers, answers it in this process.
+    #[test]
+    fn a_capture_or_a_probe_never_reaches_the_internet() {
+        let checks: [&[&str]; 6] = [
+            &[r"--capture=D:\scratch\shot.png"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-keys=enter"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-size=960x600"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-focus"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-type=abc"],
+            &["--probe"],
+        ];
+        let scratch = ol_testkit::Scratch::new("app-net");
+        for check in checks {
+            let args = parsed(check);
+            assert_eq!(Net::for_run(&args), Net::Nothing, "{check:?}");
+            let backend = Backend::start(scratch.join("data"), VERSION);
+            assert!(hand_net(&args, &backend).is_none(), "{check:?}");
+            let refused = block_on(backend.refresh_artwork(None, true))
+                .expect_err("a run that is handed nothing looks nothing up");
+            assert_eq!(refused.code, "UNAVAILABLE", "{check:?}");
+            backend.shut_down();
+        }
+        assert_eq!(Net::for_run(&parsed(&["--doctor"])), Net::Nothing);
+        assert_eq!(Net::for_run(&parsed(&[])), Net::Nothing);
+
+        #[cfg(not(feature = "fake"))]
+        {
+            assert_eq!(Net::for_run(&parsed(&["--real-launchers"])), Net::Internet);
+            for check in checks {
+                // No argument list gives this: the parser refuses --real-launchers beside a capture or a probe. Were it ever to let one through, the run is still handed nothing.
+                let mut forged = parsed(check);
+                forged.real_launchers = true;
+                assert_eq!(Net::for_run(&forged), Net::Nothing, "{check:?}");
+                let arguments = [r"--data-dir=D:\scratch\data", "--real-launchers"]
+                    .iter()
+                    .chain(check)
+                    .map(|argument| (*argument).to_owned());
+                assert!(Args::parse(arguments).is_err(), "{check:?}");
+            }
+        }
+        #[cfg(feature = "fake")]
+        {
+            let fake = [
+                r"--fake-launchers=D:\scratch\launchers",
+                r"--fake-scenario=D:\scratch\scenario",
+                r"--fake-fixtures=D:\scratch\fixtures",
+            ];
+            for check in checks {
+                let with_fakes: Vec<&str> = check.iter().chain(&fake).copied().collect();
+                let args = parsed(&with_fakes);
+                assert_eq!(Net::for_run(&args), Net::InProcess, "{check:?}");
+                let backend = Backend::start(scratch.join("data"), VERSION);
+                let asked = hand_net(&args, &backend);
+                assert!(asked.is_some(), "{check:?}");
+                assert_eq!(block_on(backend.refresh_artwork(None, true)), Ok(0));
+                backend.shut_down();
+            }
+            assert!(
+                Args::parse(
+                    [r"--data-dir=D:\scratch\data", "--real-launchers"]
+                        .map(str::to_owned)
+                        .into_iter()
+                )
+                .is_err(),
+                "a build with the fake launchers takes no real ones"
+            );
+        }
     }
 
     // Locate's dialog is GPUI's `prompt_for_paths`, which only `FilePicker::Windows` reaches.

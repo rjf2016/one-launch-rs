@@ -13,17 +13,22 @@ use gpui::{
 };
 use ol_api::library::{LibraryGame, caption, monogram, relative, visible};
 use ol_api::{ApiError, Backend, Library};
-use ol_model::{ArtworkSource, Game, LauncherId, LibraryScanResult, LibrarySort, RecentLaunch};
+use ol_model::{
+    ArtworkKind, ArtworkSource, ArtworkStatus, Game, LauncherId, LibraryScanResult, LibrarySort,
+    RecentLaunch,
+};
 use ol_ui_kit::TextField;
 use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::assets;
 use crate::follow::{Follow, follow};
 use crate::host::{JobSettled, LaunchHost};
+use crate::picker::{Picked, pick_image};
 use crate::posters::{self, Lookup, Posters, Shape};
 use crate::shell::sidebar_width;
 use crate::widgets::{
-    Button, Flash, FlashTone, Tone, icon, launcher_dot, menu_shadow, page_title, spinner, tip,
+    Button, Flash, FlashTone, Tone, icon, launcher_dot, menu_shadow, page_title, pulsing, spinner,
+    tip,
 };
 
 // The owner's pick of 2026-11-21, from a prototype of the page: the padding at its sides, the least width of a card and the room between two.
@@ -64,6 +69,10 @@ pub struct LibraryView {
     load: Load,
     games: Vec<LibraryGame>,
     cards: Vec<Card>,
+    // Counts the pictures a game has had while this list was shown: a poster decoded from an earlier one is not this one's.
+    art_stamps: Vec<u64>,
+    // The artwork queue and the Library's revision, as the backend last told them.
+    artwork: ArtworkStatus,
     recent: Vec<RecentLaunch>,
     scanning: bool,
     // The scan every start runs has ended: until then an empty Library says nothing about what is installed.
@@ -113,6 +122,11 @@ pub struct LibraryLoaded;
 
 impl EventEmitter<LibraryLoaded> for LibraryView {}
 
+// The user asked for the place the SteamGridDB key is stored: Settings, on its Artwork tab.
+pub struct OpenArtworkSettings;
+
+impl EventEmitter<OpenArtworkSettings> for LibraryView {}
+
 struct Card {
     name: SharedString,
     monogram: SharedString,
@@ -133,12 +147,24 @@ struct OpenMenu {
     highlight: usize,
 }
 
-// Refresh artwork and Choose portrait image come with the artwork fetching.
 struct CardMenu {
     game: String,
     at: Point<Pixels>,
     viewport: Size<Pixels>,
+    // The item the keyboard is on.
+    lit: usize,
 }
+
+// The card menu's items: an id, a glyph and what it says.
+const CARD_MENU: [(&str, &str, &str); 3] = [
+    ("play-as", assets::ACCOUNTS, "Play as\u{2026}"),
+    ("refresh-artwork", assets::RESCAN, "Refresh artwork"),
+    (
+        "choose-image",
+        assets::IMAGE_PLUS,
+        "Choose portrait image\u{2026}",
+    ),
+];
 
 fn artwork_line(game: &Game) -> String {
     match (&game.artwork, &game.artwork_error) {
@@ -338,6 +364,19 @@ impl LibraryView {
             }
         })
         .detach();
+        // The backend tells of every lookup queued, started and ended, and of every change to the games and their pictures.
+        cx.spawn({
+            let changes = backend.artwork_changes();
+            async move |this, cx| {
+                while let Ok(status) = changes.recv().await {
+                    let heard = this.update(cx, |this, cx| this.heard_artwork(status, cx));
+                    if heard.is_err() {
+                        break;
+                    }
+                }
+            }
+        })
+        .detach();
 
         Self {
             backend,
@@ -352,6 +391,8 @@ impl LibraryView {
             load: Load::Pending,
             games: Vec::new(),
             cards: Vec::new(),
+            art_stamps: Vec::new(),
+            artwork: ArtworkStatus::default(),
             recent: Vec::new(),
             scanning: false,
             scanned: false,
@@ -396,7 +437,16 @@ impl LibraryView {
                 .games
                 .iter()
                 .zip(&library.games)
-                .all(|(old, new)| old.game.id == new.game.id && old.grid == new.grid);
+                .all(|(old, new)| old.game.id == new.game.id);
+        // A picture that was fetched again has its file's name and a new time.
+        let repainted: Vec<usize> = self
+            .games
+            .iter()
+            .zip(&library.games)
+            .enumerate()
+            .filter(|(_, (old, new))| old.grid != new.grid || old.game.artwork != new.game.artwork)
+            .map(|(index, _)| index)
+            .collect();
         self.cards = library
             .games
             .iter()
@@ -412,10 +462,15 @@ impl LibraryView {
         self.load = Load::Ready;
         self.search.set_disabled(self.games.is_empty(), cx);
         if same_list {
-            // The same games in the same places: the posters stay, and so does the place scrolled to.
+            // The same games in the same places: the posters stay, but for a game whose picture changed, and so does the place scrolled to.
+            for game in repainted {
+                self.art_stamps[game] += 1;
+                self.stale.extend(self.posters.forget(game));
+            }
             self.arrange();
             return cx.notify();
         }
+        self.art_stamps = vec![0; self.games.len()];
         // Later reads keep the order chosen in this run, stored or not.
         if first {
             self.sort = library.sort;
@@ -423,6 +478,28 @@ impl LibraryView {
         self.list += 1;
         self.stale.extend(self.posters.clear());
         self.show(cx);
+    }
+
+    // The Library is read again when the backend says its games or their pictures changed, a lookup that ended among them.
+    fn heard_artwork(&mut self, status: ArtworkStatus, cx: &mut Context<Self>) {
+        let moved = self.artwork.revision != status.revision;
+        self.artwork = status;
+        if moved && self.on_screen && matches!(self.load, Load::Ready) {
+            self.reload(cx);
+        }
+        cx.notify();
+    }
+
+    // What the lookups could not find without a key: a game without a picture and with a recorded miss, once the scan and the queue are done.
+    fn needs_key(&self) -> bool {
+        let status = &self.artwork;
+        status.scanned
+            && !status.has_api_key
+            && status.busy() == 0
+            && self
+                .games
+                .iter()
+                .any(|entry| entry.game.artwork.is_none() && entry.game.artwork_error.is_some())
     }
 
     // Reads the Library again after something changed it: a scan, or a launch.
@@ -555,6 +632,7 @@ impl LibraryView {
             game: entry.game.id.clone(),
             at,
             viewport: window.viewport_size(),
+            lit: 0,
         });
         cx.notify();
     }
@@ -584,6 +662,56 @@ impl LibraryView {
             .map(|last| last.account_id.clone());
         self.host
             .update(cx, |host, cx| host.open(game, account, false, cx));
+    }
+
+    fn pick_card_item(&mut self, item: usize, cx: &mut Context<Self>) {
+        match item {
+            0 => self.play_as(cx),
+            1 => self.refresh_artwork(cx),
+            _ => self.choose_image(cx),
+        }
+    }
+
+    // Downloads the game's pictures again, a picture of the user's own among them. What comes of it shows when the lookup ends.
+    fn refresh_artwork(&mut self, cx: &mut Context<Self>) {
+        let Some(menu) = self.card_menu.take() else {
+            return;
+        };
+        cx.notify();
+        let backend = self.backend.clone();
+        cx.spawn(async move |this, cx| {
+            if let Err(error) = backend.refresh_artwork(Some(&menu.game), true).await {
+                this.update(cx, |this, cx| this.say(error.message, true, cx))
+                    .ok();
+            }
+        })
+        .detach();
+    }
+
+    // The user picks a picture of their own for the card. A file dialog cancelled changes nothing.
+    fn choose_image(&mut self, cx: &mut Context<Self>) {
+        let Some(menu) = self.card_menu.take() else {
+            return;
+        };
+        cx.notify();
+        let picked = pick_image(cx);
+        let backend = self.backend.clone();
+        cx.spawn(async move |this, cx| {
+            let set = match picked.await {
+                Picked::Cancelled => return,
+                Picked::Failed(error) => Err(error),
+                Picked::Path(path) => backend
+                    .set_manual_artwork(&menu.game, ArtworkKind::Grid, path.into())
+                    .await
+                    .map_err(|error| error.message),
+            };
+            this.update(cx, |this, cx| match set {
+                Ok(_) => this.reload(cx),
+                Err(error) => this.say(error, true, cx),
+            })
+            .ok();
+        })
+        .detach();
     }
 
     fn open_recent(&mut self, entry: usize, cx: &mut Context<Self>) {
@@ -738,13 +866,29 @@ impl LibraryView {
             if held.alt || held.platform {
                 return false;
             }
-            // Down, Up, Home and End all land on the one item, which has the keyboard already.
-            match keystroke.key.as_str() {
-                "down" | "up" | "home" | "end" => {}
-                "enter" | "space" => self.play_as(cx),
-                "escape" | "tab" => self.close_card_menu(cx),
+            let (lit, last) = (
+                self.card_menu.as_ref().map_or(0, |menu| menu.lit),
+                CARD_MENU.len() - 1,
+            );
+            let to = match keystroke.key.as_str() {
+                "down" => (lit + 1) % CARD_MENU.len(),
+                "up" => (lit + last) % CARD_MENU.len(),
+                "home" => 0,
+                "end" => last,
+                "enter" | "space" => {
+                    self.pick_card_item(lit, cx);
+                    return true;
+                }
+                "escape" | "tab" => {
+                    self.close_card_menu(cx);
+                    return true;
+                }
                 _ => return false,
+            };
+            if let Some(menu) = &mut self.card_menu {
+                menu.lit = to;
             }
+            cx.notify();
             return true;
         }
         if keystroke.key == "escape" && self.menu.is_some() {
@@ -842,14 +986,14 @@ impl LibraryView {
             Lookup::Ready(image) => Some(image),
             Lookup::Pending | Lookup::Unreadable => None,
             Lookup::Missing => {
-                let list = self.list;
+                let (list, stamp) = (self.list, self.art_stamps.get(game).copied());
                 cx.spawn(async move |this, cx| {
                     let image = cx
                         .background_executor()
                         .spawn(async move { posters::decode(&file, shape, scale).map(Arc::new) })
                         .await;
                     this.update(cx, |this, cx| {
-                        if this.list == list {
+                        if this.list == list && this.art_stamps.get(game).copied() == stamp {
                             this.posters.insert(game, image);
                             cx.notify();
                         }
@@ -1088,6 +1232,44 @@ impl LibraryView {
     }
 
     fn render_header(&self, window: &Window, cx: &mut Context<Self>) -> Div {
+        let small = |line: Div| {
+            line.flex()
+                .flex_none()
+                .items_center()
+                .gap(px(6.))
+                .text_size(px(12.))
+                .line_height(px(16.))
+                .whitespace_nowrap()
+                .text_color(color(theme::MUTED))
+        };
+        let busy = self.artwork.busy();
+        let fetching = (busy > 0).then(|| {
+            small(div())
+                .child(pulsing(
+                    "fetching-artwork",
+                    icon(assets::IMAGES, 14., theme::MUTED),
+                ))
+                .child(format!("Fetching artwork ({busy})"))
+        });
+        let add_key = self.needs_key().then(|| {
+            small(div())
+                .id("add-artwork-key")
+                .px(px(6.))
+                .py(px(4.))
+                .rounded(px(6.))
+                .cursor_pointer()
+                .hover(|style| {
+                    style
+                        .bg(color(theme::SURFACE_2))
+                        .text_color(color(theme::TEXT))
+                })
+                .tooltip(tip(
+                    "Games that are not on Steam get artwork from SteamGridDB, which needs a free API key. Add one in Settings \u{203a} Artwork.",
+                ))
+                .on_click(cx.listener(|_, _, _, cx| cx.emit(OpenArtworkSettings)))
+                .child(icon(assets::IMAGES, 14., theme::MUTED))
+                .child("Add a free key for missing covers")
+        });
         let heading = div()
             .flex()
             .items_end()
@@ -1103,8 +1285,14 @@ impl LibraryView {
                     .flex_none()
                     .items_center()
                     .gap(px(8.))
-                    .max_w(px(480.))
+                    .max_w(px(if fetching.is_some() || add_key.is_some() {
+                        720.
+                    } else {
+                        480.
+                    }))
                     .children(self.flash.as_ref().map(Flash::render))
+                    .children(fetching)
+                    .children(add_key)
                     .child(
                         Button::new(
                             "rescan",
@@ -1587,19 +1775,27 @@ impl LibraryView {
             .iter()
             .find(|entry| entry.game.id == menu.game)?
             .game;
-        let play_as = div()
-            .id("play-as")
-            .flex()
-            .items_center()
-            .gap(px(8.))
-            .px(px(12.))
-            .py(px(6.))
-            .cursor_pointer()
-            .text_color(color(theme::TEXT))
-            .bg(color(theme::SURFACE_3))
-            .on_click(cx.listener(|this, _, _, cx| this.play_as(cx)))
-            .child(icon(assets::ACCOUNTS, 16., theme::MUTED))
-            .child("Play as\u{2026}");
+        let lit = menu.lit;
+        let items = CARD_MENU
+            .iter()
+            .enumerate()
+            .map(|(index, (id, glyph, label))| {
+                div()
+                    .id(*id)
+                    .flex()
+                    .items_center()
+                    .gap(px(8.))
+                    .px(px(12.))
+                    .py(px(6.))
+                    .cursor_pointer()
+                    .text_color(color(theme::TEXT))
+                    .when(index == lit, |item| item.bg(color(theme::SURFACE_3)))
+                    .hover(|style| style.bg(color(theme::SURFACE_3)))
+                    .on_click(cx.listener(move |this, _, _, cx| this.pick_card_item(index, cx)))
+                    .child(icon(glyph, 16., theme::MUTED))
+                    .child(*label)
+            })
+            .collect::<Vec<_>>();
         let card = div()
             .id("card-menu")
             .occlude()
@@ -1639,7 +1835,7 @@ impl LibraryView {
                             .child(artwork_line(game)),
                     ),
             )
-            .child(play_as);
+            .children(items);
         Some(
             deferred(
                 anchored()

@@ -19,7 +19,7 @@ use crate::accounts::AccountsView;
 use crate::assets;
 use crate::guide::{GuideDone, GuideExit, SetupGuide};
 use crate::host::{LaunchHost, PlayEnded, overlay};
-use crate::library::LibraryView;
+use crate::library::{LibraryView, OpenArtworkSettings};
 use crate::settings::{KnownStatuses, SettingsAsk, SettingsTab, SettingsView};
 use crate::whats_new::{WhatsNewCard, WhatsNewDone};
 use crate::widgets::{Appeared, Button, Tone, panel_shadow, spinner, tip};
@@ -185,6 +185,7 @@ pub struct Shell {
     _keys: Subscription,
     _host: Subscription,
     _played: Subscription,
+    _library: Subscription,
 }
 
 impl EventEmitter<QuitAnyway> for Shell {}
@@ -290,8 +291,16 @@ impl Shell {
                 instant: ended.instant,
             });
         });
+        let library = cx.new(|cx| LibraryView::new(backend.clone(), host.clone(), window, cx));
+        let artwork_settings = cx.subscribe_in(
+            &library,
+            window,
+            |this, _, _: &OpenArtworkSettings, window, cx| {
+                this.open_settings_on(SettingsTab::Artwork, window, cx);
+            },
+        );
         Self {
-            library: cx.new(|cx| LibraryView::new(backend.clone(), host.clone(), window, cx)),
+            library,
             backend,
             host,
             page: Page::Library,
@@ -308,6 +317,7 @@ impl Shell {
             _keys: keys,
             _host: from_host,
             _played: played,
+            _library: artwork_settings,
         }
     }
 
@@ -361,15 +371,16 @@ impl Shell {
     }
 
     fn open_preview_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_settings_on(SettingsTab::Advanced, window, cx);
+    }
+
+    // Settings on one of its tabs, from anywhere: the sidebar's Preview mode card, the Library's link to the artwork key.
+    fn open_settings_on(&mut self, tab: SettingsTab, window: &mut Window, cx: &mut Context<Self>) {
         if let Page::Settings(page) = &self.page {
-            page.update(cx, |page, cx| page.select_tab(SettingsTab::Advanced, cx));
+            page.update(cx, |page, cx| page.select_tab(tab, cx));
             return;
         }
-        self.go(
-            Go::to(Route::Settings(Some(SettingsTab::Advanced))),
-            window,
-            cx,
-        );
+        self.go(Go::to(Route::Settings(Some(tab))), window, cx);
     }
 
     pub fn library(&self) -> &Entity<LibraryView> {
@@ -561,7 +572,8 @@ impl Shell {
                 let tab = Rc::clone(&self.settings_tab);
                 let known = Rc::clone(&self.launcher_statuses);
                 let developer = self.developer;
-                let page = cx.new(|cx| SettingsView::new(backend, tab, known, developer, cx));
+                let page =
+                    cx.new(|cx| SettingsView::new(backend, tab, known, developer, window, cx));
                 self._page = Some(cx.subscribe_in(&page, window, Self::on_settings_ask));
                 Page::Settings(page)
             }
@@ -644,7 +656,8 @@ impl Shell {
         match &self.page {
             Page::Library => self.library.read(cx).typing(window, cx),
             Page::Account(page) => page.read(cx).typing(window, cx),
-            Page::Accounts(_) | Page::Settings(_) => false,
+            Page::Settings(page) => page.read(cx).typing(window, cx),
+            Page::Accounts(_) => false,
         }
     }
 
@@ -785,7 +798,7 @@ impl Shell {
         match &self.page {
             Page::Accounts(page) => page.update(cx, |page, cx| page.on_key(keystroke, cx)),
             Page::Account(page) => page.update(cx, |page, cx| page.on_key(keystroke, window, cx)),
-            Page::Settings(page) => page.update(cx, |page, cx| page.on_key(keystroke, cx)),
+            Page::Settings(page) => page.update(cx, |page, cx| page.on_key(keystroke, window, cx)),
             Page::Library => self.library.update(cx, |library, cx| {
                 library.on_keystroke(keystroke, window, cx)
             }),

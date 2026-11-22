@@ -68,6 +68,14 @@ impl Posters {
         self.slots.insert(game, slot);
     }
 
+    // Forgets one game's poster, because its picture changed: the next look decodes it afresh.
+    pub fn forget(&mut self, game: usize) -> Option<Arc<RenderImage>> {
+        match self.slots.remove(&game) {
+            Some(Slot::Ready { image, .. }) => Some(image),
+            _ => None,
+        }
+    }
+
     // Forgets every poster, for a list of other games. What comes back is still held by the window that drew it.
     pub fn clear(&mut self) -> Vec<Arc<RenderImage>> {
         self.slots
