@@ -46,7 +46,6 @@ impl Screen {
 pub(crate) enum Route {
     Library,
     Accounts,
-    // The Accounts list with the launcher's import dialog up.
     Import(LauncherId),
     NewAccount(LauncherId),
     // `created`: the page a Create account just opened, which says what comes next.
@@ -56,7 +55,6 @@ pub(crate) enum Route {
     },
     // The tab named, or the one last shown in this run.
     Settings(Option<SettingsTab>),
-    // The Library with the game's launch dialog open, the account picked when one is named.
     Play {
         game: Box<Game>,
         account: Option<String>,
@@ -66,7 +64,7 @@ pub(crate) enum Route {
 pub(crate) struct Go {
     pub route: Route,
     pub guarded: bool,
-    // The game whose Play sent the user off to add or import an account: the page this move opens may bring them back to it. Only the move that carries it has it.
+    // Only the move that carries it has it, so it lasts one hop.
     pub return_to: Option<Game>,
 }
 
@@ -79,7 +77,6 @@ impl Go {
         }
     }
 
-    // A move a page makes once its work is done.
     pub fn done(route: Route) -> Self {
         Self {
             route,
@@ -629,6 +626,15 @@ impl Shell {
                 return taken;
             }
         }
+        self.on_page_key(keystroke, window, cx)
+    }
+
+    fn on_page_key(
+        &mut self,
+        keystroke: &Keystroke,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         match &self.page {
             Page::Accounts(page) => page.update(cx, |page, cx| page.on_key(keystroke, cx)),
             Page::Account(page) => page.update(cx, |page, cx| page.on_key(keystroke, window, cx)),

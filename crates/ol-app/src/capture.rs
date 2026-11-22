@@ -197,8 +197,8 @@ enum Step {
     Pick(Option<String>),
     Move(Point<Pixels>),
     Click(Point<Pixels>),
-    SecondClick(Point<Pixels>),
     RightClick(Point<Pixels>),
+    SecondClick(Point<Pixels>),
     Back(Point<Pixels>),
     Together(Vec<Step>),
     Wheel(Point<Pixels>, Point<f32>, Modifiers),
@@ -263,8 +263,8 @@ impl Step {
             "pick" => (!rest.is_empty()).then(|| Self::Pick(Some(rest.replace("%2C", ",")))),
             "move" => spot(rest).map(Self::Move),
             "click" => spot(rest).map(Self::Click),
-            "second-click" => spot(rest).map(Self::SecondClick),
             "right-click" => spot(rest).map(Self::RightClick),
+            "second-click" => spot(rest).map(Self::SecondClick),
             "back" => spot(rest).map(Self::Back),
             "wheel" | "shift-wheel" => rest.split_once(':').and_then(|(at, lines)| {
                 let lines = lines
@@ -316,8 +316,8 @@ impl Step {
                 "wait" => "wait:<milliseconds up to 60000>",
                 "type" => "type:<text>",
                 "pick" => "pick:<path> or pick-cancel",
-                "move" | "click" | "second-click" | "right-click" | "back" => {
-                    "move:<x>x<y>, click:<x>x<y>, second-click:<x>x<y>, right-click:<x>x<y> or back:<x>x<y>"
+                "move" | "click" | "right-click" | "second-click" | "back" => {
+                    "move:<x>x<y>, click:<x>x<y>, right-click:<x>x<y>, second-click:<x>x<y> or back:<x>x<y>"
                 }
                 "wheel" | "shift-wheel" => "wheel:<x>x<y>:<lines, minus is down>",
                 "drag" => "drag:<x>x<y>:<x>x<y>",
@@ -341,15 +341,19 @@ impl Step {
             Self::Key(_)
                 | Self::Move(_)
                 | Self::Click(_)
-                | Self::SecondClick(_)
                 | Self::RightClick(_)
+                | Self::SecondClick(_)
                 | Self::Back(_)
                 | Self::Wheel(..)
         )
     }
 
     fn take(self, window: &mut Window, cx: &mut App) {
-        let mut clicks = 1;
+        let clicks = if matches!(self, Self::SecondClick(_)) {
+            2
+        } else {
+            1
+        };
         let (position, button) = match self {
             Self::Together(steps) => {
                 for step in steps {
@@ -363,11 +367,8 @@ impl Step {
             }
             Self::Move(position) => (position, None),
             Self::Click(position) => (position, Some(MouseButton::Left)),
-            Self::SecondClick(position) => {
-                clicks = 2;
-                (position, Some(MouseButton::Left))
-            }
             Self::RightClick(position) => (position, Some(MouseButton::Right)),
+            Self::SecondClick(position) => (position, Some(MouseButton::Left)),
             Self::Back(position) => (
                 position,
                 Some(MouseButton::Navigate(NavigationDirection::Back)),
@@ -631,12 +632,12 @@ mod tests {
         assert!(matches!(Step::parse("drag:1x2:3x4"), Ok(Step::Drag(..))));
         assert!(matches!(Step::parse("back:5x6"), Ok(Step::Back(_))));
         assert!(matches!(
-            Step::parse("second-click:5x6"),
-            Ok(Step::SecondClick(_))
-        ));
-        assert!(matches!(
             Step::parse("right-click:5x6"),
             Ok(Step::RightClick(_))
+        ));
+        assert!(matches!(
+            Step::parse("second-click:5x6"),
+            Ok(Step::SecondClick(_))
         ));
         assert!(matches!(
             Step::parse("click:1x2&escape"),
