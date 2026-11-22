@@ -1,6 +1,9 @@
 // The rules of the window that the settings decide: what a close does, when a one-click Play sends the window to the tray, when a start stays in the tray, and the question asked before quitting during a switch.
 
 use ol_model::LaunchJob;
+use serde_json::json;
+
+use crate::log::Log;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CloseAction {
@@ -90,6 +93,7 @@ pub fn start_hidden<S: AsRef<str>>(args: &[S], close_to_tray: bool) -> bool {
 // The question before a quit stops a running switch. Its first button keeps the app running, and is the answer to Escape and to a close of the question.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QuitQuestion {
+    pub job_id: String,
     pub title: &'static str,
     pub message: String,
     pub detail: String,
@@ -100,6 +104,7 @@ pub struct QuitQuestion {
 pub fn quit_question(job: &LaunchJob) -> QuitQuestion {
     let launcher = job.launcher.display_name();
     QuitQuestion {
+        job_id: job.id.clone(),
         title: "A switch is still running",
         message: format!(
             "One Launch is still switching to {}.",
@@ -110,5 +115,92 @@ pub fn quit_question(job: &LaunchJob) -> QuitQuestion {
         ),
         keep: "Keep running",
         quit: "Quit anyway",
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QuitAnswer {
+    Keep,
+    Quit,
+}
+
+// What the window, the tray and a quit write to the log. Facts only: an answer, a job's id, an error's code, never a sentence that could name someone.
+#[derive(Clone)]
+pub struct WindowLog(Log);
+
+impl WindowLog {
+    pub fn new(log: &Log) -> Self {
+        Self(log.clone())
+    }
+
+    pub fn close_requested(&self, action: CloseAction) {
+        self.0.debug(
+            "window close requested",
+            json!({ "action": action.as_str() }),
+        );
+    }
+
+    pub fn hidden_to_tray(&self) {
+        self.0.info("window hidden to the tray", ());
+    }
+
+    pub fn hidden_after_instant_launch(&self, job_id: &str) {
+        self.0.info(
+            "window hidden to the tray after an instant launch",
+            json!({ "jobId": job_id }),
+        );
+    }
+
+    pub fn shown_from_tray(&self) {
+        self.0.info("window shown from the tray", ());
+    }
+
+    pub fn tray_added(&self) {
+        self.0.info("tray icon added", ());
+    }
+
+    pub fn tray_removed(&self) {
+        self.0.info("tray icon removed", ());
+    }
+
+    // The code of the failure and Windows' number for it, not Windows' own sentence.
+    pub fn tray_unavailable(&self, code: &str, hresult: Option<i32>) {
+        let error = match hresult {
+            Some(hresult) => {
+                json!({ "code": code, "hresult": format!("{:#010x}", hresult.cast_unsigned()) })
+            }
+            None => json!({ "code": code }),
+        };
+        self.0.warn(
+            "tray icon unavailable; closing the window quits",
+            json!({ "error": error }),
+        );
+    }
+
+    pub fn quit_asked(&self, job_id: &str) {
+        self.0.info(
+            "quit prompt shown during a switch",
+            json!({ "jobId": job_id }),
+        );
+    }
+
+    pub fn quit_answered(&self, answer: QuitAnswer) {
+        let answer = match answer {
+            QuitAnswer::Keep => "keep",
+            QuitAnswer::Quit => "quit",
+        };
+        self.0
+            .info("quit prompt answered", json!({ "answer": answer }));
+    }
+
+    pub fn stopping_for_quit(&self) {
+        self.0.warn(
+            "stopping the running switch",
+            json!({ "reason": "quit confirmed during a switch" }),
+        );
+    }
+
+    pub fn fatal_during_startup(&self) {
+        self.0.error("fatal during startup", ());
     }
 }

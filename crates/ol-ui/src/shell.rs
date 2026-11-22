@@ -8,7 +8,7 @@ use gpui::{
     Subscription, Svg, Window, WindowControlArea, canvas, div, px, svg,
 };
 use ol_api::Backend;
-use ol_api::settings::QuitQuestion;
+use ol_api::settings::{QuitAnswer, QuitQuestion};
 use ol_model::{Game, LaunchJob, LauncherId, SettingKey, Sidebar};
 use ol_ui_kit::theme::{self, alpha, color};
 
@@ -278,6 +278,7 @@ impl Shell {
         ) {
             return;
         }
+        self.backend.window_log().quit_asked(&question.job_id);
         self.asking = Some(Asking {
             title: question.title.into(),
             message: question.message.into(),
@@ -385,6 +386,7 @@ impl Shell {
                 self.enter(then, return_to.map(|game| *game), window, cx);
             }
             Asked::Quit if act => {
+                self.backend.window_log().quit_answered(QuitAnswer::Quit);
                 self.asking = Some(Asking {
                     title: "Stopping the switch".into(),
                     message:
@@ -399,6 +401,7 @@ impl Shell {
                 });
                 cx.emit(QuitAnyway);
             }
+            Asked::Quit => self.backend.window_log().quit_answered(QuitAnswer::Keep),
             _ => {}
         }
         cx.notify();

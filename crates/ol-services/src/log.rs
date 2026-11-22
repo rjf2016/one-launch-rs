@@ -1,7 +1,9 @@
 pub mod file;
 pub mod redact;
 
+use std::cell::Cell;
 use std::io::Write as _;
+use std::panic::PanicHookInfo;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError};
@@ -11,7 +13,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use ol_formats::js::iso_from_millis;
 use ol_model::LogLevel;
-use ol_model::redact::with_registered_names;
+use ol_model::redact::{AccountNames, try_with_registered_names, with_registered_names};
 use serde_json::Value;
 
 use self::file::FileSink;
@@ -21,6 +23,28 @@ use self::redact::format_line;
 // Past this many lines waiting for the disk, a line is dropped and counted rather than hold up its caller.
 const QUEUE: usize = 4096;
 const ROOT_SCOPE: &str = "main";
+const WRITER: &str = "log";
+// Long enough for the writer to take the line; short enough that a stuck disk does not hold up the crash.
+const PANIC_FLUSH: Duration = Duration::from_secs(1);
+
+thread_local! {
+    static FORMATTING: Cell<bool> = const { Cell::new(false) };
+}
+
+struct Formatting;
+
+impl Formatting {
+    fn start() -> Self {
+        FORMATTING.with(|formatting| formatting.set(true));
+        Self
+    }
+}
+
+impl Drop for Formatting {
+    fn drop(&mut self) {
+        FORMATTING.with(|formatting| formatting.set(false));
+    }
+}
 
 // Logged as warnings, so an error line always means something unexpected.
 pub const REFUSAL_CODES: [&str; 14] = [
@@ -196,16 +220,23 @@ impl Log {
         if rank(level) < shared.threshold.load(Ordering::Relaxed) {
             return;
         }
-        let line = with_registered_names(|names| {
-            format_line(
-                names,
-                &timestamp(),
-                level,
-                &self.scope,
-                message,
-                fields.0.as_ref(),
-            )
-        });
+        let line = {
+            let _formatting = Formatting::start();
+            with_registered_names(|names| {
+                format_line(
+                    names,
+                    &timestamp(),
+                    level,
+                    &self.scope,
+                    message,
+                    fields.0.as_ref(),
+                )
+            })
+        };
+        self.send(shared, level, line);
+    }
+
+    fn send(&self, shared: &Shared, level: LogLevel, line: String) {
         if shared.mirror {
             mirror(level, &line);
         }
@@ -216,6 +247,48 @@ impl Log {
             shared.dropped.fetch_add(1, Ordering::Relaxed);
         }
     }
+
+    // A panic that struck inside the logger's own formatting writes nothing; one that struck while this thread held the account names writes the line without its fields, which would go unmasked.
+    fn panicked(&self, info: &PanicHookInfo<'_>) -> bool {
+        let Some(shared) = &self.shared else {
+            return false;
+        };
+        if FORMATTING.with(Cell::get) || shared.sender().is_none() {
+            return false;
+        }
+        let _formatting = Formatting::start();
+        let fields = serde_json::json!({
+            "message": info.payload_as_str().unwrap_or("a panic without a message"),
+            "location": info
+                .location()
+                .map(|at| format!("{}:{}:{}", at.file(), at.line(), at.column())),
+        });
+        let format = |names: &AccountNames, fields: Option<&Value>| {
+            format_line(
+                names,
+                &timestamp(),
+                LogLevel::Error,
+                &self.scope,
+                "uncaught exception",
+                fields,
+            )
+        };
+        let line = try_with_registered_names(|names| format(names, Some(&fields)))
+            .unwrap_or_else(|| format(&AccountNames::default(), None));
+        self.send(shared, LogLevel::Error, line);
+        true
+    }
+}
+
+// The previous hook still runs after the line, so the console keeps its report.
+pub fn log_panics(logger: Arc<Logger>) {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if logger.log.panicked(info) && thread::current().name() != Some(WRITER) {
+            logger.flush(PANIC_FLUSH);
+        }
+        previous(info);
+    }));
 }
 
 fn mirror(level: LogLevel, line: &str) {
@@ -256,7 +329,7 @@ impl Logger {
         let sink = FileSink::new(dir, options.max_bytes, options.keep);
         let writing = Arc::clone(&shared);
         let writer = thread::Builder::new()
-            .name("log".to_owned())
+            .name(WRITER.to_owned())
             .spawn(move || {
                 write_until_closed(&queue, sink, &writing);
                 let _ = done.send(());

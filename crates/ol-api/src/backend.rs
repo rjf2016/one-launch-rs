@@ -28,12 +28,12 @@ use ol_services::settings::{self as setting, SettingError};
 use ol_services::switch;
 use ol_services::vault_health::{
     self, EncryptionState, VaultAccess, VaultHealth, VaultHealthError, VaultReset,
-    VaultResetRefusal,
+    VaultResetRefusal, VaultResetSummary,
 };
-use ol_services::window::{self, QuitQuestion};
+use ol_services::window::{self, QuitQuestion, WindowLog};
 use ol_store::{Store, StoreError};
 use ol_vault::{KeyError, OsCryptVault, Recovered, Secret, Vault, VaultError};
-use serde_json::json;
+use serde_json::{Value, json};
 use thiserror::Error;
 
 const RECENT_LAUNCHES_MOST: u32 = 50;
@@ -310,6 +310,10 @@ impl Said {
         }
         answer(reply, result);
     }
+}
+
+fn removed_counts(removed: &VaultResetSummary) -> Value {
+    json!({ "passwords": removed.passwords, "sessions": removed.sessions, "secrets": removed.secrets })
 }
 
 // The database's thread as a switch reaches it.
@@ -779,6 +783,11 @@ impl Backend {
         self.jobs.current().as_ref().map(window::quit_question)
     }
 
+    // The window's own lines, in this backend's log.
+    pub fn window_log(&self) -> WindowLog {
+        WindowLog::new(&self.log)
+    }
+
     // Makes an account. Its password, when it has one, is encrypted before the database is touched.
     pub async fn create_account(&self, account: NewAccount) -> Result<Account, ApiError> {
         self.ask(|reply| Command::CreateAccount(Box::new(account), reply))
@@ -1225,13 +1234,7 @@ impl Serving {
                 let reset = store.and_then(|store| self.reset_vault(store));
                 if let Ok(reset) = &reset {
                     match reset.summary() {
-                        Some(removed) => {
-                            let counts = json!({ "passwords": removed.passwords, "sessions": removed.sessions, "secrets": removed.secrets });
-                            self.log
-                                .child("vault")
-                                .warn("vault reset: all stored secrets removed", counts.clone());
-                            ipc.warn("vault reset by user", counts);
-                        }
+                        Some(removed) => ipc.warn("vault reset by user", removed_counts(&removed)),
                         None => self
                             .log
                             .child("vault")
@@ -1541,6 +1544,10 @@ impl Serving {
                     })
                 });
                 if let Ok(captured) = &captured {
+                    self.log.child("launchers").info(
+                        "session captured",
+                        json!({ "launcher": captured.account.launcher.as_str(), "accountId": account_id }),
+                    );
                     ipc.info(
                         "session captured by user",
                         json!({ "accountId": account_id, "launcher": captured.account.launcher.as_str() }),
@@ -1553,12 +1560,13 @@ impl Serving {
                     self.require_idle()?;
                     Ok(capture::forget(store, &account_id)?)
                 });
-                if forgotten.is_ok() {
-                    self.log
-                        .child("launchers")
-                        .info("session forgotten", json!({ "accountId": account_id }));
+                if let Ok(Some(launcher)) = &forgotten {
+                    self.log.child("launchers").info(
+                        "session forgotten",
+                        json!({ "launcher": launcher.as_str(), "accountId": account_id }),
+                    );
                 }
-                said.answer(&reply, forgotten);
+                said.answer(&reply, forgotten.map(|_| ()));
             }
             Command::UseShell(shell) => self.shell = Some(shell),
             Command::OpenFolder(folder, reply) => said.answer(&reply, self.open_folder(folder)),
@@ -1734,7 +1742,7 @@ impl Serving {
             match OsCryptVault::replace_lost_key(&self.data_dir, &**protector) {
                 Ok(Recovered::Opened(vault)) => {
                     self.vault.put(VaultSlot::Open(Arc::new(vault)));
-                    let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
+                    self.store_probe(store);
                     return Ok(VaultReset::KeyReadable);
                 }
                 Ok(Recovered::Replaced(vault)) => self.vault.put(VaultSlot::Open(Arc::new(vault))),
@@ -1752,7 +1760,11 @@ impl Serving {
             }
         }
         let removed = vault_health::clear_stored_secrets(store, &*self.vault, &self.stamp())?;
-        let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
+        self.log.child("vault").warn(
+            "vault reset: all stored secrets removed",
+            removed_counts(&removed),
+        );
+        self.store_probe(store);
         Ok(VaultReset::Cleared(removed))
     }
 

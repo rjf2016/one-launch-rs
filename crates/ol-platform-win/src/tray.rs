@@ -52,6 +52,22 @@ pub enum TrayError {
     Refused,
 }
 
+impl TrayError {
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Window(_) => "TRAY_WINDOW",
+            Self::Refused => "TRAY_REFUSED",
+        }
+    }
+
+    pub fn hresult(&self) -> Option<i32> {
+        match self {
+            Self::Window(error) => Some(error.code().0),
+            Self::Refused => None,
+        }
+    }
+}
+
 pub struct Tray {
     hwnd: isize,
     shows_app_icon: bool,

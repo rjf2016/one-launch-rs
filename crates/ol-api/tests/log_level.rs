@@ -110,6 +110,19 @@ impl DataProtector for Theirs {
     }
 }
 
+// A Windows that can neither wrap nor unwrap.
+struct Broken;
+
+impl DataProtector for Broken {
+    fn protect(&self, _: &[u8]) -> Result<Vec<u8>, ProtectError> {
+        Err(ProtectError::Protect)
+    }
+
+    fn unprotect(&self, _: &[u8]) -> Result<Zeroizing<Vec<u8>>, ProtectError> {
+        Err(ProtectError::Unprotect)
+    }
+}
+
 fn text(logger: &Logger) -> String {
     assert!(logger.flush(WAIT));
     fs::read_to_string(logger.current_path()).unwrap()
@@ -138,6 +151,7 @@ fn a_vault_that_is_not_there_or_a_folder_that_cannot_be_made_is_said_at_start() 
     let _ = fs::remove_dir_all(&copies);
     fs::write(&copies, "").unwrap();
     assert!(block_on(backend.back_up_database()).is_err());
+    assert!(block_on(backend.reset_vault()).is_err());
     backend.shut_down();
     fs::write(scratch.join("not-a-folder"), "").unwrap();
     let blocked = Backend::logging_to(logger.log()).start(scratch.join("not-a-folder"), VERSION);
@@ -150,6 +164,9 @@ fn a_vault_that_is_not_there_or_a_folder_that_cannot_be_made_is_said_at_start() 
     assert!(written.contains("ERROR [main] the data folder could not be opened"));
     assert!(written.contains("ERROR [main:ipc] ipc settings:getAll failed"));
     assert!(written.contains("WARN  [main] database copy failed"));
+    assert!(
+        written.contains(r#"ERROR [main:ipc] ipc vault:reset failed {"code":"VAULT_UNAVAILABLE""#)
+    );
 }
 
 #[test]
@@ -207,8 +224,48 @@ fn a_lost_key_and_its_reset_are_logged() {
         Box::new(Theirs(Arc::new(AtomicBool::new(false)))),
     );
     block_on(backend.reset_vault()).unwrap();
+    assert_eq!(
+        block_on(backend.reset_vault())
+            .err()
+            .map(|refused| refused.code),
+        Some("BAD_REQUEST")
+    );
     backend.shut_down();
+    let cleared = text(&logger);
+    let removed = [
+        "WARN  [main:vault] vault reset: all stored secrets removed",
+        "INFO  [main:vault] vault probe stored",
+        "WARN  [main:ipc] vault reset by user",
+    ]
+    .map(|line| {
+        cleared
+            .rfind(line)
+            .unwrap_or_else(|| panic!("the log has {line:?}"))
+    });
+    assert!(
+        removed.windows(2).all(|pair| pair[0] < pair[1]),
+        "the probe is stored between the reset and its answer, as in the Electron app"
+    );
+
+    let broken = Backend::logging_to(logger.log()).start_with_vault_of_data_folder(
+        scratch.join("broken"),
+        VERSION,
+        Box::new(Broken),
+    );
+    assert!(block_on(broken.reset_vault()).is_err());
+    broken.shut_down();
     let written = text(&logger);
+    assert!(cleared.contains(r#"ERROR [main:ipc] ipc vault:reset failed {"code":"BAD_REQUEST""#));
+    assert_eq!(
+        written
+            .matches("ERROR [main:ipc] ipc vault:reset failed")
+            .count(),
+        cleared
+            .matches("ERROR [main:ipc] ipc vault:reset failed")
+            .count()
+            + 1,
+        "a reset Windows cannot carry out is said"
+    );
     for line in [
         "ERROR [main] stored secrets cannot be decrypted; the vault key was lost or belongs to another Windows user",
         "INFO  [main:vault] vault reset: the key opened after all; nothing removed",

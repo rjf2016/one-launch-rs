@@ -14,7 +14,8 @@ use ol_api::launchers::{
     BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, Launchers, NewAccount, RiotMachine,
     RiotTiming, Secret, SteamTiming,
 };
-use ol_api::log::{LogLevel, LogOptions, Logger};
+use ol_api::log::{LogLevel, LogOptions, Logger, log_panics};
+use ol_api::settings::{CloseAction, QuitAnswer};
 use ol_api::{Backend, StartLaunch};
 use ol_model::{JobState, LaunchJob, LauncherId, SettingKey};
 use ol_platform_api::CancelToken;
@@ -433,7 +434,7 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
         &launch_dir(&scratch),
     )
     .unwrap();
-    let logger = Logger::for_data_folder(
+    let logger = Arc::new(Logger::for_data_folder(
         &scratch.join("data"),
         LogOptions {
             level: LogLevel::Debug,
@@ -441,7 +442,7 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
             keep: 100,
             ..LogOptions::default()
         },
-    );
+    ));
     let data = scratch.join("data");
     let run = start(&scratch, &logger);
     let backend = run.backend.clone();
@@ -522,12 +523,42 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
     assert_eq!(cancelled.state, JobState::Cancelled);
     run.fake.clock.before_sleep(|| {});
 
+    let window = backend.window_log();
+    window.close_requested(CloseAction::Hide);
+    window.hidden_to_tray();
+    window.shown_from_tray();
+    window.hidden_after_instant_launch(&cancelled.id);
+    window.tray_added();
+    window.tray_removed();
+    window.tray_unavailable("TRAY_WINDOW", Some(-1));
+    window.fatal_during_startup();
+    log_panics(Arc::clone(&logger));
+    let named = run.fake.seed.accounts[0].clone();
+    let thrown = std::thread::spawn(move || {
+        panic!(
+            "no row for {} ({}) under {}",
+            named.display_name,
+            named.login,
+            named.launcher.as_str()
+        )
+    })
+    .join();
+    assert!(thrown.is_err());
+    drop(std::panic::take_hook());
+
     let alt = run.account(LauncherId::Epic, "main@example.com");
     run.fake
         .processes
         .set_running("EpicGamesLauncher.exe", false);
     block_on(backend.capture_session(&alt.id)).unwrap();
     block_on(backend.forget_session(&alt.id)).unwrap();
+    block_on(backend.forget_session(&alt.id)).unwrap();
+    assert_eq!(
+        block_on(backend.reset_vault())
+            .err()
+            .map(|refused| refused.code),
+        Some("BAD_REQUEST")
+    );
     let snapshots = block_on(backend.backups(LauncherId::Epic)).unwrap();
     block_on(backend.restore_backup(LauncherId::Epic, &snapshots[0].id)).unwrap();
 
@@ -649,6 +680,18 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
     };
     block_on(run.backend.start_launch(start_steam)).unwrap();
     readied.recv_timeout(WAIT).unwrap();
+    let question = run.backend.quit_question().expect("a switch runs");
+    let window = run.backend.window_log();
+    window.quit_asked(&question.job_id);
+    window.quit_answered(QuitAnswer::Keep);
+    window.quit_answered(QuitAnswer::Quit);
+    window.stopping_for_quit();
+    assert_eq!(
+        block_on(run.backend.reset_vault())
+            .err()
+            .map(|refused| refused.code),
+        Some("BUSY")
+    );
     let quitting = run.backend.clone();
     let quit = std::thread::spawn(move || quitting.shut_down());
     let until = Instant::now() + WAIT;
@@ -695,7 +738,23 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
         "[main:backup] pruned backups",
         "[main:backup] backup snapshot written",
         "[main:ipc] session captured by user",
-        "[main:launchers] session forgotten",
+        r#"[main:launchers] session captured {"launcher":"epic","accountId":"#,
+        r#"[main:launchers] session forgotten {"launcher":"epic","accountId":"#,
+        "[main:ipc] ipc vault:reset failed",
+        "[main:ipc] ipc vault:reset refused",
+        r#"DEBUG [main] window close requested {"action":"hide"}"#,
+        "INFO  [main] window hidden to the tray\n",
+        "INFO  [main] window shown from the tray",
+        r#"INFO  [main] window hidden to the tray after an instant launch {"jobId":"#,
+        "INFO  [main] tray icon added",
+        "INFO  [main] tray icon removed",
+        r#"WARN  [main] tray icon unavailable; closing the window quits {"error":{"code":"TRAY_WINDOW","hresult":"0xffffffff"}}"#,
+        "ERROR [main] fatal during startup",
+        r#"ERROR [main] uncaught exception {"message":"no row for [ACCOUNT] ([ACCOUNT]) under steam","location":"#,
+        r#"INFO  [main] quit prompt shown during a switch {"jobId":"#,
+        r#"INFO  [main] quit prompt answered {"answer":"keep"}"#,
+        r#"INFO  [main] quit prompt answered {"answer":"quit"}"#,
+        r#"WARN  [main] stopping the running switch {"reason":"quit confirmed during a switch"}"#,
         "[main:ipc] copied to clipboard",
         "[main:ipc] account password updated",
         "[main:ipc] account password removed",
@@ -717,6 +776,7 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
     ] {
         assert!(log.contains(expected), "the log has {expected:?}");
     }
+    assert_eq!(log.matches("session forgotten").count(), 1);
     let secrets = secrets(&scratch, &fake);
     assert!(
         secrets.len() >= 800,

@@ -120,7 +120,7 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
                 continue;
             }
             Step::TrayOpen => {
-                crate::show_window();
+                crate::show_from_tray(life);
                 pause(STEP, cx).await;
                 continue;
             }
