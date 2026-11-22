@@ -4,6 +4,7 @@ mod banner;
 mod dialog;
 mod recovery;
 
+use std::mem::{Discriminant, discriminant};
 use std::time::Duration;
 
 use gpui::prelude::*;
@@ -20,6 +21,7 @@ use ol_model::{
 
 use crate::account::copy_note;
 use crate::shell::{Go, Route};
+use crate::widgets::Appeared;
 
 pub(crate) use dialog::{generated_at, plan_view};
 
@@ -84,6 +86,8 @@ struct Request {
     plan_open: bool,
     // Try again goes back to what was asked, not to the running job the dialog shows instead.
     asked_for: Option<(Option<Game>, LauncherId)>,
+    shown: (bool, Discriminant<Stage>),
+    appeared: Appeared,
 }
 
 enum Accounts {
@@ -268,6 +272,8 @@ impl LaunchHost {
             steps_open: false,
             plan_open: false,
             asked_for: None,
+            shown: (instant, discriminant(&Stage::Pick)),
+            appeared: Appeared::now(),
         };
         // A running job is always the one shown, under its own game's name; a finished one only when it was for this game, or a plain switch to this account, and the user asked to see it.
         let follows = match &self.active {
@@ -693,6 +699,13 @@ impl LaunchHost {
                 Stage::Job => direct,
                 _ => false,
             };
+        }
+        if let Some(request) = &mut self.request {
+            let shown = (request.silent, discriminant(&request.stage));
+            if request.shown != shown {
+                request.shown = shown;
+                request.appeared = Appeared::now();
+            }
         }
         self.arm_dismissal(cx);
         cx.notify();

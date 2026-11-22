@@ -789,6 +789,12 @@ fn steps(job: &LaunchJob) -> Div {
 }
 
 impl LaunchHost {
+    fn takes(&self, click: &ClickEvent) -> bool {
+        self.request
+            .as_ref()
+            .is_some_and(|request| request.appeared.takes(click))
+    }
+
     fn toggle_plan(&mut self, cx: &mut Context<Self>) {
         if let Some(request) = &mut self.request {
             request.plan_open = !request.plan_open;
@@ -1093,7 +1099,7 @@ impl LaunchHost {
                     .leading(true)
                     .on_click(cx.listener(
                         |this, click: &ClickEvent, _, cx| {
-                            if click.click_count() == 1 {
+                            if this.takes(click) {
                                 this.check(cx);
                             }
                         },
@@ -1126,7 +1132,7 @@ impl LaunchHost {
                     .disabled(request.starting)
                     .on_click(cx.listener(
                         move |this, click: &ClickEvent, _, cx| {
-                            if click.click_count() == 1 {
+                            if this.takes(click) {
                                 this.start(confirm_close, cx);
                             }
                         },
@@ -1149,7 +1155,7 @@ impl LaunchHost {
                     .disabled(request.starting)
                     .on_click(cx.listener(
                         |this, click: &ClickEvent, _, cx| {
-                            if click.click_count() == 1 {
+                            if this.takes(click) {
                                 this.switch_now(cx);
                             }
                         },
