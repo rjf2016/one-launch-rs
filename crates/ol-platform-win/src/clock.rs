@@ -5,7 +5,10 @@ use ol_platform_api::{CancelToken, Clock};
 use time::{Date, Month, OffsetDateTime, PrimitiveDateTime, Time};
 use windows::Win32::Foundation::SYSTEMTIME;
 use windows::Win32::Globalization::{GetLocaleInfoEx, LOCALE_STIMEFORMAT};
-use windows::Win32::System::Time::{SystemTimeToTzSpecificLocalTime, TIME_ZONE_INFORMATION};
+use windows::Win32::System::Time::{
+    DYNAMIC_TIME_ZONE_INFORMATION, GetDynamicTimeZoneInformation,
+    SystemTimeToTzSpecificLocalTimeEx, TIME_ZONE_ID_INVALID,
+};
 use windows::core::PCWSTR;
 
 // How long a sleep goes without looking at its token.
@@ -46,8 +49,18 @@ pub fn uses_24_hour_clock() -> bool {
     String::from_utf16_lossy(&picture[..written - 1]).contains('H')
 }
 
-// `zone` None is this PC's own.
-fn offset_in(zone: Option<&TIME_ZONE_INFORMATION>, unix_seconds: i64) -> Option<i32> {
+// `zone` None is this PC's own. A zone named by its key keeps the daylight-saving rules each year had, as a stored date needs.
+fn offset_in(zone: Option<&DYNAMIC_TIME_ZONE_INFORMATION>, unix_seconds: i64) -> Option<i32> {
+    let mut own = DYNAMIC_TIME_ZONE_INFORMATION::default();
+    let zone = match zone {
+        Some(zone) => zone,
+        None => {
+            if unsafe { GetDynamicTimeZoneInformation(&mut own) } == TIME_ZONE_ID_INVALID {
+                return None;
+            }
+            &own
+        }
+    };
     let utc = OffsetDateTime::from_unix_timestamp(unix_seconds).ok()?;
     let year = u16::try_from(utc.year()).ok()?;
     let universal = SYSTEMTIME {
@@ -61,8 +74,10 @@ fn offset_in(zone: Option<&TIME_ZONE_INFORMATION>, unix_seconds: i64) -> Option<
         wMilliseconds: 0,
     };
     let mut local = SYSTEMTIME::default();
-    let zone = zone.map(std::ptr::from_ref);
-    unsafe { SystemTimeToTzSpecificLocalTime(zone, &universal, &mut local) }.ok()?;
+    unsafe {
+        SystemTimeToTzSpecificLocalTimeEx(Some(std::ptr::from_ref(zone)), &universal, &mut local)
+    }
+    .ok()?;
     let local = PrimitiveDateTime::new(
         Date::from_calendar_date(
             i32::from(local.wYear),
@@ -106,32 +121,51 @@ mod tests {
         assert!(age.abs() < time::Duration::seconds(5));
     }
 
-    // Central European rules: an hour east, two from the last Sunday of March to the last Sunday of October.
-    fn central_europe() -> TIME_ZONE_INFORMATION {
-        let last_sunday = |month: u16, hour: u16| SYSTEMTIME {
+    // A rule of Windows' own: the `day`th Sunday of `month`, 5 being its last.
+    fn sunday(month: u16, day: u16, hour: u16) -> SYSTEMTIME {
+        SYSTEMTIME {
             wMonth: month,
             wDayOfWeek: 0,
-            wDay: 5,
+            wDay: day,
             wHour: hour,
             ..SYSTEMTIME::default()
-        };
-        TIME_ZONE_INFORMATION {
-            Bias: -60,
-            StandardDate: last_sunday(10, 3),
-            DaylightDate: last_sunday(3, 2),
-            DaylightBias: -60,
-            ..TIME_ZONE_INFORMATION::default()
         }
+    }
+
+    fn zone(
+        key: &str,
+        bias: i32,
+        standard: SYSTEMTIME,
+        daylight: SYSTEMTIME,
+    ) -> DYNAMIC_TIME_ZONE_INFORMATION {
+        let mut name = [0_u16; 128];
+        for (slot, unit) in name.iter_mut().zip(key.encode_utf16()) {
+            *slot = unit;
+        }
+        DYNAMIC_TIME_ZONE_INFORMATION {
+            Bias: bias,
+            StandardDate: standard,
+            DaylightDate: daylight,
+            DaylightBias: -60,
+            TimeZoneKeyName: name,
+            ..DYNAMIC_TIME_ZONE_INFORMATION::default()
+        }
+    }
+
+    fn at(text: &str) -> i64 {
+        OffsetDateTime::parse(text, &time::format_description::well_known::Rfc3339)
+            .unwrap()
+            .unix_timestamp()
     }
 
     #[test]
     fn the_offset_follows_the_zone_s_summer_time_for_the_date_given() {
-        let at = |text: &str| {
-            OffsetDateTime::parse(text, &time::format_description::well_known::Rfc3339)
-                .unwrap()
-                .unix_timestamp()
-        };
-        let zone = central_europe();
+        let zone = zone(
+            "W. Europe Standard Time",
+            -60,
+            sunday(10, 5, 3),
+            sunday(3, 5, 2),
+        );
         assert_eq!(
             offset_in(Some(&zone), at("2026-01-15T12:00:00Z")),
             Some(3600)
@@ -147,6 +181,25 @@ mod tests {
         assert_eq!(
             offset_in(Some(&zone), at("2026-03-29T01:00:00Z")),
             Some(7200)
+        );
+    }
+
+    // Eastern Time with today's rules: in 2006 summer time began on 2 April, where today's rules would start it on 12 March.
+    #[test]
+    fn a_zone_named_by_its_key_keeps_the_rules_of_the_year() {
+        let zone = zone(
+            "Eastern Standard Time",
+            300,
+            sunday(11, 1, 2),
+            sunday(3, 2, 2),
+        );
+        assert_eq!(
+            offset_in(Some(&zone), at("2006-03-20T12:00:00Z")),
+            Some(-5 * 3600)
+        );
+        assert_eq!(
+            offset_in(Some(&zone), at("2026-03-20T12:00:00Z")),
+            Some(-4 * 3600)
         );
     }
 

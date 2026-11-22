@@ -1,8 +1,8 @@
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, ClickEvent, Context, DispatchPhase, Div, Entity, FontWeight, Keystroke,
-    MouseButton, MouseUpEvent, NavigationDirection, Pixels, Stateful, Subscription, Svg, Window,
-    WindowControlArea, canvas, div, px, svg,
+    AnyElement, ClickEvent, Context, DispatchPhase, Div, Entity, FocusHandle, FontWeight,
+    Keystroke, MouseButton, MouseUpEvent, NavigationDirection, Pixels, Stateful, Subscription, Svg,
+    Window, WindowControlArea, canvas, div, px, svg,
 };
 use ol_api::Backend;
 use ol_model::{LauncherId, Sidebar};
@@ -63,6 +63,7 @@ struct Asking {
     question: Question,
     then: Route,
     leave_leads: bool,
+    had_keyboard: Option<FocusHandle>,
 }
 
 // The Library lives as long as the window, so its posters stay decoded; the other screens are made afresh at each visit, as the Electron app's are.
@@ -181,6 +182,7 @@ impl Shell {
                 question,
                 then: route,
                 leave_leads: false,
+                had_keyboard: window.focused(cx),
             });
             window.blur(cx);
             cx.notify();
@@ -202,6 +204,8 @@ impl Shell {
         };
         if leave {
             self.enter(asking.then, window, cx);
+        } else if let Some(field) = &asking.had_keyboard {
+            window.focus(field, cx);
         }
         cx.notify();
     }

@@ -624,7 +624,7 @@ impl LibraryView {
         self.flash = None;
         self.menu = None;
         self.clear_search_and_filter(window, cx);
-        if matches!(self.load, Load::Ready) {
+        if !matches!(self.load, Load::Pending) {
             self.reload(cx);
         }
     }
