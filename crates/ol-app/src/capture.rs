@@ -73,6 +73,7 @@ pub async fn run(
     }
 
     let mut logged = None;
+    let mut kept = Vec::new();
     for step in &plan.keys {
         let step = match Step::parse(step)? {
             Step::Wait(time) => {
@@ -85,7 +86,8 @@ pub async fn run(
                 continue;
             }
             Step::Resize { from, to, steps } => {
-                resize(native, window, (from, to, steps), cx).await?;
+                let outer = logged.is_some().then_some(&mut kept);
+                resize(native, window, (from, to, steps), outer, cx).await?;
                 pause(STEP, cx).await;
                 continue;
             }
@@ -96,11 +98,15 @@ pub async fn run(
             }
             Step::LogFrames => {
                 in_library(window, cx, |library, _, _| library.log_frames())?;
+                kept.clear();
                 logged = Some(Instant::now());
                 continue;
             }
             Step::PrintFrames => {
-                let frames = in_library(window, cx, |library, _, _| library.take_frames())?;
+                let mut frames = std::mem::take(&mut kept);
+                frames.extend(in_library(window, cx, |library, _, _| {
+                    library.take_frames()
+                })?);
                 let started = logged
                     .take()
                     .context("frames:print needs frames:log before it")?;
@@ -418,16 +424,24 @@ async fn drag(
     })
 }
 
-// Sets the client area from one size to the other a step a frame, as a window edge dragged by hand, and prints every frame the Library drew meanwhile: when, for which size, the size last set at that time, and the grid it laid out.
+// Sets the client area from one size to the other a step a frame, as a window edge dragged by hand, and prints every frame the Library drew meanwhile: when, for which size, the size last set at that time, and the grid it laid out; a frames:log running around it keeps every frame, those of the resize included.
 async fn resize(
     native: AppWindow,
     window: WindowHandle<Shell>,
     (from, to, steps): ((i32, i32), (i32, i32), usize),
+    mut outer: Option<&mut Vec<LibraryFrame>>,
     cx: &mut AsyncApp,
 ) -> anyhow::Result<()> {
     set_client_size(native, from)?;
     pause(STEP, cx).await;
-    in_library(window, cx, |library, _, _| library.log_frames())?;
+    let before = in_library(window, cx, |library, _, _| {
+        let before = library.take_frames();
+        library.log_frames();
+        before
+    })?;
+    if let Some(outer) = outer.as_deref_mut() {
+        outer.extend(before);
+    }
     let started = Instant::now();
     let mut set = Vec::with_capacity(steps + 1);
     for step in 0..=steps {
@@ -439,7 +453,17 @@ async fn resize(
         pause(FRAME, cx).await;
     }
     pause(STEP, cx).await;
-    let frames = in_library(window, cx, |library, _, _| library.take_frames())?;
+    let keep = outer.is_some();
+    let frames = in_library(window, cx, move |library, _, _| {
+        let frames = library.take_frames();
+        if keep {
+            library.log_frames();
+        }
+        frames
+    })?;
+    if let Some(outer) = outer {
+        outer.extend_from_slice(&frames);
+    }
     let scale = native.scale();
     let mut stale = 0;
     let mut layouts: Vec<((i32, i32), LibraryFrame)> = Vec::new();
