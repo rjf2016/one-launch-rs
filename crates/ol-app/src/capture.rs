@@ -27,6 +27,13 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
     let window = life.window;
     let native = AppWindow::on_this_thread().context("the GPUI window was not found")?;
     pause(SETTLE, cx).await;
+    if let (Some(outer), Some((width, height))) = (probe::outer_rect(native), native.client_size())
+    {
+        println!(
+            "OneLaunch: the window opened at {}x{} on the screen, its client area {width}x{height}",
+            outer.x, outer.y
+        );
+    }
 
     if let Some(size) = plan.size {
         set_client_size(native, size)?;
@@ -106,14 +113,14 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
                 });
                 continue;
             }
-            pressed @ (Step::Close | Step::Minimize) => {
+            pressed @ (Step::Close | Step::Minimize | Step::Maximize) => {
                 let (width, _) = native.client_size().unwrap_or_default();
                 let scale = native.scale();
                 let at = |logical: f32| (logical * scale).round() as i32;
-                let (area, from_right) = if matches!(pressed, Step::Close) {
-                    (Area::Close, 23.)
-                } else {
-                    (Area::Minimize, 115.)
+                let (area, from_right) = match pressed {
+                    Step::Close => (Area::Close, 23.),
+                    Step::Maximize => (Area::Maximize, 69.),
+                    _ => (Area::Minimize, 115.),
                 };
                 probe::click(native, area, width - at(from_right), at(20.));
                 pause(STEP, cx).await;
@@ -121,6 +128,27 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
             }
             Step::TrayOpen => {
                 crate::show_from_tray(life);
+                pause(STEP, cx).await;
+                continue;
+            }
+            Step::WindowAt(x, y) => {
+                let outer = probe::outer_rect(native).context("the window has no frame")?;
+                probe::set_outer_rect(native, OuterRect { x, y, ..outer });
+                pause(STEP, cx).await;
+                continue;
+            }
+            Step::SecondStart => {
+                second_start(&plan.file, cx).await?;
+                pause(STEP, cx).await;
+                continue;
+            }
+            Step::ExitHard => {
+                println!("OneLaunch: ending without a clean exit, as a crash would");
+                std::process::exit(3);
+            }
+            Step::Panic => panic!("{PANIC_TEXT}"),
+            Step::PanicThread => {
+                let _ = std::thread::spawn(|| panic!("{PANIC_TEXT}")).join();
                 pause(STEP, cx).await;
                 continue;
             }
@@ -165,6 +193,23 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
         pause(STEP, cx).await;
     }
 
+    let shown = if !native.is_visible() {
+        "hidden"
+    } else if native.is_minimized() {
+        "minimised"
+    } else if native.is_maximized() {
+        "shown maximised"
+    } else {
+        "shown"
+    };
+    println!(
+        "OneLaunch: at the shot the window is {shown} and {} the foreground window",
+        if native.is_foreground() {
+            "is"
+        } else {
+            "is not"
+        }
+    );
     let shot = native.capture()?;
     image::save_buffer(
         &plan.file,
@@ -190,6 +235,38 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
     Ok(())
 }
 
+// What a capture's panic says, so a test can look for it where it must never be: in the log, in a box.
+const PANIC_TEXT: &str = "a panic a capture asked for, quoting words-no-log-may-hold";
+
+// Starts this program again on the same data folder and fake launchers, as a capture of its own so that it takes no focus, and says how it ended and what it printed. One that holds to the lock leaves at once.
+async fn second_start(shot: &std::path::Path, cx: &AsyncApp) -> anyhow::Result<()> {
+    let mut arguments: Vec<String> = std::env::args()
+        .skip(1)
+        .filter(|argument| {
+            argument.starts_with("--data-dir=") || argument.starts_with("--fake-launchers=")
+        })
+        .collect();
+    arguments.push(format!(
+        "--capture={}",
+        shot.with_extension("second.png").display()
+    ));
+    let (code, printed) = cx
+        .background_executor()
+        .spawn(async move { own_process::run_again(&arguments) })
+        .await
+        .context("the second start could not be run")?;
+    println!(
+        "OneLaunch: a second start ended with {}",
+        code.map_or("no exit code".to_owned(), |code| format!(
+            "exit code {code}"
+        ))
+    );
+    for line in printed.lines() {
+        println!("OneLaunch: second start said: {line}");
+    }
+    Ok(())
+}
+
 // A step of --capture-keys, or several joined by & and taken in one go: a key press; the answer the next file dialog gets, a path (`pick:<path>`, with %2C for a comma) or a cancel (`pick-cancel`), for which no dialog is opened; the window's close or minimise button pressed through Windows (`close`, `minimize`), the tray's Open (`tray-open`) or Quit (`tray-quit`); text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked with the left or the right button, clicked as the second click of a double click, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
 enum Step {
     Key(Keystroke),
@@ -206,8 +283,14 @@ enum Step {
     Wait(Duration),
     Close,
     Minimize,
+    Maximize,
     TrayOpen,
     TrayQuit,
+    WindowAt(i32, i32),
+    SecondStart,
+    ExitHard,
+    Panic,
+    PanicThread,
     Size((i32, i32)),
     Resize {
         from: (i32, i32),
@@ -236,6 +319,11 @@ impl Step {
             return match text {
                 "close" => Ok(Self::Close),
                 "minimize" => Ok(Self::Minimize),
+                "maximize" => Ok(Self::Maximize),
+                "second-start" => Ok(Self::SecondStart),
+                "exit-hard" => Ok(Self::ExitHard),
+                "panic" => Ok(Self::Panic),
+                "panic-thread" => Ok(Self::PanicThread),
                 "tray-open" => Ok(Self::TrayOpen),
                 "tray-quit" => Ok(Self::TrayQuit),
                 "pick-cancel" => Ok(Self::Pick(None)),
@@ -287,6 +375,11 @@ impl Step {
                 .split_once(':')
                 .and_then(|(from, to)| Some(Self::Drag(spot(from)?, spot(to)?))),
             "size" => size(rest).map(Self::Size),
+            "window-at" => rest.split_once('x').and_then(|(x, y)| {
+                let side =
+                    |side: &str| side.parse::<i32>().ok().filter(|side| side.abs() <= 20_000);
+                Some(Self::WindowAt(side(x)?, side(y)?))
+            }),
             "frames" => match rest {
                 "log" => Some(Self::LogFrames),
                 "print" => Some(Self::PrintFrames),
@@ -322,6 +415,7 @@ impl Step {
                 "wheel" | "shift-wheel" => "wheel:<x>x<y>:<lines, minus is down>",
                 "drag" => "drag:<x>x<y>:<x>x<y>",
                 "size" => "size:<width>x<height>",
+                "window-at" => "window-at:<x>x<y>, the window's outer corner on the screen",
                 "frames" => "frames:log or frames:print",
                 _ => "resize:<width>x<height>:<width>x<height>:<steps up to 2000>",
             };
@@ -400,8 +494,14 @@ impl Step {
             | Self::Wait(_)
             | Self::Close
             | Self::Minimize
+            | Self::Maximize
             | Self::TrayOpen
             | Self::TrayQuit
+            | Self::WindowAt(..)
+            | Self::SecondStart
+            | Self::ExitHard
+            | Self::Panic
+            | Self::PanicThread
             | Self::Size(_)
             | Self::Resize { .. }
             | Self::LogFrames
@@ -655,6 +755,15 @@ mod tests {
         assert!(matches!(Step::parse("frames:log"), Ok(Step::LogFrames)));
         assert!(matches!(Step::parse("close"), Ok(Step::Close)));
         assert!(matches!(Step::parse("minimize"), Ok(Step::Minimize)));
+        assert!(matches!(Step::parse("maximize"), Ok(Step::Maximize)));
+        assert!(matches!(Step::parse("second-start"), Ok(Step::SecondStart)));
+        assert!(matches!(Step::parse("exit-hard"), Ok(Step::ExitHard)));
+        assert!(matches!(Step::parse("panic"), Ok(Step::Panic)));
+        assert!(matches!(Step::parse("panic-thread"), Ok(Step::PanicThread)));
+        assert!(matches!(
+            Step::parse("window-at:-5000x-5000"),
+            Ok(Step::WindowAt(-5000, -5000))
+        ));
         assert!(matches!(Step::parse("tray-open"), Ok(Step::TrayOpen)));
         assert!(matches!(Step::parse("tray-quit"), Ok(Step::TrayQuit)));
         assert!(matches!(Step::parse("frames:print"), Ok(Step::PrintFrames)));
@@ -687,6 +796,9 @@ mod tests {
             "back:5",
             "second-click:5",
             "frames:all",
+            "window-at:1",
+            "window-at:99999x0",
+            "click:1x2&second-start",
         ] {
             assert!(Step::parse(refused).is_err(), "{refused}");
         }

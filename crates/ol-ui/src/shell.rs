@@ -1,5 +1,6 @@
 use std::cell::Cell;
 use std::rc::Rc;
+use std::time::Duration;
 
 use gpui::prelude::*;
 use gpui::{
@@ -9,19 +10,24 @@ use gpui::{
 };
 use ol_api::Backend;
 use ol_api::settings::{QuitAnswer, QuitQuestion};
+use ol_api::whats_new::{AtStart, Release, at_start, shows_setup_guide};
 use ol_model::{Game, LaunchJob, LauncherId, SettingKey, Sidebar};
 use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::account::AccountPage;
 use crate::accounts::AccountsView;
 use crate::assets;
+use crate::guide::{GuideDone, GuideExit, SetupGuide};
 use crate::host::{LaunchHost, PlayEnded, overlay};
 use crate::library::LibraryView;
-use crate::settings::{KnownStatuses, SettingsTab, SettingsView};
+use crate::settings::{KnownStatuses, SettingsAsk, SettingsTab, SettingsView};
+use crate::whats_new::{WhatsNewCard, WhatsNewDone};
 use crate::widgets::{Appeared, Button, Tone, panel_shadow, spinner, tip};
 
 const SIDEBAR: f32 = 224.;
 const SIDEBAR_COLLAPSED: f32 = 60.;
+// As the Electron app's: the Library gets this long to paint before the notes rise over it.
+const WHATS_NEW_DELAY: Duration = Duration::from_millis(400);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Screen {
@@ -131,6 +137,18 @@ pub struct Played {
     pub instant: bool,
 }
 
+// The setup guide or the What's New card, over every page and under the recovery dialog and the app's question. One at a time.
+enum Welcome {
+    Guide {
+        guide: Entity<SetupGuide>,
+        _done: Subscription,
+    },
+    WhatsNew {
+        card: Entity<WhatsNewCard>,
+        _done: Subscription,
+    },
+}
+
 // The Library lives as long as the window, so its posters stay decoded; the other screens are made afresh at each visit, as the Electron app's are.
 enum Page {
     Library,
@@ -159,6 +177,8 @@ pub struct Shell {
     // The user has toggled the sidebar in this run: the stored choice, should it arrive later, does not undo that.
     toggled: bool,
     fake_launchers: bool,
+    developer: bool,
+    welcome: Option<Welcome>,
     settings_tab: Rc<Cell<SettingsTab>>,
     launcher_statuses: KnownStatuses,
     preview: bool,
@@ -180,9 +200,48 @@ impl Shell {
     pub fn new(
         backend: Backend,
         fake_launchers: bool,
+        developer: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        // What a start shows over the Library: the setup guide for a folder nobody has set up, and the notes of an update not seen yet unless the guide is up or a switch is left to ask about. Each is decided on its own, as by the Electron app's two hosts.
+        cx.spawn_in(window, {
+            let backend = backend.clone();
+            async move |this, cx| {
+                let (Ok(settings), Ok(accounts)) =
+                    (backend.settings().await, backend.accounts().await)
+                else {
+                    return;
+                };
+                if shows_setup_guide(&settings, accounts.len()) {
+                    this.update_in(cx, |this, window, cx| this.open_guide(window, cx))
+                        .ok();
+                }
+                let recovery = matches!(
+                    backend.recovery().await,
+                    Ok(Some(found)) if backend.can_reach(found.launcher)
+                );
+                let version = backend.app_info().version;
+                match at_start(&settings, &version, recovery) {
+                    AtStart::Nothing => {}
+                    AtStart::RecordSeen => {
+                        let _ = backend
+                            .set_setting(SettingKey::WhatsNewLastSeen, version)
+                            .await;
+                    }
+                    AtStart::Show(release) => {
+                        cx.background_executor().timer(WHATS_NEW_DELAY).await;
+                        this.update_in(cx, |this, window, cx| {
+                            if this.welcome.is_none() {
+                                this.open_whats_new(release, window, cx);
+                            }
+                        })
+                        .ok();
+                    }
+                }
+            }
+        })
+        .detach();
         // Asked before the Library asks for its games, so a stored open sidebar is in place before the first grid is laid out.
         cx.spawn({
             let backend = backend.clone();
@@ -241,6 +300,8 @@ impl Shell {
             sidebar_open: false,
             toggled: false,
             fake_launchers,
+            developer,
+            welcome: None,
             settings_tab: Rc::default(),
             launcher_statuses: KnownStatuses::default(),
             preview: false,
@@ -314,6 +375,64 @@ impl Shell {
 
     pub fn library(&self) -> &Entity<LibraryView> {
         &self.library
+    }
+
+    // From a first start or Settings' Show again. A guide or a card already up stays.
+    fn open_guide(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.welcome.is_some() {
+            return;
+        }
+        let (backend, library) = (self.backend.clone(), self.library.clone());
+        let guide = cx.new(|cx| SetupGuide::new(backend, library, cx));
+        let done = cx.subscribe_in(&guide, window, |this, _, done: &GuideDone, window, cx| {
+            this.welcome = None;
+            let route = match done.0 {
+                GuideExit::Stay => None,
+                GuideExit::Library => Some(Route::Library),
+                GuideExit::Accounts => Some(Route::Accounts),
+                GuideExit::NewAccount(launcher) => Some(Route::NewAccount(launcher)),
+            };
+            if let Some(route) = route {
+                this.go(Go::to(route), window, cx);
+            }
+            cx.notify();
+        });
+        self.welcome = Some(Welcome::Guide { guide, _done: done });
+        window.blur(cx);
+        cx.notify();
+    }
+
+    fn open_whats_new(
+        &mut self,
+        release: &'static Release,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.welcome.is_some() {
+            return;
+        }
+        let (backend, version) = (self.backend.clone(), self.backend.app_info().version);
+        let card = cx.new(|cx| WhatsNewCard::new(backend, release, version, cx));
+        let done = cx.subscribe(&card, |this, _, _: &WhatsNewDone, cx| {
+            this.welcome = None;
+            cx.notify();
+        });
+        self.welcome = Some(Welcome::WhatsNew { card, _done: done });
+        window.blur(cx);
+        cx.notify();
+    }
+
+    fn on_settings_ask(
+        &mut self,
+        _: &Entity<SettingsView>,
+        ask: &SettingsAsk,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match ask {
+            SettingsAsk::SetupGuide => self.open_guide(window, cx),
+            SettingsAsk::WhatsNew(release) => self.open_whats_new(release, window, cx),
+        }
     }
 
     // The sidebar and Ctrl+1/2/3. Accounts goes back to the list from an account's page, as in the Electron app.
@@ -443,7 +562,10 @@ impl Shell {
                 }
                 let tab = Rc::clone(&self.settings_tab);
                 let known = Rc::clone(&self.launcher_statuses);
-                Page::Settings(cx.new(|cx| SettingsView::new(backend, tab, known, cx)))
+                let developer = self.developer;
+                let page = cx.new(|cx| SettingsView::new(backend, tab, known, developer, cx));
+                self._page = Some(cx.subscribe_in(&page, window, Self::on_settings_ask));
+                Page::Settings(page)
             }
             Route::Accounts => {
                 let page = cx.new(|cx| AccountsView::new(backend, None, None, cx));
@@ -506,6 +628,7 @@ impl Shell {
 
     fn modal(&self, cx: &Context<Self>) -> bool {
         self.asking.is_some()
+            || self.welcome.is_some()
             || self.host.read(cx).is_modal()
             || self.importing(cx)
             || self.restoring(cx)
@@ -575,6 +698,21 @@ impl Shell {
                 _ => {}
             }
             return true;
+        }
+        // The order the dialogs stand in: the question, the recovery dialog, the guide or the notes, the launch dialog, then a page's own dialog.
+        if self.host.read(cx).recovery_up() {
+            return self
+                .host
+                .update(cx, |host, cx| host.on_keystroke(keystroke, cx));
+        }
+        match &self.welcome {
+            Some(Welcome::Guide { guide, .. }) => {
+                return guide.update(cx, |guide, cx| guide.on_key(keystroke, cx));
+            }
+            Some(Welcome::WhatsNew { card, .. }) => {
+                return card.update(cx, |card, cx| card.on_key(keystroke, cx));
+            }
+            None => {}
         }
         if self.host.read(cx).is_modal() {
             return self
@@ -966,6 +1104,14 @@ impl Shell {
         )
     }
 
+    fn render_welcome(&self, window: &Window, cx: &mut Context<Self>) -> Option<impl IntoElement> {
+        let card = match self.welcome.as_ref()? {
+            Welcome::Guide { guide, .. } => guide.update(cx, |guide, cx| guide.render_card(cx)),
+            Welcome::WhatsNew { card, .. } => card.update(cx, |card, cx| card.render_card(cx)),
+        };
+        Some(overlay(window.viewport_size(), 3, card))
+    }
+
     // Let go anywhere in the window, as a browser hears the mouse's Back button. The listener stands in every frame.
     fn render_back_button(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let this = cx.weak_entity();
@@ -999,9 +1145,10 @@ impl Render for Shell {
             .line_height(px(20.))
             .child(title_bar(window.is_maximized(), self.fake_launchers))
             .child(self.host.clone())
+            .children(self.render_welcome(window, cx))
             .children(
                 self.render_question(cx)
-                    .map(|question| overlay(window.viewport_size(), 4, question)),
+                    .map(|question| overlay(window.viewport_size(), 5, question)),
             )
             .child(self.render_back_button(cx))
             .child(

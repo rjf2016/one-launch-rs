@@ -90,6 +90,60 @@ pub fn start_hidden<S: AsRef<str>>(args: &[S], close_to_tray: bool) -> bool {
     close_to_tray && args.iter().any(|arg| arg.as_ref() == START_HIDDEN_FLAG)
 }
 
+pub const MIN_WINDOW: (f64, f64) = (960., 600.);
+
+// A rectangle of the screen in the units the Electron app stores, its DIPs.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Rect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Placement {
+    pub bounds: Option<Rect>,
+    pub maximized: bool,
+}
+
+// The stored `window.bounds`, when enough of its title bar still lies on a connected display's work area to grab it: 64 px sideways, its top edge no more than 8 px above the area and more than 64 px above its bottom. A width or height below the window's minimum is raised to it. Being maximised counts whatever the place.
+pub fn placement_from(raw: Option<&str>, work_areas: &[Rect]) -> Placement {
+    let Some(stored) = raw
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|value| value.as_object().cloned())
+    else {
+        return Placement::default();
+    };
+    let number = |key: &str| stored.get(key).and_then(serde_json::Value::as_f64);
+    let bounds = match (number("x"), number("y"), number("width"), number("height")) {
+        (Some(x), Some(y), Some(width), Some(height)) => Some(Rect {
+            x,
+            y,
+            width: width.max(MIN_WINDOW.0),
+            height: height.max(MIN_WINDOW.1),
+        }),
+        _ => None,
+    };
+    let on_screen = bounds.filter(|bounds| {
+        work_areas.iter().any(|area| {
+            bounds.x < area.x + area.width - 64.
+                && bounds.x + bounds.width > area.x + 64.
+                && bounds.y >= area.y - 8.
+                && bounds.y < area.y + area.height - 64.
+        })
+    });
+    Placement {
+        bounds: on_screen,
+        maximized: stored.get("maximized") == Some(&serde_json::Value::Bool(true)),
+    }
+}
+
+// What the Electron app stores: the window's place and size when it is not maximised, in its own key order.
+pub fn bounds_setting(x: i32, y: i32, width: i32, height: i32, maximized: bool) -> String {
+    format!(r#"{{"x":{x},"y":{y},"width":{width},"height":{height},"maximized":{maximized}}}"#)
+}
+
 // The question before a quit stops a running switch. Its first button keeps the app running, and is the answer to Escape and to a close of the question.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QuitQuestion {
@@ -201,5 +255,13 @@ impl WindowLog {
 
     pub fn fatal_during_startup(&self) {
         self.0.error("fatal during startup", ());
+    }
+
+    pub fn started_in_tray(&self) {
+        self.0.info("started in the tray", ());
+    }
+
+    pub fn shown_for_second_start(&self) {
+        self.0.info("window shown for a second start", ());
     }
 }

@@ -202,6 +202,10 @@ impl LaunchHost {
         }
     }
 
+    pub fn recovery_up(&self) -> bool {
+        self.recovery.is_some()
+    }
+
     // A dialog is up: the keyboard is its own.
     pub fn is_modal(&self) -> bool {
         self.recovery.is_some() || self.request.as_ref().is_some_and(|request| !request.silent)
@@ -871,7 +875,7 @@ impl Render for LaunchHost {
             )
             .children(
                 self.render_recovery(cx)
-                    .map(|dialog| overlay(viewport, 3, dialog)),
+                    .map(|dialog| overlay(viewport, 4, dialog)),
             )
     }
 }

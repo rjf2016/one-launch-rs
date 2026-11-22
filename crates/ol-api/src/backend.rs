@@ -193,6 +193,7 @@ enum Command {
     BackUpDatabase(Reply<()>),
     Settings(Reply<Settings>),
     SetSetting(SettingKey, String, Reply<()>),
+    SetWindowBounds(String),
     #[cfg(feature = "fake")]
     SeedSetting(SettingKey, String, Reply<()>),
     WatchSettings(Sender<SettingChange>),
@@ -248,6 +249,7 @@ impl Command {
             Self::BackUpDatabase(_) => "database:backUp",
             Self::Settings(_) => "settings:getAll",
             Self::SetSetting(..) => "settings:set",
+            Self::SetWindowBounds(_) => "window:bounds",
             #[cfg(feature = "fake")]
             Self::SeedSetting(..) => "settings:seed",
             Self::WatchSettings(_) => "settings:watch",
@@ -668,6 +670,13 @@ impl Backend {
     pub async fn set_setting(&self, key: SettingKey, value: String) -> Result<(), ApiError> {
         self.ask(|reply| Command::SetSetting(key, value, reply))
             .await
+    }
+
+    // The window's place, which only the app writes (`set_setting` refuses `window.bounds`): stored as it is given, in the order of the requests, without an answer, so a place handed over as the window closes is stored before the database closes.
+    pub fn remember_window_bounds(&self, bounds: String) {
+        let _ = self
+            .commands
+            .send_blocking(Command::SetWindowBounds(bounds));
     }
 
     // Stores a setting as the fake launchers' seed gives it, as the Electron app's seed does: a key only the app sets is passed over, and any other is stored without its rule.
@@ -1212,6 +1221,12 @@ impl Serving {
                     self.changed(key, Some(&value));
                 }
                 said.answer(&reply, changed.map(|_| ()));
+            }
+            // A place that cannot be stored is the last one stored: the window opens there next time.
+            Command::SetWindowBounds(bounds) => {
+                if let Ok(store) = store {
+                    let _ = store.set_setting(SettingKey::WindowBounds, &bounds);
+                }
             }
             #[cfg(feature = "fake")]
             Command::SeedSetting(key, value, reply) => said.answer(

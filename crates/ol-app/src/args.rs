@@ -69,6 +69,10 @@ impl Args {
                 probe = true;
                 continue;
             }
+            // Read where the window is made, by the rule below the UI that also wants the tray.
+            if argument == ol_api::settings::START_HIDDEN_FLAG {
+                continue;
+            }
             if argument == "--capture-focus" {
                 (plan.focus, steps) = (true, true);
                 continue;
@@ -279,12 +283,32 @@ mod tests {
 
     #[test]
     fn an_unknown_argument_is_refused() {
-        for extra in ["--start-hidden", "--capture-speed=3", "proof", "--probe=1"] {
+        for extra in [
+            "--start-hidden=1",
+            "--Start-Hidden",
+            "--capture-speed=3",
+            "proof",
+            "--probe=1",
+        ] {
             assert!(
                 parse(&[r"--data-dir=D:\scratch", extra]).is_err(),
                 "{extra}"
             );
         }
+    }
+
+    #[test]
+    fn a_start_in_the_tray_is_asked_for_by_its_flag() {
+        let args = parse(&[r"--data-dir=D:\scratch", "--start-hidden"]).unwrap();
+        assert_eq!(args.check, None);
+        assert!(
+            parse(&[
+                r"--data-dir=D:\scratch",
+                r"--capture=D:\a.png",
+                "--start-hidden"
+            ])
+            .is_ok()
+        );
     }
 
     #[test]

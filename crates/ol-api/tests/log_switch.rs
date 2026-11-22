@@ -554,6 +554,8 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
     window.tray_removed();
     window.tray_unavailable("TRAY_WINDOW", Some(-1));
     window.fatal_during_startup();
+    window.started_in_tray();
+    window.shown_for_second_start();
     log_panics(Arc::clone(&logger));
     let named = run.fake.seed.accounts[0].clone();
     let thrown = std::thread::spawn(move || {

@@ -2,18 +2,21 @@ use std::ffi::c_void;
 use std::ptr;
 
 use thiserror::Error;
-use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
+use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
     BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleDC, CreateDIBSection, DIB_RGB_COLORS,
-    DeleteDC, DeleteObject, GdiFlush, GetDC, ReleaseDC, SelectObject,
+    DeleteDC, DeleteObject, GdiFlush, GetDC, MONITOR_DEFAULTTOPRIMARY, MonitorFromPoint, ReleaseDC,
+    SelectObject,
 };
 use windows::Win32::Storage::Xps::{PRINT_WINDOW_FLAGS, PW_CLIENTONLY, PrintWindow};
 use windows::Win32::System::Threading::GetCurrentThreadId;
-use windows::Win32::UI::HiDpi::GetDpiForWindow;
+use windows::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForWindow, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumThreadWindows, GetClassNameW, GetClientRect, GetForegroundWindow, IsIconic,
-    IsWindowVisible, IsZoomed, PW_RENDERFULLCONTENT, PostMessageW, SW_HIDE, SW_RESTORE, SW_SHOW,
-    SetForegroundWindow, ShowWindow, ShowWindowAsync, USER_DEFAULT_SCREEN_DPI, WM_CHAR,
+    EnumThreadWindows, GetClassNameW, GetClientRect, GetForegroundWindow, GetWindowPlacement,
+    GetWindowRect, IsIconic, IsWindowVisible, IsZoomed, PW_RENDERFULLCONTENT, PostMessageW,
+    SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNA, SW_SHOWNOACTIVATE,
+    SetForegroundWindow, SetWindowPlacement, ShowWindow, ShowWindowAsync, USER_DEFAULT_SCREEN_DPI,
+    WINDOWPLACEMENT, WM_CHAR,
 };
 use windows::core::BOOL;
 
@@ -95,6 +98,64 @@ impl AppWindow {
             };
             let _ = ShowWindow(hwnd, command);
             let _ = SetForegroundWindow(hwnd);
+        }
+    }
+
+    // A second start or the tray's Open: out of the tray, out of the taskbar if minimised, maximised when a start in the tray left that for the first show. `focus` false shows it without taking the keyboard from the window that has it, and then without the maximise, which Windows only does with the focus.
+    pub fn bring_forward(self, maximize: bool, focus: bool) {
+        let hwnd = self.hwnd();
+        unsafe {
+            let minimized = IsIconic(hwnd).as_bool();
+            let command = match (focus, maximize, minimized) {
+                (true, true, _) => SW_SHOWMAXIMIZED,
+                (true, false, true) => SW_RESTORE,
+                (true, false, false) => SW_SHOW,
+                (false, _, true) => SW_SHOWNOACTIVATE,
+                (false, _, false) => SW_SHOWNA,
+            };
+            let _ = ShowWindow(hwnd, command);
+            if focus {
+                let _ = SetForegroundWindow(hwnd);
+            }
+        }
+    }
+
+    // Puts a window that was made hidden where it is to show, its client area at `x`, `y`, `width` by `height` in logical pixels of the primary display, as GPUI places a shown one; GPUI keeps that place for a window it shows itself, which this app never asks it to.
+    pub fn place_hidden(self, x: f32, y: f32, width: f32, height: f32) {
+        let hwnd = self.hwnd();
+        unsafe {
+            let monitor = MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY);
+            let (mut dpi_x, mut dpi_y) = (USER_DEFAULT_SCREEN_DPI, USER_DEFAULT_SCREEN_DPI);
+            let _ = GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y);
+            let scale = dpi_x as f32 / USER_DEFAULT_SCREEN_DPI as f32;
+            let mut frame = RECT::default();
+            let mut client = RECT::default();
+            if GetWindowRect(hwnd, &mut frame).is_err() || GetClientRect(hwnd, &mut client).is_err()
+            {
+                return;
+            }
+            // As GPUI's `calculate_window_rect` turns a client area into a window: the frame's extra width and height, half on each side.
+            let wide = (frame.right - frame.left) - (client.right - client.left);
+            let tall = (frame.bottom - frame.top) - (client.bottom - client.top);
+            let left = (x * scale).round() as i32;
+            let top = (y * scale).round() as i32;
+            let right = left + (width * scale).round() as i32;
+            let bottom = top + (height * scale).round() as i32;
+            let mut placement = WINDOWPLACEMENT {
+                length: size_of::<WINDOWPLACEMENT>() as u32,
+                ..Default::default()
+            };
+            if GetWindowPlacement(hwnd, &mut placement).is_err() {
+                return;
+            }
+            placement.rcNormalPosition = RECT {
+                left: left - wide / 2,
+                top: top - tall / 2,
+                right: right + (wide - wide / 2),
+                bottom: bottom + (tall - tall / 2),
+            };
+            placement.showCmd = SW_HIDE.0 as u32;
+            let _ = SetWindowPlacement(hwnd, &placement);
         }
     }
 

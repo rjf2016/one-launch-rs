@@ -1,4 +1,4 @@
-// A stand-in program for the tests of the process port, copied under a name of its own for each test. `--window` gives it a hidden top-level window and it exits when that window is asked to close; `--child=<exe>` starts another program through the port; `--echo=<file>` writes its arguments and its folder there, after the child and, with `--window`, once the window exists. It always exits within a minute.
+// A stand-in program for the tests of the process port, copied under a name of its own for each test. `--window` gives it a hidden top-level window and it exits when that window is asked to close; `--child=<exe>` starts another program through the port; `--echo=<file>` writes its arguments and its folder there, after the child and, with `--window`, once the window exists; `--claim=<folder>` takes that data folder's lock first and, once it has echoed, aborts as a crash would, with the lock still held. It always exits within a minute.
 
 use std::time::Duration;
 
@@ -21,6 +21,11 @@ fn main() {
         args.iter()
             .find_map(|arg| arg.strip_prefix(name).map(str::to_owned))
     };
+    let held = value("--claim=")
+        .map(|folder| ol_platform_win::instance::claim(std::path::Path::new(&folder)));
+    let claimed = held
+        .as_ref()
+        .map(|claim| matches!(claim, Ok(ol_platform_win::instance::Claim::First(_))));
     if let Some(exe) = value("--child=") {
         let _ = WindowsProcesses::new().start(&exe, &[], "");
     }
@@ -36,6 +41,15 @@ fn main() {
             let _ = std::fs::write(file, text);
         }
     };
+    if let Some(claimed) = claimed {
+        echo();
+        std::thread::sleep(Duration::from_millis(500));
+        if claimed {
+            std::process::abort();
+        }
+        drop(held);
+        return;
+    }
     if args.iter().any(|arg| arg == "--window") {
         run_window(echo);
     } else {

@@ -55,6 +55,10 @@ pub const SHIELD_CHECK: &str = "icons/shield-check.svg";
 pub const SHIELD_OFF: &str = "icons/shield-off.svg";
 pub const FOLDER_OPEN: &str = "icons/folder-open.svg";
 pub const FOLDER_SEARCH: &str = "icons/folder-search.svg";
+pub const ARROW_RIGHT: &str = "icons/arrow-right.svg";
+pub const REPEAT: &str = "icons/repeat.svg";
+pub const USER_PLUS: &str = "icons/user-plus.svg";
+pub const EYE_PREVIEW: &str = "icons/eye-preview.svg";
 
 macro_rules! oracle_icon {
     ($file:literal) => {
@@ -123,6 +127,10 @@ const FILES: &[(&str, &[u8])] = &[
     (SHIELD_OFF, oracle_icon!("lucide/ShieldOff.svg")),
     (FOLDER_OPEN, oracle_icon!("lucide/FolderOpen.svg")),
     (FOLDER_SEARCH, oracle_icon!("lucide/FolderSearch.svg")),
+    (ARROW_RIGHT, oracle_icon!("lucide/ArrowRight.svg")),
+    (REPEAT, oracle_icon!("lucide/Repeat.svg")),
+    (USER_PLUS, oracle_icon!("lucide/UserPlus.svg")),
+    (EYE_PREVIEW, oracle_icon!("lucide/Eye.svg")),
     (MINIMIZE, caption_icon!(r#"<path d="M0 5.5h10"/>"#)),
     (
         MAXIMIZE,

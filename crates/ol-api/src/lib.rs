@@ -22,8 +22,16 @@ pub mod settings {
         VaultReset, VaultResetRefusal, VaultResetSummary,
     };
     pub use ol_services::window::{
-        AfterPlay, CloseAction, QuitAnswer, QuitQuestion, START_HIDDEN_FLAG, WindowLog,
-        close_request_action, hide_after_instant_play, start_hidden,
+        AfterPlay, CloseAction, MIN_WINDOW, Placement, QuitAnswer, QuitQuestion, Rect,
+        START_HIDDEN_FLAG, WindowLog, bounds_setting, close_request_action,
+        hide_after_instant_play, placement_from, start_hidden,
+    };
+}
+
+pub mod whats_new {
+    pub use ol_services::whats_new::{
+        AtStart, Image, Item, RELEASES, Release, Section, Tone, at_start, latest_whats_new,
+        pick_whats_new, release_date, shows_setup_guide,
     };
 }
 

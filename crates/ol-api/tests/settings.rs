@@ -232,3 +232,34 @@ fn the_fake_launchers_seed_is_stored_as_it_is_given_but_for_the_keys_only_the_ap
     assert!(heard.taken().is_empty());
     assert!(settings.toggle(SettingKey::DryRun));
 }
+
+// `window.bounds` is the app's own: refused to settings:set, stored by the window's own call, with nothing said to the settings' listeners, and stored before the backend shuts down even when it was handed over just before.
+#[test]
+fn the_windows_place_is_stored_by_the_app_alone_and_as_given() {
+    let scratch = fixture();
+    let data_dir = scratch.path().to_path_buf();
+    let before = rows(&data_dir);
+    let backend = Backend::start(data_dir.clone(), VERSION);
+    let heard = listening(&backend);
+    let refused = refusal(block_on(
+        backend.set_setting(SettingKey::WindowBounds, "{}".to_owned()),
+    ));
+    assert_eq!(
+        refused,
+        (
+            "BAD_REQUEST",
+            "window.bounds is not user-settable".to_owned()
+        )
+    );
+    let place = ol_api::settings::bounds_setting(-1800, 40, 1280, 800, true);
+    backend.remember_window_bounds(place.clone());
+    backend.shut_down();
+    let after = rows(&data_dir);
+    assert_eq!(after.get("window.bounds"), Some(&place));
+    let mut others = after.clone();
+    others.remove("window.bounds");
+    let mut was = before.clone();
+    was.remove("window.bounds");
+    assert_eq!(others, was);
+    assert!(heard.taken().is_empty());
+}
