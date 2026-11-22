@@ -32,6 +32,46 @@ impl ArtworkSource {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ArtworkKind {
+    Grid,
+    Hero,
+    Logo,
+}
+
+impl ArtworkKind {
+    pub const ALL: [Self; 3] = [Self::Grid, Self::Hero, Self::Logo];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Grid => "grid",
+            Self::Hero => "hero",
+            Self::Logo => "logo",
+        }
+    }
+}
+
+// The artwork queue and the Library's state, as the Electron app's artwork:status answers them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ArtworkStatus {
+    pub queued: usize,
+    pub running: usize,
+    // Since the app started.
+    pub completed: usize,
+    pub failed: usize,
+    pub has_api_key: bool,
+    // Moves whenever the games, their artwork or the launch history change.
+    pub revision: u64,
+    // A scan of the launchers has finished since the app started.
+    pub scanned: bool,
+}
+
+impl ArtworkStatus {
+    pub const fn busy(&self) -> usize {
+        self.queued + self.running
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GameArtwork {
     pub source: ArtworkSource,

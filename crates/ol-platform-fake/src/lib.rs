@@ -5,6 +5,7 @@
 mod clipboard;
 mod clock;
 mod files;
+pub mod http;
 mod oplog;
 mod processes;
 mod registry;
@@ -14,6 +15,7 @@ mod shell;
 pub use clipboard::{Kept, RecordingClipboard};
 pub use clock::FakeClock;
 pub use files::ScratchFiles;
+pub use http::RecordingHttp;
 pub use oplog::OpLog;
 pub use processes::{CLOSE_ARGUMENT, FakeProcesses, ProcessKnobs};
 pub use registry::{FakeRegistry, RegistryValue};

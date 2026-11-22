@@ -17,6 +17,7 @@ use ol_api::launchers::{
 use ol_api::{ApiError, Backend, StartLaunch};
 use ol_model::{JobState, LaunchJob, LauncherId, SettingKey};
 use ol_platform_api::Clock;
+use ol_platform_fake::RecordingHttp;
 use ol_sim::{FakeLaunchers, ScenarioError};
 use ol_vault::FakeVault;
 use serde_json::{Map, Value, json};
@@ -239,6 +240,14 @@ fn job_event(job: &LaunchJob) -> Value {
     })
 }
 
+// Waits until no artwork lookup waits or runs.
+fn settle_artwork(backend: &Backend) -> Result<(), ApiError> {
+    while block_on(backend.artwork_status())?.busy() > 0 {
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    Ok(())
+}
+
 impl<'a> Replay<'a> {
     // Lays the script's scenario down in the scratch folder and starts the app on it.
     pub fn begin(setup: &'a Setup<'a>, script: &Value) -> Result<Self, ReplayError> {
@@ -266,7 +275,7 @@ impl<'a> Replay<'a> {
         Ok(replay)
     }
 
-    // A start is over once the app has done its start-up work: the seed of a fresh folder, the library scan and the copy of the database.
+    // A start is over once the app has done its start-up work: the seed of a fresh folder, the library scan, the artwork lookups the scan queued and the copy of the database. The internet is the fake launchers' own: every request is answered in this process.
     fn start(&mut self) -> Result<(), ReplayError> {
         let fake = ol_sim::materialize(&self.launchers_dir, &self.data_dir, self.now)?;
         let mut launchers = Launchers::on(fake.platform.clone(), Arc::new(FakeVault));
@@ -309,6 +318,8 @@ impl<'a> Replay<'a> {
             Some(Arc::new(observer)),
         );
 
+        backend.use_http(Arc::new(RecordingHttp::new(ol_sim::artwork::respond)));
+
         let started = (|| {
             if block_on(backend.accounts())?.is_empty() {
                 for account in &fake.seed.accounts {
@@ -342,6 +353,7 @@ impl<'a> Replay<'a> {
                 }
             }
             block_on(backend.rescan())?;
+            settle_artwork(&backend)?;
             block_on(backend.back_up_database())
         })();
         self.running = Some(Running { backend, fake });
@@ -466,9 +478,9 @@ impl<'a> Replay<'a> {
         let backend = self.backend()?.clone();
         match channel {
             "accounts:list" => drop(block_on(backend.accounts())),
-            // Reads the replay has nothing to check, the copy to the clipboard, which the replay hands no clipboard to, and what this build does not have yet: the status of the launchers and of the artwork, which are reads too.
-            "settings:get" | "settings:getAll" | "accounts:copy" | "launchers:status"
-            | "artwork:status" => {}
+            // Reads the replay has nothing to check, the copy to the clipboard, which the replay hands no clipboard to, and the status of the launchers, which is a read too.
+            "settings:get" | "settings:getAll" | "accounts:copy" | "launchers:status" => {}
+            "artwork:status" => drop(block_on(backend.artwork_status())),
             "settings:set" => {
                 let key = text("key")
                     .and_then(SettingKey::parse)
@@ -574,6 +586,10 @@ impl<'a> Replay<'a> {
                 self.start()
             }
             Some("snapshot") => {
+                // The background work is waited for before the quit, as the recording's was.
+                if let Some(running) = &self.running {
+                    let _ = settle_artwork(&running.backend);
+                }
                 self.shut_down();
                 Ok(())
             }

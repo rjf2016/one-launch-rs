@@ -1,4 +1,6 @@
-// Holds the replay of a recorded run to its recording in oracle/l2: every platform event, the job events, and what the run left behind for the four launchers. Left out of every comparison: artwork, the vault probe and the log lines, because nothing builds them yet, and the copies to the clipboard, which the replay does not make.
+// Holds the replay of a recorded run to its recording in oracle/l2: every platform event, the job events, and what the run left behind for the four launchers, their games' artwork among it. Left out of every comparison: the vault probe and the log lines, because nothing builds them yet, and the copies to the clipboard, which the replay does not make.
+//
+// One difference from the recordings is on purpose, on the owner's word of 2026-11-22: a Riot game is looked up like every other game and gets its cover from SteamGridDB once a key is stored, so the launcher's own icon is no longer stored in a cover's place. Where a recording ends with that stand-in, the replay is held to what the same lookup leaves without it: no artwork row for the game, and the reason of the miss in place of the stand-in's sentence. `without_the_stand_in` is that rule, and the only one.
 
 use std::fs;
 
@@ -18,6 +20,9 @@ const FILES: [&str; 4] = [
     "localappdata/Riot Games/Riot Client/Data/RiotGamesPrivateSettings.yaml",
 ];
 const SEALED: &str = "_enc";
+const STAND_IN_SOURCE: &str = "launcher";
+const STAND_IN_MISS: &str = "No cover found online; showing the game\u{2019}s own icon";
+const MISS_WITHOUT_A_KEY: &str = "Not found on Steam; add a SteamGridDB API key in Settings";
 
 pub fn recorded(folder: &str, name: &str) -> Value {
     let path = oracle(&format!("l2/{folder}/{name}.json"));
@@ -70,9 +75,30 @@ fn events(all: &[Value], kind: &str) -> Vec<Value> {
         .collect()
 }
 
+// The recorded artwork rows as this build is held to them: see the head of this file. Answers the rows and how many stand-ins it took out.
+fn without_the_stand_in(artwork: &Value, attempts: &Value) -> (Value, Value, usize) {
+    let stood_in = |row: &&Value| row["source"] == STAND_IN_SOURCE;
+    let rows = artwork.as_array().cloned().unwrap_or_default();
+    let games: Vec<Value> = rows
+        .iter()
+        .filter(stood_in)
+        .map(|row| row["game_id"].clone())
+        .collect();
+    let kept: Vec<Value> = rows.iter().filter(|row| !stood_in(row)).cloned().collect();
+    let mut misses = attempts.as_array().cloned().unwrap_or_default();
+    for miss in &mut misses {
+        if games.contains(&miss["game_id"]) && miss["error"] == STAND_IN_MISS {
+            miss["error"] = MISS_WITHOUT_A_KEY.into();
+        }
+    }
+    (kept.into(), misses.into(), games.len())
+}
+
 // What of a final state this build can be held to: see the head of this file.
 fn comparable(state: &Value) -> Value {
     let tables = &state["db"]["tables"];
+    let (artwork, attempts, _) =
+        without_the_stand_in(&tables["artwork"], &tables["artwork_attempts"]);
     let mut backups = Map::new();
     backups.insert("db".to_owned(), state["backups"]["db"].clone());
     for launcher in LAUNCHERS {
@@ -86,6 +112,8 @@ fn comparable(state: &Value) -> Value {
         "db": {
             "user_version": state["db"]["user_version"],
             "accounts": tables["accounts"],
+            "artwork": artwork,
+            "artwork_attempts": attempts,
             "games": tables["games"],
             "launch_history": tables["launch_history"],
             "launcher_sessions": tables["launcher_sessions"],

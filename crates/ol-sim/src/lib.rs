@@ -2,6 +2,7 @@
 
 // Fake launchers: a scenario folder laid down under a scratch folder, and scripted Steam, Epic, Battle.net and Riot clients that react to being started as the real ones would. Nothing here reaches a real launcher, the real registry or the real process list.
 
+pub mod artwork;
 mod battlenet;
 mod epic;
 mod files;

@@ -11,7 +11,7 @@ mod settings;
 mod switching;
 
 pub use account::Account;
-pub use game::{ArtworkSource, Game, GameArtwork, LastLaunch};
+pub use game::{ArtworkKind, ArtworkSource, ArtworkStatus, Game, GameArtwork, LastLaunch};
 pub use health::{HealthCheck, HealthReport, HealthStatus, LauncherStatus};
 pub use launcher::LauncherId;
 pub use preference::{LibrarySort, Sidebar};

@@ -1,4 +1,4 @@
-use ol_platform_api::{Shell, ShellError};
+use ol_platform_api::{Shell, ShellError, WebPage};
 use windows::Win32::System::Com::{
     COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx, CoUninitialize,
 };
@@ -57,6 +57,33 @@ impl Shell for WindowsShell {
         if code <= 32 {
             return Err(ShellError(format!(
                 "Windows could not open the {scheme}:// link (error {code})"
+            )));
+        }
+        Ok(())
+    }
+
+    // The address is the page's own, fixed in ol-platform-api: nothing the app is told at run time reaches Windows here.
+    fn open_page(&self, page: WebPage) -> Result<(), ShellError> {
+        let link = wide(page.url());
+        let com =
+            unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) };
+        let opened = unsafe {
+            ShellExecuteW(
+                None,
+                w!("open"),
+                PCWSTR(link.as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        if com.is_ok() {
+            unsafe { CoUninitialize() };
+        }
+        let code = opened.0 as isize;
+        if code <= 32 {
+            return Err(ShellError(format!(
+                "Windows could not open the page in a browser (error {code})"
             )));
         }
         Ok(())

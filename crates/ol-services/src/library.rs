@@ -7,7 +7,7 @@ use ol_store::{Store, StoreError};
 use time::format_description::well_known::Rfc3339;
 use time::{OffsetDateTime, UtcOffset};
 
-const ARTWORK_FOLDER: &str = "artwork";
+pub(crate) const ARTWORK_FOLDER: &str = "artwork";
 const KINDS: [&str; 3] = ["grid", "hero", "logo"];
 const EXTENSIONS: [&str; 4] = ["jpg", "png", "webp", "ico"];
 const UNITS: [(&str, f64); 6] = [

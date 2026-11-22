@@ -175,9 +175,32 @@ impl<T: FileReader + FileWriter> Files for T {}
 #[error("{0}")]
 pub struct ShellError(pub String);
 
+// The web pages the app hands to the user's browser. Each is a fixed address: no other can be named.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WebPage {
+    // Where a signed-in SteamGridDB user reads their API key.
+    SteamGridDbApiKey,
+}
+
+impl WebPage {
+    pub const fn url(self) -> &'static str {
+        match self {
+            Self::SteamGridDbApiKey => "https://www.steamgriddb.com/profile/preferences/api",
+        }
+    }
+}
+
 pub trait Shell: Send + Sync {
     // Hands a link such as steam://rungameid/1 to whatever program Windows opens it with.
     fn open_url(&self, url: &str) -> Result<(), ShellError>;
+
+    // Shows a page in the user's browser. A port that cannot refuses.
+    fn open_page(&self, page: WebPage) -> Result<(), ShellError> {
+        let _ = page;
+        Err(ShellError(
+            "This build of One Launch cannot open web pages.".to_owned(),
+        ))
+    }
 
     // Shows a folder of the data folder in Explorer. A port that cannot refuses.
     fn open_folder(&self, folder: &str) -> Result<(), ShellError> {
