@@ -22,6 +22,7 @@ use ol_services::launchers::{
     self, Adapter, Configs, ImportResult, Launchers, ServiceError, require_implemented,
 };
 use ol_services::library::{self, LibraryGame};
+use ol_services::log::paths::in_data_folder;
 use ol_services::log::{Log, is_refusal};
 use ol_services::sessions::{StoreThread, StoreWork};
 use ol_services::settings::{self as setting, SettingError};
@@ -783,7 +784,6 @@ impl Backend {
         self.jobs.current().as_ref().map(window::quit_question)
     }
 
-    // The window's own lines, in this backend's log.
     pub fn window_log(&self) -> WindowLog {
         WindowLog::new(&self.log)
     }
@@ -1066,7 +1066,7 @@ impl Serving {
             "starting",
             json!({
                 "version": version,
-                "dataDir": self.data_dir.to_string_lossy(),
+                "dataDir": "chosen",
                 "build": install::build_label(),
                 "launchers": self.launchers.is_some(),
             }),
@@ -1183,9 +1183,10 @@ impl Serving {
                 let copied =
                     store.and_then(|store| Ok(data_folder::back_up(store, &self.data_dir)?));
                 match &copied {
-                    Ok(dest) => self
-                        .log
-                        .info("database copied", json!({ "dest": dest.to_string_lossy() })),
+                    Ok(dest) => self.log.info(
+                        "database copied",
+                        json!({ "dest": in_data_folder(dest, &self.data_dir) }),
+                    ),
                     Err(error) => self.log.warn(
                         "database copy failed",
                         json!({ "code": error.code, "error": error.message }),
@@ -1683,7 +1684,7 @@ impl Serving {
         let opened = matches!(slot, VaultSlot::Open(_));
         self.vault.put(slot);
         if opened {
-            let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
+            self.store_probe(store);
         }
     }
 

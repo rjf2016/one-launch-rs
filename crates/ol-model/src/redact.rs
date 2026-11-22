@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::sync::{LazyLock, PoisonError, RwLock, TryLockError};
+use std::sync::{LazyLock, PoisonError, RwLock};
 
 pub const ACCOUNT_MASK: &str = "[ACCOUNT]";
 pub const USER_MASK: &str = "[USER]";
@@ -233,15 +233,6 @@ pub fn register_windows_user(profile: Option<&str>, user_name: Option<&str>) {
 
 pub fn with_registered_names<R>(read: impl FnOnce(&AccountNames) -> R) -> R {
     read(&REGISTERED.read().unwrap_or_else(PoisonError::into_inner))
-}
-
-// For a panic, which may have struck while this thread held the names: never waits.
-pub fn try_with_registered_names<R>(read: impl FnOnce(&AccountNames) -> R) -> Option<R> {
-    match REGISTERED.try_read() {
-        Ok(names) => Some(read(&names)),
-        Err(TryLockError::Poisoned(poisoned)) => Some(read(&poisoned.into_inner())),
-        Err(TryLockError::WouldBlock) => None,
-    }
 }
 
 #[cfg(test)]

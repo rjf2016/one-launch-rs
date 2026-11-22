@@ -94,7 +94,7 @@ fn start(scratch: &Scratch, logger: &Logger) -> Run {
     let launchers_dir = scratch.join("launchers");
     let fake = ol_sim::materialize(
         &launchers_dir,
-        &scratch.join("data"),
+        &data_dir(scratch),
         datetime!(2026-11-06 16:46:23 UTC),
     )
     .unwrap();
@@ -126,7 +126,7 @@ fn start(scratch: &Scratch, logger: &Logger) -> Run {
     let (changed, jobs) = channel();
     let changed = Mutex::new(changed);
     let backend = Backend::logging_to(logger.log()).start_with(
-        scratch.join("data"),
+        data_dir(scratch),
         VERSION,
         launchers,
         Some(Arc::new(move |job: &LaunchJob| {
@@ -250,6 +250,9 @@ fn secrets(scratch: &Scratch, fake: &FakeLaunchers) -> Vec<String> {
         serde_json::from_str(&fs::read_to_string(oracle(SCENARIO).join("scenario.json")).unwrap())
             .unwrap();
     let mut found: Vec<String> = TYPED.iter().map(|typed| (*typed).to_owned()).collect();
+    found.extend(FOLDER_WORDS.map(str::to_owned));
+    found.push(scratch.path().to_string_lossy().into_owned());
+    found.push("no row for".to_owned());
     for account in scenario["seed"]["accounts"].as_array().unwrap() {
         for key in ["displayName", "login", "launcherUid", "password"] {
             strings(&account[key], &mut found);
@@ -366,7 +369,7 @@ fn secrets(scratch: &Scratch, fake: &FakeLaunchers) -> Vec<String> {
         }
     }
     let mut kept = Vec::new();
-    files_under(&scratch.join("data").join("backups"), &mut kept);
+    files_under(&data_dir(scratch).join("backups"), &mut kept);
     for file in kept {
         let text = String::from_utf8_lossy(&fs::read(&file).unwrap()).into_owned();
         if file.extension().is_some_and(|extension| extension == "enc") {
@@ -421,6 +424,16 @@ fn hold(path: &Path, share: u32) -> fs::File {
         .unwrap()
 }
 
+// Made-up words with a space and a folder of the kind a company's OneDrive makes: neither may reach the log.
+const FOLDER_WORDS: [&str; 2] = ["Wren Halloway", "Brightwater Holdings"];
+
+fn data_dir(scratch: &Scratch) -> PathBuf {
+    scratch
+        .join(FOLDER_WORDS[0])
+        .join(format!("OneDrive - {}", FOLDER_WORDS[1]))
+        .join("OneLaunch")
+}
+
 fn launch_dir(scratch: &Scratch) -> PathBuf {
     scratch.join("launchers")
 }
@@ -435,7 +448,7 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
     )
     .unwrap();
     let logger = Arc::new(Logger::for_data_folder(
-        &scratch.join("data"),
+        &data_dir(&scratch),
         LogOptions {
             level: LogLevel::Debug,
             max_bytes: 16 * 1024,
@@ -443,11 +456,20 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
             ..LogOptions::default()
         },
     ));
-    let data = scratch.join("data");
+    let data = data_dir(&scratch);
     let run = start(&scratch, &logger);
     let backend = run.backend.clone();
     block_on(backend.set_setting(SettingKey::LogLevel, "debug".to_owned())).unwrap();
     assert!(block_on(backend.set_setting(SettingKey::LogLevel, "loud".to_owned())).is_err());
+    let elsewhere = "2026-11-07T03-23-28.574Z";
+    let copied = data.join("backups").join("steam").join(elsewhere);
+    fs::create_dir_all(copied.join("config")).unwrap();
+    let fixture = oracle("fixtures/data-folder/backups/steam").join(elsewhere);
+    for file in ["manifest.json", r"config\loginusers.vdf"] {
+        fs::copy(fixture.join(file), copied.join(file)).unwrap();
+    }
+    assert!(block_on(backend.restore_backup(LauncherId::Steam, elsewhere)).is_err());
+    fs::remove_dir_all(&copied).unwrap();
 
     let remembered = block_on(backend.remembered_accounts(LauncherId::Steam)).unwrap();
     let keys: Vec<String> = remembered
@@ -750,7 +772,10 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
         "INFO  [main] tray icon removed",
         r#"WARN  [main] tray icon unavailable; closing the window quits {"error":{"code":"TRAY_WINDOW","hresult":"0xffffffff"}}"#,
         "ERROR [main] fatal during startup",
-        r#"ERROR [main] uncaught exception {"message":"no row for [ACCOUNT] ([ACCOUNT]) under steam","location":"#,
+        r#"ERROR [main] uncaught exception {"location":"crates\\ol-api\\tests\\log_switch.rs:"#,
+        r#""thread":"unnamed"}"#,
+        r#"[main] database copied {"dest":"backups\\db\\onelaunch-"#,
+        r#"[main] starting {"version":"9.8.7","dataDir":"chosen","#,
         r#"INFO  [main] quit prompt shown during a switch {"jobId":"#,
         r#"INFO  [main] quit prompt answered {"answer":"keep"}"#,
         r#"INFO  [main] quit prompt answered {"answer":"quit"}"#,
@@ -777,6 +802,11 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
         assert!(log.contains(expected), "the log has {expected:?}");
     }
     assert_eq!(log.matches("session forgotten").count(), 1);
+    assert!(
+        log.lines()
+            .any(|line| line.contains("ipc backups:restore") && line.contains("[PATH]")),
+        "an error that quotes a path outside the data folder has it masked"
+    );
     let secrets = secrets(&scratch, &fake);
     assert!(
         secrets.len() >= 800,
@@ -815,7 +845,7 @@ fn a_launcher_that_is_not_installed_is_said_at_debug_and_nothing_else() {
     fs::write(&file, serde_json::to_string_pretty(&scenario).unwrap()).unwrap();
     let _ = fs::remove_file(launchers.join("riot").join("RiotClientServices.exe"));
     let id = "2026-11-07T03-23-28.604Z";
-    let snapshot = scratch.join("data").join("backups").join("riot").join(id);
+    let snapshot = data_dir(&scratch).join("backups").join("riot").join(id);
     fs::create_dir_all(&snapshot).unwrap();
     fs::copy(
         oracle("fixtures/data-folder/backups/riot")
@@ -825,7 +855,7 @@ fn a_launcher_that_is_not_installed_is_said_at_debug_and_nothing_else() {
     )
     .unwrap();
     let logger = Logger::for_data_folder(
-        &scratch.join("data"),
+        &data_dir(&scratch),
         LogOptions {
             level: LogLevel::Debug,
             ..LogOptions::default()

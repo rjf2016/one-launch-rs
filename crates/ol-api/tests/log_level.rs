@@ -205,6 +205,13 @@ fn a_lost_key_and_its_reset_are_logged() {
     let first = Backend::start_with_vault_of_data_folder(data.clone(), VERSION, Box::new(Mine));
     account_with_password(&first);
     first.shut_down();
+    let (store, _) = ol_store::Store::open(&data.join("onelaunch.db")).unwrap();
+    assert!(
+        store
+            .delete_secret(ol_model::SecretKey::VaultProbe)
+            .unwrap()
+    );
+    drop(store);
 
     let logger = Logger::open(&scratch.join("logs"), LogOptions::default());
     let opens = Arc::new(AtomicBool::new(false));
@@ -217,6 +224,13 @@ fn a_lost_key_and_its_reset_are_logged() {
     opens.store(true, Ordering::SeqCst);
     block_on(lost.reset_vault()).unwrap();
     lost.shut_down();
+    let readable = text(&logger);
+    assert!(
+        readable.find("INFO  [main:vault] vault probe stored")
+            < readable.find("INFO  [main:vault] vault reset: the key opened after all"),
+        "a key that opens after all gets its probe back, before the answer"
+    );
+    assert!(readable.contains("INFO  [main:vault] vault probe stored"));
 
     let backend = Backend::logging_to(logger.log()).start_with_vault_of_data_folder(
         data,

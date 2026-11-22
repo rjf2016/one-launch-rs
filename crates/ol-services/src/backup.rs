@@ -378,7 +378,7 @@ impl<'a> BackupService<'a> {
                 }
                 None => self.log.warn(
                     "unreadable backup manifest",
-                    json!({ "dir": entry.path().to_string_lossy() }),
+                    json!({ "dir": Path::new("backups").join(launcher.as_str()).join(&id).to_string_lossy() }),
                 ),
             }
         }

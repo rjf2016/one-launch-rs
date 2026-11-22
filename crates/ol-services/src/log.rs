@@ -1,7 +1,7 @@
 pub mod file;
+pub mod paths;
 pub mod redact;
 
-use std::cell::Cell;
 use std::io::Write as _;
 use std::panic::PanicHookInfo;
 use std::path::{Path, PathBuf};
@@ -13,38 +13,19 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use ol_formats::js::iso_from_millis;
 use ol_model::LogLevel;
-use ol_model::redact::{AccountNames, try_with_registered_names, with_registered_names};
+use ol_model::redact::with_registered_names;
 use serde_json::Value;
 
 use self::file::FileSink;
 pub use self::file::{KEEP, LOG_NAME, MAX_BYTES};
-use self::redact::format_line;
+use self::paths::Paths;
+use self::redact::{format_line, level_label};
 
 // Past this many lines waiting for the disk, a line is dropped and counted rather than hold up its caller.
 const QUEUE: usize = 4096;
 const ROOT_SCOPE: &str = "main";
-const WRITER: &str = "log";
 // Long enough for the writer to take the line; short enough that a stuck disk does not hold up the crash.
 const PANIC_FLUSH: Duration = Duration::from_secs(1);
-
-thread_local! {
-    static FORMATTING: Cell<bool> = const { Cell::new(false) };
-}
-
-struct Formatting;
-
-impl Formatting {
-    fn start() -> Self {
-        FORMATTING.with(|formatting| formatting.set(true));
-        Self
-    }
-}
-
-impl Drop for Formatting {
-    fn drop(&mut self) {
-        FORMATTING.with(|formatting| formatting.set(false));
-    }
-}
 
 // Logged as warnings, so an error line always means something unexpected.
 pub const REFUSAL_CODES: [&str; 14] = [
@@ -113,6 +94,7 @@ enum Message {
 struct Shared {
     threshold: AtomicU8,
     mirror: bool,
+    paths: Paths,
     lines: RwLock<Option<SyncSender<Message>>>,
     dropped: AtomicU64,
 }
@@ -220,19 +202,18 @@ impl Log {
         if rank(level) < shared.threshold.load(Ordering::Relaxed) {
             return;
         }
-        let line = {
-            let _formatting = Formatting::start();
-            with_registered_names(|names| {
-                format_line(
-                    names,
-                    &timestamp(),
-                    level,
-                    &self.scope,
-                    message,
-                    fields.0.as_ref(),
-                )
-            })
-        };
+        let message = shared.paths.mask(message);
+        let fields = fields.0.map(|fields| shared.paths.mask_value(&fields));
+        let line = with_registered_names(|names| {
+            format_line(
+                names,
+                &timestamp(),
+                level,
+                &self.scope,
+                &message,
+                fields.as_ref(),
+            )
+        });
         self.send(shared, level, line);
     }
 
@@ -248,46 +229,58 @@ impl Log {
         }
     }
 
-    // A panic that struck inside the logger's own formatting writes nothing; one that struck while this thread held the account names writes the line without its fields, which would go unmasked.
+    // Its place and its thread, never its message: a message can quote what was being sliced or the Debug of an error, and no rule can tell a password in it. Built without the redaction or the names' lock, so it cannot wait on the thread that panicked.
     fn panicked(&self, info: &PanicHookInfo<'_>) -> bool {
         let Some(shared) = &self.shared else {
             return false;
         };
-        if FORMATTING.with(Cell::get) || shared.sender().is_none() {
+        if shared.sender().is_none() {
             return false;
         }
-        let _formatting = Formatting::start();
         let fields = serde_json::json!({
-            "message": info.payload_as_str().unwrap_or("a panic without a message"),
-            "location": info
-                .location()
-                .map(|at| format!("{}:{}:{}", at.file(), at.line(), at.column())),
+            "location": info.location().map(|at| format!("{}:{}:{}", source_file(at.file()), at.line(), at.column())),
+            "thread": thread::current().name().unwrap_or("unnamed"),
         });
-        let format = |names: &AccountNames, fields: Option<&Value>| {
-            format_line(
-                names,
-                &timestamp(),
-                LogLevel::Error,
-                &self.scope,
-                "uncaught exception",
-                fields,
-            )
-        };
-        let line = try_with_registered_names(|names| format(names, Some(&fields)))
-            .unwrap_or_else(|| format(&AccountNames::default(), None));
+        let line = format!(
+            "{} {} [{}] uncaught exception {fields}\n",
+            timestamp(),
+            level_label(LogLevel::Error),
+            self.scope
+        );
         self.send(shared, LogLevel::Error, line);
         true
     }
 }
 
-// The previous hook still runs after the line, so the console keeps its report.
+// A dependency's file is under the user's profile: only the part from the crate's own folder is kept.
+fn source_file(file: &str) -> &str {
+    for marker in [
+        r"\registry\src\",
+        "/registry/src/",
+        r"\git\checkouts\",
+        "/git/checkouts/",
+    ] {
+        if let Some(at) = file.rfind(marker) {
+            let rest = &file[at + marker.len()..];
+            return rest.find(['\\', '/']).map_or(rest, |cut| &rest[cut + 1..]);
+        }
+    }
+    if Path::new(file).is_absolute() {
+        return file.rsplit(['\\', '/']).next().unwrap_or(file);
+    }
+    file
+}
+
+// In a release build Rust's own report, with the message, would go to whatever a tester redirected the output to.
 pub fn log_panics(logger: Arc<Logger>) {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        if logger.log.panicked(info) && thread::current().name() != Some(WRITER) {
+        if logger.log.panicked(info) {
             logger.flush(PANIC_FLUSH);
         }
-        previous(info);
+        if cfg!(debug_assertions) {
+            previous(info);
+        }
     }));
 }
 
@@ -314,14 +307,23 @@ pub struct Logger {
 
 impl Logger {
     pub fn for_data_folder(data_dir: &Path, options: LogOptions) -> Self {
-        Self::open(&data_dir.join("logs"), options)
+        Self::open_with(
+            &data_dir.join("logs"),
+            options,
+            Paths::for_data_folder(data_dir),
+        )
     }
 
     pub fn open(dir: &Path, options: LogOptions) -> Self {
+        Self::open_with(dir, options, Paths::none())
+    }
+
+    fn open_with(dir: &Path, options: LogOptions, paths: Paths) -> Self {
         let (lines, queue) = mpsc::sync_channel(QUEUE);
         let shared = Arc::new(Shared {
             threshold: AtomicU8::new(rank(options.level)),
             mirror: options.mirror,
+            paths,
             lines: RwLock::new(Some(lines)),
             dropped: AtomicU64::new(0),
         });
@@ -329,7 +331,7 @@ impl Logger {
         let sink = FileSink::new(dir, options.max_bytes, options.keep);
         let writing = Arc::clone(&shared);
         let writer = thread::Builder::new()
-            .name(WRITER.to_owned())
+            .name("log".to_owned())
             .spawn(move || {
                 write_until_closed(&queue, sink, &writing);
                 let _ = done.send(());
@@ -442,5 +444,41 @@ fn write_until_closed(queue: &Receiver<Message>, mut sink: FileSink, shared: &Sh
         for ack in acks {
             let _ = ack.send(());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::source_file;
+
+    #[test]
+    fn a_panics_place_keeps_no_folder_of_the_users() {
+        let registry = [
+            "C:",
+            "Users",
+            "jo.smith",
+            ".cargo",
+            "registry",
+            "src",
+            "index.crates.io-1949cf8c6b5b557f",
+            "gpui-pre-0.3.12",
+            "src",
+            "window.rs",
+        ]
+        .join("\\");
+        assert_eq!(
+            source_file(&registry),
+            ["gpui-pre-0.3.12", "src", "window.rs"].join("\\")
+        );
+        let git = "/home/jo/.cargo/git/checkouts/zed-1a2b/3c4d/crates/gpui/src/app.rs";
+        assert_eq!(source_file(git), "3c4d/crates/gpui/src/app.rs");
+        let elsewhere = ["D:", "Jo Smith", "build", "lib.rs"].join("\\");
+        assert_eq!(source_file(&elsewhere), "lib.rs");
+        let own = ["crates", "ol-ui", "src", "shell.rs"].join("\\");
+        assert_eq!(source_file(&own), own);
+        assert_eq!(
+            source_file("/rustc/abc/library/core/src/str/mod.rs"),
+            "/rustc/abc/library/core/src/str/mod.rs"
+        );
     }
 }

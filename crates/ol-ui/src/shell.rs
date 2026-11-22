@@ -103,6 +103,13 @@ enum Asked {
     Stopping,
 }
 
+impl Asked {
+    // A question about quitting during a switch stays until it is answered, whatever page a finished import or delete moves to.
+    const fn gives_way_to_a_finished_move(&self) -> bool {
+        matches!(self, Self::Leave { .. })
+    }
+}
+
 struct Asking {
     title: SharedString,
     message: SharedString,
@@ -328,11 +335,13 @@ impl Shell {
         if self.stopping() {
             return;
         }
-        if self.asking.is_some() {
+        if let Some(asking) = &self.asking {
             if go.guarded {
                 return;
             }
-            self.asking = None;
+            if asking.asked.gives_way_to_a_finished_move() {
+                self.asking = None;
+            }
         }
         if go.guarded
             && let Some(question) = self.question(cx)
@@ -1108,4 +1117,20 @@ fn icon(path: &'static str, size: f32, hex: u32) -> Svg {
         .flex_none()
         .size(px(size))
         .text_color(color(hex))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_leave_question_gives_way_to_a_finished_move() {
+        let leave = Asked::Leave {
+            then: Route::Library,
+            return_to: None,
+        };
+        assert!(leave.gives_way_to_a_finished_move());
+        assert!(!Asked::Quit.gives_way_to_a_finished_move());
+        assert!(!Asked::Stopping.gives_way_to_a_finished_move());
+    }
 }

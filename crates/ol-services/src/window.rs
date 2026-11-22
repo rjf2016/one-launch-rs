@@ -124,7 +124,6 @@ pub enum QuitAnswer {
     Quit,
 }
 
-// What the window, the tray and a quit write to the log. Facts only: an answer, a job's id, an error's code, never a sentence that could name someone.
 #[derive(Clone)]
 pub struct WindowLog(Log);
 

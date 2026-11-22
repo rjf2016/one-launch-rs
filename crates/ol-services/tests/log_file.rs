@@ -257,6 +257,9 @@ fn the_windows_user_registered_at_start_is_masked_on_a_share_too() {
     );
     assert!(logger.flush(WAIT));
     let text = read(&logger.current_path());
-    assert!(text.contains(r#"redirect$\\[USER]\\Documents"#), "{text}");
+    assert!(
+        text.contains(r#"{"dataDir":"[PATH]","by":"[USER]"}"#),
+        "{text}"
+    );
     assert!(!text.to_lowercase().contains("jo.smith") && !text.to_lowercase().contains("jsmith"));
 }
