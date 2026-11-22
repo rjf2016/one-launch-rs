@@ -1,12 +1,21 @@
-// The lock of a data folder: one holder at a time, per folder, released by a holder that crashes, and a second start that reaches the holder's window.
+// The lock of a data folder: one holder at a time per folder however it is reached, released with a holder that never let it go, and a second start that reaches the holder's window and nothing else does.
 
+use std::cell::RefCell;
+use std::fs;
+use std::path::Path;
 use std::process::Command;
+use std::rc::Rc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use ol_platform_win::instance::{Claim, InstanceEvent, bring_forward, claim};
+use ol_platform_win::instance::{Claim, bring_forward, claim, claim_waiting, name_for};
 use ol_testkit::Scratch;
-use windows::Win32::UI::WindowsAndMessaging::{DispatchMessageW, MSG, PM_REMOVE, PeekMessageW};
+use windows::Win32::Foundation::{LPARAM, WPARAM};
+use windows::Win32::UI::WindowsAndMessaging::{
+    DispatchMessageW, FindWindowExW, HWND_MESSAGE, MSG, PM_REMOVE, PeekMessageW, PostMessageW,
+    WM_CLOSE,
+};
+use windows::core::{HSTRING, w};
 
 fn pump_until(done: impl Fn() -> bool) -> bool {
     let deadline = Instant::now() + Duration::from_secs(10);
@@ -23,10 +32,27 @@ fn pump_until(done: impl Fn() -> bool) -> bool {
     false
 }
 
+#[expect(
+    clippy::disallowed_methods,
+    reason = "std makes no junction, and a junction is what this test needs"
+)]
+fn junction(link: &Path, target: &Path) {
+    let made = Command::new("cmd")
+        .args(["/C", "mklink", "/J"])
+        .arg(link)
+        .arg(target)
+        .output()
+        .unwrap();
+    assert!(made.status.success(), "mklink /J failed");
+}
+
 #[test]
-fn one_copy_holds_a_folder_and_a_second_start_reaches_it() {
+fn one_copy_holds_a_folder_however_it_is_reached_and_a_second_start_reaches_it() {
     let scratch = Scratch::new("instance-one");
     let folder = scratch.join("data");
+    fs::create_dir_all(&folder).unwrap();
+    let link = scratch.join("data-link");
+    junction(&link, &folder);
     let other = scratch.join("other");
     let Claim::First(held) = claim(&folder).unwrap() else {
         panic!("a free folder was held");
@@ -34,50 +60,91 @@ fn one_copy_holds_a_folder_and_a_second_start_reaches_it() {
     assert!(matches!(claim(&folder).unwrap(), Claim::Second));
     let upper = std::path::PathBuf::from(folder.to_string_lossy().to_uppercase());
     assert!(matches!(claim(&upper).unwrap(), Claim::Second));
+    assert!(matches!(claim(&link).unwrap(), Claim::Second));
+    assert_eq!(name_for(&link).unwrap(), name_for(&folder).unwrap());
     let Claim::First(beside) = claim(&other).unwrap() else {
         panic!("another folder was blocked");
     };
     drop(beside);
 
-    let heard = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let seen = std::rc::Rc::clone(&heard);
-    held.listen(move |event| seen.borrow_mut().push(event));
+    let heard = Rc::new(RefCell::new(Vec::new()));
+    let seen = Rc::clone(&heard);
+    held.listen(move |quiet| seen.borrow_mut().push(quiet));
     assert!(bring_forward(&folder, true, Duration::from_secs(1)));
-    assert!(bring_forward(&folder, false, Duration::from_secs(1)));
+    assert!(bring_forward(&link, false, Duration::from_secs(1)));
     assert!(pump_until(|| heard.borrow().len() == 2));
-    assert_eq!(
-        *heard.borrow(),
-        [
-            InstanceEvent::Show { quiet: true },
-            InstanceEvent::Show { quiet: false }
-        ]
-    );
-    assert!(ol_platform_win::instance::ask_to_quit());
+    assert_eq!(*heard.borrow(), [true, false]);
+
+    let title = HSTRING::from(name_for(&folder).unwrap());
+    let window =
+        unsafe { FindWindowExW(Some(HWND_MESSAGE), None, w!("OneLaunch.Instance"), &title) }
+            .unwrap();
+    unsafe { PostMessageW(Some(window), WM_CLOSE, WPARAM(0), LPARAM(0)) }.unwrap();
+    assert!(pump_until(|| true));
+    assert!(bring_forward(&folder, true, Duration::from_secs(1)));
     assert!(pump_until(|| heard.borrow().len() == 3));
-    assert_eq!(heard.borrow()[2], InstanceEvent::Quit);
+
+    let quits = Rc::new(std::cell::Cell::new(0));
+    let counted = Rc::clone(&quits);
+    let asker = held.on_quit(move || counted.set(counted.get() + 1));
+    unsafe {
+        PostMessageW(
+            Some(window),
+            windows::Win32::UI::WindowsAndMessaging::WM_APP + 2,
+            WPARAM(0),
+            LPARAM(0),
+        )
+    }
+    .unwrap();
+    assert!(pump_until(|| true));
+    assert_eq!(quits.get(), 0);
+    assert!(asker.ask());
+    assert!(pump_until(|| quits.get() == 1));
 
     drop(held);
     assert!(!bring_forward(&folder, true, Duration::from_millis(200)));
-    assert!(!ol_platform_win::instance::ask_to_quit());
     assert!(matches!(claim(&folder).unwrap(), Claim::First(_)));
 }
 
 #[test]
-fn a_second_start_before_anyone_listens_is_handed_over_when_someone_does() {
+fn a_second_start_before_anyone_listens_is_heard_from_the_loop_once_someone_does() {
     let scratch = Scratch::new("instance-early");
     let folder = scratch.join("data");
     let Claim::First(held) = claim(&folder).unwrap() else {
         panic!("a free folder was held");
     };
     assert!(bring_forward(&folder, true, Duration::from_secs(1)));
-    let mut message = MSG::default();
-    while unsafe { PeekMessageW(&mut message, None, 0, 0, PM_REMOVE) }.as_bool() {
-        unsafe { DispatchMessageW(&message) };
-    }
-    let heard = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let seen = std::rc::Rc::clone(&heard);
-    held.listen(move |event| seen.borrow_mut().push(event));
-    assert_eq!(*heard.borrow(), [InstanceEvent::Show { quiet: true }]);
+    assert!(pump_until(|| true));
+    let heard = Rc::new(RefCell::new(Vec::new()));
+    let seen = Rc::clone(&heard);
+    held.listen(move |quiet| seen.borrow_mut().push(quiet));
+    assert!(heard.borrow().is_empty(), "heard inside listen");
+    assert!(pump_until(|| !heard.borrow().is_empty()));
+    assert_eq!(*heard.borrow(), [true]);
+}
+
+#[test]
+fn a_relaunched_copy_waits_for_the_lock_of_the_copy_before_it() {
+    let scratch = Scratch::new("instance-relaunch");
+    let folder = scratch.join("data");
+    let Claim::First(held) = claim(&folder).unwrap() else {
+        panic!("a free folder was held");
+    };
+    let waiting = folder.clone();
+    let relaunched = thread::spawn(move || {
+        let started = Instant::now();
+        let first = matches!(
+            claim_waiting(&waiting, Duration::from_secs(10)).unwrap(),
+            Claim::First(_)
+        );
+        (first, started.elapsed())
+    });
+    thread::sleep(Duration::from_millis(300));
+    assert!(matches!(claim(&folder).unwrap(), Claim::Second));
+    drop(held);
+    let (first, waited) = relaunched.join().unwrap();
+    assert!(first);
+    assert!(waited >= Duration::from_millis(250), "{waited:?}");
 }
 
 #[test]
@@ -85,22 +152,25 @@ fn a_second_start_before_anyone_listens_is_handed_over_when_someone_does() {
     clippy::disallowed_methods,
     reason = "the test waits for its own child's exit code, which the process port does not give"
 )]
-fn a_copy_that_crashed_leaves_no_lock() {
-    let scratch = Scratch::new("instance-crash");
+fn a_copy_that_ends_without_letting_go_of_the_lock_leaves_no_lock() {
+    let scratch = Scratch::new("instance-ended");
     let folder = scratch.join("data");
     let echo = scratch.join("echo.txt");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_ol-test-child"))
+    let child =
+        scratch.join(format!("olrs-test-child-{}.exe", uuid::Uuid::new_v4().simple()).as_str());
+    fs::copy(env!("CARGO_BIN_EXE_ol-test-child"), &child).unwrap();
+    let mut running = Command::new(&child)
         .arg(format!("--claim={}", folder.display()))
         .arg(format!("--echo={}", echo.display()))
         .spawn()
         .unwrap();
     let deadline = Instant::now() + Duration::from_secs(20);
-    while !echo.exists() && Instant::now() < deadline {
+    let said = || fs::read_to_string(&echo).unwrap_or_default();
+    while !said().contains("claimed") && Instant::now() < deadline {
         thread::sleep(Duration::from_millis(20));
     }
-    assert!(echo.exists(), "the child did not take the lock");
+    assert!(said().contains("claimed true"), "{}", said());
     assert!(matches!(claim(&folder).unwrap(), Claim::Second));
-    let status = child.wait().unwrap();
-    assert!(!status.success(), "the child was to crash");
+    assert_eq!(running.wait().unwrap().code(), Some(3));
     assert!(matches!(claim(&folder).unwrap(), Claim::First(_)));
 }

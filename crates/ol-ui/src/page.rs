@@ -42,7 +42,6 @@ impl PageScroll {
         &self.handle
     }
 
-    // Down by `pixels`, up when it is less than nothing, kept within the page.
     pub fn scroll_by(&self, pixels: f32) {
         let scrolled = -f32::from(self.handle.offset().y);
         clamped(&self.handle, scrolled + pixels);
@@ -109,7 +108,6 @@ fn clamped(handle: &ScrollHandle, scrolled: f32) {
     handle.set_offset(point(offset.x, px(-scrolled.clamp(0., max))));
 }
 
-// `always`: the thumb shows whether the pointer is over the page or not, as the Electron app's `sb-always`.
 pub fn scrollbar(scroll: &PageScroll, always: bool) -> impl IntoElement + use<> {
     let (handle, grab, over) = (
         scroll.handle.clone(),

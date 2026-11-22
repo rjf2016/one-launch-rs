@@ -1,5 +1,3 @@
-// The What's New card: a release's notes, once after the update that brought them or on request from Settings. The Electron app's `WhatsNewDialog.tsx`.
-
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -22,13 +20,11 @@ const CARD_WIDTH: f32 = 640.;
 const LINE: f32 = 40.;
 const PAGE_STEP: f32 = 0.875;
 
-// The notes' pictures, shipped with the app as the Electron app's are.
 const PICTURES: &[(&str, &[u8])] = &[(
     "beta-3.png",
     include_bytes!("../../../oracle/assets/whats-new/beta-3.png"),
 )];
 
-// The card was closed and the running version recorded as seen, or the record failed: the card comes back at the next start then.
 pub struct WhatsNewDone;
 
 pub struct WhatsNewCard {
@@ -93,7 +89,7 @@ impl WhatsNewCard {
         }
     }
 
-    // Every way out records the running version as seen, and closes also when that fails. A second close while one is under way is passed over.
+    // A write that fails still closes the card: it then comes back at the next start.
     fn close(&mut self, cx: &mut Context<Self>) {
         if self.closing {
             return;
@@ -109,7 +105,6 @@ impl WhatsNewCard {
         .detach();
     }
 
-    // The list has the keyboard while the card is up, as in the Electron app: the keys that scroll a page scroll it. Keys held with Alt or the Windows key go on to Windows; no other key reaches what is behind.
     pub fn on_key(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
         let held = keystroke.modifiers;
         if held.alt || held.platform {
@@ -324,7 +319,7 @@ impl WhatsNewCard {
             .justify_center()
             .p(px(24.))
             .bg(alpha(theme::BG, 0.9))
-            // The card is all there is while it is up: the wheel anywhere scrolls its list.
+            // The card is all there is while it is up, as in the Electron app.
             .on_scroll(move |event: &ScrollEvent, window: &mut Window, _| {
                 if wheeled.handle().bounds().contains(&event.position) {
                     return;

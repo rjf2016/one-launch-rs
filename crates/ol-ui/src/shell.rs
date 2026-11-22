@@ -26,7 +26,7 @@ use crate::widgets::{Appeared, Button, Tone, panel_shadow, spinner, tip};
 
 const SIDEBAR: f32 = 224.;
 const SIDEBAR_COLLAPSED: f32 = 60.;
-// As the Electron app's: the Library gets this long to paint before the notes rise over it.
+// The Library gets this long to paint first, as in the Electron app.
 const WHATS_NEW_DELAY: Duration = Duration::from_millis(400);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -137,7 +137,6 @@ pub struct Played {
     pub instant: bool,
 }
 
-// The setup guide or the What's New card, over every page and under the recovery dialog and the app's question. One at a time.
 enum Welcome {
     Guide {
         guide: Entity<SetupGuide>,
@@ -204,7 +203,7 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        // What a start shows over the Library: the setup guide for a folder nobody has set up, and the notes of an update not seen yet unless the guide is up or a switch is left to ask about. Each is decided on its own, as by the Electron app's two hosts.
+        // Decided apart, as by the Electron app's two hosts.
         cx.spawn_in(window, {
             let backend = backend.clone();
             async move |this, cx| {
@@ -377,7 +376,6 @@ impl Shell {
         &self.library
     }
 
-    // From a first start or Settings' Show again. A guide or a card already up stays.
     fn open_guide(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.welcome.is_some() {
             return;
@@ -699,7 +697,6 @@ impl Shell {
             }
             return true;
         }
-        // The order the dialogs stand in: the question, the recovery dialog, the guide or the notes, the launch dialog, then a page's own dialog.
         if self.host.read(cx).recovery_up() {
             return self
                 .host

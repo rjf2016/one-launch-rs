@@ -873,3 +873,47 @@ fn a_launcher_that_is_not_installed_is_said_at_debug_and_nothing_else() {
     ));
     assert!(log.contains(r#"DEBUG [main:launchers] launcher not installed {"launcher":"riot","operation":"restoreBackup"}"#));
 }
+
+// A panic on the switch thread once its snapshot is taken: the job ends as failed, the board takes the next job, the journal stays for the next start's question, and the log has the job's end with no word of the panic.
+#[test]
+fn a_switch_that_panics_ends_as_failed_and_leaves_its_snapshot_to_the_next_start() {
+    let scratch = Scratch::new("api-switch-panic");
+    ol_sim::lay_down(
+        &oracle(SCENARIO),
+        &oracle("fixtures/launchers"),
+        &launch_dir(&scratch),
+    )
+    .unwrap();
+    let logger = Logger::open(&scratch.join("logs"), LogOptions::default());
+    let run = start(&scratch, &logger);
+    let journal = data_dir(&scratch).join("switch.json");
+    let fired = Arc::new(AtomicBool::new(false));
+    let (seen, flag) = (journal.clone(), Arc::clone(&fired));
+    run.fake.clock.before_sleep(move || {
+        if seen.exists() && !flag.swap(true, Ordering::SeqCst) {
+            panic!("a fake step that panics, quoting words-no-log-may-hold");
+        }
+    });
+    let ended = run.play(LauncherId::Steam, "user_3", true).unwrap();
+    run.fake.clock.before_sleep(|| {});
+    assert!(
+        fired.load(Ordering::SeqCst),
+        "the switch never slept after its journal"
+    );
+    assert_eq!(ended.state, JobState::Failed);
+    assert_eq!(ended.error.as_deref(), Some(ol_api::launch::UNWOUND));
+    assert!(!run.backend.is_busy());
+    assert!(journal.exists());
+    run.backend.shut_down();
+    assert!(logger.flush(WAIT));
+    let written = fs::read_to_string(logger.current_path()).unwrap();
+    assert!(
+        written.contains(r#"launch job failed {"jobId":"#),
+        "{written}"
+    );
+    assert!(written.contains(r#""code":"INTERNAL"}"#), "{written}");
+    assert!(!written.contains("words-no-log-may-hold"));
+    let again = Backend::start(data_dir(&scratch), VERSION);
+    assert!(block_on(again.recovery()).unwrap().is_some());
+    again.shut_down();
+}

@@ -1,4 +1,4 @@
-// A stand-in program for the tests of the process port, copied under a name of its own for each test. `--window` gives it a hidden top-level window and it exits when that window is asked to close; `--child=<exe>` starts another program through the port; `--echo=<file>` writes its arguments and its folder there, after the child and, with `--window`, once the window exists; `--claim=<folder>` takes that data folder's lock first and, once it has echoed, aborts as a crash would, with the lock still held. It always exits within a minute.
+// A stand-in program for the tests of the process port, copied under a name of its own for each test. `--window` gives it a hidden top-level window and it exits when that window is asked to close; `--child=<exe>` starts another program through the port; `--echo=<file>` writes its arguments and its folder there, after the child and, with `--window`, once the window exists; `--claim=<folder>` takes that data folder's lock first and, once it has echoed, exits without letting it go, as a crash would. It always exits within a minute.
 
 use std::time::Duration;
 
@@ -34,6 +34,9 @@ fn main() {
         if let Some(file) = value("--echo=") {
             let folder = std::env::current_dir().unwrap_or_default();
             let mut text = format!("{}\n", folder.display());
+            if let Some(claimed) = claimed {
+                text.push_str(&format!("claimed {claimed}\n"));
+            }
             for arg in &args {
                 text.push_str(arg);
                 text.push('\n');
@@ -43,12 +46,10 @@ fn main() {
     };
     if let Some(claimed) = claimed {
         echo();
+        let _kept = &held;
         std::thread::sleep(Duration::from_millis(500));
-        if claimed {
-            std::process::abort();
-        }
-        drop(held);
-        return;
+        // Windows closes the lock's handle as it would after a crash.
+        std::process::exit(if claimed { 3 } else { 4 });
     }
     if args.iter().any(|arg| arg == "--window") {
         run_window(echo);

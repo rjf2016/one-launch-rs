@@ -1,19 +1,22 @@
-// The boxes the app shows before and beside its window, as the Electron app's: that it could not start, and that it hit an error inside it. A capture or a probe is run by agents, so it shows none on the owner's desktop: it says which box would have been shown, and answers as the box's last button does.
-
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::thread::ThreadId;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use ol_api::Backend;
+use ol_api::log::Logger;
 use ol_platform_win::boxes::MessageBox;
-use ol_platform_win::instance;
+use ol_platform_win::instance::QuitAsker;
 
-use crate::args::Args;
+use crate::args::{Args, RELAUNCHED};
 
 const CRASH_BOX_EVERY: Duration = Duration::from_secs(60);
-// As the Electron app's Relaunch: the quit gets this long before the process is ended without it.
 const QUIT_WAIT: Duration = Duration::from_secs(15);
+const SHUTDOWN_WAIT: Duration = Duration::from_secs(5);
+const LOG_CLOSE: Duration = Duration::from_secs(2);
+const LOOK_EVERY: Duration = Duration::from_millis(50);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Boxes {
@@ -29,7 +32,7 @@ impl Boxes {
         }
     }
 
-    // The one place a box reaches Windows. Answers the index of the button pressed; a recorded box answers its last.
+    // The one place a box reaches Windows.
     fn show(self, message: &MessageBox<'_>) -> Option<usize> {
         match self {
             Self::Windows => ol_platform_win::boxes::show(message),
@@ -60,7 +63,6 @@ pub fn startup_text(reason: &str, data_dir: &Path) -> String {
     )
 }
 
-// Electron's error box: "Error" in the title bar, its sentence over the reason, the log and the data folder, and OK.
 pub fn could_not_start(boxes: Boxes, reason: &str, data_dir: &Path) {
     let content = startup_text(reason, data_dir);
     boxes.show(&MessageBox {
@@ -71,9 +73,12 @@ pub fn could_not_start(boxes: Boxes, reason: &str, data_dir: &Path) {
     });
 }
 
+pub const NOT_ANSWERING: &str = "Another copy of One Launch runs on this data folder and did not answer. Look for it in the notification area, or end it in Task Manager, then start One Launch again.";
+
+pub const STARTING_FAILED: &str = "One Launch hit an error inside it while starting, and stopped.";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Crashed {
-    // On the window's thread: nothing can run on after it.
     Window,
     Elsewhere,
 }
@@ -83,7 +88,6 @@ pub struct CrashBox {
     pub buttons: &'static [&'static str],
 }
 
-// What the box says. Never the panic's message, which can quote the text being handled, a typed password among it: that the app stopped, and where the log is.
 pub fn crash_box(crashed: Crashed, data_dir: &Path) -> CrashBox {
     let log = log_file(data_dir);
     match crashed {
@@ -111,22 +115,39 @@ struct Watch {
     relaunch_args: Vec<String>,
 }
 
+struct Ending {
+    backend: Backend,
+    logger: Arc<Logger>,
+}
+
 static WATCH: OnceLock<Watch> = OnceLock::new();
+static ENDING: OnceLock<Ending> = OnceLock::new();
+static QUIT: OnceLock<QuitAsker> = OnceLock::new();
+static QUIT_HEARD: AtomicBool = AtomicBool::new(false);
 static WINDOW_UP: AtomicBool = AtomicBool::new(false);
 static LAST_BOX: AtomicU64 = AtomicU64::new(0);
 static RELAUNCH: AtomicBool = AtomicBool::new(false);
 
-// From the window's first frame on, a panic shows the crash box. Called on the window's thread, after the log's own hook, which this one runs first.
+thread_local! {
+    static WINDOW_END: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
+}
+
+// The new copy waits for this one's lock, which goes only when this process ends.
+pub fn relaunch_arguments(arguments: impl Iterator<Item = String>) -> Vec<String> {
+    arguments
+        .filter(|argument| {
+            argument != ol_api::settings::START_HIDDEN_FLAG && argument != RELAUNCHED
+        })
+        .chain([RELAUNCHED.to_owned()])
+        .collect()
+}
+
 pub fn watch(boxes: Boxes, data_dir: &Path) {
-    let relaunch_args = std::env::args()
-        .skip(1)
-        .filter(|arg| arg != ol_api::settings::START_HIDDEN_FLAG)
-        .collect();
     let _ = WATCH.set(Watch {
         boxes,
         data_dir: data_dir.to_path_buf(),
         window_thread: std::thread::current().id(),
-        relaunch_args,
+        relaunch_args: relaunch_arguments(std::env::args().skip(1)),
     });
     let logged = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -135,27 +156,49 @@ pub fn watch(boxes: Boxes, data_dir: &Path) {
     }));
 }
 
+pub fn attach(backend: Backend, logger: Arc<Logger>) {
+    let _ = ENDING.set(Ending { backend, logger });
+}
+
 pub fn window_up(up: bool) {
     WINDOW_UP.store(up, Ordering::SeqCst);
 }
 
-// Whether a Relaunch asked the app to quit: then the copy to start comes once the lock is let go.
+pub fn on_window_thread_end(end: impl FnOnce() + 'static) {
+    WINDOW_END.with(|slot| {
+        if let Ok(mut slot) = slot.try_borrow_mut() {
+            *slot = Some(Box::new(end));
+        }
+    });
+}
+
+// Inside the process only: nothing outside it can ask the app to quit.
+pub fn quit_through(asker: QuitAsker) {
+    let _ = QUIT.set(asker);
+}
+
+pub fn quit_heard() {
+    QUIT_HEARD.store(true, Ordering::SeqCst);
+}
+
 pub fn relaunch_asked() -> bool {
     RELAUNCH.load(Ordering::SeqCst)
 }
 
 pub fn relaunch() {
-    let Some(watch) = WATCH.get() else {
-        return;
-    };
-    instance::release();
-    ol_platform_win::own_process::start_again(&watch.relaunch_args);
+    if let Some(watch) = WATCH.get() {
+        ol_platform_win::own_process::start_again(&watch.relaunch_args);
+    }
 }
 
 fn now_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |since| since.as_secs())
+}
+
+fn switch_runs() -> bool {
+    ENDING.get().is_some_and(|ending| ending.backend.is_busy())
 }
 
 fn after_panic() {
@@ -167,15 +210,21 @@ fn after_panic() {
     } else {
         Crashed::Elsewhere
     };
+    let up = WINDOW_UP.load(Ordering::SeqCst);
+    if !up {
+        if crashed == Crashed::Window {
+            could_not_start(watch.boxes, STARTING_FAILED, &watch.data_dir);
+            end_here(false);
+        }
+        return;
+    }
     let now = now_secs();
     let last = LAST_BOX.load(Ordering::SeqCst);
-    let shows = WINDOW_UP.load(Ordering::SeqCst)
-        && (last == 0 || now.saturating_sub(last) >= CRASH_BOX_EVERY.as_secs());
-    let relaunch_now = if shows {
+    let relaunch_now = if last == 0 || now.saturating_sub(last) >= CRASH_BOX_EVERY.as_secs() {
         LAST_BOX.store(now.max(1), Ordering::SeqCst);
         let text = crash_box(crashed, &watch.data_dir);
         let boxes = watch.boxes;
-        // On a thread of its own and with no owner: the window's thread may be in the middle of an update, and a box there would hand it messages it cannot take.
+        // A box on the window's thread mid-update would hand GPUI messages it cannot take.
         let answer = std::thread::spawn(move || {
             boxes.show(&MessageBox {
                 title: "One Launch hit an unexpected error",
@@ -192,23 +241,59 @@ fn after_panic() {
         false
     };
     match crashed {
-        // Unwinding out of the window's thread would end the process with nothing said; it is ended here instead, the lock let go with it.
-        Crashed::Window => {
-            if relaunch_now {
-                relaunch();
-            }
-            std::process::exit(1);
-        }
+        Crashed::Window => end_here(relaunch_now),
         Crashed::Elsewhere if relaunch_now => {
             RELAUNCH.store(true, Ordering::SeqCst);
-            if instance::ask_to_quit() {
-                std::thread::sleep(QUIT_WAIT);
-            }
-            relaunch();
-            std::process::exit(1);
+            let asked = QUIT.get().is_some_and(|quit| quit.ask());
+            wait_for_the_quit(asked);
         }
         Crashed::Elsewhere => {}
     }
+}
+
+// Only a window thread that does not answer while no switch runs is overtaken.
+fn wait_for_the_quit(asked: bool) {
+    let started = Instant::now();
+    loop {
+        if asked && QUIT_HEARD.load(Ordering::SeqCst) {
+            return;
+        }
+        if started.elapsed() >= QUIT_WAIT && !switch_runs() {
+            end_here(true);
+        }
+        std::thread::sleep(LOOK_EVERY);
+    }
+}
+
+// A switch being stopped or put back is waited for, however long its own timeouts run.
+fn end_here(relaunch_after: bool) -> ! {
+    WINDOW_END.with(|slot| {
+        if let Some(end) = slot.try_borrow_mut().ok().and_then(|mut slot| slot.take()) {
+            end();
+        }
+    });
+    if let Some(ending) = ENDING.get() {
+        let backend = ending.backend.clone();
+        let done = Arc::new(AtomicBool::new(false));
+        let finished = Arc::clone(&done);
+        let _ = std::thread::Builder::new()
+            .name("shutdown".to_owned())
+            .spawn(move || {
+                backend.shut_down();
+                finished.store(true, Ordering::SeqCst);
+            });
+        let started = Instant::now();
+        while !done.load(Ordering::SeqCst)
+            && (ending.backend.is_busy() || started.elapsed() < SHUTDOWN_WAIT)
+        {
+            std::thread::sleep(LOOK_EVERY);
+        }
+        ending.logger.close(LOG_CLOSE);
+    }
+    if relaunch_after {
+        relaunch();
+    }
+    std::process::exit(1);
 }
 
 #[cfg(test)]
@@ -223,7 +308,7 @@ mod tests {
         Args::parse(arguments).unwrap()
     }
 
-    // `Boxes::Windows` is the only way to `ol_platform_win::boxes::show`; the crash hook and the start's box both go through `Boxes::show`.
+    // `Boxes::Windows` is the only way to `ol_platform_win::boxes::show`; the crash hook and every start's box go through `Boxes::show`.
     #[test]
     fn a_capture_or_a_probe_never_shows_a_native_box() {
         let checks: [&[&str]; 7] = [
@@ -244,7 +329,10 @@ mod tests {
         }
         assert_eq!(Boxes::for_run(&parsed(&["--doctor"])), Boxes::Recording);
         assert_eq!(Boxes::for_run(&parsed(&[])), Boxes::Windows);
-        assert_eq!(Boxes::for_run(&parsed(&["--start-hidden"])), Boxes::Windows);
+        assert_eq!(
+            Boxes::for_run(&parsed(&["--start-hidden", RELAUNCHED])),
+            Boxes::Windows
+        );
         let recorded = Boxes::Recording.show(&MessageBox {
             title: "t",
             instruction: "i",
@@ -255,7 +343,7 @@ mod tests {
     }
 
     #[test]
-    fn the_crash_box_never_carries_the_panics_message() {
+    fn the_crash_box_offers_relaunch_and_what_the_thread_that_stopped_allows() {
         let data_dir = Path::new(r"D:\scratch\data");
         for crashed in [Crashed::Window, Crashed::Elsewhere] {
             let text = crash_box(crashed, data_dir);
@@ -270,6 +358,16 @@ mod tests {
         assert_eq!(
             crash_box(Crashed::Elsewhere, data_dir).buttons[1],
             "Keep running"
+        );
+    }
+
+    #[test]
+    fn a_relaunch_starts_the_app_as_it_was_started_but_shown_and_says_it_is_one() {
+        let arguments =
+            [r"--data-dir=D:\scratch\data", "--start-hidden", RELAUNCHED].map(str::to_owned);
+        assert_eq!(
+            relaunch_arguments(arguments.into_iter()),
+            [r"--data-dir=D:\scratch\data", RELAUNCHED]
         );
     }
 

@@ -1,5 +1,3 @@
-// Windows' own message boxes for what the app tells before or beside its window: that it could not start, and that it hit an error it cannot carry on from. Task dialogs, as the Electron app's are.
-
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Controls::{
     TASKDIALOG_BUTTON, TASKDIALOG_COMMON_BUTTON_FLAGS, TASKDIALOGCONFIG, TD_ERROR_ICON,
@@ -16,11 +14,9 @@ pub struct MessageBox<'a> {
     pub title: &'a str,
     pub instruction: &'a str,
     pub content: &'a str,
-    // None: Windows' own OK. Otherwise the buttons in order; the last answers Escape and the window's close.
     pub buttons: Option<&'a [&'a str]>,
 }
 
-// Shows the box on this thread, with no owner window, and waits for it. Answers the index of the button pressed, Escape and the close answering the last; None when Windows could not show it.
 pub fn show(message: &MessageBox<'_>) -> Option<usize> {
     let title = wide(message.title);
     let instruction = wide(message.instruction);

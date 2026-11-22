@@ -20,18 +20,19 @@ use ol_api::Backend;
 use ol_api::library::HourClock;
 use ol_api::log::{Log, LogOptions, Logger, log_panics, register_windows_user};
 use ol_api::settings::{
-    AfterPlay, CloseAction, Folder, Rect, bounds_setting, close_request_action,
+    AfterPlay, CloseAction, Folder, Rect, bounds_setting, close_request_action, display_for, fit,
     hide_after_instant_play, placement_from, start_hidden,
 };
 use ol_model::{SettingKey, Settings};
 use ol_platform_api::{Shell as FolderShell, ShellError};
 use ol_platform_win::data_folder::refuse_real_data_folder;
 use ol_platform_win::dpapi::Dpapi;
-use ol_platform_win::instance::{self, Claim, Instance, InstanceEvent};
+use ol_platform_win::instance::{self, Claim, Instance};
 use ol_platform_win::own_process;
 use ol_platform_win::shell::WindowsShell;
 use ol_platform_win::tray::{MenuEntry, Tray, TrayEvent};
 use ol_platform_win::window::AppWindow;
+use ol_platform_win::window::Display;
 use ol_ui::{FilePicker, LibraryLoaded, Opening, Played, Presence, QuitAnyway, Shell};
 
 use crate::args::{Args, Check, DoctorVault};
@@ -44,9 +45,10 @@ const FAKE_TITLE: &str = "One Launch (fake launchers)";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const COPY_DELAY: Duration = Duration::from_millis(250);
 const LOG_CLOSE: Duration = Duration::from_secs(2);
-// How long a second start looks for the first copy's window, which may still be opening.
+// The first copy's window may still be opening.
 const SECOND_START_WAIT: Duration = Duration::from_secs(10);
-// As the Electron app's: the place is stored once the window has kept still this long.
+// A switch the copy before stops has timeouts of its own.
+const RELAUNCH_WAIT: Duration = Duration::from_secs(60);
 const BOUNDS_SETTLE: Duration = Duration::from_millis(500);
 const DEFAULT_SIZE: (f32, f32) = (1280., 800.);
 
@@ -223,9 +225,8 @@ struct Life {
     quitting: Cell<bool>,
     // "Quit anyway" was answered: the switch is being stopped, and the app quits when it has.
     stopping: Cell<bool>,
-    // A capture or a probe: nothing takes the keyboard from the window that has it.
     quiet: bool,
-    // Stored maximised and not shown so yet: a start in the tray, or a run that takes no focus. Stored maximised meanwhile, as the Electron app's pending maximize is.
+    // Stored as maximised meanwhile, as the Electron app's pending maximize is.
     pending_maximize: Cell<bool>,
     bounds_timer: RefCell<Option<Task<()>>>,
 }
@@ -275,48 +276,69 @@ fn main() -> ExitCode {
     if let Some(vault) = args.doctor {
         return doctor(&args.data_dir, vault);
     }
-    let instance = match claim(&args) {
-        Ok(instance) => instance,
+    let boxes = Boxes::for_run(&args);
+    let instance = match claim(&args, boxes) {
+        Ok(instance) => Rc::new(instance),
         Err(exit) => return exit,
     };
     let logger = open_log(&args.data_dir);
-    let boxes = Boxes::for_run(&args);
     boxes::watch(boxes, &args.data_dir);
     let data_dir = args.data_dir.clone();
-    let (exit, failure) = run(args, &logger.log(), instance.clone());
+    let (exit, failure) = run(args, &logger, Rc::clone(&instance));
     logger.close(LOG_CLOSE);
     if let Some(reason) = failure {
         boxes::could_not_start(boxes, &reason, &data_dir);
     }
-    drop(instance);
+    // The new copy waits for this one's lock, which goes when the process ends.
     if boxes::relaunch_asked() {
         boxes::relaunch();
     }
+    drop(instance);
     exit
 }
 
-// Before the log, the database and the vault are opened, as the Electron app's single-instance lock: a second start on the same data folder brings the first copy's window forward and leaves with 0. A lock Windows will not make leaves this copy running without one.
-fn claim(args: &Args) -> Result<Option<Rc<Instance>>, ExitCode> {
-    match instance::claim(&args.data_dir) {
-        Ok(Claim::First(held)) => Ok(Some(Rc::new(held))),
+fn second_start_quiet(args: &Args) -> bool {
+    args.check.is_some()
+}
+
+// Before the log, the database and the vault, as the Electron app's lock.
+fn claim(args: &Args, boxes: Boxes) -> Result<Instance, ExitCode> {
+    let claimed = if args.relaunched {
+        instance::claim_waiting(&args.data_dir, RELAUNCH_WAIT)
+    } else {
+        instance::claim(&args.data_dir)
+    };
+    match claimed {
+        Ok(Claim::First(held)) => Ok(held),
         Ok(Claim::Second) => {
-            let quiet = args.check.is_some();
-            let found = instance::bring_forward(&args.data_dir, quiet, SECOND_START_WAIT);
-            println!(
-                "OneLaunch: another copy runs on this data folder; {}",
-                if found {
-                    "its window was asked to come forward"
-                } else {
-                    "its window was not found"
-                }
+            let found = instance::bring_forward(
+                &args.data_dir,
+                second_start_quiet(args),
+                SECOND_START_WAIT,
             );
-            Err(ExitCode::SUCCESS)
+            if found {
+                println!(
+                    "OneLaunch: another copy runs on this data folder; its window was asked to come forward"
+                );
+                return Err(ExitCode::SUCCESS);
+            }
+            println!("OneLaunch: another copy runs on this data folder and did not answer");
+            boxes::could_not_start(boxes, boxes::NOT_ANSWERING, &args.data_dir);
+            Err(ExitCode::FAILURE)
         }
         Err(error) => {
-            eprintln!("OneLaunch: {error}; this copy runs without it");
-            Ok(None)
+            println!("OneLaunch: {error}");
+            boxes::could_not_start(boxes, &capitalised(&error.to_string()), &args.data_dir);
+            Err(ExitCode::FAILURE)
         }
     }
+}
+
+fn capitalised(text: &str) -> String {
+    let mut letters = text.chars();
+    letters.next().map_or_else(String::new, |first| {
+        format!("{}{}.", first.to_uppercase(), letters.as_str())
+    })
 }
 
 // The Windows user is registered before the first line, so no line can name them.
@@ -331,15 +353,17 @@ fn open_log(data_dir: &Path) -> Arc<Logger> {
     logger
 }
 
-fn run(args: Args, log: &Log, instance: Option<Rc<Instance>>) -> (ExitCode, Option<String>) {
+fn run(args: Args, logger: &Arc<Logger>, instance: Rc<Instance>) -> (ExitCode, Option<String>) {
     // Started first: the database opens on its own thread while the window is being made.
-    let (backend, machine) = match start_backend(&args, log) {
+    let (backend, machine) = match start_backend(&args, &logger.log()) {
         Ok(started) => started,
         Err(problem) => {
             eprintln!("OneLaunch: {problem:#}");
-            return (ExitCode::from(2), None);
+            logger.log().error("fatal during startup", ());
+            return (ExitCode::FAILURE, Some(format!("{problem:#}")));
         }
     };
+    boxes::attach(backend.clone(), Arc::clone(logger));
     let heard = use_clipboard(Board::for_run(&args).give(), &backend);
     let _recorded = hand_shell(&args, &backend);
     let picker = Rc::new(RefCell::new(None));
@@ -492,7 +516,7 @@ struct Start {
     failed: Rc<Cell<bool>>,
     failure: Rc<RefCell<Option<String>>>,
     tray: TraySlot,
-    instance: Option<Rc<Instance>>,
+    instance: Rc<Instance>,
 }
 
 fn start(args: Args, started: Start, cx: &mut App) {
@@ -511,7 +535,7 @@ fn start(args: Args, started: Start, cx: &mut App) {
     if !Board::for_run(&args).keys_reach_it() {
         ol_ui_kit::refuse_clipboard_keys(cx);
     }
-    // As the Electron app's bootstrap: the data folder is read before the window is made, so it opens where it was and goes to the tray as the settings say, and a database that cannot be opened ends the start with its box.
+    // Read before the window, so it opens where it was and a database that cannot be opened shows no window.
     cx.spawn(async move |cx| {
         let Start {
             backend,
@@ -528,7 +552,7 @@ fn start(args: Args, started: Start, cx: &mut App) {
             Machine::None => TITLE,
             #[cfg(feature = "fake")]
             Machine::Fake(seed) => {
-                // The code and not the sentence, which can name an account. Before the window, so the setup guide's question about accounts has the scenario's answer.
+                // The code and not the sentence, which can name an account.
                 if let Err(error) = fake::seed(&backend, seed).await {
                     eprintln!(
                         "OneLaunch: the scenario's accounts could not be made ({})",
@@ -583,22 +607,58 @@ struct Opened {
     title: &'static str,
     failed: Rc<Cell<bool>>,
     tray: TraySlot,
-    instance: Option<Rc<Instance>>,
+    instance: Rc<Instance>,
 }
 
-fn work_areas(cx: &App) -> Vec<Rect> {
-    cx.displays()
+fn area_of(display: &Display) -> Rect {
+    Rect {
+        x: display.x,
+        y: display.y,
+        width: display.width,
+        height: display.height,
+    }
+}
+
+fn opening_place(stored: Option<&str>, displays: &[Display]) -> (Rect, f64, bool) {
+    let areas: Vec<Rect> = displays.iter().map(area_of).collect();
+    let placement = placement_from(stored, &areas);
+    if let Some(bounds) = placement.bounds
+        && let Some(at) = display_for(&bounds, &areas)
+    {
+        return (
+            fit(bounds, &areas[at]),
+            displays[at].scale,
+            placement.maximized,
+        );
+    }
+    let primary = displays
         .iter()
-        .map(|display| {
-            let area = display.visible_bounds();
+        .find(|display| display.primary)
+        .or_else(|| displays.first());
+    let (area, scale) = primary.map_or(
+        (
             Rect {
-                x: f64::from(area.origin.x.as_f32()),
-                y: f64::from(area.origin.y.as_f32()),
-                width: f64::from(area.size.width.as_f32()),
-                height: f64::from(area.size.height.as_f32()),
-            }
-        })
-        .collect()
+                x: 0.,
+                y: 0.,
+                width: f64::from(DEFAULT_SIZE.0),
+                height: f64::from(DEFAULT_SIZE.1),
+            },
+            1.,
+        ),
+        |display| (area_of(display), display.scale),
+    );
+    let wanted = Rect {
+        width: f64::from(DEFAULT_SIZE.0),
+        height: f64::from(DEFAULT_SIZE.1),
+        ..area
+    };
+    let sized = fit(wanted, &area);
+    let centred = Rect {
+        x: area.x + ((area.width - sized.width) / 2.).max(0.),
+        y: area.y + ((area.height - sized.height) / 2.).max(0.),
+        ..sized
+    };
+    (centred, scale, placement.maximized)
 }
 
 fn open(args: Args, opened: Opened, cx: &mut App) -> anyhow::Result<()> {
@@ -611,25 +671,21 @@ fn open(args: Args, opened: Opened, cx: &mut App) -> anyhow::Result<()> {
         instance,
     } = opened;
     let fake_launchers = title != TITLE;
-    let presence = match &args.check {
-        Some(Check::Capture(plan)) if !plan.focus => Presence::Background,
-        Some(Check::Probe) => Presence::Background,
-        _ => Presence::Foreground,
-    };
+    let presence = presence_for(&args);
     let quiet = presence == Presence::Background;
     let close_to_tray = settings.toggle(SettingKey::WindowCloseToTray);
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let hidden = start_hidden(&argv, close_to_tray);
-    let placement = placement_from(settings.get(SettingKey::WindowBounds), &work_areas(cx));
-    let restore = placement.bounds.map_or_else(
-        || Bounds::centered(None, size(px(DEFAULT_SIZE.0), px(DEFAULT_SIZE.1)), cx),
-        |stored| Bounds {
-            origin: point(px(stored.x as f32), px(stored.y as f32)),
-            size: size(px(stored.width as f32), px(stored.height as f32)),
-        },
+    let (place, scale, maximized) = opening_place(
+        settings.get(SettingKey::WindowBounds),
+        &ol_platform_win::window::displays(),
     );
-    // Windows maximises only with the focus: a run that takes none, or a start in the tray, leaves it for the first show that may.
-    let maximize_now = placement.maximized && !hidden && !quiet;
+    let restore = Bounds {
+        origin: point(px(place.x as f32), px(place.y as f32)),
+        size: size(px(place.width as f32), px(place.height as f32)),
+    };
+    // Windows maximises only with the focus.
+    let maximize_now = maximized && !hidden && !quiet;
     // Heard from before the window opens, so no change made meanwhile is missed.
     let changes = backend.setting_changes();
     let window = ol_ui::open_main_window(
@@ -639,20 +695,20 @@ fn open(args: Args, opened: Opened, cx: &mut App) -> anyhow::Result<()> {
             fake_launchers,
             developer: cfg!(feature = "fake"),
             bounds: restore,
-            maximized: maximize_now,
-            shown: !hidden,
         },
         backend.clone(),
         cx,
     )?;
-    if hidden && let Some(native) = AppWindow::on_this_thread() {
-        native.place_hidden(
-            restore.origin.x.as_f32(),
-            restore.origin.y.as_f32(),
-            restore.size.width.as_f32(),
-            restore.size.height.as_f32(),
-        );
-    }
+    // GPUI keeps a place only on its primary display, and cannot take a move or a show inside an update.
+    cx.spawn(async move |_| {
+        if let Some(native) = AppWindow::on_this_thread() {
+            native.place_hidden(place.x, place.y, place.width, place.height, scale);
+            if !hidden {
+                native.bring_forward(maximize_now, !quiet);
+            }
+        }
+    })
+    .detach();
     boxes::window_up(true);
     let library = window.update(cx, |shell, _, _| shell.library().clone())?;
     cx.subscribe(&library, move |_, _: &LibraryLoaded, cx| {
@@ -672,12 +728,36 @@ fn open(args: Args, opened: Opened, cx: &mut App) -> anyhow::Result<()> {
         quitting: Cell::new(false),
         stopping: Cell::new(false),
         quiet,
-        pending_maximize: Cell::new(placement.maximized && !maximize_now),
+        pending_maximize: Cell::new(maximized && !maximize_now),
         bounds_timer: RefCell::new(None),
     });
-    if let Some(instance) = &instance {
+    {
+        let life = Rc::clone(&life);
+        instance.listen(move |quiet| {
+            if bring_window_forward(&life, !quiet) {
+                println!(
+                    "OneLaunch: a second start on this data folder brought the window forward"
+                );
+                life.backend.window_log().shown_for_second_start();
+            }
+        });
+    }
+    {
         let (life, cx) = (Rc::clone(&life), cx.to_async());
-        instance.listen(move |event| on_instance_event(event, &life, &cx));
+        boxes::quit_through(instance.on_quit(move || {
+            boxes::quit_heard();
+            life.quitting.set(true);
+            let life = Rc::clone(&life);
+            cx.spawn(async move |cx| quit_app(&life, cx)).detach();
+        }));
+    }
+    {
+        let tray = tray.clone();
+        boxes::on_window_thread_end(move || {
+            if let Ok(mut held) = tray.try_borrow_mut() {
+                drop(held.take());
+            }
+        });
     }
     cx.subscribe(&shell, {
         let life = Rc::clone(&life);
@@ -830,7 +910,7 @@ fn open(args: Args, opened: Opened, cx: &mut App) -> anyhow::Result<()> {
     Ok(())
 }
 
-// The place as the Electron app stores it, while the window can be seen: one hidden in the tray or minimised keeps the place it was last seen at, maximised or not.
+// A hidden or minimised window keeps the place it was last seen at (triage S11.5-04).
 fn remember_bounds(life: &Life, window: &Window) {
     let Some(native) = AppWindow::on_this_thread() else {
         return;
@@ -852,23 +932,16 @@ fn remember_bounds(life: &Life, window: &Window) {
     ));
 }
 
-// Called from the message loop, between two GPUI updates, as the tray's handler is.
-fn on_instance_event(event: InstanceEvent, life: &Rc<Life>, cx: &AsyncApp) {
-    match event {
-        InstanceEvent::Show { quiet } => {
-            if bring_window_forward(life, !quiet) {
-                println!(
-                    "OneLaunch: a second start on this data folder brought the window forward"
-                );
-                life.backend.window_log().shown_for_second_start();
-            }
-        }
-        InstanceEvent::Quit => {
-            life.quitting.set(true);
-            let life = Rc::clone(life);
-            cx.spawn(async move |cx| quit_app(&life, cx)).detach();
-        }
+fn presence_for(args: &Args) -> Presence {
+    match &args.check {
+        Some(Check::Capture(plan)) if !plan.focus => Presence::Background,
+        Some(Check::Probe) => Presence::Background,
+        _ => Presence::Foreground,
     }
+}
+
+fn takes_focus(asked: bool, quiet: bool) -> bool {
+    asked && !quiet
 }
 
 // A callback of a frame runs before the frame is drawn, so it is the second one that follows the frame shown.
@@ -926,12 +999,11 @@ fn on_tray_event(event: TrayEvent, life: &Rc<Life>, cx: &AsyncApp) {
     }
 }
 
-// Out of the tray or the taskbar; with the focus, and then maximised when that was left for the first show, unless the run takes no focus.
 fn bring_window_forward(life: &Life, focus: bool) -> bool {
     let Some(window) = AppWindow::on_this_thread() else {
         return false;
     };
-    let focus = focus && !life.quiet;
+    let focus = takes_focus(focus, life.quiet);
     let maximize = focus && life.pending_maximize.replace(false);
     window.bring_forward(maximize, focus);
     true
@@ -993,7 +1065,6 @@ fn quit(cx: &AsyncApp) {
     cx.update(|cx| cx.quit());
 }
 
-// A quit the app itself asks for stores the window's place first, as the Electron app's close does.
 fn quit_app(life: &Life, cx: &mut AsyncApp) {
     let _ = life
         .window
@@ -1125,6 +1196,33 @@ mod tests {
             .chain(arguments)
             .map(|argument| (*argument).to_owned());
         Args::parse(arguments).unwrap()
+    }
+
+    // The three ways a run could take the foreground: the window it opens, a second start it is, and a second start it hears.
+    #[test]
+    fn a_capture_or_a_probe_never_takes_the_foreground_nor_lets_a_second_start_take_it() {
+        let checks: [&[&str]; 6] = [
+            &[r"--capture=D:\scratch\shot.png"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-keys=enter"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-size=960x600"],
+            &[r"--capture=D:\scratch\shot.png", "--start-hidden"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-type=abc"],
+            &["--probe"],
+        ];
+        for check in checks {
+            let args = parsed(check);
+            assert!(presence_for(&args) == Presence::Background, "{check:?}");
+            assert!(second_start_quiet(&args), "{check:?}");
+            assert!(!takes_focus(true, true), "{check:?}");
+        }
+        let focused = parsed(&[r"--capture=D:\scratch\shot.png", "--capture-focus"]);
+        assert!(presence_for(&focused) == Presence::Foreground);
+        assert!(second_start_quiet(&focused));
+        let person = parsed(&[]);
+        assert!(presence_for(&person) == Presence::Foreground);
+        assert!(!second_start_quiet(&person));
+        assert!(takes_focus(true, false));
+        assert!(!takes_focus(false, false));
     }
 
     #[test]

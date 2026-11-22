@@ -102,6 +102,10 @@ fn on_a_lettered_drive(path: &Path, resolved: bool) -> bool {
     }
 }
 
+pub fn identity(path: &Path) -> Result<String, FolderError> {
+    Ok(key(&resolve(path)?)?.join("\\"))
+}
+
 fn resolve(path: &Path) -> Result<PathBuf, FolderError> {
     let mut path = absolute(path)?;
     let mut below = Vec::new();

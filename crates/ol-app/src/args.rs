@@ -1,12 +1,14 @@
 use std::path::PathBuf;
 
 const MOST: usize = 20_000;
+pub const RELAUNCHED: &str = "--relaunched";
 
 #[derive(Debug, PartialEq)]
 pub struct Args {
     pub data_dir: PathBuf,
     pub check: Option<Check>,
     pub doctor: Option<DoctorVault>,
+    pub relaunched: bool,
     #[cfg(feature = "fake")]
     pub fake: Option<FakeMachine>,
     // The registry, the processes, the files and the shell of this PC behind the launchers. Without it the app reaches no launcher.
@@ -53,6 +55,7 @@ impl Args {
         let mut plan = CapturePlan::default();
         let mut steps = false;
         let mut real_launchers = false;
+        let mut relaunched = false;
         #[cfg(feature = "fake")]
         let (mut fake_folder, mut fake_scenario, mut fake_fixtures) = (None, None, None);
         for argument in arguments {
@@ -69,8 +72,11 @@ impl Args {
                 probe = true;
                 continue;
             }
-            // Read where the window is made, by the rule below the UI that also wants the tray.
             if argument == ol_api::settings::START_HIDDEN_FLAG {
+                continue;
+            }
+            if argument == RELAUNCHED {
+                relaunched = true;
                 continue;
             }
             if argument == "--capture-focus" {
@@ -173,6 +179,7 @@ impl Args {
             data_dir,
             check,
             doctor,
+            relaunched,
             #[cfg(feature = "fake")]
             fake,
             #[cfg(not(feature = "fake"))]

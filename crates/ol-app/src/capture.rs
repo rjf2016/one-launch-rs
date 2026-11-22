@@ -235,10 +235,10 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
     Ok(())
 }
 
-// What a capture's panic says, so a test can look for it where it must never be: in the log, in a box.
+// A test looks for this text where it must never be: in the log or a box.
 const PANIC_TEXT: &str = "a panic a capture asked for, quoting words-no-log-may-hold";
 
-// Starts this program again on the same data folder and fake launchers, as a capture of its own so that it takes no focus, and says how it ended and what it printed. One that holds to the lock leaves at once.
+// As a capture, so that a copy that wrongly starts takes no focus.
 async fn second_start(shot: &std::path::Path, cx: &AsyncApp) -> anyhow::Result<()> {
     let mut arguments: Vec<String> = std::env::args()
         .skip(1)

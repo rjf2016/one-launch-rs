@@ -69,7 +69,6 @@ fn from_ticks(ticks: u64) -> Duration {
     Duration::from_nanos(ticks * 100)
 }
 
-// This program started again with `arguments`, not waited for: the crash box's Relaunch. False when Windows would not start it.
 #[expect(
     clippy::disallowed_methods,
     reason = "processes are started here, in ol-platform-win"
@@ -80,7 +79,6 @@ pub fn start_again(arguments: &[String]) -> bool {
         .is_ok()
 }
 
-// This program run again with `arguments` and waited for: its exit code, when it had one, and what it printed.
 #[expect(
     clippy::disallowed_methods,
     reason = "processes are started here, in ol-platform-win"

@@ -672,7 +672,7 @@ impl Backend {
             .await
     }
 
-    // The window's place, which only the app writes (`set_setting` refuses `window.bounds`): stored as it is given, in the order of the requests, without an answer, so a place handed over as the window closes is stored before the database closes.
+    // No answer is waited for, so a place handed over as the window closes is still stored before the database closes.
     pub fn remember_window_bounds(&self, bounds: String) {
         let _ = self
             .commands
@@ -1222,7 +1222,6 @@ impl Serving {
                 }
                 said.answer(&reply, changed.map(|_| ()));
             }
-            // A place that cannot be stored is the last one stored: the window opens there next time.
             Command::SetWindowBounds(bounds) => {
                 if let Ok(store) = store {
                     let _ = store.set_setting(SettingKey::WindowBounds, &bounds);
@@ -1943,8 +1942,15 @@ impl Serving {
         let on_job = Arc::clone(&self.on_job);
         let commands = self.commands.upgrade();
         let database: Arc<dyn StoreThread> = Arc::new(DatabaseThread(commands.clone()));
+        let (board, job_id, log) = (self.jobs.clone(), job.id.clone(), self.log.clone());
         let run = move || {
-            let finished = launch::run(prepared, database, &*on_job);
+            // A panic in a switch must not leave the board busy for good.
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                launch::run(prepared, database, &*on_job)
+            }));
+            let Some(finished) = ran.ok().or_else(|| launch::unwound(&board, &job_id, &log)) else {
+                return;
+            };
             // Without the database thread nobody can record the launch; the job still ends for whoever watches it.
             let undelivered = match commands {
                 Some(commands) => commands

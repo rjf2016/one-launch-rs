@@ -154,7 +154,6 @@ enum Control {
     PreviewWhatsNew,
 }
 
-// What Settings asks the Shell to open over every page.
 pub enum SettingsAsk {
     SetupGuide,
     WhatsNew(&'static Release),
@@ -209,7 +208,6 @@ pub struct SettingsView {
     known: KnownStatuses,
     launchers: launchers::Launchers,
     backups: backups::Backups,
-    // A development build: Advanced has the Developer panel.
     developer: bool,
 }
 
@@ -723,14 +721,12 @@ impl SettingsView {
         true
     }
 
-    // The newest notes at or below the running version, seen or not.
     fn show_whats_new(&mut self, cx: &mut Context<Self>) {
         if let Some(release) = latest_whats_new(&self.info.version) {
             cx.emit(SettingsAsk::WhatsNew(release));
         }
     }
 
-    // A development build's preview: the newest notes whatever the running version, which closing records as seen as the real card does.
     fn preview_whats_new(&mut self, cx: &mut Context<Self>) {
         if let Some(release) = RELEASES.first() {
             cx.emit(SettingsAsk::WhatsNew(release));

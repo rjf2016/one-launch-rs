@@ -780,6 +780,34 @@ pub fn settle(store: &Store, finished: FinishedJob, now: &str, changed: &dyn Fn(
     changed(&job);
 }
 
+pub const UNWOUND: &str = "One Launch hit an internal error during this switch and stopped it. The launcher's files may be half switched: Settings › Backups, or the question at the next start, puts back the snapshot taken before it.";
+
+// Its journal stays, so the next start offers the snapshot.
+pub fn unwound(board: &JobBoard, job_id: &str, log: &Log) -> Option<FinishedJob> {
+    let mut job = board.current().filter(|job| job.id == job_id)?;
+    let log = log.child("launch");
+    log.error(
+        "launch job failed",
+        json!({ "jobId": job_id, "code": "INTERNAL" }),
+    );
+    job.state = JobState::Failed;
+    job.attention = None;
+    job.error = Some(UNWOUND.to_owned());
+    for step in &mut job.steps {
+        if step.status == JobStepStatus::Running {
+            step.status = JobStepStatus::Failed;
+        }
+    }
+    job.finished_at = Some(ol_store::iso_timestamp(time::OffsetDateTime::now_utc()));
+    Some(FinishedJob {
+        job,
+        board: board.clone(),
+        touch_last_used: false,
+        result: LaunchResult::Failed,
+        log,
+    })
+}
+
 // The same as `settle` when the database is gone: the job still ends for whoever watches it.
 pub fn abandon(finished: FinishedJob, changed: &dyn Fn(&LaunchJob)) {
     finished.board.finish(&finished.job);

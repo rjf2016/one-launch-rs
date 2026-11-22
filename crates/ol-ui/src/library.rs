@@ -677,7 +677,6 @@ impl LibraryView {
         self.await_frame(window, cx);
     }
 
-    // The scan every start runs has ended.
     pub fn scanned(&self) -> bool {
         self.scanned
     }

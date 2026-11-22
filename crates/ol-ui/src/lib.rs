@@ -57,15 +57,10 @@ pub(crate) fn local_time(cx: &App) -> LocalTime {
 pub struct Opening {
     pub title: &'static str,
     pub presence: Presence,
-    // Said in the title bar, so that no picture of a fake run passes for a real one.
+    // So that no picture of a fake run passes for a real one.
     pub fake_launchers: bool,
-    // A development build: Settings has the Developer panel, as the Electron app's `npm run dev` has.
     pub developer: bool,
-    // Where the window is, or comes back to from maximised.
     pub bounds: Bounds<Pixels>,
-    pub maximized: bool,
-    // False for a start in the tray.
-    pub shown: bool,
 }
 
 pub fn open_main_window(
@@ -80,22 +75,16 @@ pub fn open_main_window(
         fake_launchers,
         developer,
         bounds,
-        maximized,
-        shown,
     } = opening;
     let options = WindowOptions {
-        window_bounds: Some(if maximized {
-            WindowBounds::Maximized(bounds)
-        } else {
-            WindowBounds::Windowed(bounds)
-        }),
+        window_bounds: Some(WindowBounds::Windowed(bounds)),
         titlebar: Some(TitlebarOptions {
             title: Some(title.into()),
             appears_transparent: true,
             traffic_light_position: None,
         }),
         window_min_size: Some(size(px(960.), px(600.))),
-        show: shown,
+        show: false,
         focus: presence == Presence::Foreground,
         inactive_frame_interval: defaults
             .inactive_frame_interval

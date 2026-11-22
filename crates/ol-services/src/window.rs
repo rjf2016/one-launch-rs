@@ -92,7 +92,6 @@ pub fn start_hidden<S: AsRef<str>>(args: &[S], close_to_tray: bool) -> bool {
 
 pub const MIN_WINDOW: (f64, f64) = (960., 600.);
 
-// A rectangle of the screen in the units the Electron app stores, its DIPs.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Rect {
     pub x: f64,
@@ -107,7 +106,6 @@ pub struct Placement {
     pub maximized: bool,
 }
 
-// The stored `window.bounds`, when enough of its title bar still lies on a connected display's work area to grab it: 64 px sideways, its top edge no more than 8 px above the area and more than 64 px above its bottom. A width or height below the window's minimum is raised to it. Being maximised counts whatever the place.
 pub fn placement_from(raw: Option<&str>, work_areas: &[Rect]) -> Placement {
     let Some(stored) = raw
         .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
@@ -125,21 +123,41 @@ pub fn placement_from(raw: Option<&str>, work_areas: &[Rect]) -> Placement {
         }),
         _ => None,
     };
-    let on_screen = bounds.filter(|bounds| {
-        work_areas.iter().any(|area| {
-            bounds.x < area.x + area.width - 64.
-                && bounds.x + bounds.width > area.x + 64.
-                && bounds.y >= area.y - 8.
-                && bounds.y < area.y + area.height - 64.
-        })
-    });
+    let on_screen = bounds.filter(|bounds| display_for(bounds, work_areas).is_some());
     Placement {
         bounds: on_screen,
         maximized: stored.get("maximized") == Some(&serde_json::Value::Bool(true)),
     }
 }
 
-// What the Electron app stores: the window's place and size when it is not maximised, in its own key order.
+pub fn display_for(bounds: &Rect, work_areas: &[Rect]) -> Option<usize> {
+    let grabbed = |area: &Rect| {
+        bounds.x < area.x + area.width - 64.
+            && bounds.x + bounds.width > area.x + 64.
+            && bounds.y >= area.y - 8.
+            && bounds.y < area.y + area.height - 64.
+    };
+    let across =
+        |area: &Rect| (bounds.x + bounds.width).min(area.x + area.width) - bounds.x.max(area.x);
+    // Of two displays the title bar spans, the one that holds more of it, as Windows counts a window to the display with most of it.
+    work_areas
+        .iter()
+        .enumerate()
+        .filter(|(_, area)| grabbed(area))
+        .max_by(|(at, a), (other, b)| across(a).total_cmp(&across(b)).then(other.cmp(at)))
+        .map(|(at, _)| at)
+}
+
+// `placement_from` keeps any size, as its recorded cases want; Windows cuts a window larger than the screen.
+pub fn fit(bounds: Rect, area: &Rect) -> Rect {
+    Rect {
+        width: bounds.width.min(area.width).max(MIN_WINDOW.0),
+        height: bounds.height.min(area.height).max(MIN_WINDOW.1),
+        ..bounds
+    }
+}
+
+// The Electron app's own key order.
 pub fn bounds_setting(x: i32, y: i32, width: i32, height: i32, maximized: bool) -> String {
     format!(r#"{{"x":{x},"y":{y},"width":{width},"height":{height},"maximized":{maximized}}}"#)
 }

@@ -1,5 +1,3 @@
-// The setup guide: five steps for a data folder nobody has set up, also opened again from Settings › General. The words and the rules are the Electron app's `SetupGuide.tsx` and `SetupGuideSteps.tsx`.
-
 use std::time::Duration;
 
 use gpui::prelude::*;
@@ -34,17 +32,14 @@ const LAUNCHERS: usize = 1;
 const PLAY: usize = 2;
 const ACCOUNTS: usize = 3;
 const READY: usize = 4;
-// The two that keep a list of the accounts that signed in on the PC.
 const IMPORT_LAUNCHERS: [LauncherId; 2] = [LauncherId::Steam, LauncherId::Battlenet];
 const TICK: Duration = Duration::from_millis(850);
-// The account in the welcome's picture changes every three ticks, close to the Electron app's 2.5 s.
 const SWAP_TICKS: u32 = 3;
 const DEMO_STAGES: usize = 5 + 1 + 3;
 const IMPORTED_FLASH_STAYS: Duration = Duration::from_secs(4);
 const CARD_WIDTH: f32 = 832.;
 const CARD_HEIGHT: f32 = 580.;
 
-// Where the guide leaves to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GuideExit {
     Stay,
@@ -53,7 +48,6 @@ pub enum GuideExit {
     NewAccount(LauncherId),
 }
 
-// The guide is done: `firstRun.dismissed` was written, or could not be, and the guide is to close and go where the user chose.
 pub struct GuideDone(pub GuideExit);
 
 enum Statuses {
@@ -200,7 +194,6 @@ impl SetupGuide {
         .detach();
     }
 
-    // The launchers' status, and what the two that keep a list remember once it is in. An answer to an earlier read is dropped.
     fn read_statuses(&mut self, cx: &mut Context<Self>) {
         self.reads += 1;
         let (read, backend) = (self.reads, self.backend.clone());
@@ -360,7 +353,6 @@ impl SetupGuide {
         cx.notify();
     }
 
-    // Imports what is ticked, launcher by launcher. `then` moves on once every import went through.
     fn run_import(&mut self, then: bool, cx: &mut Context<Self>) {
         if self.busy() || self.selected.is_empty() {
             return;
@@ -461,7 +453,7 @@ impl SetupGuide {
         cx.notify();
     }
 
-    // Every way out writes that the guide was seen, then closes it, also when the write failed: it then comes back at the next start.
+    // A write that fails still closes the guide: it then comes back at the next start.
     fn finish(&mut self, exit: GuideExit, cx: &mut Context<Self>) {
         if self.busy() {
             return;
@@ -531,7 +523,6 @@ impl SetupGuide {
         }
     }
 
-    // The Shell hands each key here while the guide is up, after the question and the recovery dialog: every key is the guide's but those held with Alt or the Windows key, which go on to Windows.
     pub fn on_key(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
         let held = keystroke.modifiers;
         if held.alt || held.platform {
@@ -1510,7 +1501,6 @@ impl SetupGuide {
                     .child(body),
             )
             .child(self.render_footer(cx).relative());
-        // The backdrop takes no click, as the Electron app's: the guide is left by its own buttons.
         div()
             .id("guide-backdrop")
             .occlude()
@@ -1617,7 +1607,6 @@ fn checkbox(checked: bool, locked: bool) -> Div {
         })
 }
 
-// The installed launchers that keep no account list, in one sentence; empty when every installed one keeps one.
 fn by_hand_only_text(statuses: &[LauncherStatus]) -> String {
     let names: Vec<&str> = statuses
         .iter()
@@ -1641,7 +1630,6 @@ fn no_import_text(statuses: &[LauncherStatus]) -> String {
     by_hand_only_text(statuses)
 }
 
-// The product in one picture: a game, an account that keeps changing, and Play. Decorative.
 fn flow_art(account: &'static str) -> Div {
     let beat = |label: &'static str, art: AnyElement| {
         div()
@@ -1768,7 +1756,6 @@ fn demo_status(stage: usize, index: usize) -> DemoStatus {
     }
 }
 
-// The launch dialog's phases playing themselves: all pending, then each in turn, then all done for three ticks. Decorative.
 fn phase_demo(stage: usize) -> Div {
     let names = PhaseNames {
         launcher: "Steam",

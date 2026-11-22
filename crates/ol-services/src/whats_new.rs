@@ -1,5 +1,3 @@
-// What each release tells the user the first time One Launch opens after the update that brought it, and the rules of when it is told: the Electron app's `whats-new.ts` and `whats-new-releases.ts`.
-
 use std::cmp::Ordering;
 
 use ol_model::{SettingKey, Settings, is_version};
@@ -53,14 +51,12 @@ pub struct Image {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Release {
     pub version: &'static str,
-    // YYYY-MM-DD.
     pub date: &'static str,
     pub intro: Option<&'static str>,
     pub image: Option<Image>,
     pub sections: &'static [Section],
 }
 
-// Newest first.
 pub static RELEASES: &[Release] = &[Release {
     version: "1.0.0-beta.3",
     date: "2026-10-15",
@@ -93,7 +89,6 @@ pub static RELEASES: &[Release] = &[Release {
     ],
 }];
 
-// JavaScript's white space and line ends, which `Number()` trims.
 fn js_space(c: char) -> bool {
     matches!(
         c,
@@ -108,7 +103,7 @@ fn js_space(c: char) -> bool {
     )
 }
 
-// JavaScript's `Number()` of a text: what the Electron app compares the parts of a version by.
+// As JavaScript's `Number()`, which the Electron app compares the parts of a version by.
 fn js_number(text: &str) -> f64 {
     let text = text.trim_matches(js_space);
     if text.is_empty() {
@@ -172,7 +167,7 @@ fn numeric(identifier: &str) -> bool {
     !identifier.is_empty() && identifier.bytes().all(|byte| byte.is_ascii_digit())
 }
 
-// As JavaScript's `a < b`: by UTF-16 code units.
+// JavaScript's `a < b` compares UTF-16 code units.
 fn code_units(a: &str, b: &str) -> Ordering {
     a.encode_utf16().cmp(b.encode_utf16())
 }
@@ -196,7 +191,6 @@ fn compare_identifiers(a: &str, b: &str) -> Ordering {
     }
 }
 
-// Semver order as the Electron app has it: the three numbers, then a prerelease before its release, then the prerelease's parts, numbers below words. It does not check its input; a part that is not a number orders as JavaScript's NaN does, after everything.
 pub fn compare_versions(a: &str, b: &str) -> Ordering {
     let (a_core, a_pre) = identifiers(a);
     let (b_core, b_pre) = identifiers(b);
@@ -226,7 +220,6 @@ pub fn compare_versions(a: &str, b: &str) -> Ordering {
     Ordering::Equal
 }
 
-// Which of the releases, named by their versions, is the newest at or below the running version and newer than the one last seen. A `last_seen` that is not a version counts as older than everything; a running version that is not one gets nothing. Of two equal versions the first counts.
 pub fn pick(versions: &[&str], current: Option<&str>, last_seen: Option<&str>) -> Option<usize> {
     let current = current.filter(|current| is_version(current))?;
     let seen = last_seen.filter(|seen| is_version(seen));
@@ -250,7 +243,6 @@ pub fn pick_whats_new(current: &str, last_seen: Option<&str>) -> Option<&'static
     pick(&versions, Some(current), last_seen).map(|at| &RELEASES[at])
 }
 
-// What Settings shows on request: the newest release at or below the running version, seen or not.
 pub fn latest_whats_new(current: &str) -> Option<&'static Release> {
     pick_whats_new(current, None)
 }
@@ -258,12 +250,11 @@ pub fn latest_whats_new(current: &str) -> Option<&'static Release> {
 #[derive(Debug, PartialEq, Eq)]
 pub enum AtStart {
     Nothing,
-    // The setting is off: the running version counts as seen, so turning it on later never shows old notes.
+    // So turning the setting on later never shows old notes.
     RecordSeen,
     Show(&'static Release),
 }
 
-// What a start does about the notes, given the settings, the running version and whether a switch the last run did not finish is to be asked about (then nothing: the card comes back next start).
 pub fn at_start(settings: &Settings, version: &str, recovery_pending: bool) -> AtStart {
     if recovery_pending {
         return AtStart::Nothing;
@@ -279,7 +270,6 @@ pub fn at_start(settings: &Settings, version: &str, recovery_pending: bool) -> A
     pick_whats_new(version, last_seen).map_or(AtStart::Nothing, AtStart::Show)
 }
 
-// The setup guide opens at a start for a data folder nobody has set up: it was never dismissed and no account exists.
 pub fn shows_setup_guide(settings: &Settings, accounts: usize) -> bool {
     settings.get(SettingKey::FirstRunDismissed) != Some("true") && accounts == 0
 }
@@ -299,7 +289,7 @@ const MONTHS: [&str; 12] = [
     "December",
 ];
 
-// `YYYY-MM-DD` as a long date in English words, from its parts, so the day never shifts with the time zone: "October 15, 2026". A date that does not read is shown as it is.
+// From its parts, so the day never shifts with the time zone.
 pub fn release_date(date: &str) -> String {
     let mut parts = date.split('-').map(|part| part.parse::<u32>().ok());
     match (parts.next(), parts.next(), parts.next(), parts.next()) {
