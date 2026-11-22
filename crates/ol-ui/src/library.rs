@@ -22,7 +22,7 @@ use crate::follow::{Follow, follow};
 use crate::host::{JobSettled, LaunchHost};
 use crate::posters::{self, Lookup, Posters, Shape};
 use crate::shell::sidebar_width;
-use crate::widgets::{Button, Tone, icon, launcher_dot, spinner};
+use crate::widgets::{Button, Tone, icon, launcher_dot, page_title, spinner};
 
 // The owner's pick of 2026-11-21, from a prototype of the page: the padding at its sides, the least width of a card and the room between two.
 const PAGE_PADDING: f32 = 24.;
@@ -79,6 +79,8 @@ pub struct LibraryView {
     sweep: Option<Sweep>,
     sweep_report: Option<SweepReport>,
     frames: Option<Vec<LibraryFrame>>,
+    sidebar: Pixels,
+    on_screen: bool,
     _subscriptions: [Subscription; 4],
 }
 
@@ -87,6 +89,7 @@ pub struct LibraryView {
 pub struct LibraryFrame {
     pub at: Instant,
     pub viewport: Size<Pixels>,
+    pub pane: f32,
     pub columns: usize,
     pub card: f32,
     pub gap: f32,
@@ -352,6 +355,8 @@ impl LibraryView {
             sweep: None,
             sweep_report: None,
             frames: None,
+            sidebar: sidebar_width(false),
+            on_screen: true,
             _subscriptions: [search_changed, keys, host_changed, job_settled],
         }
     }
@@ -619,6 +624,33 @@ impl LibraryView {
         self.search.focus(window, cx);
     }
 
+    pub fn set_sidebar(&mut self, width: Pixels, cx: &mut Context<Self>) {
+        self.sidebar = width;
+        cx.notify();
+    }
+
+    pub fn typing(&self, window: &Window, cx: &App) -> bool {
+        self.search.is_focused(window, cx)
+    }
+
+    // As the Electron app's page, which is made afresh each time it is shown: no search, no filter, the top of the grid and of the Recent strip, the sort kept.
+    pub fn arrive(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.on_screen = true;
+        self.flash = None;
+        self.menu = None;
+        self.clear_search_and_filter(window, cx);
+    }
+
+    pub fn leave(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.on_screen = false;
+        self.menu = None;
+        self.over_trigger = None;
+        self.let_go(cx);
+        if self.typing(window, cx) {
+            window.blur(cx);
+        }
+    }
+
     pub fn scroll_to_row(&mut self, row: usize, cx: &mut Context<Self>) {
         self.scroll.scroll_to_item_strict(row, ScrollStrategy::Top);
         cx.notify();
@@ -631,7 +663,7 @@ impl LibraryView {
         cx: &mut Context<Self>,
     ) -> bool {
         // A dialog over the Library has the keyboard to itself.
-        if self.host.read(cx).is_modal() {
+        if !self.on_screen || self.host.read(cx).is_modal() {
             return false;
         }
         if keystroke.key == "escape" && self.menu.is_some() {
@@ -968,29 +1000,10 @@ impl LibraryView {
             .items_end()
             .justify_between()
             .gap(px(16.))
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .min_w_0()
-                    .child(
-                        div()
-                            .text_size(px(20.))
-                            .line_height(px(28.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(color(theme::TEXT_STRONG))
-                            .child("Library"),
-                    )
-                    .child(
-                        div()
-                            .mt(px(2.))
-                            .truncate()
-                            .text_color(color(theme::MUTED))
-                            .child(
-                                "Installed games across your launchers. Pick a game, pick an account, play.",
-                            ),
-                    ),
-            )
+            .child(page_title(
+                "Library",
+                Some("Installed games across your launchers. Pick a game, pick an account, play."),
+            ))
             .child(
                 div()
                     .flex()
@@ -1630,7 +1643,7 @@ impl Render for LibraryView {
         let banner = self.host.read(cx).banner_height();
         let pane = (f32::from(viewport.height) - TITLE_BAR - banner - HEADER).max(0.);
         let recent = self.recent_shown();
-        let pane_width = viewport.width - sidebar_width();
+        let pane_width = viewport.width - self.sidebar;
         let launches = recent.len() as f32;
         let recent_track = Track {
             view: row_room(pane_width),
@@ -1645,6 +1658,7 @@ impl Render for LibraryView {
             frames.push(LibraryFrame {
                 at: Instant::now(),
                 viewport,
+                pane: f32::from(pane_width),
                 columns: grid.columns,
                 card: f32::from(grid.card),
                 gap: f32::from(grid.gap),
@@ -1763,53 +1777,81 @@ mod tests {
     use super::*;
 
     const NARROWEST: usize = 960;
+    const FOLDED: bool = false;
+    const OPEN: bool = true;
+    const BOTH: [bool; 2] = [FOLDED, OPEN];
 
-    fn grid_at(window: usize) -> (Grid, f32) {
-        let pane = px(window as f32) - sidebar_width();
+    fn grid_at(window: usize, open: bool) -> (Grid, f32) {
+        let pane = px(window as f32) - sidebar_width(open);
         (Grid::for_pane(pane), row_room(pane))
     }
 
     #[test]
     fn a_window_dragged_wider_never_takes_a_column_away() {
-        let (mut before, _) = grid_at(NARROWEST);
-        for window in NARROWEST + 1..=3840 {
-            let (grid, _) = grid_at(window);
-            assert!(grid.columns >= before.columns, "{window}");
-            assert!(grid.columns <= before.columns + 1, "{window}");
-            before = grid;
+        for sidebar in BOTH {
+            let (mut before, _) = grid_at(NARROWEST, sidebar);
+            for window in NARROWEST + 1..=3840 {
+                let (grid, _) = grid_at(window, sidebar);
+                assert!(grid.columns >= before.columns, "{window} open {sidebar}");
+                assert!(
+                    grid.columns <= before.columns + 1,
+                    "{window} open {sidebar}"
+                );
+                before = grid;
+            }
         }
     }
 
     #[test]
     fn the_cards_fill_the_row_at_every_width_and_none_is_narrower_than_the_least() {
-        for window in NARROWEST..=3840 {
-            let (grid, room) = grid_at(window);
-            let (card, columns) = (f32::from(grid.card), grid.columns as f32);
-            let row = columns * card + (columns - 1.) * f32::from(grid.gap);
-            assert!((row - room).abs() < 0.01, "{window}");
-            assert!(card >= CARD_MIN, "{window}");
-            assert!(
-                card < CARD_MIN + (CARD_MIN + CARD_GAP) / columns,
-                "{window}"
-            );
+        for sidebar in BOTH {
+            for window in NARROWEST..=3840 {
+                let (grid, room) = grid_at(window, sidebar);
+                let (card, columns) = (f32::from(grid.card), grid.columns as f32);
+                let row = columns * card + (columns - 1.) * f32::from(grid.gap);
+                assert!((row - room).abs() < 0.01, "{window} open {sidebar}");
+                assert!(card >= CARD_MIN, "{window} open {sidebar}");
+                assert!(
+                    card < CARD_MIN + (CARD_MIN + CARD_GAP) / columns,
+                    "{window} open {sidebar}"
+                );
+            }
         }
     }
 
     #[test]
     fn a_card_only_grows_while_the_window_is_dragged_wider_and_the_columns_stay() {
-        let (mut before, _) = grid_at(NARROWEST);
-        for window in NARROWEST + 1..=3840 {
-            let (grid, _) = grid_at(window);
-            if grid.columns == before.columns {
-                assert!(grid.card > before.card, "{window}");
+        for sidebar in BOTH {
+            let (mut before, _) = grid_at(NARROWEST, sidebar);
+            for window in NARROWEST + 1..=3840 {
+                let (grid, _) = grid_at(window, sidebar);
+                if grid.columns == before.columns {
+                    assert!(grid.card > before.card, "{window} open {sidebar}");
+                }
+                before = grid;
             }
-            before = grid;
         }
     }
 
     #[test]
     fn the_narrowest_window_shows_five_in_a_row_and_the_window_as_it_first_opens_six() {
-        assert_eq!(grid_at(NARROWEST).0.columns, 5);
-        assert_eq!(grid_at(1280).0.columns, 6);
+        assert_eq!(grid_at(NARROWEST, FOLDED).0.columns, 5);
+        assert_eq!(grid_at(1280, FOLDED).0.columns, 6);
+    }
+
+    #[test]
+    fn with_the_sidebar_open_the_narrowest_window_shows_four_and_the_first_one_five() {
+        assert_eq!(grid_at(NARROWEST, OPEN).0.columns, 4);
+        assert_eq!(grid_at(1280, OPEN).0.columns, 5);
+    }
+
+    #[test]
+    fn opening_the_sidebar_takes_at_most_one_column_away_and_never_gives_one() {
+        for window in NARROWEST..=3840 {
+            let (folded, _) = grid_at(window, FOLDED);
+            let (open, _) = grid_at(window, OPEN);
+            assert!(open.columns <= folded.columns, "{window}");
+            assert!(open.columns + 1 >= folded.columns, "{window}");
+        }
     }
 }

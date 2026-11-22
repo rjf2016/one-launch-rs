@@ -6,7 +6,7 @@ use std::path::Path;
 use futures_lite::future::block_on;
 use ol_api::library::visible;
 use ol_api::{ApiError, Backend};
-use ol_model::{LibrarySort, SettingKey};
+use ol_model::{LibrarySort, SettingKey, Sidebar};
 use ol_store::{SCHEMA_VERSION, Store, database_backups_dir, database_path};
 use ol_testkit::{Scratch, oracle, snapshot};
 
@@ -120,6 +120,23 @@ fn the_sort_that_was_chosen_is_there_after_a_restart() {
         .collect();
     assert!(names.is_sorted());
     backend.shut_down();
+}
+
+#[test]
+fn the_sidebar_that_was_opened_is_open_after_a_restart_and_folded_again_after_the_next() {
+    let scratch = fixture();
+    let restart = |sidebar: Option<Sidebar>| {
+        let backend = Backend::start(scratch.path().to_path_buf(), VERSION);
+        let read = block_on(backend.sidebar()).unwrap();
+        if let Some(sidebar) = sidebar {
+            block_on(backend.set_sidebar(sidebar)).unwrap();
+        }
+        backend.shut_down();
+        read
+    };
+    assert_eq!(restart(Some(Sidebar::Open)), Sidebar::Folded);
+    assert_eq!(restart(Some(Sidebar::Folded)), Sidebar::Open);
+    assert_eq!(restart(None), Sidebar::Folded);
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use ol_model::{
     Account, ArtworkSource, Ciphertext, Game, GameArtwork, LastLaunch, LauncherId, LibrarySort,
-    SecretKey, SettingKey, Settings,
+    SecretKey, SettingKey, Settings, Sidebar,
 };
 use rusqlite::{OptionalExtension, Row};
 
@@ -110,9 +110,18 @@ impl Store {
         Ok(LibrarySort::from_stored(stored.as_deref()))
     }
 
+    pub fn sidebar(&self) -> Result<Sidebar, StoreError> {
+        let stored = self.stored_value(Sidebar::KEY)?;
+        Ok(Sidebar::from_stored(stored.as_deref()))
+    }
+
     // The rows of the settings table that are this app's own and not among the Electron app's keys.
     pub fn preferences_stored(&self) -> Result<usize, StoreError> {
-        Ok(usize::from(self.stored_value(LibrarySort::KEY)?.is_some()))
+        let mut stored = 0;
+        for key in [LibrarySort::KEY, Sidebar::KEY] {
+            stored += usize::from(self.stored_value(key)?.is_some());
+        }
+        Ok(stored)
     }
 
     fn stored_value(&self, key: &str) -> Result<Option<String>, StoreError> {

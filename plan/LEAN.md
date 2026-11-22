@@ -41,6 +41,8 @@ Decided by the owner on 2026-11-15. This page is the plan. It replaces the miles
 | 6 | Installer, updater, taking over an existing install | A fresh install and an Electron-to-Rust takeover pass on a CI runner |
 | 7 | Speed and memory against the Electron baseline; cutover | The owner says go |
 
+Slice 1 is closed: on 2026-11-21 the owner said go on GPUI, after using the Rust window by hand on fake launchers. The toolkit question is not reopened without the owner.
+
 A small number of beta testers have the Electron app installed. So slice 6 keeps the data folder, the database schema, the vault format, the installer identity and the update feed exact: their installs are taken over in place, with their saved accounts intact.
 
 ## Dropped

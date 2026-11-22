@@ -69,6 +69,10 @@ impl TextField {
         });
     }
 
+    pub fn is_focused(&self, window: &Window, cx: &App) -> bool {
+        self.state.read(cx).focus_handle(cx).is_focused(window)
+    }
+
     pub fn clear(&self, window: &mut Window, cx: &mut App) {
         self.state.update(cx, |state, cx| state.clean(window, cx));
     }
