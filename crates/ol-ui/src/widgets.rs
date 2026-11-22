@@ -1,6 +1,6 @@
 use std::cell::Cell;
 use std::rc::Rc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gpui::prelude::*;
 use gpui::{
@@ -16,6 +16,8 @@ use crate::assets;
 const TURN: Duration = Duration::from_secs(1);
 const FLASH_STAYS: Duration = Duration::from_secs(3);
 const ERROR_FLASH_STAYS: Duration = Duration::from_secs(6);
+// Windows' double-click time as it ships, read from no setting.
+const SECOND_CLICK: Duration = Duration::from_millis(500);
 
 pub fn icon(path: &'static str, size: f32, hex: u32) -> Svg {
     svg()
@@ -294,6 +296,24 @@ impl Button {
             .child(self.label)
             .children(self.trailing)
     }
+}
+
+// When a confirmation came up, so the second click of the double click that brought it is not taken for a yes, and later quick clicks are.
+#[derive(Clone, Copy, Debug)]
+pub struct Appeared(Instant);
+
+impl Appeared {
+    pub fn now() -> Self {
+        Self(Instant::now())
+    }
+
+    pub fn takes(self, click: &ClickEvent) -> bool {
+        takes_click(click.click_count(), self.0.elapsed())
+    }
+}
+
+fn takes_click(count: usize, since: Duration) -> bool {
+    count <= 1 || since >= SECOND_CLICK
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -890,7 +910,18 @@ pub fn setting_row(
 mod tests {
     use gpui::{Bounds, point, px, size};
 
-    use super::dropdown_place;
+    use std::time::Duration;
+
+    use super::{SECOND_CLICK, dropdown_place, takes_click};
+
+    #[test]
+    fn a_confirmation_ignores_only_the_second_click_of_the_double_click_that_brought_it() {
+        assert!(takes_click(1, Duration::ZERO));
+        assert!(!takes_click(2, Duration::from_millis(120)));
+        assert!(!takes_click(3, SECOND_CLICK - Duration::from_millis(1)));
+        assert!(takes_click(2, SECOND_CLICK));
+        assert!(takes_click(3, Duration::from_secs(2)));
+    }
 
     fn trigger(x: f32, y: f32, width: f32) -> Bounds<gpui::Pixels> {
         Bounds::new(point(px(x), px(y)), size(px(width), px(32.)))

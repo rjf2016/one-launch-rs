@@ -40,4 +40,9 @@ impl VaultError {
 pub trait Vault {
     fn encrypt(&self, plaintext: &Secret) -> Result<Ciphertext, VaultError>;
     fn decrypt(&self, ciphertext: &Ciphertext) -> Result<Secret, VaultError>;
+
+    // Whether it has a key to seal and open with at all, asked without sealing anything.
+    fn has_key(&self) -> bool {
+        true
+    }
 }

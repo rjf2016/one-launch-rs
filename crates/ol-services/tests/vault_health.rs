@@ -61,7 +61,7 @@ fn the_probe_is_stored_once_and_a_wrong_one_is_never_written_over() {
 #[test]
 fn a_reset_of_an_empty_folder_counts_nothing() {
     let scratch = Scratch::new("services-vault");
-    let removed = clear_stored_secrets(&store(&scratch), NOW).unwrap();
+    let removed = clear_stored_secrets(&store(&scratch), &FakeVault, NOW).unwrap();
     assert_eq!(removed, VaultResetSummary::default());
     assert_eq!(
         removed.note(),
@@ -71,10 +71,16 @@ fn a_reset_of_an_empty_folder_counts_nothing() {
         passwords: 1,
         sessions: 1,
         secrets: 1,
+        kept: 0,
     };
     assert_eq!(
         one.note(),
         "Removed 1 password, 1 saved sign-in, 1 other secret."
+    );
+    let kept = VaultResetSummary { kept: 1, ..one };
+    assert_eq!(
+        kept.note(),
+        "Removed 1 password, 1 saved sign-in, 1 other secret. Kept 1 that can still be read."
     );
 }
 

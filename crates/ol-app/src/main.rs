@@ -28,7 +28,7 @@ use ol_platform_win::own_process;
 use ol_platform_win::shell::WindowsShell;
 use ol_platform_win::tray::{MenuEntry, Tray, TrayEvent};
 use ol_platform_win::window::AppWindow;
-use ol_ui::{LibraryLoaded, Played, Presence, QuitAnyway, Shell};
+use ol_ui::{FilePicker, LibraryLoaded, Played, Presence, QuitAnyway, Shell};
 
 use crate::args::{Args, Check, DoctorVault};
 
@@ -129,11 +129,17 @@ impl Opener {
             _ => Self::Recording,
         }
     }
+}
 
-    fn give(&self, backend: &Backend) -> Arc<dyn FolderShell> {
-        match self {
-            Self::Windows => Arc::new(WindowsShell),
-            Self::Recording => Arc::new(RecordingShell {
+// The one place a run's backend is handed its shell. Answers the recording shell when that is the one given.
+fn hand_shell(args: &Args, backend: &Backend) -> Option<Arc<RecordingShell>> {
+    match Opener::for_run(args) {
+        Opener::Windows => {
+            backend.use_shell(Arc::new(WindowsShell));
+            None
+        }
+        Opener::Recording => {
+            let shell = Arc::new(RecordingShell {
                 folders: [
                     (Folder::Data, "the data folder"),
                     (Folder::Logs, "logs"),
@@ -141,7 +147,10 @@ impl Opener {
                 ]
                 .map(|(folder, name)| (backend.folder(folder), name))
                 .to_vec(),
-            }),
+                asked: std::sync::Mutex::default(),
+            });
+            backend.use_shell(Arc::clone(&shell) as Arc<dyn FolderShell>);
+            Some(shell)
         }
     }
 }
@@ -149,6 +158,7 @@ impl Opener {
 // Opens nothing: it says which of the data folder's folders it was asked for, by name and not by path, which can run through the user's profile.
 struct RecordingShell {
     folders: Vec<(PathBuf, &'static str)>,
+    asked: std::sync::Mutex<Vec<&'static str>>,
 }
 
 impl FolderShell for RecordingShell {
@@ -163,7 +173,31 @@ impl FolderShell for RecordingShell {
             .find(|(path, _)| path.as_os_str() == folder)
             .map_or("another folder", |(_, name)| name);
         println!("OneLaunch: folder recorded and not opened: {name}");
+        if let Ok(mut asked) = self.asked.lock() {
+            asked.push(name);
+        }
         Ok(())
+    }
+}
+
+// The one place a run is handed the picker Locate asks with. A capture or a probe is run by agents, so it is answered from the run's steps and never opens a dialog on the owner's desktop.
+fn hand_picker(args: &Args, set: impl FnOnce(FilePicker)) -> FilePicker {
+    let picker = match Opener::for_run(args) {
+        Opener::Windows => FilePicker::Windows,
+        Opener::Recording => FilePicker::Scripted(Rc::default()),
+    };
+    set(picker.clone());
+    picker
+}
+
+fn report_picks(picker: &FilePicker) {
+    if let FilePicker::Scripted(script) = picker {
+        let asked = script.borrow().asked();
+        if asked > 0 {
+            println!(
+                "OneLaunch: the file dialog was asked for {asked} time(s), answered from the run's steps and not opened"
+            );
+        }
     }
 }
 
@@ -176,6 +210,8 @@ struct Life {
     close_to_tray: Cell<bool>,
     hide_to_tray: Cell<bool>,
     quitting: Cell<bool>,
+    // "Quit anyway" was answered: the switch is being stopped, and the app quits when it has.
+    stopping: Cell<bool>,
 }
 
 impl Life {
@@ -232,14 +268,17 @@ fn main() -> ExitCode {
         }
     };
     let heard = use_clipboard(Board::for_run(&args).give(), &backend);
-    backend.use_shell(Opener::for_run(&args).give(&backend));
+    let _recorded = hand_shell(&args, &backend);
+    let picker = Rc::new(RefCell::new(None));
     let failed = Rc::new(Cell::new(false));
     let tray = TraySlot::default();
     gpui_platform::application()
         .with_assets(ol_ui::Assets)
         .run({
             let (backend, failed, tray) = (backend.clone(), failed.clone(), tray.clone());
+            let picker = Rc::clone(&picker);
             move |cx| {
+                *picker.borrow_mut() = Some(hand_picker(&args, |given| cx.set_global(given)));
                 if let Err(error) = start(args, backend, machine, failed.clone(), tray, cx) {
                     eprintln!("OneLaunch: {error:#}");
                     failed.set(true);
@@ -256,6 +295,9 @@ fn main() -> ExitCode {
     backend.shut_down();
     if let Some(heard) = heard {
         heard();
+    }
+    if let Some(picker) = picker.borrow().as_ref() {
+        report_picks(picker);
     }
     if failed.get() {
         ExitCode::FAILURE
@@ -429,13 +471,11 @@ fn start(
         close_to_tray: Cell::new(SettingKey::WindowCloseToTray.default_on()),
         hide_to_tray: Cell::new(SettingKey::PlayHideToTray.default_on()),
         quitting: Cell::new(false),
+        stopping: Cell::new(false),
     });
     cx.subscribe(&shell, {
         let life = Rc::clone(&life);
-        move |_, _: &QuitAnyway, cx| {
-            life.quitting.set(true);
-            cx.quit();
-        }
+        move |_, _: &QuitAnyway, cx| quit_after_the_switch(&life, cx)
     })
     .detach();
     cx.subscribe(&shell, {
@@ -497,6 +537,9 @@ fn start(
         });
         let life = Rc::clone(&life);
         window.on_window_should_close(cx, move |window, cx| {
+            if life.stopping.get() {
+                return false;
+            }
             let tray = life.close_to_tray.get() && life.tray.borrow().is_some();
             match close_request_action(life.quitting.get(), tray, life.backend.is_busy()) {
                 CloseAction::Close => true,
@@ -507,6 +550,8 @@ fn start(
                 // A start still being prepared has no job to ask about: it is stopped, and the window closes.
                 CloseAction::Ask => match life.backend.quit_question() {
                     Some(question) => {
+                        // A minimised window is brought back for its question, once GPUI is done with this close.
+                        cx.spawn(async |_| show_window()).detach();
                         shell.update(cx, |shell, cx| shell.ask_before_quit(question, window, cx));
                         false
                     }
@@ -609,8 +654,38 @@ fn hide_window(why: &str) {
     }
 }
 
+// "Quit anyway": the window and the tray stay while the switch is asked to stop and puts back what it must; the app quits once the job has ended. The Electron app gives up after 10 s; this waits for the switch's own timeouts.
+fn quit_after_the_switch(life: &Rc<Life>, cx: &mut App) {
+    life.stopping.set(true);
+    let running = life.backend.running_job();
+    println!(
+        "OneLaunch: quit anyway: {}",
+        if running.is_some() {
+            "stopping the switch first"
+        } else {
+            "no switch runs any more"
+        }
+    );
+    if let Some(job) = running {
+        let _ = life.backend.cancel_launch(&job.id);
+    }
+    let life = Rc::clone(life);
+    cx.spawn(async move |cx| {
+        while life.backend.is_busy() {
+            capture::pause(Duration::from_millis(100), cx).await;
+        }
+        life.quitting.set(true);
+        println!("OneLaunch: the switch has stopped; quitting");
+        quit(cx);
+    })
+    .detach();
+}
+
 // The tray's Quit: during a switch the window is shown and the question asked, as the Electron app's before-quit does.
 fn request_quit(life: &Life, cx: &mut AsyncApp) {
+    if life.stopping.get() {
+        return show_window();
+    }
     let Some(question) = life.backend.quit_question() else {
         life.quitting.set(true);
         return quit(cx);
@@ -664,6 +739,28 @@ mod tests {
         assert_eq!(board(&["--doctor"]), Board::None);
     }
 
+    // Polls a future on this thread until it is ready.
+    fn block_on<F: std::future::Future>(future: F) -> F::Output {
+        struct Unpark(std::thread::Thread);
+
+        impl std::task::Wake for Unpark {
+            fn wake(self: Arc<Self>) {
+                self.0.unpark();
+            }
+        }
+
+        let mut future = std::pin::pin!(future);
+        let waker = Arc::new(Unpark(std::thread::current())).into();
+        let mut context = std::task::Context::from_waker(&waker);
+        loop {
+            if let std::task::Poll::Ready(output) = future.as_mut().poll(&mut context) {
+                return output;
+            }
+            std::thread::park();
+        }
+    }
+
+    // What `main` hands the backend: in a capture or a probe the folders asked for reach the recording shell and nothing else.
     #[test]
     fn a_capture_or_a_probe_never_opens_a_folder_in_explorer() {
         let checks: [&[&str]; 6] = [
@@ -674,29 +771,59 @@ mod tests {
             &[r"--capture=D:\scratch\shot.png", "--capture-type=abc"],
             &["--probe"],
         ];
-        for check in checks {
-            assert_eq!(opener(check), Opener::Recording, "{check:?}");
-        }
-        assert_eq!(opener(&["--doctor"]), Opener::Recording);
-        assert_eq!(opener(&[]), Opener::Windows);
-
         let scratch = ol_testkit::Scratch::new("app-shell");
-        let backend = Backend::start(scratch.join("data"), VERSION);
-        let shell = Opener::Recording.give(&backend);
-        for folder in [Folder::Data, Folder::Logs, Folder::Backups] {
-            let path = backend.folder(folder);
-            assert!(shell.open_folder(path.to_str().unwrap()).is_ok());
+        for check in checks {
+            let backend = Backend::start(scratch.join("data"), VERSION);
+            let recorded = hand_shell(&parsed(check), &backend)
+                .unwrap_or_else(|| panic!("{check:?} was handed the Windows shell"));
+            for folder in [Folder::Data, Folder::Logs, Folder::Backups] {
+                block_on(backend.open_folder(folder)).unwrap();
+            }
+            backend.shut_down();
+            assert_eq!(
+                *recorded.asked.lock().unwrap(),
+                ["the data folder", "logs", "backups"],
+                "{check:?}"
+            );
+            assert!(recorded.open_url("steam://rungameid/1").is_err());
         }
-        assert!(shell.open_url("steam://rungameid/1").is_err());
-        backend.shut_down();
+        assert_eq!(Opener::for_run(&parsed(&["--doctor"])), Opener::Recording);
+        assert_eq!(Opener::for_run(&parsed(&[])), Opener::Windows);
     }
 
-    fn opener(arguments: &[&str]) -> Opener {
+    // Locate's dialog is GPUI's `prompt_for_paths`, which only `FilePicker::Windows` reaches.
+    #[test]
+    fn a_capture_or_a_probe_never_opens_the_file_dialog() {
+        let checks: [&[&str]; 6] = [
+            &[r"--capture=D:\scratch\shot.png"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-keys=enter"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-size=960x600"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-focus"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-type=abc"],
+            &["--probe"],
+        ];
+        let handed = |arguments: &[&str]| {
+            let mut set = None;
+            let kept = hand_picker(&parsed(arguments), |given| set = Some(given));
+            (set.expect("the picker was handed on"), kept)
+        };
+        for check in checks {
+            let (set, kept) = handed(check);
+            assert!(
+                matches!(set, FilePicker::Scripted(_)) && matches!(kept, FilePicker::Scripted(_)),
+                "{check:?} could open the file dialog"
+            );
+        }
+        let (set, _) = handed(&[]);
+        assert!(matches!(set, FilePicker::Windows));
+    }
+
+    fn parsed(arguments: &[&str]) -> Args {
         let arguments = [r"--data-dir=D:\scratch\data"]
             .iter()
             .chain(arguments)
             .map(|argument| (*argument).to_owned());
-        Opener::for_run(&Args::parse(arguments).unwrap())
+        Args::parse(arguments).unwrap()
     }
 
     #[test]

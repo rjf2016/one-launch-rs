@@ -376,8 +376,8 @@ fn locate_takes_the_launchers_own_program_and_reset_goes_back_to_detection() {
         r".\steam.exe".to_owned(),
         r"steam\steam.exe".to_owned(),
         format!("{drive}steam.exe"),
-        format!(r"\?\{picked}"),
-        r"\server\share\steam.exe".to_owned(),
+        format!(r"\\?\{picked}"),
+        r"\\server\share\steam.exe".to_owned(),
         r"\steam\steam.exe".to_owned(),
     ] {
         assert_eq!(

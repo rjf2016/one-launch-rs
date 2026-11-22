@@ -3,7 +3,7 @@
 use std::time::{Duration, Instant};
 
 use ol_model::SecretKey;
-use ol_store::{ClearedSecrets, Store, StoreError};
+use ol_store::{ClearedSecrets, Sealed, Store, StoreError};
 use ol_vault::{PROBE_VALUE, Secret, Vault, VaultError};
 use thiserror::Error;
 use uuid::Uuid;
@@ -124,12 +124,13 @@ pub fn ensure_probe(
     Ok(true)
 }
 
-// What a reset removed, as the note under the banner counts it.
+// What a reset removed, as the note under the banner counts it, and how many sealed values it kept because they still open.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct VaultResetSummary {
     pub passwords: usize,
     pub sessions: usize,
     pub secrets: usize,
+    pub kept: usize,
 }
 
 impl From<ClearedSecrets> for VaultResetSummary {
@@ -138,6 +139,7 @@ impl From<ClearedSecrets> for VaultResetSummary {
             passwords: cleared.passwords,
             sessions: cleared.sessions,
             secrets: cleared.secrets,
+            kept: cleared.kept,
         }
     }
 }
@@ -145,12 +147,16 @@ impl From<ClearedSecrets> for VaultResetSummary {
 impl VaultResetSummary {
     pub fn note(self) -> String {
         let count = |n: usize, word: &str| format!("{n} {word}{}", if n == 1 { "" } else { "s" });
-        format!(
+        let removed = format!(
             "Removed {}, {}, {}.",
             count(self.passwords, "password"),
             count(self.sessions, "saved sign-in"),
             count(self.secrets, "other secret")
-        )
+        );
+        match self.kept {
+            0 => removed,
+            kept => format!("{removed} Kept {kept} that can still be read."),
+        }
     }
 }
 
@@ -180,7 +186,7 @@ impl VaultReset {
 pub const KEY_READABLE: &str = "Windows unwrapped the vault key this time, so nothing was removed: your stored passwords and saved sign-ins can be read again.";
 
 // Beside the confirmation: Windows gives no sure sign that the key belongs to another user or PC, so the user is told what a reset loses if it does not.
-pub const RESET_WARNING: &str = "This deletes every stored password and saved sign-in for good. If Windows could read them again later, for example once your PC reaches your work network again, they are gone all the same.";
+pub const RESET_WARNING: &str = "This deletes every stored password and saved sign-in that cannot be read, for good. If Windows could read them again later, for example once your PC reaches your work network again, they are gone all the same.";
 
 // Why a reset is not carried out: it exists only for secrets that cannot be read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
@@ -202,9 +208,19 @@ impl VaultResetRefusal {
     }
 }
 
-// Every account's password, every saved sign-in and every named secret go; the accounts, their other fields and the copies of launcher files under backups stay. The caller puts a new probe in once the vault it holds can seal one.
-pub fn clear_stored_secrets(store: &Store, now: &str) -> Result<VaultResetSummary, StoreError> {
-    Ok(store.clear_secrets(now)?.into())
+// Each password, saved sign-in and named secret `vault` cannot open goes, and the probe unless it opens to its own text; what opens stays, so a value sealed with a key made since the old one was lost survives. The accounts, their other fields and the copies of launcher files under backups stay. The caller puts a new probe in once the vault it holds can seal one.
+pub fn clear_stored_secrets(
+    store: &Store,
+    vault: &dyn Vault,
+    now: &str,
+) -> Result<VaultResetSummary, StoreError> {
+    let opens = |sealed: Sealed<'_>, value: &ol_model::Ciphertext| match sealed {
+        Sealed::Secret(key) if key == SecretKey::VaultProbe.as_str() => vault
+            .decrypt(value)
+            .is_ok_and(|text| text.expose() == PROBE_VALUE),
+        _ => vault.decrypt(value).is_ok(),
+    };
+    Ok(store.clear_unopened(now, opens)?.into())
 }
 
 #[derive(Debug, Error)]

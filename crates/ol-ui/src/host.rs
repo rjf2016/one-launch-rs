@@ -4,6 +4,7 @@ mod banner;
 mod dialog;
 mod recovery;
 
+use std::mem::{Discriminant, discriminant};
 use std::time::Duration;
 
 use gpui::prelude::*;
@@ -20,6 +21,7 @@ use ol_model::{
 
 use crate::account::copy_note;
 use crate::shell::{Go, Route};
+use crate::widgets::Appeared;
 
 pub(crate) use dialog::{generated_at, plan_view};
 
@@ -56,10 +58,9 @@ pub struct PlayEnded {
 
 impl EventEmitter<PlayEnded> for LaunchHost {}
 
-// The empty picker sends the user to add or import an account, and back to this game's Play after.
 impl EventEmitter<Go> for LaunchHost {}
 
-// The job the app follows, with the game it was started for: none for a plain switch.
+// The job the app follows, with the game it was started for.
 struct Active {
     job: LaunchJob,
     game: Option<Game>,
@@ -68,7 +69,6 @@ struct Active {
 
 struct Request {
     key: u64,
-    // None for a plain switch, which starts no game.
     game: Option<Game>,
     launcher: LauncherId,
     wanted: Option<String>,
@@ -84,6 +84,10 @@ struct Request {
     copied: Option<SharedString>,
     steps_open: bool,
     plan_open: bool,
+    // Try again goes back to what was asked, not to the running job the dialog shows instead.
+    asked_for: Option<(Option<Game>, LauncherId)>,
+    shown: (bool, Discriminant<Stage>),
+    appeared: Appeared,
 }
 
 enum Accounts {
@@ -267,12 +271,18 @@ impl LaunchHost {
             copied: None,
             steps_open: false,
             plan_open: false,
+            asked_for: None,
+            shown: (instant, discriminant(&Stage::Pick)),
+            appeared: Appeared::now(),
         };
         // A running job is always the one shown, under its own game's name; a finished one only when it was for this game, or a plain switch to this account, and the user asked to see it.
         let follows = match &self.active {
             Some(active) if active.job.state == JobState::Running => {
-                request.game = active.game.clone();
-                request.launcher = active.job.launcher;
+                let asked = (
+                    std::mem::replace(&mut request.game, active.game.clone()),
+                    std::mem::replace(&mut request.launcher, active.job.launcher),
+                );
+                request.asked_for = Some(asked);
                 true
             }
             Some(active) => {
@@ -358,7 +368,6 @@ impl LaunchHost {
         }
     }
 
-    // From the account list, or from preview mode once it is off; Enter and a click together check once.
     fn check(&mut self, cx: &mut Context<Self>) {
         let Some(request) = &mut self.request else {
             return;
@@ -617,7 +626,17 @@ impl LaunchHost {
 
     fn try_again(&mut self, cx: &mut Context<Self>) {
         self.active = None;
-        self.back_to_pick(cx);
+        let asked = self.request.as_mut().and_then(|request| {
+            let (game, launcher) = request.asked_for.take()?;
+            Some((game, launcher, request.wanted.clone()))
+        });
+        match asked {
+            Some((game, launcher, wanted)) => {
+                self.request = None;
+                self.open_for(game, launcher, wanted, false, cx);
+            }
+            None => self.back_to_pick(cx),
+        }
     }
 
     fn close(&mut self, cx: &mut Context<Self>) {
@@ -648,7 +667,6 @@ impl LaunchHost {
         }
     }
 
-    // As in the Electron app: Steam and Battle.net import what they remember; Epic and Riot keep no list, so their account is added by hand.
     fn go_to_accounts(&mut self, cx: &mut Context<Self>) {
         let Some(request) = self.request.take_if(|request| request.empty()) else {
             return;
@@ -681,6 +699,13 @@ impl LaunchHost {
                 Stage::Job => direct,
                 _ => false,
             };
+        }
+        if let Some(request) = &mut self.request {
+            let shown = (request.silent, discriminant(&request.stage));
+            if request.shown != shown {
+                request.shown = shown;
+                request.appeared = Appeared::now();
+            }
         }
         self.arm_dismissal(cx);
         cx.notify();
@@ -805,6 +830,7 @@ impl LaunchHost {
     }
 }
 
+// Epic and the Riot Client keep no account list, as in the Electron app.
 pub(crate) fn can_import(launcher: LauncherId) -> bool {
     matches!(launcher, LauncherId::Steam | LauncherId::Battlenet)
 }

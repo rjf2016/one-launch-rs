@@ -7,6 +7,7 @@ mod follow;
 mod host;
 mod library;
 mod page;
+mod picker;
 mod posters;
 mod settings;
 mod shell;
@@ -21,6 +22,7 @@ use ol_api::library::HourClock;
 
 pub use assets::Assets;
 pub use library::{LibraryFrame, LibraryLoaded, LibraryView, SweepReport};
+pub use picker::{FilePicker, Script};
 pub use shell::{Played, QuitAnyway, Shell};
 
 #[derive(Clone, Copy, PartialEq, Eq)]

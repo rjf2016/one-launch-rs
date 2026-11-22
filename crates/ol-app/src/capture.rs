@@ -10,7 +10,7 @@ use gpui::{
 use ol_platform_win::own_process;
 use ol_platform_win::probe::{self, Area, OuterRect};
 use ol_platform_win::window::AppWindow;
-use ol_ui::{LibraryFrame, LibraryView, Shell};
+use ol_ui::{FilePicker, LibraryFrame, LibraryView, Shell};
 
 use crate::Life;
 use crate::args::CapturePlan;
@@ -98,13 +98,24 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
                 pause(STEP, cx).await;
                 continue;
             }
-            Step::Close => {
-                let (width, _) = native
-                    .client_size()
-                    .context("the window has no client area")?;
+            Step::Pick(answer) => {
+                cx.update(|cx| {
+                    if let Some(FilePicker::Scripted(script)) = cx.try_global::<FilePicker>() {
+                        script.borrow_mut().answer(answer);
+                    }
+                });
+                continue;
+            }
+            pressed @ (Step::Close | Step::Minimize) => {
+                let (width, _) = native.client_size().unwrap_or_default();
                 let scale = native.scale();
                 let at = |logical: f32| (logical * scale).round() as i32;
-                probe::click(native, Area::Close, width - at(23.), at(20.));
+                let (area, from_right) = if matches!(pressed, Step::Close) {
+                    (Area::Close, 23.)
+                } else {
+                    (Area::Minimize, 115.)
+                };
+                probe::click(native, area, width - at(from_right), at(20.));
                 pause(STEP, cx).await;
                 continue;
             }
@@ -179,20 +190,22 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
     Ok(())
 }
 
-// A step of --capture-keys, or several joined by & and taken in one go: a key press; the window's close button pressed through Windows (`close`), the tray's Open (`tray-open`) or Quit (`tray-quit`); text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked with the left or the right button, clicked as the second click of a double click, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
+// A step of --capture-keys, or several joined by & and taken in one go: a key press; the answer the next file dialog gets, a path (`pick:<path>`, with %2C for a comma) or a cancel (`pick-cancel`), for which no dialog is opened; the window's close or minimise button pressed through Windows (`close`, `minimize`), the tray's Open (`tray-open`) or Quit (`tray-quit`); text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked with the left or the right button, clicked as the second click of a double click, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
 enum Step {
     Key(Keystroke),
     Type(String),
+    Pick(Option<String>),
     Move(Point<Pixels>),
     Click(Point<Pixels>),
-    SecondClick(Point<Pixels>),
     RightClick(Point<Pixels>),
+    SecondClick(Point<Pixels>),
     Back(Point<Pixels>),
     Together(Vec<Step>),
     Wheel(Point<Pixels>, Point<f32>, Modifiers),
     Drag(Point<Pixels>, Point<Pixels>),
     Wait(Duration),
     Close,
+    Minimize,
     TrayOpen,
     TrayQuit,
     Size((i32, i32)),
@@ -222,8 +235,10 @@ impl Step {
         let Some((kind, rest)) = text.split_once(':') else {
             return match text {
                 "close" => Ok(Self::Close),
+                "minimize" => Ok(Self::Minimize),
                 "tray-open" => Ok(Self::TrayOpen),
                 "tray-quit" => Ok(Self::TrayQuit),
+                "pick-cancel" => Ok(Self::Pick(None)),
                 _ => Self::key(text),
             };
         };
@@ -245,10 +260,11 @@ impl Step {
                 .filter(|milliseconds| *milliseconds <= LONGEST_WAIT)
                 .map(|milliseconds| Self::Wait(Duration::from_millis(milliseconds))),
             "type" => (!rest.is_empty()).then(|| Self::Type(rest.replace("%2C", ","))),
+            "pick" => (!rest.is_empty()).then(|| Self::Pick(Some(rest.replace("%2C", ",")))),
             "move" => spot(rest).map(Self::Move),
             "click" => spot(rest).map(Self::Click),
-            "second-click" => spot(rest).map(Self::SecondClick),
             "right-click" => spot(rest).map(Self::RightClick),
+            "second-click" => spot(rest).map(Self::SecondClick),
             "back" => spot(rest).map(Self::Back),
             "wheel" | "shift-wheel" => rest.split_once(':').and_then(|(at, lines)| {
                 let lines = lines
@@ -299,8 +315,9 @@ impl Step {
             let form = match kind {
                 "wait" => "wait:<milliseconds up to 60000>",
                 "type" => "type:<text>",
-                "move" | "click" | "second-click" | "right-click" | "back" => {
-                    "move:<x>x<y>, click:<x>x<y>, second-click:<x>x<y>, right-click:<x>x<y> or back:<x>x<y>"
+                "pick" => "pick:<path> or pick-cancel",
+                "move" | "click" | "right-click" | "second-click" | "back" => {
+                    "move:<x>x<y>, click:<x>x<y>, right-click:<x>x<y>, second-click:<x>x<y> or back:<x>x<y>"
                 }
                 "wheel" | "shift-wheel" => "wheel:<x>x<y>:<lines, minus is down>",
                 "drag" => "drag:<x>x<y>:<x>x<y>",
@@ -324,15 +341,19 @@ impl Step {
             Self::Key(_)
                 | Self::Move(_)
                 | Self::Click(_)
-                | Self::SecondClick(_)
                 | Self::RightClick(_)
+                | Self::SecondClick(_)
                 | Self::Back(_)
                 | Self::Wheel(..)
         )
     }
 
     fn take(self, window: &mut Window, cx: &mut App) {
-        let mut clicks = 1;
+        let clicks = if matches!(self, Self::SecondClick(_)) {
+            2
+        } else {
+            1
+        };
         let (position, button) = match self {
             Self::Together(steps) => {
                 for step in steps {
@@ -346,11 +367,8 @@ impl Step {
             }
             Self::Move(position) => (position, None),
             Self::Click(position) => (position, Some(MouseButton::Left)),
-            Self::SecondClick(position) => {
-                clicks = 2;
-                (position, Some(MouseButton::Left))
-            }
             Self::RightClick(position) => (position, Some(MouseButton::Right)),
+            Self::SecondClick(position) => (position, Some(MouseButton::Left)),
             Self::Back(position) => (
                 position,
                 Some(MouseButton::Navigate(NavigationDirection::Back)),
@@ -378,8 +396,10 @@ impl Step {
             }
             Self::Drag(..)
             | Self::Type(_)
+            | Self::Pick(_)
             | Self::Wait(_)
             | Self::Close
+            | Self::Minimize
             | Self::TrayOpen
             | Self::TrayQuit
             | Self::Size(_)
@@ -612,12 +632,12 @@ mod tests {
         assert!(matches!(Step::parse("drag:1x2:3x4"), Ok(Step::Drag(..))));
         assert!(matches!(Step::parse("back:5x6"), Ok(Step::Back(_))));
         assert!(matches!(
-            Step::parse("second-click:5x6"),
-            Ok(Step::SecondClick(_))
-        ));
-        assert!(matches!(
             Step::parse("right-click:5x6"),
             Ok(Step::RightClick(_))
+        ));
+        assert!(matches!(
+            Step::parse("second-click:5x6"),
+            Ok(Step::SecondClick(_))
         ));
         assert!(matches!(
             Step::parse("click:1x2&escape"),
@@ -627,8 +647,14 @@ mod tests {
             panic!("a step that types");
         };
         assert_eq!(text, "gold, smurf");
+        let Ok(Step::Pick(Some(path))) = Step::parse(r"pick:D:\x\a%2Cb\steam.exe") else {
+            panic!("a step that answers the file dialog");
+        };
+        assert_eq!(path, r"D:\x\a,b\steam.exe");
+        assert!(matches!(Step::parse("pick-cancel"), Ok(Step::Pick(None))));
         assert!(matches!(Step::parse("frames:log"), Ok(Step::LogFrames)));
         assert!(matches!(Step::parse("close"), Ok(Step::Close)));
+        assert!(matches!(Step::parse("minimize"), Ok(Step::Minimize)));
         assert!(matches!(Step::parse("tray-open"), Ok(Step::TrayOpen)));
         assert!(matches!(Step::parse("tray-quit"), Ok(Step::TrayQuit)));
         assert!(matches!(Step::parse("frames:print"), Ok(Step::PrintFrames)));
@@ -655,6 +681,8 @@ mod tests {
             "resize:1600x1150:1000x1150:5000",
             "wait:61000",
             "type:",
+            "pick:",
+            r"click:1x2&pick:D:\x.exe",
             "click:1x2&wait:5",
             "back:5",
             "second-click:5",

@@ -21,7 +21,9 @@ use crate::host::{LaunchHost, generated_at, plan_view};
 use crate::local_time;
 use crate::page::{PageScroll, scroll_page};
 use crate::shell::{Go, Question, Route};
-use crate::widgets::{Button, Flash, FlashTone, Tone, field, icon, launcher_badge, panel};
+use crate::widgets::{
+    Appeared, Button, Flash, FlashTone, Tone, field, icon, launcher_badge, panel,
+};
 
 pub(crate) use password::copy_note;
 
@@ -181,7 +183,6 @@ struct Preview {
 pub struct AccountPage {
     backend: Backend,
     host: Option<Entity<LaunchHost>>,
-    // On the form that adds an account: the game whose Play sent the user here, which a new account of its launcher goes back to.
     return_to: Option<Game>,
     preview: Preview,
     kind: Kind,
@@ -205,7 +206,7 @@ pub struct AccountPage {
     error: Option<SharedString>,
     flash: Option<Flash>,
     advanced: bool,
-    confirm_delete: bool,
+    confirm_delete: Option<Appeared>,
     scroll: PageScroll,
     _subscriptions: Vec<Subscription>,
 }
@@ -295,7 +296,7 @@ impl AccountPage {
             error: None,
             flash: None,
             advanced: false,
-            confirm_delete: false,
+            confirm_delete: None,
             scroll: PageScroll::default(),
             _subscriptions: subscriptions,
         }
@@ -562,7 +563,6 @@ impl AccountPage {
         cx.spawn(async move |this, cx| {
             let made = backend.create_account(account).await;
             this.update(cx, |this, cx| match made {
-                // Sent here by a game's Play: back to that game, with the new account picked.
                 Ok(account) => cx.emit(Go::done(match this.return_to.take() {
                     Some(game) => Route::Play {
                         game: Box::new(game),
@@ -1091,7 +1091,7 @@ impl AccountPage {
     fn render_danger(&self, cx: &mut Context<Self>) -> Option<Div> {
         let account = self.account.as_ref()?;
         let busy = self.busy;
-        let buttons: Vec<AnyElement> = if self.confirm_delete {
+        let buttons: Vec<AnyElement> = if self.confirm_delete.is_some() {
             vec![
                 Button::new(
                     "delete-yes",
@@ -1101,14 +1101,14 @@ impl AccountPage {
                 .glyph(assets::TRASH)
                 .disabled(busy)
                 .on_click(cx.listener(|this, click, _, cx| {
-                    if password::single(click) {
+                    if this.confirm_delete.is_some_and(|shown| shown.takes(click)) {
                         this.delete(cx);
                     }
                 })),
                 Button::new("delete-cancel", Tone::Ghost, "Cancel")
                     .disabled(busy)
                     .on_click(cx.listener(|this, _, _, cx| {
-                        this.confirm_delete = false;
+                        this.confirm_delete = None;
                         cx.notify();
                     })),
             ]
@@ -1117,7 +1117,7 @@ impl AccountPage {
                 Button::new("delete", Tone::Danger, "Delete account")
                     .glyph(assets::TRASH)
                     .on_click(cx.listener(|this, _, _, cx| {
-                        this.confirm_delete = true;
+                        this.confirm_delete = Some(Appeared::now());
                         cx.notify();
                     })),
             ]

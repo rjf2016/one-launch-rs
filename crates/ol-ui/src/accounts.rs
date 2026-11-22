@@ -48,15 +48,12 @@ const IMPORT_ITEMS: [(LauncherId, &str, &str); 4] = [
 pub struct AccountsView {
     backend: Backend,
     load: Load,
-    // Counts the reads of the list: only the newest one is shown.
     reads: u64,
     menu: Option<OpenMenu>,
     over_trigger: Option<MenuSpot>,
     scroll: PageScroll,
     import: Option<Import>,
-    // Counts the import dialogs opened: an answer for one that was closed is no answer for the next.
     imports: u64,
-    // The game whose Play sent the user here: an import of an account of its launcher goes back to it.
     return_to: Option<Game>,
     flash: Option<Flash>,
 }
@@ -113,7 +110,6 @@ fn note_preview(notes: &str) -> Option<&str> {
 }
 
 impl AccountsView {
-    // `import` opens that launcher's import dialog at once, as a game's empty Play asks.
     pub fn new(
         backend: Backend,
         import: Option<LauncherId>,
@@ -210,6 +206,10 @@ impl AccountsView {
     }
 
     pub fn on_key(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
+        let held = keystroke.modifiers;
+        if held.control || held.alt || held.platform || held.function {
+            return false;
+        }
         let Some(menu) = self.menu.as_mut() else {
             return false;
         };

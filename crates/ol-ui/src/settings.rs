@@ -12,28 +12,43 @@ use ol_api::settings::{
     VaultBackend, VaultHealth,
 };
 use ol_api::{ApiError, AppInfo, Backend};
-use ol_model::{BATTLENET_LAUNCH_CHOICES, EPIC_LAUNCH_URI_CHOICES, LogLevel, SettingKey, Settings};
+use ol_model::{
+    BATTLENET_LAUNCH_CHOICES, DEFAULT_BACKUPS_TO_KEEP, EPIC_LAUNCH_URI_CHOICES, LauncherId,
+    LogLevel, SettingKey, Settings,
+};
 use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::assets;
+use crate::host::overlay;
 use crate::page::{PageScroll, scroll_page};
 use crate::widgets::{
-    Button, DropdownMenu, Spot, Tone, dropdown_menu, dropdown_place, dropdown_trigger, icon,
-    page_title, panel, setting_row, spot_of, switch, tab_strip,
+    Appeared, Button, DropdownMenu, Spot, Tone, dropdown_menu, dropdown_place, dropdown_trigger,
+    icon, page_title, panel, setting_row, spot_of, switch, tab_strip,
 };
 
-// The tabs this build shows. Artwork and Backups come with their screens.
+mod backups;
+mod launchers;
+
+pub use launchers::KnownStatuses;
+
+// The tabs this build shows, in the Electron app's order. Artwork comes with its screen.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SettingsTab {
     #[default]
     General,
     Launchers,
+    Backups,
     Advanced,
 }
 
 impl SettingsTab {
-    const SHOWN: [Self; 3] = [Self::General, Self::Launchers, Self::Advanced];
-    const LABELS: [&'static str; 3] = ["General", "Launchers", "Advanced"];
+    const SHOWN: [Self; 4] = [
+        Self::General,
+        Self::Launchers,
+        Self::Backups,
+        Self::Advanced,
+    ];
+    const LABELS: [&'static str; 4] = ["General", "Launchers", "Backups", "Advanced"];
 
     fn index(self) -> usize {
         Self::SHOWN.iter().position(|tab| *tab == self).unwrap_or(0)
@@ -45,6 +60,7 @@ enum Pick {
     EpicLaunch,
     BattlenetLaunch,
     LogLevel,
+    Keep,
 }
 
 impl Pick {
@@ -53,6 +69,7 @@ impl Pick {
             Self::EpicLaunch => SettingKey::EpicLaunchUri,
             Self::BattlenetLaunch => SettingKey::BattlenetLaunch,
             Self::LogLevel => SettingKey::LogLevel,
+            Self::Keep => SettingKey::BackupsKeep,
         }
     }
 
@@ -61,38 +78,59 @@ impl Pick {
             Self::EpicLaunch => "epic-launch-link",
             Self::BattlenetLaunch => "battlenet-launch",
             Self::LogLevel => "log-level",
+            Self::Keep => "backups-keep",
         }
     }
 
-    fn choices(self) -> Vec<(&'static str, &'static str)> {
+    // The stored value and what the list says. A number of snapshots stored outside the list is offered too, as in the Electron app.
+    fn choices(self, settings: &Settings) -> Vec<(String, String)> {
+        let owned = |choices: &[(&str, &str)]| {
+            choices
+                .iter()
+                .map(|(value, label)| ((*value).to_owned(), (*label).to_owned()))
+                .collect()
+        };
         match self {
-            Self::EpicLaunch => EPIC_LAUNCH_URI_CHOICES.to_vec(),
-            Self::BattlenetLaunch => BATTLENET_LAUNCH_CHOICES.to_vec(),
+            Self::EpicLaunch => owned(&EPIC_LAUNCH_URI_CHOICES),
+            Self::BattlenetLaunch => owned(&BATTLENET_LAUNCH_CHOICES),
             Self::LogLevel => LogLevel::ALL
                 .iter()
-                .map(|level| (level.as_str(), level.label()))
+                .map(|level| (level.as_str().to_owned(), level.label().to_owned()))
+                .collect(),
+            Self::Keep => settings
+                .backups_keep_choices()
+                .into_iter()
+                .map(|keep| {
+                    let label = if keep == DEFAULT_BACKUPS_TO_KEEP {
+                        format!("{keep} (default)")
+                    } else {
+                        keep.to_string()
+                    };
+                    (keep.to_string(), label)
+                })
                 .collect(),
         }
     }
 
-    fn current(self, settings: &Settings) -> &'static str {
+    fn current(self, settings: &Settings) -> String {
         match self {
-            Self::EpicLaunch => settings.epic_launch_uri(),
-            Self::BattlenetLaunch => settings.battlenet_launch(),
-            Self::LogLevel => settings.log_level().as_str(),
+            Self::EpicLaunch => settings.epic_launch_uri().to_owned(),
+            Self::BattlenetLaunch => settings.battlenet_launch().to_owned(),
+            Self::LogLevel => settings.log_level().as_str().to_owned(),
+            Self::Keep => settings.backups_keep().to_string(),
         }
     }
 
     fn chosen(self, settings: &Settings) -> usize {
         let current = self.current(settings);
-        self.choices()
+        self.choices(settings)
             .iter()
             .position(|(value, _)| *value == current)
             .unwrap_or(0)
     }
 }
 
-// What the keyboard can be on, in the order Tab goes through it.
+// What the keyboard can be on, in the order Tab goes through it. A snapshot's Restore is named by where its id stands among those seen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Control {
     Tabs,
@@ -103,6 +141,13 @@ enum Control {
     Pick(Pick),
     RunTest,
     Open(Folder),
+    Recheck,
+    Disclose(LauncherId),
+    Locate(LauncherId),
+    ResetPath(LauncherId),
+    Refresh,
+    Section(LauncherId),
+    Restore(LauncherId, usize),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -137,7 +182,7 @@ pub struct SettingsView {
     vault_reads: u64,
     test: SelfTest,
     tests: u64,
-    confirm_reset: bool,
+    confirm_reset: Option<Appeared>,
     resetting: bool,
     reset_note: Option<SharedString>,
     folder_error: Option<SharedString>,
@@ -151,10 +196,18 @@ pub struct SettingsView {
     ring: bool,
     reveal: bool,
     focused: Spot,
+    known: KnownStatuses,
+    launchers: launchers::Launchers,
+    backups: backups::Backups,
 }
 
 impl SettingsView {
-    pub fn new(backend: Backend, tab: Rc<Cell<SettingsTab>>, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        backend: Backend,
+        tab: Rc<Cell<SettingsTab>>,
+        known: KnownStatuses,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let mut view = Self {
             info: backend.app_info(),
             update: backend.update_status(),
@@ -171,7 +224,7 @@ impl SettingsView {
             vault_reads: 0,
             test: SelfTest::Idle,
             tests: 0,
-            confirm_reset: false,
+            confirm_reset: None,
             resetting: false,
             reset_note: None,
             folder_error: None,
@@ -182,10 +235,22 @@ impl SettingsView {
             ring: false,
             reveal: false,
             focused: Spot::default(),
+            known,
+            launchers: launchers::Launchers::default(),
+            backups: backups::Backups::default(),
         };
         view.reload(cx);
         view.read_vault(cx);
+        view.enter_tab(cx);
         view
+    }
+
+    fn enter_tab(&mut self, cx: &mut Context<Self>) {
+        match self.tab.get() {
+            SettingsTab::Launchers => self.enter_launchers(cx),
+            SettingsTab::Backups => self.enter_backups(cx),
+            SettingsTab::General | SettingsTab::Advanced => {}
+        }
     }
 
     pub fn select_tab(&mut self, tab: SettingsTab, cx: &mut Context<Self>) {
@@ -193,6 +258,12 @@ impl SettingsView {
             self.tab.set(tab);
             self.scroll.to_top();
             self.menu = None;
+            self.folder_error = None;
+            self.enter_tab(cx);
+        }
+        // A control of the tab that was shown is no longer drawn: the keyboard leaves it, unless it is on the tabs themselves.
+        if self.focus != Some(Control::Tabs) {
+            self.focus = None;
         }
         cx.notify();
     }
@@ -370,11 +441,11 @@ impl SettingsView {
         let Some(settings) = &self.settings else {
             return;
         };
-        let Some((value, _)) = pick.choices().get(index).copied() else {
+        let Some((value, _)) = pick.choices(settings).into_iter().nth(index) else {
             return;
         };
         if value != pick.current(settings) {
-            self.write(pick.key(), value.to_owned(), cx);
+            self.write(pick.key(), value, cx);
         }
     }
 
@@ -414,7 +485,7 @@ impl SettingsView {
         if self.resetting || !self.shows_reset() {
             return;
         }
-        self.confirm_reset = ask;
+        self.confirm_reset = ask.then(Appeared::now);
         // The button that had the keyboard is gone, as in the Electron app: the next Enter presses nothing.
         self.focus = None;
         cx.notify();
@@ -422,7 +493,7 @@ impl SettingsView {
 
     // Enter and a click together reset once.
     fn reset(&mut self, cx: &mut Context<Self>) {
-        if self.resetting || !self.confirm_reset || !self.shows_reset() {
+        if self.resetting || self.confirm_reset.is_none() || !self.shows_reset() {
             return;
         }
         self.resetting = true;
@@ -435,7 +506,7 @@ impl SettingsView {
                 match reset {
                     Ok(reset) => {
                         this.reset_note = Some(reset.note().into());
-                        this.confirm_reset = false;
+                        this.confirm_reset = None;
                     }
                     Err(error) => this.reset_note = Some(error.message.into()),
                 }
@@ -448,13 +519,16 @@ impl SettingsView {
         cx.notify();
     }
 
+    // A refusal is told on the tab that asked, while it is shown.
     fn open_folder(&mut self, folder: Folder, cx: &mut Context<Self>) {
         self.folder_error = None;
-        let backend = self.backend.clone();
+        let (backend, tab) = (self.backend.clone(), self.tab.get());
         cx.spawn(async move |this, cx| {
             let opened = backend.open_folder(folder).await;
             this.update(cx, |this, cx| {
-                if let Err(error) = opened {
+                if let Err(error) = opened
+                    && this.tab.get() == tab
+                {
                     this.folder_error = Some(error.message.into());
                 }
                 cx.notify();
@@ -468,7 +542,7 @@ impl SettingsView {
     fn controls(&self) -> Vec<Control> {
         let mut controls = vec![Control::Tabs];
         if self.shows_reset() && !self.resetting {
-            if self.confirm_reset {
+            if self.confirm_reset.is_some() {
                 controls.extend([Control::YesReset, Control::CancelReset]);
             } else {
                 controls.push(Control::AskReset);
@@ -486,11 +560,21 @@ impl SettingsView {
                 SettingKey::WindowCloseToTray,
                 SettingKey::UpdatesAuto,
             ])),
-            SettingsTab::Launchers => controls.extend(toggles(&[
-                SettingKey::SteamAutoLogin,
-                SettingKey::RiotPressPlay,
-                SettingKey::PlayHideToTray,
-            ])),
+            SettingsTab::Launchers => {
+                self.launchers.controls(&mut controls);
+                controls.extend(toggles(&[
+                    SettingKey::SteamAutoLogin,
+                    SettingKey::RiotPressPlay,
+                    SettingKey::PlayHideToTray,
+                ]));
+            }
+            SettingsTab::Backups => {
+                controls.extend([Control::Refresh, Control::Open(Folder::Backups)]);
+                if loaded {
+                    controls.push(Control::Pick(Pick::Keep));
+                }
+                self.backups.controls(&mut controls);
+            }
             SettingsTab::Advanced => {
                 controls.extend(toggles(&[SettingKey::DryRun]));
                 if loaded {
@@ -536,7 +620,10 @@ impl SettingsView {
         }
         let key = keystroke.key.as_str();
         if let Some((pick, lit)) = self.menu {
-            let last = pick.choices().len() - 1;
+            let last = self
+                .settings
+                .as_ref()
+                .map_or(0, |settings| pick.choices(settings).len().saturating_sub(1));
             match key {
                 "down" => self.menu = Some((pick, (lit + 1).min(last))),
                 "up" => self.menu = Some((pick, lit.saturating_sub(1))),
@@ -564,6 +651,10 @@ impl SettingsView {
         let Some(focus) = self.focus else {
             return false;
         };
+        // A key acts only on a control that is drawn and can be used.
+        if !self.controls().contains(&focus) {
+            return false;
+        }
         let press = matches!(key, "enter" | "space");
         match focus {
             Control::Tabs => {
@@ -590,6 +681,13 @@ impl SettingsView {
             Control::AskReset if press => self.ask_reset(true, cx),
             Control::YesReset if press => self.reset(cx),
             Control::CancelReset if press => self.ask_reset(false, cx),
+            Control::Recheck if press => self.recheck(cx),
+            Control::Disclose(launcher) if press => self.disclose(launcher, cx),
+            Control::Locate(launcher) if press => self.locate(launcher, cx),
+            Control::ResetPath(launcher) if press => self.reset_path(launcher, cx),
+            Control::Refresh if press => self.list_backups(None, cx),
+            Control::Section(launcher) if press => self.toggle_section(launcher, cx),
+            Control::Restore(launcher, seen) if press => self.ask_restore(launcher, seen, cx),
             _ => return false,
         }
         cx.notify();
@@ -662,10 +760,16 @@ impl SettingsView {
     fn render_pick(&mut self, pick: Pick, cx: &mut Context<Self>) -> AnyElement {
         let control = Control::Pick(pick);
         let spot = self.spots.entry(pick).or_default().clone();
-        let label = self.settings.as_ref().map_or("", |settings| {
-            let chosen = pick.chosen(settings);
-            pick.choices()[chosen].1
-        });
+        let label = self
+            .settings
+            .as_ref()
+            .and_then(|settings| {
+                pick.choices(settings)
+                    .into_iter()
+                    .nth(pick.chosen(settings))
+                    .map(|(_, label)| label)
+            })
+            .unwrap_or_default();
         let element = dropdown_trigger(
             pick.id(),
             label,
@@ -685,12 +789,12 @@ impl SettingsView {
         let (pick, lit) = self.menu?;
         let settings = self.settings.as_ref()?;
         let trigger = self.spots.get(&pick)?.get()?;
-        let choices = pick.choices();
+        let choices = pick.choices(settings);
         let at = dropdown_place(trigger, viewport, choices.len());
         let spot = self.spots.get(&pick)?.clone();
         let menu = dropdown_menu(
             DropdownMenu {
-                labels: choices.iter().map(|(_, label)| (*label).into()).collect(),
+                labels: choices.into_iter().map(|(_, label)| label.into()).collect(),
                 chosen: pick.chosen(settings),
                 lit,
                 least: trigger.size.width,
@@ -744,8 +848,30 @@ impl SettingsView {
 
     fn render_banner(&self, cx: &mut Context<Self>) -> Option<Div> {
         let shows = self.shows_reset();
-        if !shows && self.reset_note.is_none() {
-            return None;
+        if !shows {
+            // Once the secrets read again, the reset's answer stands alone: the banner's sentence would say the opposite.
+            return self.reset_note.clone().map(|note| {
+                div()
+                    .flex()
+                    .items_start()
+                    .gap(px(8.))
+                    .rounded(px(8.))
+                    .border_1()
+                    .border_color(color(theme::BORDER))
+                    .bg(color(theme::SURFACE))
+                    .px(px(16.))
+                    .py(px(12.))
+                    .text_color(color(theme::TEXT))
+                    .child(
+                        if self.vault_works() {
+                            icon(assets::SHIELD_CHECK, 16., theme::SUCCESS)
+                        } else {
+                            icon(assets::SHIELD_OFF, 16., theme::FAINT)
+                        }
+                        .mt(px(2.)),
+                    )
+                    .child(div().flex_1().min_w_0().child(note))
+            });
         }
         let (before, after) = RESET_BANNER
             .split_once("chromium")
@@ -766,7 +892,7 @@ impl SettingsView {
         ]);
         let buttons: Vec<AnyElement> = if !shows {
             Vec::new()
-        } else if self.confirm_reset {
+        } else if self.confirm_reset.is_some() {
             vec![
                 Button::new(
                     "reset-yes",
@@ -780,8 +906,7 @@ impl SettingsView {
                 .disabled(self.resetting)
                 .leading(self.ringed_on(Control::YesReset))
                 .on_click(cx.listener(|this, click: &ClickEvent, _, cx| {
-                    // The second click of a double click on the button before it is not a yes.
-                    if click.click_count() > 1 {
+                    if !this.confirm_reset.is_some_and(|shown| shown.takes(click)) {
                         return;
                     }
                     this.clicked(Control::YesReset);
@@ -823,7 +948,7 @@ impl SettingsView {
                         .child(icon(assets::SHIELD_OFF, 16., theme::DANGER).mt(px(2.)))
                         .child(div().flex_1().min_w_0().child(text)),
                 )
-                .when(self.confirm_reset && shows, |banner| {
+                .when(self.confirm_reset.is_some() && shows, |banner| {
                     banner.child(
                         div()
                             .ml(px(24.))
@@ -918,7 +1043,8 @@ impl SettingsView {
         } else {
             "Needs Minimize One Launch to System Tray, in General."
         };
-        vec![panel(
+        let status = self.render_launchers_panel(cx);
+        vec![status, panel(
             "Play",
             Some("What One Launch does for you when you press Play.".into()),
             None,
@@ -1135,6 +1261,7 @@ impl Render for SettingsView {
         let panels = match self.tab.get() {
             SettingsTab::General => self.render_general(cx),
             SettingsTab::Launchers => self.render_launchers(cx),
+            SettingsTab::Backups => self.render_backups(cx),
             SettingsTab::Advanced => self.render_advanced(cx),
         };
         let body = div()
@@ -1145,6 +1272,9 @@ impl Render for SettingsView {
             .children(self.render_banner(cx))
             .children(panels);
         let menu = self.render_menu(viewport, cx);
+        let dialog = self
+            .render_restore(cx)
+            .map(|dialog| overlay(viewport, 2, dialog));
         div()
             .id("settings")
             .size_full()
@@ -1155,5 +1285,6 @@ impl Render for SettingsView {
             }))
             .child(scroll_page("settings-page", &self.scroll, header, body))
             .children(menu)
+            .children(dialog)
     }
 }

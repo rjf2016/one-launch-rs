@@ -367,6 +367,10 @@ impl Vault for NoVault {
     fn decrypt(&self, _: &Ciphertext) -> Result<Secret, VaultError> {
         Err(VaultError::Unavailable)
     }
+
+    fn has_key(&self) -> bool {
+        false
+    }
 }
 
 // While the key is lost nothing new is sealed, because no other key may take its place but by the reset; what was sealed cannot be read, as the reset's banner says.
@@ -379,6 +383,10 @@ impl Vault for LostKey {
 
     fn decrypt(&self, _: &Ciphertext) -> Result<Secret, VaultError> {
         Err(VaultError::Unreadable)
+    }
+
+    fn has_key(&self) -> bool {
+        false
     }
 }
 
@@ -416,6 +424,13 @@ impl Vault for VaultCell {
             VaultSlot::Open(vault) => vault.decrypt(ciphertext),
             VaultSlot::KeyLost => LostKey.decrypt(ciphertext),
             VaultSlot::Unavailable => NoVault.decrypt(ciphertext),
+        }
+    }
+
+    fn has_key(&self) -> bool {
+        match self.slot() {
+            VaultSlot::Open(vault) => vault.has_key(),
+            VaultSlot::KeyLost | VaultSlot::Unavailable => false,
         }
     }
 }
@@ -467,7 +482,15 @@ impl BackendStart {
         on_job: Option<JobObserver>,
     ) -> Result<Backend, KeyError> {
         let opened = match OsCryptVault::open_or_create(&data_dir, &*protector) {
-            Err(error) if !matches!(error, KeyError::Unwrap | KeyError::WindowsUnavailable) => {
+            Err(error)
+                if !matches!(
+                    error,
+                    KeyError::Unwrap
+                        | KeyError::WindowsUnavailable
+                        | KeyError::Wrap
+                        | KeyError::Random
+                ) =>
+            {
                 self.log.error(
                     "the vault key could not be opened",
                     json!({ "error": error.to_string() }),
@@ -526,7 +549,7 @@ impl Backend {
         Self::logging_to(Log::off()).start_with_vault_of_data_folder(data_dir, version, protector)
     }
 
-    // The launchers of this PC on the data folder's own vault. Its key is opened, or made for a folder that has none, before the thread starts. A key Windows does not unwrap leaves the vault in its Key lost state, and a Windows that unwraps nothing just now leaves it unavailable, with the accounts readable either way; any other fault of the key file stops the start.
+    // The launchers of this PC on the data folder's own vault. Its key is opened, or made for a folder that has none, before the thread starts. A key Windows does not unwrap leaves the vault in its Key lost state, and a Windows that unwraps or wraps nothing just now leaves it unavailable with nothing written, to be tried again at the next look; the accounts are readable either way. Any other fault of the key file stops the start.
     pub fn start_on_this_pc(
         data_dir: PathBuf,
         version: &str,
@@ -1728,7 +1751,7 @@ impl Serving {
                 }
             }
         }
-        let removed = vault_health::clear_stored_secrets(store, &self.stamp())?;
+        let removed = vault_health::clear_stored_secrets(store, &*self.vault, &self.stamp())?;
         let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
         Ok(VaultReset::Cleared(removed))
     }

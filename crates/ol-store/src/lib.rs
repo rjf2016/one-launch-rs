@@ -22,7 +22,7 @@ pub use launchers::{AccountUpdate, GameSync, NewAccount};
 pub use open::{MigrationReport, Snapshot};
 pub use read::{Ciphertexts, RowCounts};
 pub use sessions::NewSession;
-pub use write::ClearedSecrets;
+pub use write::{ClearedSecrets, Sealed};
 
 pub const DATABASE_FILE: &str = "onelaunch.db";
 pub const SCHEMA_VERSION: u32 = 5;

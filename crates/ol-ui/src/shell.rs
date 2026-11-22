@@ -17,8 +17,8 @@ use crate::accounts::AccountsView;
 use crate::assets;
 use crate::host::{LaunchHost, PlayEnded, overlay};
 use crate::library::LibraryView;
-use crate::settings::{SettingsTab, SettingsView};
-use crate::widgets::{Button, Tone, panel_shadow, tip};
+use crate::settings::{KnownStatuses, SettingsTab, SettingsView};
+use crate::widgets::{Appeared, Button, Tone, panel_shadow, spinner, tip};
 
 const SIDEBAR: f32 = 224.;
 const SIDEBAR_COLLAPSED: f32 = 60.;
@@ -46,7 +46,6 @@ impl Screen {
 pub(crate) enum Route {
     Library,
     Accounts,
-    // The Accounts list with the launcher's import dialog up.
     Import(LauncherId),
     NewAccount(LauncherId),
     // `created`: the page a Create account just opened, which says what comes next.
@@ -56,7 +55,6 @@ pub(crate) enum Route {
     },
     // The tab named, or the one last shown in this run.
     Settings(Option<SettingsTab>),
-    // The Library with the game's launch dialog open, the account picked when one is named.
     Play {
         game: Box<Game>,
         account: Option<String>,
@@ -66,7 +64,7 @@ pub(crate) enum Route {
 pub(crate) struct Go {
     pub route: Route,
     pub guarded: bool,
-    // The game whose Play sent the user off to add or import an account: the page this move opens may bring them back to it. Only the move that carries it has it.
+    // Only the move that carries it has it, so it lasts one hop.
     pub return_to: Option<Game>,
 }
 
@@ -79,7 +77,6 @@ impl Go {
         }
     }
 
-    // A move a page makes once its work is done.
     pub fn done(route: Route) -> Self {
         Self {
             route,
@@ -102,6 +99,8 @@ enum Asked {
     },
     // A quit while a switch runs; its first answer keeps the app running.
     Quit,
+    // "Quit anyway" was answered: no answer is left, only the line that the switch is being stopped.
+    Stopping,
 }
 
 struct Asking {
@@ -113,6 +112,7 @@ struct Asking {
     asked: Asked,
     // The second answer carries the ring, and Enter gives it.
     act_leads: bool,
+    appeared: Appeared,
 }
 
 // The user answered Quit anyway: the app is to quit.
@@ -153,6 +153,7 @@ pub struct Shell {
     toggled: bool,
     fake_launchers: bool,
     settings_tab: Rc<Cell<SettingsTab>>,
+    launcher_statuses: KnownStatuses,
     preview: bool,
     _page: Option<Subscription>,
     _keys: Subscription,
@@ -234,6 +235,7 @@ impl Shell {
             toggled: false,
             fake_launchers,
             settings_tab: Rc::default(),
+            launcher_statuses: KnownStatuses::default(),
             preview: false,
             _page: None,
             _keys: keys,
@@ -270,7 +272,7 @@ impl Shell {
         if matches!(
             self.asking,
             Some(Asking {
-                asked: Asked::Quit,
+                asked: Asked::Quit | Asked::Stopping,
                 ..
             })
         ) {
@@ -284,6 +286,7 @@ impl Shell {
             act: question.quit,
             asked: Asked::Quit,
             act_leads: false,
+            appeared: Appeared::now(),
         });
         window.blur(cx);
         cx.notify();
@@ -321,6 +324,9 @@ impl Shell {
 
     // An unguarded move is one a page makes when a create, a delete or an import has finished: it wins over a question still open.
     fn go(&mut self, go: Go, window: &mut Window, cx: &mut Context<Self>) {
+        if self.stopping() {
+            return;
+        }
         if self.asking.is_some() {
             if go.guarded {
                 return;
@@ -341,6 +347,7 @@ impl Shell {
                     return_to: go.return_to.map(Box::new),
                 },
                 act_leads: false,
+                appeared: Appeared::now(),
             });
             window.blur(cx);
             cx.notify();
@@ -356,7 +363,20 @@ impl Shell {
         }
     }
 
+    fn stopping(&self) -> bool {
+        matches!(
+            self.asking,
+            Some(Asking {
+                asked: Asked::Stopping,
+                ..
+            })
+        )
+    }
+
     fn answer(&mut self, act: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.stopping() {
+            return;
+        }
         let Some(asking) = self.asking.take() else {
             return;
         };
@@ -364,7 +384,21 @@ impl Shell {
             Asked::Leave { then, return_to } if act => {
                 self.enter(then, return_to.map(|game| *game), window, cx);
             }
-            Asked::Quit if act => cx.emit(QuitAnyway),
+            Asked::Quit if act => {
+                self.asking = Some(Asking {
+                    title: "Stopping the switch".into(),
+                    message:
+                        "One Launch quits once the switch has stopped and put back what it had to."
+                            .into(),
+                    detail: None,
+                    keep: "",
+                    act: "",
+                    asked: Asked::Stopping,
+                    act_leads: false,
+                    appeared: Appeared::now(),
+                });
+                cx.emit(QuitAnyway);
+            }
             _ => {}
         }
         cx.notify();
@@ -396,7 +430,8 @@ impl Shell {
                     self.settings_tab.set(tab);
                 }
                 let tab = Rc::clone(&self.settings_tab);
-                Page::Settings(cx.new(|cx| SettingsView::new(backend, tab, cx)))
+                let known = Rc::clone(&self.launcher_statuses);
+                Page::Settings(cx.new(|cx| SettingsView::new(backend, tab, known, cx)))
             }
             Route::Accounts => {
                 let page = cx.new(|cx| AccountsView::new(backend, None, None, cx));
@@ -458,11 +493,18 @@ impl Shell {
     }
 
     fn modal(&self, cx: &Context<Self>) -> bool {
-        self.asking.is_some() || self.host.read(cx).is_modal() || self.importing(cx)
+        self.asking.is_some()
+            || self.host.read(cx).is_modal()
+            || self.importing(cx)
+            || self.restoring(cx)
     }
 
     fn importing(&self, cx: &Context<Self>) -> bool {
         matches!(&self.page, Page::Accounts(page) if page.read(cx).importing())
+    }
+
+    fn restoring(&self, cx: &Context<Self>) -> bool {
+        matches!(&self.page, Page::Settings(page) if page.read(cx).restoring())
     }
 
     fn typing(&self, window: &Window, cx: &Context<Self>) -> bool {
@@ -536,6 +578,15 @@ impl Shell {
             page.update(cx, |page, cx| page.on_import_key(keystroke, cx));
             return true;
         }
+        if let Page::Settings(page) = &self.page
+            && page.read(cx).restoring()
+        {
+            if held.alt || held.platform {
+                return false;
+            }
+            page.update(cx, |page, cx| page.on_restore_key(keystroke, cx));
+            return true;
+        }
         let only_alt = held.alt && !held.control && !held.shift && !held.platform && !held.function;
         if only_alt && keystroke.key == "left" {
             return self.back(window, cx);
@@ -575,6 +626,15 @@ impl Shell {
                 return taken;
             }
         }
+        self.on_page_key(keystroke, window, cx)
+    }
+
+    fn on_page_key(
+        &mut self,
+        keystroke: &Keystroke,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         match &self.page {
             Page::Accounts(page) => page.update(cx, |page, cx| page.on_key(keystroke, cx)),
             Page::Account(page) => page.update(cx, |page, cx| page.on_key(keystroke, window, cx)),
@@ -806,7 +866,16 @@ impl Shell {
                     .gap(px(12.))
                     .px(px(20.))
                     .py(px(16.))
-                    .child(icon(assets::UPDATE, 20., theme::WARNING).mt(px(2.)))
+                    .child(if matches!(asking.asked, Asked::Stopping) {
+                        div()
+                            .mt(px(2.))
+                            .child(spinner("stopping", 20., theme::WARNING))
+                            .into_any_element()
+                    } else {
+                        icon(assets::UPDATE, 20., theme::WARNING)
+                            .mt(px(2.))
+                            .into_any_element()
+                    })
                     .child(
                         div()
                             .min_w_0()
@@ -834,34 +903,39 @@ impl Shell {
                             })),
                     ),
             )
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_end()
-                    .gap(px(8.))
-                    .border_t_1()
-                    .border_color(color(theme::BORDER))
-                    .px(px(20.))
-                    .py(px(12.))
-                    .child(
-                        Button::new("stay", Tone::Ghost, asking.keep)
-                            .leading(!asking.act_leads)
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.answer(false, window, cx);
-                            })),
-                    )
-                    .child(
-                        Button::new("leave", Tone::Danger, asking.act)
-                            .leading(asking.act_leads)
-                            .on_click(cx.listener(|this, click: &ClickEvent, window, cx| {
-                                // The second click of a double click is not an answer.
-                                if click.click_count() == 1 {
-                                    this.answer(true, window, cx);
-                                }
-                            })),
-                    ),
-            );
+            .when(!matches!(asking.asked, Asked::Stopping), |card| {
+                card.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_end()
+                        .gap(px(8.))
+                        .border_t_1()
+                        .border_color(color(theme::BORDER))
+                        .px(px(20.))
+                        .py(px(12.))
+                        .child(
+                            Button::new("stay", Tone::Ghost, asking.keep)
+                                .leading(!asking.act_leads)
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.answer(false, window, cx);
+                                })),
+                        )
+                        .child(
+                            Button::new("leave", Tone::Danger, asking.act)
+                                .leading(asking.act_leads)
+                                .on_click(cx.listener(|this, click: &ClickEvent, window, cx| {
+                                    if this
+                                        .asking
+                                        .as_ref()
+                                        .is_some_and(|asking| asking.appeared.takes(click))
+                                    {
+                                        this.answer(true, window, cx);
+                                    }
+                                })),
+                        ),
+                )
+            });
         Some(
             div()
                 .id("confirm-backdrop")

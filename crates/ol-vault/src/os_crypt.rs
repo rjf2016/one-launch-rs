@@ -105,10 +105,16 @@ impl OsCryptVault {
 
     // Windows names no error for a key of another user or PC (Microsoft's CryptUnprotectData page: do not "rely on a specific error code"), so it counts as lost only while Windows wraps and unwraps a value of its own.
     fn unwrap(wrapped: &[u8], protector: &dyn DataProtector) -> Result<Self, KeyError> {
+        if let Ok(key) = protector.unprotect(wrapped) {
+            return Self::with_key(&key);
+        }
+        if !protector_works(protector) {
+            return Err(KeyError::WindowsUnavailable);
+        }
+        // Windows works now, so the key gets one more try before it counts as lost: the first may have failed while it did not.
         match protector.unprotect(wrapped) {
             Ok(key) => Self::with_key(&key),
-            Err(_) if protector_works(protector) => Err(KeyError::Unwrap),
-            Err(_) => Err(KeyError::WindowsUnavailable),
+            Err(_) => Err(KeyError::Unwrap),
         }
     }
 
@@ -451,6 +457,39 @@ mod tests {
                 "{text}: the folder changed"
             );
         }
+    }
+
+    // This user's DPAPI failing once, as at an early start, and working from then on.
+    struct FailsOnce(std::cell::Cell<bool>);
+
+    impl DataProtector for FailsOnce {
+        fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ProtectError> {
+            Reversible.protect(plain)
+        }
+
+        fn unprotect(&self, protected: &[u8]) -> Result<Zeroizing<Vec<u8>>, ProtectError> {
+            if self.0.replace(false) {
+                return Err(ProtectError::Unprotect);
+            }
+            Reversible.unprotect(protected)
+        }
+    }
+
+    #[test]
+    fn a_key_that_fails_to_unwrap_once_is_tried_again_and_never_replaced() {
+        let scratch = Scratch::new("vault");
+        let first = OsCryptVault::open_or_create(scratch.path(), &Reversible).unwrap();
+        let sealed = first.encrypt(&secret("placeholder")).unwrap();
+        let before = snapshot(scratch.path());
+        let Ok(Recovered::Opened(kept)) =
+            OsCryptVault::replace_lost_key(scratch.path(), &FailsOnce(std::cell::Cell::new(true)))
+        else {
+            panic!("a key that unwraps on the second try was not opened");
+        };
+        assert!(kept.decrypt(&sealed).unwrap().expose() == "placeholder");
+        assert!(before == snapshot(scratch.path()), "the key was replaced");
+        let opened = OsCryptVault::open(scratch.path(), &FailsOnce(std::cell::Cell::new(true)));
+        assert!(opened.is_ok());
     }
 
     #[test]
