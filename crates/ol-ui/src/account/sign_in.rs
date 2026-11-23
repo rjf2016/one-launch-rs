@@ -204,6 +204,7 @@ impl AccountPage {
                     Ok(()) => {
                         this.sign_in.confirm_forget = false;
                         this.sign_in.note = Some("Saved sign-in removed".into());
+                        this.preview.plan = None;
                         this.load_sign_in(cx);
                     }
                     Err(error) => this.sign_in.failed = Some(error.message.into()),
@@ -342,7 +343,13 @@ impl AccountPage {
                 }))
                 .child(disk.text)
                 .into_any_element(),
-            (None, None) => div().child("Checking\u{2026}").into_any_element(),
+            (None, None) if sign_in.loading || found.is_none() => {
+                div().child("Checking\u{2026}").into_any_element()
+            }
+            (None, None) => div()
+                .text_color(color(theme::MUTED))
+                .child("Unknown")
+                .into_any_element(),
         };
         rows.push(row(
             format!("{name} is signed in as"),

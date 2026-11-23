@@ -122,6 +122,7 @@ impl AccountPage {
             return;
         }
         let password = Secret::new(field.owned_text(cx));
+        field.set_text("", window, cx);
         let had = self
             .account
             .as_ref()
