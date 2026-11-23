@@ -308,6 +308,7 @@ impl Button {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FlashTone {
+    Info,
     Success,
     Error,
 }
@@ -352,11 +353,62 @@ impl Flash {
             .text_size(px(12.))
             .line_height(px(16.))
             .text_color(color(match self.tone {
+                FlashTone::Info => theme::MUTED,
                 FlashTone::Success => theme::SUCCESS,
                 FlashTone::Error => theme::DANGER,
             }))
             .child(self.text.clone())
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PillTone {
+    Ok,
+    Warn,
+    Fail,
+    Info,
+}
+
+pub fn pill(tone: PillTone, glyph: Option<&'static str>, label: impl Into<SharedString>) -> Div {
+    let (line, fill, hex) = match tone {
+        PillTone::Ok => (
+            alpha(theme::SUCCESS, 0.3),
+            alpha(theme::SUCCESS, 0.1),
+            theme::SUCCESS,
+        ),
+        PillTone::Warn => (
+            alpha(theme::WARNING, 0.3),
+            alpha(theme::WARNING, 0.1),
+            theme::WARNING,
+        ),
+        PillTone::Fail => (
+            alpha(theme::DANGER, 0.3),
+            alpha(theme::DANGER, 0.1),
+            theme::DANGER,
+        ),
+        PillTone::Info => (
+            color(theme::BORDER).into(),
+            color(theme::SURFACE_2).into(),
+            theme::MUTED,
+        ),
+    };
+    div()
+        .flex()
+        .flex_none()
+        .items_center()
+        .gap(px(4.))
+        .rounded(px(6.))
+        .border_1()
+        .border_color(line)
+        .bg(fill)
+        .px(px(8.))
+        .py(px(2.))
+        .text_size(px(12.))
+        .line_height(px(16.))
+        .font_weight(FontWeight::MEDIUM)
+        .text_color(color(hex))
+        .children(glyph.map(|glyph| icon(glyph, 12., hex)))
+        .child(label.into())
 }
 
 pub fn panel_shadow() -> Vec<BoxShadow> {

@@ -7,9 +7,9 @@ use gpui::prelude::*;
 use gpui::{
     AnyElement, App, BoxShadow, ClickEvent, Context, DispatchPhase, Div, Entity, EventEmitter,
     FontWeight, Keystroke, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ObjectFit,
-    Pixels, Point, RenderImage, ScrollHandle, ScrollStrategy, SharedString, Size, Stateful,
-    Subscription, UniformListScrollHandle, Window, anchored, canvas, deferred, div, hsla, img,
-    linear_color_stop, linear_gradient, point, px, uniform_list,
+    Pixels, Point, RenderImage, ScrollEvent, ScrollHandle, ScrollStrategy, SharedString, Size,
+    Stateful, Subscription, UniformListScrollHandle, Window, anchored, canvas, deferred, div, hsla,
+    img, linear_color_stop, linear_gradient, point, px, uniform_list,
 };
 use ol_api::library::{LibraryGame, caption, monogram, relative, visible};
 use ol_api::{ApiError, Backend, Library};
@@ -22,7 +22,9 @@ use crate::follow::{Follow, follow};
 use crate::host::{JobSettled, LaunchHost};
 use crate::posters::{self, Lookup, Posters, Shape};
 use crate::shell::sidebar_width;
-use crate::widgets::{Button, Flash, FlashTone, Tone, icon, launcher_dot, page_title, spinner};
+use crate::widgets::{
+    Button, Flash, FlashTone, Tone, icon, launcher_dot, menu_shadow, page_title, spinner, tip,
+};
 
 // The owner's pick of 2026-11-21, from a prototype of the page: the padding at its sides, the least width of a card and the room between two.
 const PAGE_PADDING: f32 = 24.;
@@ -74,12 +76,13 @@ pub struct LibraryView {
     sort: LibrarySort,
     menu: Option<OpenMenu>,
     over_trigger: Option<Menu>,
+    card_menu: Option<CardMenu>,
     sweep: Option<Sweep>,
     sweep_report: Option<SweepReport>,
     frames: Option<Vec<LibraryFrame>>,
     sidebar: Pixels,
     on_screen: bool,
-    _subscriptions: [Subscription; 4],
+    _subscriptions: [Subscription; 3],
 }
 
 // What a frame was drawn for and how its grid was laid out, for a capture to tell a layout that changes its mind from one drawn late.
@@ -128,6 +131,29 @@ enum Menu {
 struct OpenMenu {
     which: Menu,
     highlight: usize,
+}
+
+// Refresh artwork and Choose portrait image come with the artwork fetching.
+struct CardMenu {
+    game: String,
+    at: Point<Pixels>,
+    viewport: Size<Pixels>,
+}
+
+fn artwork_line(game: &Game) -> String {
+    match (&game.artwork, &game.artwork_error) {
+        (Some(art), _) => format!(
+            "Artwork: {}",
+            match art.source {
+                ArtworkSource::SteamCdn => "Steam",
+                ArtworkSource::SteamGridDb => "SteamGridDB",
+                ArtworkSource::Manual => "your image",
+                ArtworkSource::Launcher => "the game's own icon",
+            }
+        ),
+        (None, Some(error)) => error.clone(),
+        (None, None) => "No artwork yet".to_owned(),
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -282,19 +308,13 @@ impl LibraryView {
                 this.update(cx, |this, cx| this.set_query(text, cx)).ok();
             }
         });
-        // Before the bindings of whatever has the keyboard: a text field has its own for Ctrl+F.
-        let keys = cx.intercept_keystrokes(move |event, window, cx| {
-            let taken = this
-                .update(cx, |this, cx| {
-                    this.on_keystroke(&event.keystroke, window, cx)
-                })
-                .unwrap_or(false);
-            if taken {
-                cx.stop_propagation();
+        let host_changed = cx.observe(&host, |this, host, cx| {
+            if host.read(cx).is_modal() {
+                this.card_menu = None;
+                this.menu = None;
             }
+            cx.notify();
         });
-
-        let host_changed = cx.observe(&host, |_, _, cx| cx.notify());
         let job_settled = cx.subscribe(&host, |this, _, _: &JobSettled, cx| this.reload(cx));
         cx.spawn({
             let backend = backend.clone();
@@ -343,12 +363,13 @@ impl LibraryView {
             sort: LibrarySort::default(),
             menu: None,
             over_trigger: None,
+            card_menu: None,
             sweep: None,
             sweep_report: None,
             frames: None,
             sidebar: sidebar_width(false),
             on_screen: true,
-            _subscriptions: [search_changed, keys, host_changed, job_settled],
+            _subscriptions: [search_changed, host_changed, job_settled],
         }
     }
 
@@ -382,6 +403,11 @@ impl LibraryView {
             .map(|entry| Card::of(entry, now))
             .collect();
         self.games = library.games;
+        if let Some(menu) = &self.card_menu
+            && !self.games.iter().any(|entry| entry.game.id == menu.game)
+        {
+            self.card_menu = None;
+        }
         self.recent = recent;
         self.load = Load::Ready;
         self.search.set_disabled(self.games.is_empty(), cx);
@@ -514,6 +540,52 @@ impl LibraryView {
             .update(cx, |host, cx| host.open(game, account, instant, cx));
     }
 
+    fn open_card_menu(
+        &mut self,
+        game: usize,
+        at: Point<Pixels>,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(entry) = self.games.get(game) else {
+            return;
+        };
+        self.menu = None;
+        self.card_menu = Some(CardMenu {
+            game: entry.game.id.clone(),
+            at,
+            viewport: window.viewport_size(),
+        });
+        cx.notify();
+    }
+
+    fn close_card_menu(&mut self, cx: &mut Context<Self>) {
+        if self.card_menu.take().is_some() {
+            cx.notify();
+        }
+    }
+
+    fn play_as(&mut self, cx: &mut Context<Self>) {
+        let Some(menu) = self.card_menu.take() else {
+            return;
+        };
+        cx.notify();
+        let Some(game) = self
+            .games
+            .iter()
+            .find(|entry| entry.game.id == menu.game)
+            .map(|entry| entry.game.clone())
+        else {
+            return;
+        };
+        let account = game
+            .last_launch
+            .as_ref()
+            .map(|last| last.account_id.clone());
+        self.host
+            .update(cx, |host, cx| host.open(game, account, false, cx));
+    }
+
     fn open_recent(&mut self, entry: usize, cx: &mut Context<Self>) {
         let Some(recent) = self.recent.get(entry) else {
             return;
@@ -623,6 +695,7 @@ impl LibraryView {
         self.on_screen = true;
         self.flash = None;
         self.menu = None;
+        self.card_menu = None;
         self.clear_search_and_filter(window, cx);
         if !matches!(self.load, Load::Pending) {
             self.reload(cx);
@@ -632,6 +705,7 @@ impl LibraryView {
     pub fn leave(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.on_screen = false;
         self.menu = None;
+        self.card_menu = None;
         self.over_trigger = None;
         self.let_go(cx);
         if self.typing(window, cx) {
@@ -644,7 +718,7 @@ impl LibraryView {
         cx.notify();
     }
 
-    fn on_keystroke(
+    pub fn on_keystroke(
         &mut self,
         keystroke: &Keystroke,
         window: &mut Window,
@@ -653,6 +727,20 @@ impl LibraryView {
         // A dialog over the Library has the keyboard to itself.
         if !self.on_screen || self.host.read(cx).is_modal() {
             return false;
+        }
+        if self.card_menu.is_some() {
+            let held = keystroke.modifiers;
+            if held.alt || held.platform {
+                return false;
+            }
+            // Down, Up, Home and End all land on the one item, which has the keyboard already.
+            match keystroke.key.as_str() {
+                "down" | "up" | "home" | "end" => {}
+                "enter" | "space" => self.play_as(cx),
+                "escape" | "tab" => self.close_card_menu(cx),
+                _ => return false,
+            }
+            return true;
         }
         if keystroke.key == "escape" && self.menu.is_some() {
             self.menu = None;
@@ -699,6 +787,7 @@ impl LibraryView {
     }
 
     fn toggle_menu(&mut self, which: Menu, cx: &mut Context<Self>) {
+        self.card_menu = None;
         let open = self.menu.as_ref().is_some_and(|menu| menu.which == which);
         self.menu = (!open).then(|| OpenMenu {
             which,
@@ -933,8 +1022,13 @@ impl LibraryView {
                     .bg(alpha(theme::BG, 0.8))
                     .opacity(0.)
                     .group_hover("card", |style| style.opacity(1.))
-                    // The card's menu is not built yet; a press here is not a press on Play.
-                    .on_click(|_, _, cx| cx.stop_propagation())
+                    .cursor_pointer()
+                    .hover(|style| style.text_color(color(theme::TEXT)))
+                    // A press here is not a press on Play.
+                    .on_click(cx.listener(move |this, click: &ClickEvent, window, cx| {
+                        cx.stop_propagation();
+                        this.open_card_menu(game, click.position(), window, cx);
+                    }))
                     .child(icon(assets::MORE, 16., theme::MUTED)),
             );
         let caption = div()
@@ -978,6 +1072,12 @@ impl LibraryView {
                     this.open_card(game, cx);
                 }
             }))
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(move |this, down: &MouseDownEvent, window, cx| {
+                    this.open_card_menu(game, down.position, window, cx);
+                }),
+            )
             .child(art)
             .child(caption)
     }
@@ -1333,6 +1433,10 @@ impl LibraryView {
                     .bg(color(theme::SURFACE))
                     .cursor_pointer()
                     .hover(|style| style.border_color(color(theme::BORDER_STRONG)))
+                    .tooltip(tip(format!(
+                        "Play {} as {}",
+                        recent.game_name, recent.account_name
+                    )))
                     .on_click(cx.listener(move |this, click: &ClickEvent, _, cx| {
                         if click.click_count() == 1 {
                             this.open_recent(entry, cx);
@@ -1471,6 +1575,77 @@ impl LibraryView {
         )
     }
 
+    fn render_card_menu(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+        let menu = self.card_menu.as_ref()?;
+        let game = &self
+            .games
+            .iter()
+            .find(|entry| entry.game.id == menu.game)?
+            .game;
+        let play_as = div()
+            .id("play-as")
+            .flex()
+            .items_center()
+            .gap(px(8.))
+            .px(px(12.))
+            .py(px(6.))
+            .cursor_pointer()
+            .text_color(color(theme::TEXT))
+            .bg(color(theme::SURFACE_3))
+            .on_click(cx.listener(|this, _, _, cx| this.play_as(cx)))
+            .child(icon(assets::ACCOUNTS, 16., theme::MUTED))
+            .child("Play as\u{2026}");
+        let card = div()
+            .id("card-menu")
+            .occlude()
+            .flex()
+            .flex_col()
+            .min_w(px(208.))
+            .max_w(px(320.))
+            .overflow_hidden()
+            .py(px(4.))
+            .rounded(px(8.))
+            .border_1()
+            .border_color(color(theme::BORDER))
+            .bg(color(theme::SURFACE_2))
+            .shadow(menu_shadow())
+            .on_mouse_down_out(cx.listener(|this, _, _, cx| this.close_card_menu(cx)))
+            .child(
+                div()
+                    .border_b_1()
+                    .border_color(alpha(theme::BORDER, 0.6))
+                    .px(px(12.))
+                    .py(px(6.))
+                    .child(
+                        div()
+                            .truncate()
+                            .text_size(px(12.))
+                            .line_height(px(16.))
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(color(theme::TEXT_STRONG))
+                            .child(game.name.clone()),
+                    )
+                    .child(
+                        div()
+                            .truncate()
+                            .text_size(px(11.))
+                            .line_height(px(15.))
+                            .text_color(color(theme::FAINT))
+                            .child(artwork_line(game)),
+                    ),
+            )
+            .child(play_as);
+        Some(
+            deferred(
+                anchored()
+                    .position(menu.at)
+                    .snap_to_window_with_margin(px(8.))
+                    .child(card),
+            )
+            .with_priority(1),
+        )
+    }
+
     fn render_thumb(&self, track: Track, cx: &mut Context<Self>) -> Option<Follow> {
         let length = track.thumb()?;
         let per_pixel = track.per_pixel(length);
@@ -1583,6 +1758,13 @@ impl LibraryView {
                         released.update(cx, |this, cx| this.let_go(cx)).ok();
                     }
                 });
+                // Any wheel closes the card's menu, as any scroll closes the Electron app's.
+                let wheeled = this.clone();
+                window.on_mouse_event(move |_: &ScrollEvent, phase, _, cx| {
+                    if phase == DispatchPhase::Capture {
+                        wheeled.update(cx, |this, cx| this.close_card_menu(cx)).ok();
+                    }
+                });
             },
         )
         .absolute()
@@ -1617,6 +1799,14 @@ impl Card {
 impl Render for LibraryView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let viewport = window.viewport_size();
+        // A resize of the window closes the card's menu, as in the Electron app.
+        if self
+            .card_menu
+            .as_ref()
+            .is_some_and(|menu| menu.viewport != viewport)
+        {
+            self.card_menu = None;
+        }
         let banner = self.host.read(cx).banner_height();
         let pane = (f32::from(viewport.height) - TITLE_BAR - banner - HEADER).max(0.);
         let recent = self.recent_shown();
@@ -1701,6 +1891,7 @@ impl Render for LibraryView {
             .child(self.render_header(window, cx))
             .child(body)
             .child(self.render_grab(cx))
+            .children(self.render_card_menu(cx))
     }
 }
 
@@ -1752,6 +1943,44 @@ fn empty_state(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn game(artwork: Option<ArtworkSource>, error: Option<&str>) -> Game {
+        Game {
+            id: "g".to_owned(),
+            launcher: LauncherId::Steam,
+            launcher_game_id: "1".to_owned(),
+            name: "Game".to_owned(),
+            install_path: None,
+            installed: true,
+            last_seen_at: String::new(),
+            needs_update: false,
+            last_played_at: None,
+            artwork: artwork.map(|source| ol_model::GameArtwork {
+                source,
+                grid: None,
+                hero: None,
+                logo: None,
+                fetched_at: None,
+            }),
+            artwork_error: error.map(str::to_owned),
+            last_launch: None,
+        }
+    }
+
+    #[test]
+    fn the_card_menu_names_where_the_artwork_came_from_or_why_there_is_none() {
+        let named = [
+            (ArtworkSource::SteamCdn, "Artwork: Steam"),
+            (ArtworkSource::SteamGridDb, "Artwork: SteamGridDB"),
+            (ArtworkSource::Manual, "Artwork: your image"),
+            (ArtworkSource::Launcher, "Artwork: the game's own icon"),
+        ];
+        for (source, line) in named {
+            assert_eq!(artwork_line(&game(Some(source), Some("missed"))), line);
+        }
+        assert_eq!(artwork_line(&game(None, Some("Not found"))), "Not found");
+        assert_eq!(artwork_line(&game(None, None)), "No artwork yet");
+    }
 
     const NARROWEST: usize = 960;
     const FOLDED: bool = false;

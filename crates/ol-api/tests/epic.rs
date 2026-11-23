@@ -8,6 +8,7 @@ use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, Mutex};
 
 use futures_lite::future::block_on;
+use ol_api::accounts::AccountPatch;
 use ol_api::launchers::{
     BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, Launchers, NewAccount, Secret,
     SteamTiming,
@@ -590,6 +591,28 @@ fn a_running_launcher_is_closed_by_its_window_once_the_user_has_said_yes() {
             .session
             .is_some()
     );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn an_edit_after_the_dialog_s_check_makes_the_start_check_again() {
+    let knobs = json!({ "knobs": { "epic": { "runningAs": account_id_of(ALT) } } });
+    let fakes = fakes(Some(&knobs));
+    let (alt, game) = (fakes.account(ALT), fakes.game());
+    let preflight = block_on(fakes.backend.launch_preflight(&alt.id, Some(&game.id))).unwrap();
+    assert!(preflight.already_active);
+
+    block_on(fakes.backend.update_account(
+        &alt.id,
+        AccountPatch {
+            launcher_uid: Some(Some("f".repeat(32))),
+            ..AccountPatch::default()
+        },
+    ))
+    .unwrap();
+    let refused = fakes.play_with(ALT, false).err().expect("a refusal");
+    assert_eq!(refused.code, "CONFIRM_REQUIRED");
+    assert!(asked_of_the_machine(&fakes).is_empty());
     fakes.backend.shut_down();
 }
 

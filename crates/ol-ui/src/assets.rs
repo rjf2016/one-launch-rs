@@ -47,6 +47,8 @@ pub const MINIMIZE: &str = "icons/minimize.svg";
 pub const MAXIMIZE: &str = "icons/maximize.svg";
 pub const RESTORE: &str = "icons/restore.svg";
 pub const CLOSE: &str = "icons/close.svg";
+pub const DOWNLOAD: &str = "icons/download.svg";
+pub const LIST_CHECKS: &str = "icons/list-checks.svg";
 
 macro_rules! oracle_icon {
     ($file:literal) => {
@@ -107,6 +109,8 @@ const FILES: &[(&str, &[u8])] = &[
     (NOTE, oracle_icon!("lucide/StickyNote.svg")),
     (EYE, oracle_icon!("lucide/Eye.svg")),
     (PERSON, oracle_icon!("lucide/UserRound.svg")),
+    (DOWNLOAD, oracle_icon!("lucide/Download.svg")),
+    (LIST_CHECKS, oracle_icon!("lucide/ListChecks.svg")),
     (MINIMIZE, caption_icon!(r#"<path d="M0 5.5h10"/>"#)),
     (
         MAXIMIZE,

@@ -9,11 +9,17 @@ use std::time::Duration;
 use gpui::prelude::*;
 use gpui::{
     Context, Div, EventEmitter, Keystroke, Pixels, ScrollHandle, SharedString, Size, Stateful,
-    Subscription, Task, Window, anchored, deferred, div, point, px,
+    Task, Window, anchored, deferred, div, point, px,
 };
 use ol_api::launch::in_pick_order;
 use ol_api::{ApiError, Backend, StartLaunch};
-use ol_model::{Account, Game, JobState, LaunchJob, LaunchPreflight, SettingKey, SwitchRecovery};
+use ol_model::{
+    Account, Game, JobState, LaunchJob, LaunchPreflight, LauncherId, SettingKey, SwitchRecovery,
+};
+
+use crate::shell::{Go, Route};
+
+pub(crate) use dialog::{generated_at, plan_view};
 
 const TITLE_BAR: f32 = 36.;
 // Its button, the room above and below it, and the line under it.
@@ -32,7 +38,6 @@ pub struct LaunchHost {
     dismissal: Option<(String, Task<()>)>,
     blurred: bool,
     body: ScrollHandle,
-    _keys: Subscription,
 }
 
 // Sent when the job that was followed is no longer running: what the Library shows has changed.
@@ -40,15 +45,18 @@ pub struct JobSettled;
 
 impl EventEmitter<JobSettled> for LaunchHost {}
 
+impl EventEmitter<Go> for LaunchHost {}
+
 // The job the app follows, with the game it was started for.
 struct Active {
     job: LaunchJob,
-    game: Game,
+    game: Option<Game>,
 }
 
 struct Request {
     key: u64,
-    game: Game,
+    game: Option<Game>,
+    launcher: LauncherId,
     wanted: Option<String>,
     // A one-click Play: nothing is drawn until something needs the user.
     silent: bool,
@@ -61,6 +69,8 @@ struct Request {
     note: Option<SharedString>,
     steps_open: bool,
     plan_open: bool,
+    // Try again goes back to what was asked, not to the running job the dialog shows instead.
+    asked_for: Option<(Option<Game>, LauncherId)>,
 }
 
 enum Accounts {
@@ -117,15 +127,6 @@ impl Request {
 
 impl LaunchHost {
     pub fn new(backend: Backend, cx: &mut Context<Self>) -> Self {
-        let this = cx.weak_entity();
-        let keys = cx.intercept_keystrokes(move |event, _, cx| {
-            let taken = this
-                .update(cx, |this, cx| this.on_keystroke(&event.keystroke, cx))
-                .unwrap_or(false);
-            if taken {
-                cx.stop_propagation();
-            }
-        });
         cx.spawn({
             let backend = backend.clone();
             async move |this, cx| {
@@ -157,7 +158,6 @@ impl LaunchHost {
             dismissal: None,
             blurred: false,
             body: ScrollHandle::new(),
-            _keys: keys,
         }
     }
 
@@ -172,7 +172,8 @@ impl LaunchHost {
         self.request
             .as_ref()
             .filter(|request| request.silent)
-            .map(|request| request.game.id.as_str())
+            .and_then(|request| request.game.as_ref())
+            .map(|game| game.id.as_str())
     }
 
     // The room the banner takes above the views.
@@ -212,6 +213,22 @@ impl LaunchHost {
         instant: bool,
         cx: &mut Context<Self>,
     ) {
+        let launcher = game.launcher;
+        self.open_for(Some(game), launcher, account, instant, cx);
+    }
+
+    pub fn open_switch(&mut self, launcher: LauncherId, account: String, cx: &mut Context<Self>) {
+        self.open_for(None, launcher, Some(account), false, cx);
+    }
+
+    fn open_for(
+        &mut self,
+        game: Option<Game>,
+        launcher: LauncherId,
+        account: Option<String>,
+        instant: bool,
+        cx: &mut Context<Self>,
+    ) {
         // The start under way reports to the request that asked for it.
         if self
             .request
@@ -224,6 +241,7 @@ impl LaunchHost {
         let mut request = Request {
             key: self.serial,
             game,
+            launcher,
             wanted: account,
             silent: instant,
             asked: false,
@@ -235,14 +253,26 @@ impl LaunchHost {
             note: None,
             steps_open: false,
             plan_open: false,
+            asked_for: None,
         };
-        // A running job is always the one shown, under its own game's name; a finished one only when it was for this game and the user asked to see it.
+        // A running job is always the one shown, under its own game's name; a finished one only when it was for this game, or a plain switch to this account, and the user asked to see it.
         let follows = match &self.active {
             Some(active) if active.job.state == JobState::Running => {
-                request.game = active.game.clone();
+                let asked = (
+                    std::mem::replace(&mut request.game, active.game.clone()),
+                    std::mem::replace(&mut request.launcher, active.job.launcher),
+                );
+                request.asked_for = Some(asked);
                 true
             }
-            Some(active) => !instant && active.game.id == request.game.id,
+            Some(active) => {
+                !instant
+                    && match (&active.game, &request.game) {
+                        (Some(played), Some(asked)) => played.id == asked.id,
+                        (None, None) => request.wanted.as_deref() == Some(&*active.job.account.id),
+                        _ => false,
+                    }
+            }
             None => false,
         };
         if follows {
@@ -251,9 +281,8 @@ impl LaunchHost {
         } else {
             self.active = None;
         }
-        if self.backend.can_reach(request.game.launcher) {
-            let (key, launcher, backend) =
-                (request.key, request.game.launcher, self.backend.clone());
+        if self.backend.can_reach(request.launcher) {
+            let (key, launcher, backend) = (request.key, request.launcher, self.backend.clone());
             cx.spawn(async move |this, cx| {
                 let accounts = backend.accounts().await.map(|accounts| {
                     in_pick_order(
@@ -323,13 +352,19 @@ impl LaunchHost {
         let Some(request) = &mut self.request else {
             return;
         };
-        let Some(account_id) = request.selected.clone() else {
+        if request.starting || !matches!(request.stage, Stage::Pick | Stage::Preview(_)) {
+            return;
+        }
+        let Some(account_id) = request.account().map(|account| account.id.clone()) else {
             return;
         };
         request.stage = Stage::Checking;
-        let (key, game_id, backend) = (request.key, request.game.id.clone(), self.backend.clone());
+        let game_id = request.game.as_ref().map(|game| game.id.clone());
+        let (key, backend) = (request.key, self.backend.clone());
         cx.spawn(async move |this, cx| {
-            let preflight = backend.launch_preflight(&account_id, Some(&game_id)).await;
+            let preflight = backend
+                .launch_preflight(&account_id, game_id.as_deref())
+                .await;
             this.update(cx, |this, cx| this.checked(key, preflight, cx))
                 .ok();
         })
@@ -346,6 +381,9 @@ impl LaunchHost {
         let Some(request) = self.request_mut(key) else {
             return;
         };
+        if !matches!(request.stage, Stage::Checking) {
+            return;
+        }
         request.stage = match preflight {
             Err(error) => Stage::Error(error.message.into()),
             Ok(preflight) if preflight.blocked.is_some() => Stage::Blocked(Box::new(preflight)),
@@ -374,16 +412,20 @@ impl LaunchHost {
         request.starting = true;
         let (key, game, backend) = (request.key, request.game.clone(), self.backend.clone());
         cx.spawn(async move |this, cx| {
+            let game_id = game.as_ref().map(|game| game.id.clone());
             let start = StartLaunch {
                 account_id: account_id.clone(),
-                game_id: Some(game.id.clone()),
+                game_id: game_id.clone(),
                 confirm_close,
             };
             let outcome = match backend.start_launch(start).await {
                 Ok(job) => Ok(job),
                 // The launcher came up between the check and the start: ask, rather than stop at a refusal.
                 Err(refused) if refused.code == "CONFIRM_REQUIRED" => Err(
-                    match backend.launch_preflight(&account_id, Some(&game.id)).await {
+                    match backend
+                        .launch_preflight(&account_id, game_id.as_deref())
+                        .await
+                    {
                         Ok(preflight) => Stage::Confirm(Box::new(preflight)),
                         Err(error) => Stage::Error(error.message.into()),
                     },
@@ -400,7 +442,7 @@ impl LaunchHost {
     fn started(
         &mut self,
         key: u64,
-        game: Game,
+        game: Option<Game>,
         outcome: Result<LaunchJob, Stage>,
         cx: &mut Context<Self>,
     ) {
@@ -526,7 +568,17 @@ impl LaunchHost {
 
     fn try_again(&mut self, cx: &mut Context<Self>) {
         self.active = None;
-        self.back_to_pick(cx);
+        let asked = self.request.as_mut().and_then(|request| {
+            let (game, launcher) = request.asked_for.take()?;
+            Some((game, launcher, request.wanted.clone()))
+        });
+        match asked {
+            Some((game, launcher, wanted)) => {
+                self.request = None;
+                self.open_for(game, launcher, wanted, false, cx);
+            }
+            None => self.back_to_pick(cx),
+        }
     }
 
     fn close(&mut self, cx: &mut Context<Self>) {
@@ -548,9 +600,30 @@ impl LaunchHost {
 
     fn show_job(&mut self, cx: &mut Context<Self>) {
         if let Some(active) = &self.active {
-            let (game, account) = (active.game.clone(), active.job.account.id.clone());
-            self.open(game, Some(account), false, cx);
+            let (game, launcher, account) = (
+                active.game.clone(),
+                active.job.launcher,
+                active.job.account.id.clone(),
+            );
+            self.open_for(game, launcher, Some(account), false, cx);
         }
+    }
+
+    fn go_to_accounts(&mut self, cx: &mut Context<Self>) {
+        let Some(request) = self.request.take_if(|request| request.empty()) else {
+            return;
+        };
+        let route = if can_import(request.launcher) {
+            Route::Import(request.launcher)
+        } else {
+            Route::NewAccount(request.launcher)
+        };
+        self.changed(cx);
+        cx.emit(Go {
+            route,
+            guarded: true,
+            return_to: request.game,
+        });
     }
 
     fn forget_job(&mut self, cx: &mut Context<Self>) {
@@ -650,7 +723,7 @@ impl LaunchHost {
     }
 
     // True when the key is a dialog's: nothing behind the dialog hears it.
-    fn on_keystroke(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
+    pub fn on_keystroke(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
         let held = keystroke.modifiers;
         // The window's own keys, Alt+F4 among them, reach Windows only when nothing stops them.
         if !self.is_modal() || held.alt || held.platform {
@@ -682,7 +755,7 @@ impl LaunchHost {
             return;
         };
         match request.stage {
-            Stage::Pick if request.empty() => self.close(cx),
+            Stage::Pick if request.empty() => self.go_to_accounts(cx),
             Stage::Pick => self.check(cx),
             Stage::Blocked(_) => self.back_to_pick(cx),
             Stage::Job if !self.job_running() => self.finish(cx),
@@ -690,6 +763,11 @@ impl LaunchHost {
             _ => {}
         }
     }
+}
+
+// Epic and the Riot Client keep no account list, as in the Electron app.
+pub(crate) fn can_import(launcher: LauncherId) -> bool {
+    matches!(launcher, LauncherId::Steam | LauncherId::Battlenet)
 }
 
 pub(crate) fn overlay(

@@ -166,12 +166,14 @@ pub async fn run(
     Ok(())
 }
 
-// A step of --capture-keys, or several joined by & and taken in one go: a key press; text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
+// A step of --capture-keys, or several joined by & and taken in one go: a key press; text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked with the left or the right button, given the second click of a double-click, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
 enum Step {
     Key(Keystroke),
     Type(String),
     Move(Point<Pixels>),
     Click(Point<Pixels>),
+    RightClick(Point<Pixels>),
+    SecondClick(Point<Pixels>),
     Back(Point<Pixels>),
     Together(Vec<Step>),
     Wheel(Point<Pixels>, Point<f32>, Modifiers),
@@ -227,6 +229,8 @@ impl Step {
             "type" => (!rest.is_empty()).then(|| Self::Type(rest.replace("%2C", ","))),
             "move" => spot(rest).map(Self::Move),
             "click" => spot(rest).map(Self::Click),
+            "right-click" => spot(rest).map(Self::RightClick),
+            "second-click" => spot(rest).map(Self::SecondClick),
             "back" => spot(rest).map(Self::Back),
             "wheel" | "shift-wheel" => rest.split_once(':').and_then(|(at, lines)| {
                 let lines = lines
@@ -277,7 +281,9 @@ impl Step {
             let form = match kind {
                 "wait" => "wait:<milliseconds up to 60000>",
                 "type" => "type:<text>",
-                "move" | "click" | "back" => "move:<x>x<y>, click:<x>x<y> or back:<x>x<y>",
+                "move" | "click" | "right-click" | "second-click" | "back" => {
+                    "move:<x>x<y>, click:<x>x<y>, right-click:<x>x<y>, second-click:<x>x<y> or back:<x>x<y>"
+                }
                 "wheel" | "shift-wheel" => "wheel:<x>x<y>:<lines, minus is down>",
                 "drag" => "drag:<x>x<y>:<x>x<y>",
                 "size" => "size:<width>x<height>",
@@ -297,11 +303,22 @@ impl Step {
     fn at_once(&self) -> bool {
         matches!(
             self,
-            Self::Key(_) | Self::Move(_) | Self::Click(_) | Self::Back(_) | Self::Wheel(..)
+            Self::Key(_)
+                | Self::Move(_)
+                | Self::Click(_)
+                | Self::RightClick(_)
+                | Self::SecondClick(_)
+                | Self::Back(_)
+                | Self::Wheel(..)
         )
     }
 
     fn take(self, window: &mut Window, cx: &mut App) {
+        let clicks = if matches!(self, Self::SecondClick(_)) {
+            2
+        } else {
+            1
+        };
         let (position, button) = match self {
             Self::Together(steps) => {
                 for step in steps {
@@ -315,6 +332,8 @@ impl Step {
             }
             Self::Move(position) => (position, None),
             Self::Click(position) => (position, Some(MouseButton::Left)),
+            Self::RightClick(position) => (position, Some(MouseButton::Right)),
+            Self::SecondClick(position) => (position, Some(MouseButton::Left)),
             Self::Back(position) => (
                 position,
                 Some(MouseButton::Navigate(NavigationDirection::Back)),
@@ -365,7 +384,7 @@ impl Step {
                 button,
                 position,
                 modifiers,
-                click_count: 1,
+                click_count: clicks,
                 first_mouse: false,
             }),
             cx,
@@ -375,7 +394,7 @@ impl Step {
                 button,
                 position,
                 modifiers,
-                click_count: 1,
+                click_count: clicks,
             }),
             cx,
         );
@@ -590,6 +609,14 @@ mod tests {
         assert_eq!((lines, held.shift), (point(2., 0.), true));
         assert!(matches!(Step::parse("drag:1x2:3x4"), Ok(Step::Drag(..))));
         assert!(matches!(Step::parse("back:5x6"), Ok(Step::Back(_))));
+        assert!(matches!(
+            Step::parse("right-click:5x6"),
+            Ok(Step::RightClick(_))
+        ));
+        assert!(matches!(
+            Step::parse("second-click:5x6"),
+            Ok(Step::SecondClick(_))
+        ));
         assert!(matches!(
             Step::parse("click:1x2&escape"),
             Ok(Step::Together(steps)) if steps.len() == 2
