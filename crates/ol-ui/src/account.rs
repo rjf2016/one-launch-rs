@@ -640,13 +640,12 @@ impl AccountPage {
         .detach();
     }
 
-    fn stops(&self) -> Vec<Stop<'_>> {
-        let mut stops = vec![
-            Stop::Line(&self.name),
-            Stop::Line(&self.login),
-            Stop::Line(&self.tag_field),
-            Stop::Lines(&self.notes),
-        ];
+    fn stops(&self, cx: &App) -> Vec<Stop<'_>> {
+        let mut stops = vec![Stop::Line(&self.name), Stop::Line(&self.login)];
+        if !self.tag_field.is_disabled(cx) {
+            stops.push(Stop::Line(&self.tag_field));
+        }
+        stops.push(Stop::Lines(&self.notes));
         stops.extend(self.password.as_ref().map(Stop::Line));
         if self.advanced {
             stops.push(Stop::Line(&self.uid));
@@ -683,7 +682,7 @@ impl AccountPage {
                 true
             }
             "tab" => {
-                let stops = self.stops();
+                let stops = self.stops(cx);
                 let Some(at) = stops.iter().position(|stop| stop.is_focused(window, cx)) else {
                     return false;
                 };
