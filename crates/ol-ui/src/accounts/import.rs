@@ -157,7 +157,7 @@ impl AccountsView {
     }
 
     fn toggle(&mut self, index: usize, cx: &mut Context<Self>) {
-        let Some(import) = self.import.as_mut() else {
+        let Some(import) = self.import.as_mut().filter(|import| !import.busy) else {
             return;
         };
         let Some(entry) = import.entries().get(index) else {
@@ -268,6 +268,7 @@ impl AccountsView {
 
     // Allowed while an import runs, as in the Electron app.
     fn close_import(&mut self, cx: &mut Context<Self>) {
+        self.return_to = None;
         if self.import.take().is_some() {
             cx.notify();
         }
