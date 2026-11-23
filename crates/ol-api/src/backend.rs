@@ -787,16 +787,21 @@ impl Serving {
                 store.and_then(|store| {
                     self.require_idle()?;
                     let account = accounts::require(store, &account_id)?;
-                    self.with_adapter(store, account.launcher, |_, _, adapter| {
-                        Ok(capture::capture(store, adapter, &account)?)
-                    })
+                    let captured =
+                        self.with_adapter(store, account.launcher, |_, _, adapter| {
+                            Ok(capture::capture(store, adapter, &account)?)
+                        })?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(captured)
                 }),
             ),
             Command::ForgetSession(account_id, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(capture::forget(store, &account_id)?)
+                    capture::forget(store, &account_id)?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(())
                 }),
             ),
             Command::UseClipboard(service) => {
