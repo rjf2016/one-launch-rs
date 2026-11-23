@@ -5,7 +5,14 @@ mod backend;
 pub use backend::{ApiError, Backend, JobObserver, Library, SavedSignIn, StartLaunch};
 
 pub mod library {
-    pub use ol_services::library::{LibraryGame, caption, monogram, relative, visible};
+    pub use ol_services::library::{
+        HourClock, LibraryGame, caption, date_time, monogram, relative, visible,
+    };
+}
+
+pub mod accounts {
+    pub use ol_services::accounts::{AccountPatch, NewAccount};
+    pub use ol_vault::Secret;
 }
 
 // What the launch dialog, its banner and the recovery dialog say about a switch.

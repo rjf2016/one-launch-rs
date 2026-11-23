@@ -3,8 +3,8 @@ use std::time::{Duration, Instant};
 use anyhow::Context as _;
 use gpui::{
     AnyWindowHandle, App, AsyncApp, Keystroke, Modifiers, MouseButton, MouseDownEvent,
-    MouseMoveEvent, MouseUpEvent, Pixels, PlatformInput, Point, ScrollDelta, ScrollEvent,
-    ScrollSource, TouchPhase, Window, WindowHandle, point, px,
+    MouseMoveEvent, MouseUpEvent, NavigationDirection, Pixels, PlatformInput, Point, ScrollDelta,
+    ScrollEvent, ScrollSource, TouchPhase, Window, WindowHandle, point, px,
 };
 use ol_platform_win::own_process;
 use ol_platform_win::probe::{self, OuterRect};
@@ -96,6 +96,11 @@ pub async fn run(
                 pause(STEP, cx).await;
                 continue;
             }
+            Step::Type(text) => {
+                native.post_text(&text);
+                pause(STEP, cx).await;
+                continue;
+            }
             Step::LogFrames => {
                 in_library(window, cx, |library, _, _| library.log_frames())?;
                 kept.clear();
@@ -161,11 +166,14 @@ pub async fn run(
     Ok(())
 }
 
-// A step of --capture-keys: a key press; the pointer at a place of the client area, moved there, clicked, dragged from there or turning the wheel there, with Shift held as Windows reports it; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
+// A step of --capture-keys, or several joined by & and taken in one go: a key press; text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
 enum Step {
     Key(Keystroke),
+    Type(String),
     Move(Point<Pixels>),
     Click(Point<Pixels>),
+    Back(Point<Pixels>),
+    Together(Vec<Step>),
     Wheel(Point<Pixels>, Point<f32>, Modifiers),
     Drag(Point<Pixels>, Point<Pixels>),
     Wait(Duration),
@@ -181,6 +189,21 @@ enum Step {
 
 impl Step {
     fn parse(text: &str) -> anyhow::Result<Self> {
+        if let Some(typed) = text.strip_prefix("type:").filter(|typed| !typed.is_empty()) {
+            return Ok(Self::Type(typed.replace("%2C", ",")));
+        }
+        if text.contains('&') {
+            let steps = text
+                .split('&')
+                .map(Self::parse)
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            if steps.iter().any(|step| !step.at_once()) {
+                anyhow::bail!(
+                    "{text}: only keys, clicks, moves, the wheel and Back go together with &"
+                );
+            }
+            return Ok(Self::Together(steps));
+        }
         let Some((kind, rest)) = text.split_once(':') else {
             return Self::key(text);
         };
@@ -201,8 +224,10 @@ impl Step {
                 .ok()
                 .filter(|milliseconds| *milliseconds <= LONGEST_WAIT)
                 .map(|milliseconds| Self::Wait(Duration::from_millis(milliseconds))),
+            "type" => (!rest.is_empty()).then(|| Self::Type(rest.replace("%2C", ","))),
             "move" => spot(rest).map(Self::Move),
             "click" => spot(rest).map(Self::Click),
+            "back" => spot(rest).map(Self::Back),
             "wheel" | "shift-wheel" => rest.split_once(':').and_then(|(at, lines)| {
                 let lines = lines
                     .parse::<f32>()
@@ -251,7 +276,8 @@ impl Step {
         step.with_context(|| {
             let form = match kind {
                 "wait" => "wait:<milliseconds up to 60000>",
-                "move" | "click" => "move:<x>x<y> or click:<x>x<y>",
+                "type" => "type:<text>",
+                "move" | "click" | "back" => "move:<x>x<y>, click:<x>x<y> or back:<x>x<y>",
                 "wheel" | "shift-wheel" => "wheel:<x>x<y>:<lines, minus is down>",
                 "drag" => "drag:<x>x<y>:<x>x<y>",
                 "size" => "size:<width>x<height>",
@@ -268,14 +294,31 @@ impl Step {
             .with_context(|| format!("{text} is not a keystroke"))
     }
 
+    fn at_once(&self) -> bool {
+        matches!(
+            self,
+            Self::Key(_) | Self::Move(_) | Self::Click(_) | Self::Back(_) | Self::Wheel(..)
+        )
+    }
+
     fn take(self, window: &mut Window, cx: &mut App) {
-        let (position, click) = match self {
+        let (position, button) = match self {
+            Self::Together(steps) => {
+                for step in steps {
+                    step.take(window, cx);
+                }
+                return;
+            }
             Self::Key(keystroke) => {
                 window.dispatch_keystroke(keystroke, cx);
                 return;
             }
-            Self::Move(position) => (position, false),
-            Self::Click(position) => (position, true),
+            Self::Move(position) => (position, None),
+            Self::Click(position) => (position, Some(MouseButton::Left)),
+            Self::Back(position) => (
+                position,
+                Some(MouseButton::Navigate(NavigationDirection::Back)),
+            ),
             Self::Wheel(position, lines, modifiers) => {
                 window.dispatch_event(
                     PlatformInput::MouseMove(MouseMoveEvent {
@@ -298,6 +341,7 @@ impl Step {
                 return;
             }
             Self::Drag(..)
+            | Self::Type(_)
             | Self::Wait(_)
             | Self::Size(_)
             | Self::Resize { .. }
@@ -313,12 +357,12 @@ impl Step {
             }),
             cx,
         );
-        if !click {
+        let Some(button) = button else {
             return;
-        }
+        };
         window.dispatch_event(
             PlatformInput::MouseDown(MouseDownEvent {
-                button: MouseButton::Left,
+                button,
                 position,
                 modifiers,
                 click_count: 1,
@@ -328,7 +372,7 @@ impl Step {
         );
         window.dispatch_event(
             PlatformInput::MouseUp(MouseUpEvent {
-                button: MouseButton::Left,
+                button,
                 position,
                 modifiers,
                 click_count: 1,
@@ -545,6 +589,19 @@ mod tests {
         };
         assert_eq!((lines, held.shift), (point(2., 0.), true));
         assert!(matches!(Step::parse("drag:1x2:3x4"), Ok(Step::Drag(..))));
+        assert!(matches!(Step::parse("back:5x6"), Ok(Step::Back(_))));
+        assert!(matches!(
+            Step::parse("click:1x2&escape"),
+            Ok(Step::Together(steps)) if steps.len() == 2
+        ));
+        let Ok(Step::Type(text)) = Step::parse("type:gold%2C smurf") else {
+            panic!("a step that types");
+        };
+        assert_eq!(text, "gold, smurf");
+        let Ok(Step::Type(text)) = Step::parse("type:R&D") else {
+            panic!("a step that types an ampersand");
+        };
+        assert_eq!(text, "R&D");
         assert!(matches!(Step::parse("frames:log"), Ok(Step::LogFrames)));
         assert!(matches!(Step::parse("frames:print"), Ok(Step::PrintFrames)));
         assert!(matches!(
@@ -569,6 +626,9 @@ mod tests {
             "resize:1600x1150:1000x1150:0",
             "resize:1600x1150:1000x1150:5000",
             "wait:61000",
+            "type:",
+            "click:1x2&wait:5",
+            "back:5",
             "frames:all",
         ] {
             assert!(Step::parse(refused).is_err(), "{refused}");

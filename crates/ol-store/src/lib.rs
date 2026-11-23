@@ -18,7 +18,7 @@ use time::OffsetDateTime;
 use time::macros::format_description;
 
 pub use error::StoreError;
-pub use launchers::{GameSync, NewAccount};
+pub use launchers::{AccountUpdate, GameSync, NewAccount};
 pub use open::{MigrationReport, Snapshot};
 pub use read::{Ciphertexts, RowCounts};
 pub use sessions::NewSession;
@@ -45,4 +45,8 @@ pub fn iso_timestamp(at: OffsetDateTime) -> String {
     at.to_offset(time::UtcOffset::UTC)
         .format(format)
         .expect("a date formats with a fixed description")
+}
+
+pub fn iso_now() -> String {
+    iso_timestamp(OffsetDateTime::now_utc())
 }

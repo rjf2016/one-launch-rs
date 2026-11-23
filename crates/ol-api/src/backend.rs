@@ -4,11 +4,12 @@ use std::thread::{self, JoinHandle};
 
 use async_channel::{Receiver, Sender, WeakSender};
 use ol_model::{
-    Account, BackupSnapshot, InstalledGame, LaunchJob, LaunchPreflight, LauncherId,
+    Account, BackupSnapshot, Ciphertext, InstalledGame, LaunchJob, LaunchPreflight, LauncherId,
     LauncherSession, LauncherSessionState, LibraryScanResult, LibrarySort, RecentLaunch,
     RememberedAccount, RestoreResult, SettingKey, Sidebar, SwitchPlan, SwitchRecovery,
 };
-use ol_services::accounts::{self, AccountError, NewAccount};
+use ol_platform_api::DataProtector;
+use ol_services::accounts::{self, AccountError, AccountPatch, NewAccount};
 use ol_services::data_folder::{self, OpenError};
 use ol_services::journal::Recovery;
 use ol_services::launch::{self, FinishedJob, JobBoard, LastPreflight, StartInput};
@@ -19,16 +20,24 @@ use ol_services::library::{self, LibraryGame};
 use ol_services::sessions::{StoreThread, StoreWork};
 use ol_services::switch;
 use ol_store::{Store, StoreError};
+use ol_vault::{OsCryptVault, Secret, Vault, VaultError};
 use thiserror::Error;
 
 const RECENT_LAUNCHES_MOST: u32 = 50;
 
 // What the Electron app sends across to its page for a failure: a code to act on and a sentence to show.
-#[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[derive(Clone, PartialEq, Eq, Error)]
 #[error("{message}")]
 pub struct ApiError {
     pub code: &'static str,
     pub message: String,
+}
+
+// The message can name an account, as a refused duplicate does, so only the code is printed.
+impl std::fmt::Debug for ApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ApiError({})", self.code)
+    }
 }
 
 impl ApiError {
@@ -111,6 +120,11 @@ enum Command {
     BackUpDatabase(Reply<()>),
     SetSetting(SettingKey, String, Reply<()>),
     CreateAccount(Box<NewAccount>, Reply<Account>),
+    Account(String, Reply<Account>),
+    UpdateAccount(String, Box<AccountPatch>, Reply<Account>),
+    DeleteAccount(String, Reply<()>),
+    SetAccountPassword(String, Secret, Reply<Account>),
+    ClearAccountPassword(String, Reply<Account>),
     Rescan(Reply<Vec<LibraryScanResult>>),
     InstalledGames(LauncherId, Reply<Vec<InstalledGame>>),
     RememberedAccounts(LauncherId, Reply<Vec<RememberedAccount>>),
@@ -147,6 +161,26 @@ impl StoreThread for DatabaseThread {
 
 type Thread = Arc<Mutex<Option<JoinHandle<()>>>>;
 
+type SharedVault = Arc<dyn Vault + Send + Sync>;
+
+enum VaultSource {
+    None,
+    Launchers,
+    DataFolder(Box<dyn DataProtector + Send>),
+}
+
+struct NoVault;
+
+impl Vault for NoVault {
+    fn encrypt(&self, _: &Secret) -> Result<Ciphertext, VaultError> {
+        Err(VaultError::Unavailable)
+    }
+
+    fn decrypt(&self, _: &Ciphertext) -> Result<Secret, VaultError> {
+        Err(VaultError::Unavailable)
+    }
+}
+
 // The database lives on one thread of its own. A handle only sends that thread a request and waits for the answer, so it can be held and cloned anywhere. A switch waits for a launcher on a second thread, which has no database: what it needs of the accounts and their saved sign-ins it asks of the first.
 #[derive(Clone)]
 pub struct Backend {
@@ -167,7 +201,22 @@ fn take(thread: &Thread) -> Option<JoinHandle<()>> {
 impl Backend {
     // Returns at once: the folder is made and the database opened on the new thread, and a failure there is the answer to every request. Without launchers nothing can be scanned, switched or started.
     pub fn start(data_dir: PathBuf, version: &str) -> Self {
-        Self::start_on(data_dir, version, None, None)
+        Self::start_on(data_dir, version, None, VaultSource::None, None)
+    }
+
+    // A key that does not unwrap is never replaced: it may be another Windows user's, and what it sealed would be lost with it.
+    pub fn start_with_vault_of_data_folder(
+        data_dir: PathBuf,
+        version: &str,
+        protector: Box<dyn DataProtector + Send>,
+    ) -> Self {
+        Self::start_on(
+            data_dir,
+            version,
+            None,
+            VaultSource::DataFolder(protector),
+            None,
+        )
     }
 
     // As `start`, on the machine `launchers` describes. `on_job` hears every change of a launch job.
@@ -177,13 +226,20 @@ impl Backend {
         launchers: Launchers,
         on_job: Option<JobObserver>,
     ) -> Self {
-        Self::start_on(data_dir, version, Some(launchers), on_job)
+        Self::start_on(
+            data_dir,
+            version,
+            Some(launchers),
+            VaultSource::Launchers,
+            on_job,
+        )
     }
 
     fn start_on(
         data_dir: PathBuf,
         version: &str,
         launchers: Option<Launchers>,
+        vault: VaultSource,
         on_job: Option<JobObserver>,
     ) -> Self {
         let (commands, requests) = async_channel::unbounded();
@@ -194,6 +250,7 @@ impl Backend {
         let serving = Serving {
             data_dir,
             launchers,
+            vault: None,
             jobs: jobs.clone(),
             on_job: on_job.unwrap_or_else(|| Arc::new(|_| {})),
             commands: commands.downgrade(),
@@ -203,7 +260,7 @@ impl Backend {
         };
         let thread = thread::Builder::new()
             .name("backend".to_owned())
-            .spawn(move || serving.serve(&version, &requests))
+            .spawn(move || serving.serve(&version, vault, &requests))
             .ok();
         Self {
             commands,
@@ -252,6 +309,38 @@ impl Backend {
     // Makes an account. Its password, when it has one, is encrypted before the database is touched.
     pub async fn create_account(&self, account: NewAccount) -> Result<Account, ApiError> {
         self.ask(|reply| Command::CreateAccount(Box::new(account), reply))
+            .await
+    }
+
+    pub async fn account(&self, id: &str) -> Result<Account, ApiError> {
+        let id = id.to_owned();
+        self.ask(|reply| Command::Account(id, reply)).await
+    }
+
+    pub async fn update_account(&self, id: &str, patch: AccountPatch) -> Result<Account, ApiError> {
+        let id = id.to_owned();
+        self.ask(|reply| Command::UpdateAccount(id, Box::new(patch), reply))
+            .await
+    }
+
+    pub async fn delete_account(&self, id: &str) -> Result<(), ApiError> {
+        let id = id.to_owned();
+        self.ask(|reply| Command::DeleteAccount(id, reply)).await
+    }
+
+    pub async fn set_account_password(
+        &self,
+        id: &str,
+        password: Secret,
+    ) -> Result<Account, ApiError> {
+        let id = id.to_owned();
+        self.ask(|reply| Command::SetAccountPassword(id, password, reply))
+            .await
+    }
+
+    pub async fn clear_account_password(&self, id: &str) -> Result<Account, ApiError> {
+        let id = id.to_owned();
+        self.ask(|reply| Command::ClearAccountPassword(id, reply))
             .await
     }
 
@@ -421,6 +510,7 @@ impl Drop for Unanswered<'_> {
 struct Serving {
     data_dir: PathBuf,
     launchers: Option<Launchers>,
+    vault: Option<SharedVault>,
     jobs: JobBoard,
     on_job: JobObserver,
     commands: WeakSender<Command>,
@@ -430,13 +520,14 @@ struct Serving {
 }
 
 impl Serving {
-    fn serve(mut self, version: &str, requests: &Receiver<Command>) {
+    fn serve(mut self, version: &str, vault: VaultSource, requests: &Receiver<Command>) {
         let _answered = Unanswered(requests);
         let opened = data_folder::open(&self.data_dir, version)
             .map(|(store, _)| store)
             .map_err(ApiError::from);
         if opened.is_ok() {
             self.recovery = Recovery::load(&self.data_dir);
+            self.vault = self.open_vault(vault);
         }
         while let Ok(command) = requests.recv_blocking() {
             let store = opened.as_ref().map_err(ApiError::clone);
@@ -479,6 +570,46 @@ impl Serving {
                     store.and_then(|store| self.create_account(store, &account)),
                 );
             }
+            Command::Account(id, reply) => {
+                answer(
+                    &reply,
+                    store.and_then(|store| Ok(accounts::require(store, &id)?)),
+                );
+            }
+            Command::UpdateAccount(id, patch, reply) => answer(
+                &reply,
+                store.and_then(|store| {
+                    self.require_idle()?;
+                    Ok(accounts::update(store, &id, &patch, &self.stamp())?)
+                }),
+            ),
+            Command::DeleteAccount(id, reply) => answer(
+                &reply,
+                store.and_then(|store| {
+                    self.require_idle()?;
+                    Ok(accounts::delete(store, &id)?)
+                }),
+            ),
+            Command::SetAccountPassword(id, password, reply) => answer(
+                &reply,
+                store.and_then(|store| {
+                    self.require_idle()?;
+                    Ok(accounts::set_password(
+                        store,
+                        self.vault(),
+                        &id,
+                        &password,
+                        &self.stamp(),
+                    )?)
+                }),
+            ),
+            Command::ClearAccountPassword(id, reply) => answer(
+                &reply,
+                store.and_then(|store| {
+                    self.require_idle()?;
+                    Ok(accounts::clear_password(store, &id, &self.stamp())?)
+                }),
+            ),
             Command::Rescan(reply) => answer(&reply, store.and_then(|store| self.rescan(store))),
             Command::InstalledGames(launcher, reply) => answer(
                 &reply,
@@ -631,6 +762,43 @@ impl Serving {
         ol_store::iso_timestamp(launchers.platform.clock.now())
     }
 
+    // The machine's clock when there is one, so a fake machine's rows carry its time; else the system's.
+    fn stamp(&self) -> String {
+        self.launchers
+            .as_ref()
+            .map_or_else(ol_store::iso_now, |launchers| self.now(launchers))
+    }
+
+    fn open_vault(&self, source: VaultSource) -> Option<SharedVault> {
+        match source {
+            VaultSource::None => None,
+            VaultSource::Launchers => self
+                .launchers
+                .as_ref()
+                .map(|launchers| Arc::clone(&launchers.vault)),
+            VaultSource::DataFolder(protector) => {
+                OsCryptVault::open_or_create(&self.data_dir, &*protector)
+                    .ok()
+                    .map(|vault| Arc::new(vault) as SharedVault)
+            }
+        }
+    }
+
+    fn vault(&self) -> &dyn Vault {
+        match &self.vault {
+            Some(vault) => &**vault,
+            None => &NoVault,
+        }
+    }
+
+    // A switch works from the accounts as they were when it began: what changes one waits until it is done.
+    fn require_idle(&self) -> Result<(), ApiError> {
+        if self.jobs.is_busy() {
+            return Err(ServiceError::Busy.into());
+        }
+        Ok(())
+    }
+
     // Asks the adapter of one launcher, with the settings as they are now. A launcher without an adapter is refused before anything is read.
     fn with_adapter<T>(
         &self,
@@ -669,12 +837,11 @@ impl Serving {
     }
 
     fn create_account(&self, store: &Store, account: &NewAccount) -> Result<Account, ApiError> {
-        let launchers = self.launchers.as_ref().ok_or_else(no_launchers)?;
         Ok(accounts::create(
             store,
-            launchers.vault.as_ref(),
+            self.vault(),
             account,
-            &self.now(launchers),
+            &self.stamp(),
         )?)
     }
 

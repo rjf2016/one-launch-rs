@@ -1,18 +1,20 @@
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, Context, Div, Entity, FontWeight, Keystroke, Pixels, Stateful, Subscription, Svg,
-    Window, WindowControlArea, div, px, svg,
+    AnyElement, ClickEvent, Context, DispatchPhase, Div, Entity, FocusHandle, FontWeight,
+    Keystroke, MouseButton, MouseUpEvent, NavigationDirection, Pixels, Stateful, Subscription, Svg,
+    Window, WindowControlArea, canvas, div, px, svg,
 };
 use ol_api::Backend;
-use ol_model::Sidebar;
+use ol_model::{LauncherId, Sidebar};
 use ol_ui_kit::theme::{self, alpha, color};
 
+use crate::account::AccountPage;
 use crate::accounts::AccountsView;
 use crate::assets;
-use crate::host::LaunchHost;
+use crate::host::{LaunchHost, overlay};
 use crate::library::LibraryView;
 use crate::settings::SettingsView;
-use crate::widgets::tip;
+use crate::widgets::{Button, Tone, panel_shadow, tip};
 
 const SIDEBAR: f32 = 224.;
 const SIDEBAR_COLLAPSED: f32 = 60.;
@@ -36,10 +38,39 @@ impl Screen {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) enum Route {
+    Library,
+    Accounts,
+    NewAccount(LauncherId),
+    // `created`: the page a Create account just opened, which says what comes next.
+    Account { id: String, created: bool },
+    Settings,
+}
+
+pub(crate) struct Go {
+    pub route: Route,
+    pub guarded: bool,
+}
+
+#[derive(Clone)]
+pub(crate) struct Question {
+    pub title: &'static str,
+    pub message: &'static str,
+}
+
+struct Asking {
+    question: Question,
+    then: Route,
+    leave_leads: bool,
+    had_keyboard: Option<FocusHandle>,
+}
+
 // The Library lives as long as the window, so its posters stay decoded; the other screens are made afresh at each visit, as the Electron app's are.
 enum Page {
     Library,
     Accounts(Entity<AccountsView>),
+    Account(Entity<AccountPage>),
     Settings(Entity<SettingsView>),
 }
 
@@ -47,7 +78,7 @@ impl Page {
     fn screen(&self) -> Screen {
         match self {
             Self::Library => Screen::Library,
-            Self::Accounts(_) => Screen::Accounts,
+            Self::Accounts(_) | Self::Account(_) => Screen::Accounts,
             Self::Settings(_) => Screen::Settings,
         }
     }
@@ -58,10 +89,12 @@ pub struct Shell {
     host: Entity<LaunchHost>,
     library: Entity<LibraryView>,
     page: Page,
+    asking: Option<Asking>,
     sidebar_open: bool,
     // The user has toggled the sidebar in this run: the stored choice, should it arrive later, does not undo that.
     toggled: bool,
     fake_launchers: bool,
+    _page: Option<Subscription>,
     _keys: Subscription,
 }
 
@@ -109,9 +142,11 @@ impl Shell {
             backend,
             host,
             page: Page::Library,
+            asking: None,
             sidebar_open: false,
             toggled: false,
             fake_launchers,
+            _page: None,
             _keys: keys,
         }
     }
@@ -120,25 +155,118 @@ impl Shell {
         &self.library
     }
 
-    // Every way to another screen comes through here, so a later question about unsaved changes has one place to stand.
+    // The sidebar and Ctrl+1/2/3. Accounts goes back to the list from an account's page, as in the Electron app.
     fn navigate(&mut self, screen: Screen, window: &mut Window, cx: &mut Context<Self>) {
-        let left = self.page.screen();
-        if screen == left {
+        let on_list = matches!(self.page, Page::Accounts(_));
+        if screen == self.page.screen() && (screen != Screen::Accounts || on_list) {
             return;
         }
-        self.page = match screen {
-            Screen::Library => Page::Library,
-            Screen::Accounts => Page::Accounts(cx.new(|_| AccountsView)),
-            Screen::Settings => Page::Settings(cx.new(|_| SettingsView)),
+        let route = match screen {
+            Screen::Library => Route::Library,
+            Screen::Accounts => Route::Accounts,
+            Screen::Settings => Route::Settings,
         };
+        self.go(route, true, window, cx);
+    }
+
+    // An unguarded move is one a page makes when a create or a delete has finished: it wins over a question still open.
+    fn go(&mut self, route: Route, guarded: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.asking.is_some() {
+            if guarded {
+                return;
+            }
+            self.asking = None;
+        }
+        if guarded && let Some(question) = self.question(cx) {
+            self.asking = Some(Asking {
+                question,
+                then: route,
+                leave_leads: false,
+                had_keyboard: window.focused(cx),
+            });
+            window.blur(cx);
+            cx.notify();
+            return;
+        }
+        self.enter(route, window, cx);
+    }
+
+    fn question(&self, cx: &Context<Self>) -> Option<Question> {
+        match &self.page {
+            Page::Account(page) => page.read(cx).leave_question(cx),
+            _ => None,
+        }
+    }
+
+    fn answer(&mut self, leave: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(asking) = self.asking.take() else {
+            return;
+        };
+        if leave {
+            self.enter(asking.then, window, cx);
+        } else if let Some(field) = &asking.had_keyboard {
+            window.focus(field, cx);
+        }
+        cx.notify();
+    }
+
+    fn enter(&mut self, route: Route, window: &mut Window, cx: &mut Context<Self>) {
+        let left = self.page.screen();
+        let backend = self.backend.clone();
+        self._page = None;
+        self.page = match route {
+            Route::Library => Page::Library,
+            Route::Settings => Page::Settings(cx.new(|_| SettingsView)),
+            Route::Accounts => {
+                let page = cx.new(|cx| AccountsView::new(backend, cx));
+                self._page = Some(cx.subscribe_in(&page, window, Self::on_go));
+                Page::Accounts(page)
+            }
+            Route::NewAccount(launcher) => {
+                let page = cx.new(|cx| AccountPage::create(backend, launcher, window, cx));
+                self._page = Some(cx.subscribe_in(&page, window, Self::on_go));
+                Page::Account(page)
+            }
+            Route::Account { id, created } => {
+                let page = cx.new(|cx| AccountPage::edit(backend, id, created, window, cx));
+                self._page = Some(cx.subscribe_in(&page, window, Self::on_go));
+                Page::Account(page)
+            }
+        };
+        let screen = self.page.screen();
         self.library.update(cx, |library, cx| {
-            if screen == Screen::Library {
+            if screen == Screen::Library && left != Screen::Library {
                 library.arrive(window, cx);
-            } else if left == Screen::Library {
+            } else if screen != Screen::Library && left == Screen::Library {
                 library.leave(window, cx);
             }
         });
         cx.notify();
+    }
+
+    fn on_go<E>(&mut self, _: &Entity<E>, go: &Go, window: &mut Window, cx: &mut Context<Self>) {
+        self.go(go.route.clone(), go.guarded, window, cx);
+    }
+
+    // The mouse's Back button and Alt+Left leave an account's page for the list; nowhere else has anywhere to go back to.
+    fn back(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if !matches!(self.page, Page::Account(_)) || self.modal(cx) {
+            return false;
+        }
+        self.go(Route::Accounts, true, window, cx);
+        true
+    }
+
+    fn modal(&self, cx: &Context<Self>) -> bool {
+        self.asking.is_some() || self.host.read(cx).is_modal()
+    }
+
+    fn typing(&self, window: &Window, cx: &Context<Self>) -> bool {
+        match &self.page {
+            Page::Library => self.library.read(cx).typing(window, cx),
+            Page::Account(page) => page.read(cx).typing(window, cx),
+            Page::Accounts(_) | Page::Settings(_) => false,
+        }
     }
 
     fn toggle_sidebar(&mut self, cx: &mut Context<Self>) {
@@ -170,23 +298,58 @@ impl Shell {
         cx: &mut Context<Self>,
     ) -> bool {
         let held = keystroke.modifiers;
-        let only_control =
-            held.control && !held.alt && !held.shift && !held.platform && !held.function;
-        // As in the Electron app: neither a dialog nor the search field gives these keys up.
-        if !only_control
-            || self.host.read(cx).is_modal()
-            || self.library.read(cx).typing(window, cx)
-        {
+        let none = !held.control && !held.alt && !held.shift && !held.platform && !held.function;
+        if let Some(asking) = &mut self.asking {
+            // The window's own keys, Alt+F4 among them, reach Windows only when nothing stops them.
+            if held.alt || held.platform {
+                return false;
+            }
+            match keystroke.key.as_str() {
+                "escape" if none => self.answer(false, window, cx),
+                "enter" if none => {
+                    let leave = asking.leave_leads;
+                    self.answer(leave, window, cx);
+                }
+                "tab" => {
+                    asking.leave_leads = !asking.leave_leads;
+                    cx.notify();
+                }
+                _ => {}
+            }
+            return true;
+        }
+        if self.host.read(cx).is_modal() {
             return false;
         }
-        match keystroke.key.as_str() {
-            "b" => self.toggle_sidebar(cx),
-            "1" => self.navigate(Screen::Library, window, cx),
-            "2" => self.navigate(Screen::Accounts, window, cx),
-            "3" => self.navigate(Screen::Settings, window, cx),
-            _ => return false,
+        let only_alt = held.alt && !held.control && !held.shift && !held.platform && !held.function;
+        if only_alt && keystroke.key == "left" {
+            return self.back(window, cx);
         }
-        true
+        let only_control =
+            held.control && !held.alt && !held.shift && !held.platform && !held.function;
+        if only_control && keystroke.key == "s" {
+            if let Page::Account(page) = &self.page {
+                page.update(cx, |page, cx| page.save(window, cx));
+                return true;
+            }
+            return false;
+        }
+        // As in the Electron app: neither a dialog nor a text field gives these keys up.
+        if only_control && !self.typing(window, cx) {
+            match keystroke.key.as_str() {
+                "b" => self.toggle_sidebar(cx),
+                "1" => self.navigate(Screen::Library, window, cx),
+                "2" => self.navigate(Screen::Accounts, window, cx),
+                "3" => self.navigate(Screen::Settings, window, cx),
+                _ => return false,
+            }
+            return true;
+        }
+        match &self.page {
+            Page::Accounts(page) => page.update(cx, |page, cx| page.on_key(keystroke, cx)),
+            Page::Account(page) => page.update(cx, |page, cx| page.on_key(keystroke, window, cx)),
+            Page::Library | Page::Settings(_) => false,
+        }
     }
 
     fn render_sidebar(&self, cx: &mut Context<Self>) -> Div {
@@ -331,8 +494,109 @@ impl Shell {
         match &self.page {
             Page::Library => self.library.clone().into_any_element(),
             Page::Accounts(accounts) => accounts.clone().into_any_element(),
+            Page::Account(account) => account.clone().into_any_element(),
             Page::Settings(settings) => settings.clone().into_any_element(),
         }
+    }
+
+    fn render_question(&self, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
+        let asking = self.asking.as_ref()?;
+        let card = div()
+            .id("confirm")
+            .occlude()
+            .w_full()
+            .max_w(px(448.))
+            .rounded(px(12.))
+            .border_1()
+            .border_color(color(theme::BORDER))
+            .bg(color(theme::SURFACE))
+            .shadow(panel_shadow())
+            .on_click(|_, _, cx| cx.stop_propagation())
+            .child(
+                div()
+                    .flex()
+                    .items_start()
+                    .gap(px(12.))
+                    .px(px(20.))
+                    .py(px(16.))
+                    .child(icon(assets::UPDATE, 20., theme::WARNING).mt(px(2.)))
+                    .child(
+                        div()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(color(theme::TEXT_STRONG))
+                                    .child(asking.question.title),
+                            )
+                            .child(
+                                div()
+                                    .mt(px(4.))
+                                    .text_color(color(theme::MUTED))
+                                    .child(asking.question.message),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_end()
+                    .gap(px(8.))
+                    .border_t_1()
+                    .border_color(color(theme::BORDER))
+                    .px(px(20.))
+                    .py(px(12.))
+                    .child(
+                        Button::new("stay", Tone::Ghost, "Stay")
+                            .leading(!asking.leave_leads)
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.answer(false, window, cx);
+                            })),
+                    )
+                    .child(
+                        Button::new("leave", Tone::Danger, "Leave")
+                            .leading(asking.leave_leads)
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.answer(true, window, cx);
+                            })),
+                    ),
+            );
+        Some(
+            div()
+                .id("confirm-backdrop")
+                .occlude()
+                .flex()
+                .items_center()
+                .justify_center()
+                .p(px(24.))
+                .bg(alpha(theme::BG, 0.7))
+                .on_click(cx.listener(|this, click: &ClickEvent, window, cx| {
+                    if click.click_count() == 1 {
+                        this.answer(false, window, cx);
+                    }
+                }))
+                .child(card),
+        )
+    }
+
+    // Let go anywhere in the window, as a browser hears the mouse's Back button. The listener stands in every frame.
+    fn render_back_button(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let this = cx.weak_entity();
+        canvas(
+            |_, _, _| {},
+            move |_, (), window, _| {
+                window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
+                    if phase == DispatchPhase::Bubble
+                        && event.button == MouseButton::Navigate(NavigationDirection::Back)
+                    {
+                        this.update(cx, |this, cx| this.back(window, cx)).ok();
+                    }
+                });
+            },
+        )
+        .absolute()
+        .size_0()
     }
 }
 
@@ -349,6 +613,11 @@ impl Render for Shell {
             .line_height(px(20.))
             .child(title_bar(window.is_maximized(), self.fake_launchers))
             .child(self.host.clone())
+            .children(
+                self.render_question(cx)
+                    .map(|question| overlay(window.viewport_size(), 4, question)),
+            )
+            .child(self.render_back_button(cx))
             .child(
                 div()
                     .flex()

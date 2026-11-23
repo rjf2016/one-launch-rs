@@ -27,6 +27,20 @@ pub struct NewAccount<'a> {
     pub now: &'a str,
 }
 
+pub struct AccountUpdate<'a> {
+    pub display_name: &'a str,
+    pub login: &'a str,
+    pub launcher_uid: Option<&'a str>,
+    // None leaves the column as it is: a stored value this reader cannot parse is not replaced by an edit of another field.
+    pub tags: Option<&'a [String]>,
+    pub notes: &'a str,
+    pub now: &'a str,
+}
+
+fn tags_json(tags: &[String]) -> String {
+    serde_json::Value::from(tags.to_vec()).to_string()
+}
+
 struct Known {
     id: String,
     name: String,
@@ -181,7 +195,7 @@ impl Store {
     }
 
     pub fn insert_account(&self, new: &NewAccount<'_>) -> Result<(), StoreError> {
-        let tags = serde_json::Value::from(new.tags.to_vec()).to_string();
+        let tags = tags_json(new.tags);
         self.conn.execute(
             "INSERT INTO accounts (id, launcher, display_name, login, secret_enc, launcher_uid, tags, notes, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)",
@@ -211,6 +225,42 @@ impl Store {
             params![launcher_uid, now, id],
         )?;
         Ok(())
+    }
+
+    pub fn update_account(&self, id: &str, update: &AccountUpdate<'_>) -> Result<(), StoreError> {
+        self.conn.execute(
+            "UPDATE accounts SET display_name = ?1, login = ?2, launcher_uid = ?3, tags = COALESCE(?4, tags), notes = ?5, updated_at = ?6 WHERE id = ?7",
+            params![
+                update.display_name,
+                update.login,
+                update.launcher_uid,
+                update.tags.map(tags_json),
+                update.notes,
+                update.now,
+                id,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_account_password(
+        &self,
+        id: &str,
+        password: Option<&Ciphertext>,
+        now: &str,
+    ) -> Result<(), StoreError> {
+        self.conn.execute(
+            "UPDATE accounts SET secret_enc = ?1, updated_at = ?2 WHERE id = ?3",
+            params![password.map(Ciphertext::as_bytes), now, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_account(&self, id: &str) -> Result<bool, StoreError> {
+        Ok(self
+            .conn
+            .execute("DELETE FROM accounts WHERE id = ?1", [id])?
+            > 0)
     }
 
     pub fn touch_account(&self, id: &str, at: &str) -> Result<(), StoreError> {

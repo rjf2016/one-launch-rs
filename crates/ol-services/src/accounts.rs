@@ -2,7 +2,7 @@ use std::fmt;
 
 use ol_formats::js;
 use ol_model::{Account, LauncherId};
-use ol_store::{NewAccount as NewRow, Store, StoreError};
+use ol_store::{AccountUpdate, NewAccount as NewRow, Store, StoreError};
 use ol_vault::{Secret, Vault, VaultError};
 use thiserror::Error;
 use uuid::Uuid;
@@ -82,8 +82,39 @@ pub struct NewAccount {
     pub notes: String,
 }
 
+#[derive(Default)]
+pub struct AccountPatch {
+    pub display_name: Option<String>,
+    pub login: Option<String>,
+    // Some(None) clears the launcher's id.
+    pub launcher_uid: Option<Option<String>>,
+    pub tags: Option<Vec<String>>,
+    pub notes: Option<String>,
+}
+
 fn invalid(message: String) -> AccountError {
     AccountError::Invalid(message)
+}
+
+fn check_notes(notes: &str) -> Result<(), AccountError> {
+    if js::utf16_len(notes) > NOTES_MAX {
+        return Err(invalid(format!(
+            "Notes must be at most {NOTES_MAX} characters"
+        )));
+    }
+    Ok(())
+}
+
+fn check_password(password: &Secret) -> Result<(), AccountError> {
+    if password.expose().is_empty() {
+        return Err(invalid("Password must not be empty".to_owned()));
+    }
+    if js::utf16_len(password.expose()) > PASSWORD_MAX {
+        return Err(invalid(format!(
+            "Password must be at most {PASSWORD_MAX} characters"
+        )));
+    }
+    Ok(())
 }
 
 fn require_text(value: &str, name: &str, max: usize) -> Result<String, AccountError> {
@@ -183,19 +214,13 @@ pub fn create(
     let login = require_text(&input.login, "Login", LOGIN_MAX)?;
     let launcher_uid = optional_uid(input.launcher_uid.as_deref())?;
     let tags = normalize_tags(&input.tags);
-    if js::utf16_len(&input.notes) > NOTES_MAX {
-        return Err(invalid(format!(
-            "Notes must be at most {NOTES_MAX} characters"
-        )));
-    }
+    check_notes(&input.notes)?;
     let password = input
         .password
         .as_ref()
         .filter(|password| !password.expose().is_empty());
-    if password.is_some_and(|password| js::utf16_len(password.expose()) > PASSWORD_MAX) {
-        return Err(invalid(format!(
-            "Password must be at most {PASSWORD_MAX} characters"
-        )));
+    if let Some(password) = password {
+        check_password(password)?;
     }
     check_unique(store, input.launcher, &login, launcher_uid.as_deref(), None)?;
     let sealed = password
@@ -215,6 +240,82 @@ pub fn create(
         now,
     })?;
     require(store, &id)
+}
+
+pub fn update(
+    store: &Store,
+    id: &str,
+    patch: &AccountPatch,
+    now: &str,
+) -> Result<Account, AccountError> {
+    let current = require(store, id)?;
+    let display_name = match &patch.display_name {
+        Some(name) => require_text(name, "Display name", DISPLAY_NAME_MAX)?,
+        None => current.display_name,
+    };
+    let login = match &patch.login {
+        Some(login) => require_text(login, "Login", LOGIN_MAX)?,
+        None => current.login,
+    };
+    let launcher_uid = match &patch.launcher_uid {
+        Some(uid) => optional_uid(uid.as_deref())?,
+        None => current.launcher_uid,
+    };
+    let tags = patch.tags.as_deref().map(normalize_tags);
+    let notes = match &patch.notes {
+        Some(notes) => {
+            check_notes(notes)?;
+            notes.clone()
+        }
+        None => current.notes,
+    };
+    check_unique(
+        store,
+        current.launcher,
+        &login,
+        launcher_uid.as_deref(),
+        Some(id),
+    )?;
+    store.update_account(
+        id,
+        &AccountUpdate {
+            display_name: &display_name,
+            login: &login,
+            launcher_uid: launcher_uid.as_deref(),
+            tags: tags.as_deref(),
+            notes: &notes,
+            now,
+        },
+    )?;
+    require(store, id)
+}
+
+pub fn delete(store: &Store, id: &str) -> Result<(), AccountError> {
+    if store.delete_account(id)? {
+        Ok(())
+    } else {
+        Err(AccountError::NotFound(id.to_owned()))
+    }
+}
+
+pub fn set_password(
+    store: &Store,
+    vault: &dyn Vault,
+    id: &str,
+    password: &Secret,
+    now: &str,
+) -> Result<Account, AccountError> {
+    require(store, id)?;
+    check_password(password)?;
+    let sealed = vault.encrypt(password)?;
+    store.set_account_password(id, Some(&sealed), now)?;
+    require(store, id)
+}
+
+pub fn clear_password(store: &Store, id: &str, now: &str) -> Result<Account, AccountError> {
+    require(store, id)?;
+    store.set_account_password(id, None, now)?;
+    require(store, id)
 }
 
 // Records the launcher's own id on an account. A second account with that id is refused, so nothing is ever linked under an id another account holds.

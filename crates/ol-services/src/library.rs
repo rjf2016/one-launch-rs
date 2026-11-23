@@ -4,8 +4,8 @@ use std::time::SystemTime;
 
 use ol_model::{Game, LauncherId, LibrarySort};
 use ol_store::{Store, StoreError};
-use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
+use time::{OffsetDateTime, UtcOffset};
 
 const ARTWORK_FOLDER: &str = "artwork";
 const KINDS: [&str; 3] = ["grid", "hero", "logo"];
@@ -144,6 +144,47 @@ pub fn relative(at: &str, now: SystemTime) -> Option<String> {
             format!("in {count} {unit}{plural}")
         }
     }))
+}
+
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HourClock {
+    Twelve,
+    TwentyFour,
+}
+
+// English words always, with the clock of the regional settings (`triage.toml` X-02); `offset_of` gives seconds east of UTC for a moment.
+pub fn date_time(
+    at: &str,
+    offset_of: impl Fn(i64) -> Option<i32>,
+    clock: HourClock,
+) -> Option<String> {
+    let utc = OffsetDateTime::parse(at, &Rfc3339).ok()?;
+    let offset = offset_of(utc.unix_timestamp())
+        .and_then(|seconds| UtcOffset::from_whole_seconds(seconds).ok())
+        .unwrap_or(UtcOffset::UTC);
+    let local = utc.to_offset(offset);
+    let time = match (clock, local.hour()) {
+        (HourClock::TwentyFour, hour) => format!("{hour:02}:{:02}", local.minute()),
+        (HourClock::Twelve, hour) => {
+            let (hour, half) = match hour {
+                0 => (12, "AM"),
+                hour @ 1..=11 => (hour, "AM"),
+                12 => (12, "PM"),
+                hour => (hour - 12, "PM"),
+            };
+            format!("{hour}:{:02}\u{202f}{half}", local.minute())
+        }
+    };
+    Some(format!(
+        "{} {}, {}, {time}",
+        MONTHS[usize::from(u8::from(local.month())) - 1],
+        local.day(),
+        local.year(),
+    ))
 }
 
 // Halves go up, as the Electron app rounds them: -1.5 is -1.
@@ -411,5 +452,40 @@ mod tests {
         ] {
             assert_eq!(artwork_file(folder, &stored), None, "{stored:?}");
         }
+    }
+
+    #[test]
+    fn a_date_and_time_read_in_english_words_with_the_clock_and_the_zone_given() {
+        let utc = |_| Some(0);
+        let twelve = HourClock::Twelve;
+        assert_eq!(
+            date_time("2026-11-06T16:46:23.000Z", utc, twelve).as_deref(),
+            Some("Nov 6, 2026, 4:46\u{202f}PM")
+        );
+        assert_eq!(
+            date_time("2026-11-06T16:46:23.000Z", utc, HourClock::TwentyFour).as_deref(),
+            Some("Nov 6, 2026, 16:46")
+        );
+        assert_eq!(
+            date_time("2026-01-01T00:05:00.000Z", utc, twelve).as_deref(),
+            Some("Jan 1, 2026, 12:05\u{202f}AM")
+        );
+        assert_eq!(
+            date_time("2026-01-01T00:05:00.000Z", utc, HourClock::TwentyFour).as_deref(),
+            Some("Jan 1, 2026, 00:05")
+        );
+        assert_eq!(
+            date_time("2026-07-04T12:00:00Z", |_| Some(-4 * 3600), twelve).as_deref(),
+            Some("Jul 4, 2026, 8:00\u{202f}AM")
+        );
+        assert_eq!(
+            date_time("2026-12-31T23:30:00Z", |_| Some(3600), twelve).as_deref(),
+            Some("Jan 1, 2027, 12:30\u{202f}AM")
+        );
+        assert_eq!(
+            date_time("2026-11-06T16:46:23Z", |_| None, twelve).as_deref(),
+            Some("Nov 6, 2026, 4:46\u{202f}PM")
+        );
+        assert_eq!(date_time("not a time", utc, twelve), None);
     }
 }
