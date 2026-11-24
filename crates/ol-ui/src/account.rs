@@ -1,3 +1,5 @@
+mod password;
+mod sign_in;
 mod tags;
 
 use std::time::{Duration, SystemTime};
@@ -20,6 +22,8 @@ use crate::local_time;
 use crate::page::{PageScroll, scroll_page};
 use crate::shell::{Go, Question, Route};
 use crate::widgets::{Button, Flash, FlashTone, Tone, field, icon, launcher_badge, panel};
+
+pub(crate) use password::copy_note;
 
 const NAME_MOST: usize = 120;
 const LOGIN_MOST: usize = 256;
@@ -191,9 +195,11 @@ pub struct AccountPage {
     notes: TextArea,
     tags: Vec<String>,
     tag_field: TextField,
-    // Only the form that adds an account has one: an account's page has a panel of its own for it, not built yet.
+    // The form that adds an account shows it at all times, an account's page while a password is being stored.
     password: Option<TextField>,
     show_password: bool,
+    keeping: password::Keeping,
+    sign_in: sign_in::SignIn,
     baseline: Draft,
     touched: bool,
     busy: bool,
@@ -217,10 +223,6 @@ impl AccountPage {
     ) -> Self {
         let mut page = Self::new(backend, Kind::Create, window, cx);
         page.return_to = return_to.filter(|game| game.launcher == launcher);
-        let password = TextField::new("", true, window, cx).limited_to(PASSWORD_MOST, cx);
-        page._subscriptions
-            .push(password.on_event_in(window, cx, |_, _, _, cx| cx.notify()));
-        page.password = Some(password);
         page.set_launcher(launcher, window, cx);
         page.name.focus(window, cx);
         page
@@ -257,6 +259,7 @@ impl AccountPage {
         let tag_field =
             TextField::new("Add a tag", false, window, cx).limited_to(tags::LONGEST, cx);
         let notes = TextArea::new("", NOTES_ROWS, NOTES_MOST_ROWS, window, cx);
+        let password = TextField::new("", true, window, cx).limited_to(PASSWORD_MOST, cx);
         let changed = |_: &mut Self, _: FieldEvent, _: &mut Window, cx: &mut Context<Self>| {
             cx.notify();
         };
@@ -265,6 +268,7 @@ impl AccountPage {
             login.on_event_in(window, cx, changed),
             uid.on_event_in(window, cx, changed),
             notes.on_event_in(window, cx, changed),
+            password.on_event_in(window, cx, changed),
             tag_field.on_event_in(window, cx, Self::on_tag_field),
         ];
         Self {
@@ -282,8 +286,10 @@ impl AccountPage {
             notes,
             tags: Vec::new(),
             tag_field,
-            password: None,
+            password: Some(password),
             show_password: false,
+            keeping: password::Keeping::default(),
+            sign_in: sign_in::SignIn::default(),
             baseline: Draft::default(),
             touched: false,
             busy: false,
@@ -329,6 +335,7 @@ impl AccountPage {
                 self.set_launcher(account.launcher, window, cx);
                 self.show(&account, window, cx);
                 self.account = Some(account);
+                self.load_sign_in(cx);
                 if created {
                     self.flash = Some(Flash::new(
                         "Account created. Pick a game in the Library and press Play.",
@@ -381,6 +388,41 @@ impl AccountPage {
             .is_some_and(|password| !password.is_empty(cx))
     }
 
+    // The fields keep what the user typed, as in the Electron app; a plan made before the change is dropped, and the saved sign-in is asked again.
+    fn take_account(&mut self, account: Account, cx: &mut Context<Self>) {
+        let changed = self
+            .account
+            .as_ref()
+            .is_none_or(|was| was.updated_at != account.updated_at);
+        self.baseline = Draft::of(&account);
+        self.account = Some(account);
+        if changed {
+            self.preview.plan = None;
+            self.load_sign_in(cx);
+        }
+        cx.notify();
+    }
+
+    // Only an id the save recorded anew replaces what is in the field, so an unsaved edit of it is kept otherwise.
+    fn take_linked(&mut self, account: Account, window: &mut Window, cx: &mut Context<Self>) {
+        let before = self
+            .account
+            .as_ref()
+            .and_then(|before| before.launcher_uid.clone());
+        if let Some(uid) = account
+            .launcher_uid
+            .clone()
+            .filter(|uid| Some(uid) != before.as_ref())
+        {
+            self.uid.set_text(uid, window, cx);
+        }
+        self.take_account(account, cx);
+    }
+
+    pub fn leave(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_password(window, cx);
+    }
+
     fn dirty(&self, cx: &App) -> bool {
         match self.kind {
             Kind::Create => self.draft(cx) != Draft::default() || self.typed_password(cx),
@@ -421,6 +463,10 @@ impl AccountPage {
                 title: "Leave without saving?",
                 message: "Your changes to this account will be lost.",
             }),
+            Kind::Edit { .. } if self.typed_new_password(cx) => Some(Question {
+                title: "Leave without storing the password?",
+                message: "The password you typed is not stored until you press Store password.",
+            }),
             _ => None,
         }
     }
@@ -443,7 +489,7 @@ impl AccountPage {
             field.set_disabled(busy, cx);
         }
         if let Some(password) = &self.password {
-            password.set_disabled(busy, cx);
+            password.set_disabled(busy || self.keeping.busy, cx);
         }
         self.notes.set_disabled(busy, cx);
         self.tag_field
@@ -588,22 +634,8 @@ impl AccountPage {
         match saved {
             Ok(account) => {
                 self.show(&account, window, cx);
-                // A plan describes the account as it was.
-                if self
-                    .account
-                    .as_ref()
-                    .is_none_or(|was| was.updated_at != account.updated_at)
-                {
-                    self.preview.plan = None;
-                }
-                self.account = Some(account);
-                self.flash = Some(Flash::new(
-                    "Saved",
-                    FlashTone::Success,
-                    None,
-                    |this: &mut Self| &mut this.flash,
-                    cx,
-                ));
+                self.take_account(account, cx);
+                self.flash("Saved", None, cx);
             }
             Err(error) => self.error = Some(error.message.into()),
         }
@@ -646,7 +678,12 @@ impl AccountPage {
             stops.push(Stop::Line(&self.tag_field));
         }
         stops.push(Stop::Lines(&self.notes));
-        stops.extend(self.password.as_ref().map(Stop::Line));
+        stops.extend(
+            self.password
+                .as_ref()
+                .filter(|_| self.password_open())
+                .map(Stop::Line),
+        );
         if self.advanced {
             stops.push(Stop::Line(&self.uid));
         }
@@ -660,12 +697,28 @@ impl AccountPage {
         cx: &mut Context<Self>,
     ) -> bool {
         let held = keystroke.modifiers;
+        let in_password = self
+            .password
+            .as_ref()
+            .is_some_and(|password| password.is_focused(window, cx));
+        if in_password && password::copies_or_cuts(keystroke) {
+            return true;
+        }
         let plain = !held.control && !held.alt && !held.platform && !held.function;
         if !plain {
             return false;
         }
         let in_tags = self.tag_field.is_focused(window, cx);
+        let storing = in_password && self.keeping.editing;
         match keystroke.key.as_str() {
+            "enter" if storing => {
+                self.store_password(window, cx);
+                true
+            }
+            "escape" if storing => {
+                self.cancel_password(window, cx);
+                true
+            }
             "tab" if in_tags && !held.shift && !blank(&self.tag_field.text(cx)) => {
                 self.commit_tag(window, cx);
                 true
@@ -899,35 +952,6 @@ impl AccountPage {
 
     fn render_password(&self, window: &Window, cx: &mut Context<Self>) -> Option<Div> {
         let password = self.password.as_ref()?;
-        let shown = self.show_password;
-        let eye = div()
-            .id("eye")
-            .group("eye")
-            .flex_none()
-            .p(px(4.))
-            .mr(px(-4.))
-            .rounded(px(4.))
-            .cursor_pointer()
-            .tooltip(crate::widgets::tip(if shown {
-                "Hide password"
-            } else {
-                "Show password"
-            }))
-            .on_click(cx.listener(|this, _, window, cx| {
-                this.show_password = !this.show_password;
-                if let Some(password) = &this.password {
-                    password.set_masked(!this.show_password, window, cx);
-                }
-                cx.notify();
-            }))
-            .child(
-                icon(
-                    if shown { assets::HIDE } else { assets::EYE },
-                    16.,
-                    theme::MUTED,
-                )
-                .group_hover("eye", |style| style.text_color(color(theme::TEXT))),
-            );
         Some(panel(
             "Password",
             Some(PASSWORD_LINE.into()),
@@ -936,7 +960,7 @@ impl AccountPage {
                 "Password",
                 None,
                 None,
-                password.form_frame("password", Some(eye.into_any_element()), window, cx),
+                password.form_frame("password", Some(self.eye(cx)), window, cx),
             ),
         ))
     }
@@ -1083,7 +1107,11 @@ impl AccountPage {
                 )
                 .glyph(assets::TRASH)
                 .disabled(busy)
-                .on_click(cx.listener(|this, _, _, cx| this.delete(cx))),
+                .on_click(cx.listener(|this, click, _, cx| {
+                    if password::single(click) {
+                        this.delete(cx);
+                    }
+                })),
                 Button::new("delete-cancel", Tone::Ghost, "Cancel")
                     .disabled(busy)
                     .on_click(cx.listener(|this, _, _, cx| {
@@ -1168,7 +1196,11 @@ impl Render for AccountPage {
             .gap(px(16.))
             .pb(px(24.))
             .child(details)
-            .children(self.render_password(window, cx))
+            .children(match self.kind {
+                Kind::Create => self.render_password(window, cx),
+                Kind::Edit { .. } => self.render_keeping(window, cx),
+            })
+            .children(self.render_sign_in(cx))
             .child(self.render_advanced(launcher, window, cx))
             .children(self.render_danger(cx));
         scroll_page("account-page", &self.scroll, self.render_header(cx), body).into_any_element()

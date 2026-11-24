@@ -11,6 +11,7 @@ use std::cell::{Cell, RefCell};
 use std::path::Path;
 use std::process::ExitCode;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use gpui::{App, AsyncApp, Window};
@@ -33,6 +34,80 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const COPY_DELAY: Duration = Duration::from_millis(250);
 
 type TraySlot = Rc<RefCell<Option<Tray>>>;
+
+// The clipboard a run copies to. A capture or a probe is run by agents, so it never reaches the real one, neither through the backend nor through a text field's keys.
+#[derive(Debug, PartialEq, Eq)]
+enum Board {
+    Windows,
+    #[cfg(feature = "fake")]
+    Recording,
+    None,
+}
+
+impl Board {
+    fn for_run(args: &Args) -> Self {
+        match (&args.check, &args.doctor) {
+            (None, None) => Self::Windows,
+            #[cfg(feature = "fake")]
+            (Some(_), _) => Self::Recording,
+            _ => Self::None,
+        }
+    }
+
+    fn keys_reach_it(&self) -> bool {
+        matches!(self, Self::Windows)
+    }
+
+    fn give(&self) -> Given {
+        match self {
+            Self::Windows => Given::Windows(ol_platform_win::clipboard::WindowsClipboard),
+            #[cfg(feature = "fake")]
+            Self::Recording => {
+                let log = ol_platform_fake::OpLog::new();
+                Given::Recording(
+                    Arc::new(ol_platform_fake::RecordingClipboard::new(log.clone())),
+                    log,
+                )
+            }
+            Self::None => Given::None,
+        }
+    }
+}
+
+enum Given {
+    Windows(ol_platform_win::clipboard::WindowsClipboard),
+    #[cfg(feature = "fake")]
+    Recording(
+        Arc<ol_platform_fake::RecordingClipboard>,
+        ol_platform_fake::OpLog,
+    ),
+    None,
+}
+
+fn use_clipboard(given: Given, backend: &Backend) -> Option<Box<dyn FnOnce()>> {
+    let timer = || {
+        Arc::new(ol_api::clipboard::SleepingTimer::new(Arc::new(
+            ol_platform_win::clock::SystemClock,
+        )))
+    };
+    match given {
+        Given::Windows(clipboard) => {
+            backend.use_clipboard(Arc::new(clipboard), timer());
+            None
+        }
+        #[cfg(feature = "fake")]
+        Given::Recording(clipboard, log) => {
+            backend.use_clipboard(clipboard, timer());
+            println!("OneLaunch: clipboard: a recording one, in this process only");
+            Some(Box::new(move || {
+                for event in log.snapshot() {
+                    println!("OneLaunch: clipboard {event}");
+                }
+            }))
+        }
+        Given::None => None,
+    }
+}
 
 // What the launchers run on: nothing yet in the app itself, a scenario folder in a build with the fake launchers.
 enum Machine {
@@ -76,6 +151,7 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    let heard = use_clipboard(Board::for_run(&args).give(), &backend);
     let failed = Rc::new(Cell::new(false));
     let tray = TraySlot::default();
     gpui_platform::application()
@@ -97,6 +173,9 @@ fn main() -> ExitCode {
         println!("OneLaunch: tray icon removed");
     }
     backend.shut_down();
+    if let Some(heard) = heard {
+        heard();
+    }
     if failed.get() {
         ExitCode::FAILURE
     } else {
@@ -220,6 +299,9 @@ fn start(
             clock,
         },
     );
+    if !Board::for_run(&args).keys_reach_it() {
+        ol_ui_kit::refuse_clipboard_keys(cx);
+    }
     let title = match machine {
         Machine::None => TITLE,
         #[cfg(feature = "fake")]
@@ -364,4 +446,62 @@ fn show_window() {
 
 fn quit(cx: &AsyncApp) {
     cx.update(|cx| cx.quit());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn board(arguments: &[&str]) -> Board {
+        let arguments = [r"--data-dir=D:\scratch\data"]
+            .iter()
+            .chain(arguments)
+            .map(|argument| (*argument).to_owned());
+        Board::for_run(&Args::parse(arguments).unwrap())
+    }
+
+    #[test]
+    fn a_capture_or_a_probe_never_gets_the_windows_clipboard() {
+        let checks: [&[&str]; 6] = [
+            &[r"--capture=D:\scratch\shot.png"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-keys=ctrl-c"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-size=960x600"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-focus"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-type=abc"],
+            &["--probe"],
+        ];
+        for check in checks {
+            let board = board(check);
+            assert_ne!(board, Board::Windows, "{check:?}");
+            assert!(!board.keys_reach_it(), "{check:?}");
+            assert!(!matches!(board.give(), Given::Windows(_)), "{check:?}");
+            #[cfg(feature = "fake")]
+            assert!(matches!(board.give(), Given::Recording(..)), "{check:?}");
+            #[cfg(not(feature = "fake"))]
+            assert!(matches!(board.give(), Given::None), "{check:?}");
+            #[cfg(feature = "fake")]
+            assert_eq!(board, Board::Recording, "{check:?}");
+            #[cfg(not(feature = "fake"))]
+            assert_eq!(board, Board::None, "{check:?}");
+        }
+        assert_eq!(board(&["--doctor"]), Board::None);
+    }
+
+    #[test]
+    fn a_run_a_person_uses_gets_the_windows_clipboard() {
+        assert_eq!(board(&[]), Board::Windows);
+        assert!(board(&[]).keys_reach_it());
+        assert!(matches!(board(&[]).give(), Given::Windows(_)));
+        #[cfg(not(feature = "fake"))]
+        assert_eq!(board(&["--real-launchers"]), Board::Windows);
+        #[cfg(feature = "fake")]
+        assert_eq!(
+            board(&[
+                r"--fake-launchers=D:\scratch\launchers",
+                r"--fake-scenario=D:\scratch\scenario",
+                r"--fake-fixtures=D:\scratch\fixtures",
+            ]),
+            Board::Windows
+        );
+    }
 }

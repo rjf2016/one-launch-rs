@@ -11,12 +11,14 @@ use gpui::{
     Context, Div, EventEmitter, Keystroke, Pixels, ScrollHandle, SharedString, Size, Stateful,
     Task, Window, anchored, deferred, div, point, px,
 };
+use ol_api::clipboard::CopyField;
 use ol_api::launch::in_pick_order;
 use ol_api::{ApiError, Backend, StartLaunch};
 use ol_model::{
     Account, Game, JobState, LaunchJob, LaunchPreflight, LauncherId, SettingKey, SwitchRecovery,
 };
 
+use crate::account::copy_note;
 use crate::shell::{Go, Route};
 
 pub(crate) use dialog::{generated_at, plan_view};
@@ -67,6 +69,7 @@ struct Request {
     starting: bool,
     stopping: Option<String>,
     note: Option<SharedString>,
+    copied: Option<SharedString>,
     steps_open: bool,
     plan_open: bool,
     // Try again goes back to what was asked, not to the running job the dialog shows instead.
@@ -251,6 +254,7 @@ impl LaunchHost {
             starting: false,
             stopping: None,
             note: None,
+            copied: None,
             steps_open: false,
             plan_open: false,
             asked_for: None,
@@ -503,7 +507,11 @@ impl LaunchHost {
             return true;
         }
         let running = job.state == JobState::Running;
+        let handing_over = job.attention.is_some() && running;
         active.job = job;
+        if !handing_over && let Some(request) = &mut self.request {
+            request.copied = None;
+        }
         if !running {
             cx.emit(JobSettled);
         }
@@ -521,6 +529,31 @@ impl LaunchHost {
             request.note = Some(error.message.into());
         }
         cx.notify();
+    }
+
+    fn copy(&mut self, field: CopyField, cx: &mut Context<Self>) {
+        let (Some(request), Some(active)) = (&self.request, &self.active) else {
+            return;
+        };
+        let (key, account_id, backend) = (
+            request.key,
+            active.job.account.id.clone(),
+            self.backend.clone(),
+        );
+        cx.spawn(async move |this, cx| {
+            let copied = backend.copy_to_clipboard(&account_id, field).await;
+            this.update(cx, |this, cx| {
+                if let Some(request) = this.request_mut(key) {
+                    request.copied = Some(match copied {
+                        Ok(copied) => copy_note(field, &copied).into(),
+                        Err(error) => error.message.into(),
+                    });
+                    cx.notify();
+                }
+            })
+            .ok();
+        })
+        .detach();
     }
 
     // Preview mode goes off and the switch that was shown runs.

@@ -74,7 +74,7 @@ pub(super) fn look_before_write(
 }
 
 // Records the Riot account id on the account, then encrypts and stores the file for it. The id comes first and is refused when another account holds it, so no sign-in is ever stored under an id the account was not given.
-fn store_session(
+pub(crate) fn store_session(
     directory: &dyn Directory,
     account: &AccountRef,
     session: &RiotSession,

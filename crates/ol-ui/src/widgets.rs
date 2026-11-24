@@ -4,7 +4,7 @@ use gpui::prelude::*;
 use gpui::{
     Animation, AnimationExt as _, AnyElement, AnyView, App, BoxShadow, ClickEvent, Context, Div,
     ElementId, FontWeight, SharedString, Stateful, Svg, Task, Transformation, Window, div, hsla,
-    percentage, px, svg,
+    percentage, px, relative, svg,
 };
 use ol_model::LauncherId;
 use ol_ui_kit::theme::{self, alpha, color};
@@ -495,6 +495,49 @@ pub fn field(
                 .text_color(color(hex))
                 .child(line)
         }))
+}
+
+pub fn row(
+    label: impl Into<SharedString>,
+    hint: Option<SharedString>,
+    first: bool,
+    value: impl IntoElement,
+) -> Div {
+    div()
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap(px(24.))
+        .py(px(10.))
+        .when(first, |row| row.pt_0())
+        .border_b_1()
+        .border_color(alpha(theme::BORDER, 0.6))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .child(div().text_color(color(theme::TEXT)).child(label.into()))
+                .children(hint.map(|hint| {
+                    div()
+                        .text_size(px(12.))
+                        .line_height(px(16.))
+                        .text_color(color(theme::MUTED))
+                        .child(hint)
+                })),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_none()
+                .min_w_0()
+                .max_w(relative(0.6))
+                .items_center()
+                .justify_end()
+                .gap(px(8.))
+                .text_right()
+                .text_color(color(theme::MUTED))
+                .child(value),
+        )
 }
 
 pub fn menu_shadow() -> Vec<BoxShadow> {

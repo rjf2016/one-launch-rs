@@ -100,4 +100,11 @@ impl Store {
         )?;
         Ok(())
     }
+
+    pub fn delete_session(&self, account_id: &str) -> Result<bool, StoreError> {
+        Ok(self.conn.execute(
+            "DELETE FROM launcher_sessions WHERE account_id = ?1",
+            [account_id],
+        )? > 0)
+    }
 }

@@ -8,8 +8,10 @@ use ol_model::{
     LauncherSession, LauncherSessionState, LibraryScanResult, LibrarySort, RecentLaunch,
     RememberedAccount, RestoreResult, SettingKey, Sidebar, SwitchPlan, SwitchRecovery,
 };
-use ol_platform_api::DataProtector;
+use ol_platform_api::{Clipboard, DataProtector};
 use ol_services::accounts::{self, AccountError, AccountPatch, NewAccount};
+use ol_services::capture::{self, Captured};
+use ol_services::clipboard::{self, ClipboardService, CopyError, CopyField, CopyResult, Timer};
 use ol_services::data_folder::{self, OpenError};
 use ol_services::journal::Recovery;
 use ol_services::launch::{self, FinishedJob, JobBoard, LastPreflight, StartInput};
@@ -85,6 +87,15 @@ impl From<AccountError> for ApiError {
     }
 }
 
+impl From<CopyError> for ApiError {
+    fn from(error: CopyError) -> Self {
+        Self {
+            code: error.code(),
+            message: error.to_string(),
+        }
+    }
+}
+
 pub struct Library {
     pub games: Vec<LibraryGame>,
     pub sort: LibrarySort,
@@ -139,6 +150,10 @@ enum Command {
     RestoreRecovery(Reply<RestoreResult>),
     DismissRecovery(Reply<()>),
     Session(String, Reply<SavedSignIn>),
+    CaptureSession(String, Reply<Captured>),
+    ForgetSession(String, Reply<()>),
+    UseClipboard(ClipboardService),
+    Copy(String, CopyField, Reply<CopyResult>),
     #[cfg(feature = "fake")]
     SeedSession(String, Option<String>, ol_vault::Secret, Reply<()>),
     // Work a switch hands over from its own thread: a question about accounts or saved sign-ins.
@@ -257,6 +272,7 @@ impl Backend {
             job_thread: Arc::clone(&job_thread),
             last_preflight: LastPreflight::default(),
             recovery: Recovery::default(),
+            clipboard: None,
         };
         let thread = thread::Builder::new()
             .name("backend".to_owned())
@@ -454,6 +470,34 @@ impl Backend {
         self.ask(|reply| Command::Session(account_id, reply)).await
     }
 
+    pub async fn capture_session(&self, account_id: &str) -> Result<Captured, ApiError> {
+        let account_id = account_id.to_owned();
+        self.ask(|reply| Command::CaptureSession(account_id, reply))
+            .await
+    }
+
+    pub async fn forget_session(&self, account_id: &str) -> Result<(), ApiError> {
+        let account_id = account_id.to_owned();
+        self.ask(|reply| Command::ForgetSession(account_id, reply))
+            .await
+    }
+
+    // Until this is called a copy is refused, so a run that is handed no clipboard never reaches one.
+    pub fn use_clipboard(&self, clipboard: Arc<dyn Clipboard>, timer: Arc<dyn Timer>) {
+        let service = ClipboardService::new(clipboard, timer);
+        let _ = self.commands.send_blocking(Command::UseClipboard(service));
+    }
+
+    pub async fn copy_to_clipboard(
+        &self,
+        account_id: &str,
+        field: CopyField,
+    ) -> Result<CopyResult, ApiError> {
+        let account_id = account_id.to_owned();
+        self.ask(|reply| Command::Copy(account_id, field, reply))
+            .await
+    }
+
     // Stores a sign-in for an account as it is given, encrypted like any other. Only a build with the fake launchers has it: the app itself saves a sign-in only from the launcher's own file.
     #[cfg(feature = "fake")]
     pub async fn seed_session(
@@ -507,6 +551,15 @@ impl Drop for Unanswered<'_> {
     }
 }
 
+// However the database's thread ends, a panic included, a copy still on the clipboard is taken off.
+impl Drop for Serving {
+    fn drop(&mut self) {
+        if let Some(clipboard) = &self.clipboard {
+            clipboard.clear_if_unchanged();
+        }
+    }
+}
+
 struct Serving {
     data_dir: PathBuf,
     launchers: Option<Launchers>,
@@ -517,6 +570,7 @@ struct Serving {
     job_thread: Thread,
     last_preflight: LastPreflight,
     recovery: Recovery,
+    clipboard: Option<ClipboardService>,
 }
 
 impl Serving {
@@ -727,6 +781,45 @@ impl Serving {
             Command::Session(account_id, reply) => answer(
                 &reply,
                 store.and_then(|store| self.saved_sign_in(store, &account_id)),
+            ),
+            Command::CaptureSession(account_id, reply) => answer(
+                &reply,
+                store.and_then(|store| {
+                    self.require_idle()?;
+                    let account = accounts::require(store, &account_id)?;
+                    let captured =
+                        self.with_adapter(store, account.launcher, |_, _, adapter| {
+                            Ok(capture::capture(store, adapter, &account)?)
+                        })?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(captured)
+                }),
+            ),
+            Command::ForgetSession(account_id, reply) => answer(
+                &reply,
+                store.and_then(|store| {
+                    self.require_idle()?;
+                    capture::forget(store, &account_id)?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(())
+                }),
+            ),
+            Command::UseClipboard(service) => {
+                if let Some(previous) = self.clipboard.replace(service) {
+                    previous.clear_if_unchanged();
+                }
+            }
+            Command::Copy(account_id, field, reply) => answer(
+                &reply,
+                store.and_then(|store| {
+                    Ok(clipboard::copy_account_field(
+                        store,
+                        self.vault(),
+                        self.clipboard.as_ref(),
+                        &account_id,
+                        field,
+                    )?)
+                }),
             ),
             #[cfg(feature = "fake")]
             Command::SeedSession(account_id, launcher_uid, blob, reply) => answer(

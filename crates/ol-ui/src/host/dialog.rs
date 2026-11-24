@@ -7,6 +7,7 @@ use gpui::{
     AnyElement, App, BoxShadow, ClickEvent, Context, Div, FontWeight, HighlightStyle, Hsla,
     SharedString, Stateful, StyledText, div, hsla, px,
 };
+use ol_api::clipboard::CopyField;
 use ol_api::launch::{
     PhaseNames, failed_note, group_steps, phase_label, plan_phases, sentence, stopped_note,
     update_note,
@@ -500,6 +501,7 @@ fn hand_over(
     attention: &LaunchAttention,
     launcher: &str,
     stopping: bool,
+    copied: Option<SharedString>,
     cx: &mut Context<LaunchHost>,
 ) -> Div {
     let steps = attention.steps.iter().enumerate().map(|(index, step)| {
@@ -558,19 +560,42 @@ fn hand_over(
         .text_color(color(theme::TEXT))
         .child(marked(assets::KEY, 16., theme::WARNING, words))
         .child(
-            div().ml(px(24.)).flex().items_center().gap(px(8.)).child(
-                Button::new(
-                    "stop-waiting",
-                    Tone::Ghost,
-                    if stopping {
-                        "Stopping\u{2026}"
-                    } else {
-                        "Stop waiting"
-                    },
+            div()
+                .ml(px(24.))
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap(px(8.))
+                .child(
+                    Button::new("handover-copy-login", Tone::Secondary, "Copy login")
+                        .glyph(assets::COPY)
+                        .on_click(cx.listener(|this, _, _, cx| this.copy(CopyField::Login, cx))),
                 )
-                .disabled(stopping)
-                .on_click(cx.listener(|this, _, _, cx| this.stop(cx))),
-            ),
+                .when(attention.can_copy_password, |buttons| {
+                    buttons.child(
+                        Button::new("handover-copy-password", Tone::Secondary, "Copy password")
+                            .glyph(assets::COPY)
+                            .on_click(
+                                cx.listener(|this, _, _, cx| this.copy(CopyField::Password, cx)),
+                            ),
+                    )
+                })
+                .child(
+                    Button::new(
+                        "stop-waiting",
+                        Tone::Ghost,
+                        if stopping {
+                            "Stopping\u{2026}"
+                        } else {
+                            "Stop waiting"
+                        },
+                    )
+                    .disabled(stopping)
+                    .on_click(cx.listener(|this, _, _, cx| this.stop(cx))),
+                )
+                .children(
+                    copied.map(|copied| small(div()).text_color(color(theme::FAINT)).child(copied)),
+                ),
         )
 }
 
@@ -968,7 +993,15 @@ impl LaunchHost {
                     .attention
                     .as_ref()
                     .filter(|_| job.state == JobState::Running)
-                    .map(|attention| hand_over(attention, launcher.display_name(), stopping, cx));
+                    .map(|attention| {
+                        hand_over(
+                            attention,
+                            launcher.display_name(),
+                            stopping,
+                            request.copied.clone(),
+                            cx,
+                        )
+                    });
                 body.gap(px(16.))
                     .children(outcome(job, client, game.is_some()))
                     .children(waiting)

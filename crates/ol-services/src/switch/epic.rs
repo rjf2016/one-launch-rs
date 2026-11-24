@@ -161,6 +161,31 @@ fn attention_for(
     }
 }
 
+// Records the Epic id on the account, then encrypts and stores the session for it. The id comes first and is refused when another account holds it, so no session is ever stored under an id the account was not given.
+pub(crate) fn store_session(
+    directory: &dyn Directory,
+    account: &AccountRef,
+    blob: &EpicSessionBlob,
+    uid: Option<&str>,
+) -> Result<(), AdapterError> {
+    let Some(account_id) = account.id.as_deref() else {
+        return Ok(());
+    };
+    let uid = uid.filter(|uid| !uid.is_empty());
+    let linked = account
+        .launcher_uid
+        .as_deref()
+        .filter(|linked| !linked.is_empty());
+    if let Some(uid) = uid
+        && linked.is_none_or(|linked| linked.to_lowercase() != uid.to_lowercase())
+    {
+        directory.set_launcher_uid(account_id, uid)?;
+    }
+    let sealed = Secret::new(serialize_blob(blob));
+    directory.save_session(account_id, uid, &fingerprint_of(&blob.data), &sealed)?;
+    Ok(())
+}
+
 struct Switch<'a> {
     epic: &'a EpicAdapter<'a>,
     platform: &'a Platform,
@@ -223,30 +248,13 @@ impl Switch<'_> {
         ))
     }
 
-    // Records the Epic id on the account, then encrypts and stores the session for it. The id comes first and is refused when another account holds it, so no session is ever stored under an id the account was not given.
     fn store_session(
         &self,
         account: &AccountRef,
         blob: &EpicSessionBlob,
         uid: Option<&str>,
     ) -> Result<(), AdapterError> {
-        let Some(account_id) = account.id.as_deref() else {
-            return Ok(());
-        };
-        let uid = uid.filter(|uid| !uid.is_empty());
-        let linked = account
-            .launcher_uid
-            .as_deref()
-            .filter(|linked| !linked.is_empty());
-        if let Some(uid) = uid
-            && linked.is_none_or(|linked| linked.to_lowercase() != uid.to_lowercase())
-        {
-            self.directory.set_launcher_uid(account_id, uid)?;
-        }
-        let sealed = Secret::new(serialize_blob(blob));
-        self.directory
-            .save_session(account_id, uid, &fingerprint_of(&blob.data), &sealed)?;
-        Ok(())
+        store_session(self.directory, account, blob, uid)
     }
 
     // Runs once the launcher is closed: the file is then the last run's, and the launcher's log names the account. When the plan passed the step over, the launcher is looked at all the same if this switch closed it, because a sign-in can land while it closes; the step then shows only a session that was saved. A session that cannot be saved costs one sign-in by hand later, never the switch.

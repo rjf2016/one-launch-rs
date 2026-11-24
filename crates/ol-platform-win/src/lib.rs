@@ -1,3 +1,4 @@
+pub mod clipboard;
 pub mod clock;
 pub mod data_folder;
 pub mod dpapi;

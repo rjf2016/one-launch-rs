@@ -466,7 +466,7 @@ impl<'a> Replay<'a> {
         let backend = self.backend()?.clone();
         match channel {
             "accounts:list" => drop(block_on(backend.accounts())),
-            // Reads the replay has nothing to check, and what this build does not have yet: the copy to the clipboard, and the status of the launchers and of the artwork, which are reads too.
+            // Reads the replay has nothing to check, the copy to the clipboard, which the replay hands no clipboard to, and what this build does not have yet: the status of the launchers and of the artwork, which are reads too.
             "settings:get" | "settings:getAll" | "accounts:copy" | "launchers:status"
             | "artwork:status" => {}
             "settings:set" => {

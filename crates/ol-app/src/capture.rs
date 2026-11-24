@@ -656,6 +656,7 @@ mod tests {
             "type:",
             "click:1x2&wait:5",
             "back:5",
+            "second-click:5",
             "frames:all",
         ] {
             assert!(Step::parse(refused).is_err(), "{refused}");

@@ -201,6 +201,39 @@ fn account_id(uid: Option<&str>) -> Option<String> {
         .map(str::to_lowercase)
 }
 
+// Records the account id on the account, then encrypts and stores the token for it. The id comes first and is refused when another account holds it, so no token is ever stored under an id the account was not given.
+pub(crate) fn store_session(
+    directory: &dyn Directory,
+    account: &AccountRef,
+    token: &TokenValue,
+    uid: Option<&str>,
+) -> Result<(), AdapterError> {
+    let Some(owner_id) = account.id.as_deref() else {
+        return Ok(());
+    };
+    let uid = account_id(uid);
+    let linked = account
+        .launcher_uid
+        .as_deref()
+        .filter(|linked| !linked.is_empty());
+    if let Some(uid) = &uid
+        && linked.is_none_or(|linked| linked.to_lowercase() != *uid)
+    {
+        directory.set_launcher_uid(owner_id, uid)?;
+    }
+    let blob = BattlenetSessionBlob {
+        unified_auth: token.clone(),
+    };
+    let sealed = Secret::new(serialize_blob(&blob));
+    directory.save_session(
+        owner_id,
+        uid.as_deref(),
+        &fingerprint_of(&token.hex),
+        &sealed,
+    )?;
+    Ok(())
+}
+
 struct Switch<'a> {
     battlenet: &'a BattlenetAdapter<'a>,
     platform: &'a Platform,
@@ -270,37 +303,13 @@ impl Switch<'_> {
         Ok(self.battlenet.is_running()?)
     }
 
-    // Records the account id on the account, then encrypts and stores the token for it. The id comes first and is refused when another account holds it, so no token is ever stored under an id the account was not given.
     fn store_session(
         &self,
         account: &AccountRef,
         token: &TokenValue,
         uid: Option<&str>,
     ) -> Result<(), AdapterError> {
-        let Some(owner_id) = account.id.as_deref() else {
-            return Ok(());
-        };
-        let uid = account_id(uid);
-        let linked = account
-            .launcher_uid
-            .as_deref()
-            .filter(|linked| !linked.is_empty());
-        if let Some(uid) = &uid
-            && linked.is_none_or(|linked| linked.to_lowercase() != *uid)
-        {
-            self.directory.set_launcher_uid(owner_id, uid)?;
-        }
-        let blob = BattlenetSessionBlob {
-            unified_auth: token.clone(),
-        };
-        let sealed = Secret::new(serialize_blob(&blob));
-        self.directory.save_session(
-            owner_id,
-            uid.as_deref(),
-            &fingerprint_of(&token.hex),
-            &sealed,
-        )?;
-        Ok(())
+        store_session(self.directory, account, token, uid)
     }
 
     // Runs once the client is closed: the token is then the last run's, and the client's log names the account. When the plan passed the step over, the client is looked at all the same if this switch closed it, because a sign-in can land while it closes; the step then shows only a token that was saved. A token that cannot be saved costs one sign-in by hand later, never the switch.
