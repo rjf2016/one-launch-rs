@@ -186,6 +186,8 @@ pub struct CurrentSession {
     pub fingerprint: Option<String>,
     // While the client runs its own log decides. Closed, a saved sign-in with the token's fingerprint decides, then the last run's log: the client writes the token at the sign-in itself.
     pub owner: Option<AccountRef>,
+    // The account a saved sign-in with the token's fingerprint belongs to, whoever the log names.
+    pub token_owner: Option<AccountRef>,
     // The account the client last signed in, by its current log.
     pub logged_uid: Option<String>,
     pub last_sign_in: Option<SignInOutcome>,
@@ -605,7 +607,7 @@ impl<'a> BattlenetAdapter<'a> {
         let owner = if running {
             by_log
         } else if token.is_some() {
-            stored_owner.or(by_log.filter(|_| !signed_out))
+            stored_owner.clone().or(by_log.filter(|_| !signed_out))
         } else {
             None
         };
@@ -614,6 +616,7 @@ impl<'a> BattlenetAdapter<'a> {
             tokens,
             token,
             owner,
+            token_owner: stored_owner,
             logged_uid,
             last_sign_in,
             signed_out,

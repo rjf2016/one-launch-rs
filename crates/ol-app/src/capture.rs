@@ -217,6 +217,9 @@ enum Step {
 
 impl Step {
     fn parse(text: &str) -> anyhow::Result<Self> {
+        if let Some(typed) = text.strip_prefix("type:").filter(|typed| !typed.is_empty()) {
+            return Ok(Self::Type(typed.replace("%2C", ",")));
+        }
         if text.contains('&') {
             let steps = text
                 .split('&')
@@ -658,6 +661,10 @@ mod tests {
             panic!("a step that types");
         };
         assert_eq!(text, "gold, smurf");
+        let Ok(Step::Type(text)) = Step::parse("type:R&D") else {
+            panic!("a step that types an ampersand");
+        };
+        assert_eq!(text, "R&D");
         assert!(matches!(Step::parse("frames:log"), Ok(Step::LogFrames)));
         assert!(matches!(Step::parse("close"), Ok(Step::Close)));
         assert!(matches!(Step::parse("minimize"), Ok(Step::Minimize)));

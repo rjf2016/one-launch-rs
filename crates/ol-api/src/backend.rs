@@ -1020,34 +1020,37 @@ impl Serving {
                 &reply,
                 store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::update(store, &id, &patch, &self.stamp())?)
+                    let account = accounts::update(store, &id, &patch, &self.stamp())?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(account)
                 }),
             ),
             Command::DeleteAccount(id, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::delete(store, &id)?)
+                    accounts::delete(store, &id)?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(())
                 }),
             ),
             Command::SetAccountPassword(id, password, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::set_password(
-                        store,
-                        self.vault(),
-                        &id,
-                        &password,
-                        &self.stamp(),
-                    )?)
+                    let account =
+                        accounts::set_password(store, self.vault(), &id, &password, &self.stamp())?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(account)
                 }),
             ),
             Command::ClearAccountPassword(id, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::clear_password(store, &id, &self.stamp())?)
+                    let account = accounts::clear_password(store, &id, &self.stamp())?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(account)
                 }),
             ),
             Command::Rescan(reply) => answer(&reply, store.and_then(|store| self.rescan(store))),
@@ -1170,16 +1173,21 @@ impl Serving {
                 store.and_then(|store| {
                     self.require_idle()?;
                     let account = accounts::require(store, &account_id)?;
-                    self.with_adapter(store, account.launcher, |_, _, adapter| {
-                        Ok(capture::capture(store, adapter, &account)?)
-                    })
+                    let captured =
+                        self.with_adapter(store, account.launcher, |_, _, adapter| {
+                            Ok(capture::capture(store, adapter, &account)?)
+                        })?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(captured)
                 }),
             ),
             Command::ForgetSession(account_id, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(capture::forget(store, &account_id)?)
+                    capture::forget(store, &account_id)?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(())
                 }),
             ),
             Command::UseShell(shell) => self.shell = Some(shell),

@@ -2,7 +2,7 @@ use std::thread;
 use std::time::Duration;
 
 use ol_platform_api::{Clipboard, ClipboardError, Zeroizing};
-use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL};
+use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL, HWND};
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard,
     RegisterClipboardFormatW, SetClipboardData,
@@ -10,7 +10,10 @@ use windows::Win32::System::DataExchange::{
 use windows::Win32::System::Memory::{
     GMEM_MOVEABLE, GMEM_ZEROINIT, GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock,
 };
-use windows::core::PCWSTR;
+use windows::Win32::UI::WindowsAndMessaging::{
+    CreateWindowExW, DestroyWindow, HWND_MESSAGE, WINDOW_EX_STYLE, WINDOW_STYLE,
+};
+use windows::core::{PCWSTR, w};
 use zeroize::Zeroize as _;
 
 use crate::wide;
@@ -26,22 +29,46 @@ pub const PRIVATE_FORMATS: [&str; 3] = [
 const TRIES: u32 = 10;
 const PAUSE: Duration = Duration::from_millis(15);
 
-// Opened with no window as its owner: nothing is rendered later on request.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct WindowsClipboard;
 
-struct Opened(());
+// Windows documents that SetClipboardData fails after EmptyClipboard on a clipboard opened with no owner; the copy outlives this window because nothing is rendered later on request.
+struct Opened {
+    owner: HWND,
+}
 
 impl Opened {
     fn open() -> Result<Self, ClipboardError> {
+        let owner = unsafe {
+            CreateWindowExW(
+                WINDOW_EX_STYLE(0),
+                w!("STATIC"),
+                PCWSTR::null(),
+                WINDOW_STYLE(0),
+                0,
+                0,
+                0,
+                0,
+                Some(HWND_MESSAGE),
+                None,
+                None,
+                None,
+            )
+        }
+        .map_err(|_| {
+            ClipboardError::Refused(
+                "Windows would not make the window that holds the clipboard".to_owned(),
+            )
+        })?;
         for attempt in 1..=TRIES {
-            if unsafe { OpenClipboard(None) }.is_ok() {
-                return Ok(Self(()));
+            if unsafe { OpenClipboard(Some(owner)) }.is_ok() {
+                return Ok(Self { owner });
             }
             if attempt < TRIES {
                 thread::sleep(PAUSE);
             }
         }
+        let _ = unsafe { DestroyWindow(owner) };
         Err(ClipboardError::Busy)
     }
 
@@ -114,6 +141,7 @@ impl Opened {
 impl Drop for Opened {
     fn drop(&mut self) {
         let _ = unsafe { CloseClipboard() };
+        let _ = unsafe { DestroyWindow(self.owner) };
     }
 }
 

@@ -144,6 +144,12 @@ impl ClipboardService {
         let inner = &self.inner;
         let mut state = inner.state();
         let text = text.expose();
+        // CF_UNICODETEXT ends at the first NUL: such a text would paste cut short, and its clear could never match it.
+        if text.contains('\0') {
+            return Err(ClipboardError::Refused(
+                "the text holds a character the clipboard cannot carry".to_owned(),
+            ));
+        }
         let history_excluded = match inner.board.write_private(text) {
             Ok(()) => true,
             Err(ClipboardError::Unmarked(_)) => {

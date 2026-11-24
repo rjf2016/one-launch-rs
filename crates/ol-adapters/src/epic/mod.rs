@@ -151,7 +151,7 @@ pub struct CurrentSession {
 
 impl CurrentSession {
     // The account the log names, when the file on disk is that sign-in's: a closed launcher's file older than the sign-in may be someone else's.
-    fn uid_of_the_file(&self, running: bool) -> Option<String> {
+    pub fn uid_of_the_file(&self, running: bool) -> Option<String> {
         self.logged_uid
             .clone()
             .filter(|_| running || self.disk_current)
