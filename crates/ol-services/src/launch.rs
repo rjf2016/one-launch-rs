@@ -157,7 +157,7 @@ fn game_for(
     Ok(Some(game))
 }
 
-// A switch that needs the vault and cannot have it would close the launcher, take its snapshot and stop at the first seal or open: it is refused before anything is touched. Steam needs it only to hand over a stored password; Epic, Battle.net and Riot seal their snapshots and saved sign-ins.
+// A switch that needs the vault and cannot have it, or whose stored password or saved sign-in the vault's key does not open, would close the launcher, take its snapshot and stop at the first seal or open: it is refused before anything is touched. Steam needs it only to hand over a stored password; Epic, Battle.net and Riot seal their snapshots and saved sign-ins.
 fn vault_closed(
     store: &Store,
     launchers: &Launchers,
@@ -172,10 +172,19 @@ fn vault_closed(
         }
         _ => true,
     };
-    Ok(
-        (needs && !launchers.vault.has_key())
-            .then_some(ServiceError::VaultClosed(account.launcher)),
-    )
+    if !needs {
+        return Ok(None);
+    }
+    if !launchers.vault.has_key() {
+        return Ok(Some(ServiceError::VaultClosed(account.launcher)));
+    }
+    let sealed = match account.launcher {
+        ol_model::LauncherId::Steam => store.account_password(&account.id)?,
+        _ => store.session_blob(&account.id)?,
+    };
+    Ok(sealed
+        .filter(|sealed| launchers.vault.decrypt(sealed).is_err())
+        .map(|_| ServiceError::SealedUnreadable(account.launcher)))
 }
 
 fn dry_run(store: &Store) -> Result<bool, ServiceError> {
