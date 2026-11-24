@@ -5,8 +5,9 @@
 use std::fs;
 use std::sync::Arc;
 
+use ol_adapters::health::Known;
 use ol_adapters::steam::{AccountRef, SteamAdapter, SteamConfig, Timing};
-use ol_model::{SwitchPlan, SwitchPlanStep};
+use ol_model::{HealthStatus, SwitchPlan, SwitchPlanStep};
 use ol_platform_api::Platform;
 use ol_platform_fake::{
     FakeClock, FakeProcesses, FakeRegistry, FakeShell, OpLog, ProcessKnobs, RegistryValue,
@@ -310,5 +311,42 @@ fn a_file_the_rewrite_would_leave_with_another_account_marked_blocks_the_switch(
     assert_eq!(
         preflight.plan.warnings.first().map(String::as_str),
         Some(ol_formats::steam::loginusers::UNWRITABLE_LAYOUT)
+    );
+}
+
+#[test]
+fn an_auto_login_user_is_compared_only_with_an_account_marked_most_recent() {
+    let world = world();
+    let registry_check = || {
+        let adapter = SteamAdapter::new(&world.platform, &world.config);
+        let checks = adapter.health_checks(&Known {
+            install: adapter.detect_install().unwrap(),
+            running: Some(false),
+        });
+        let check = checks.iter().find(|check| check.id == "registry").unwrap();
+        (check.status, check.detail.clone())
+    };
+    assert_eq!(
+        registry_check(),
+        (
+            HealthStatus::Ok,
+            "Present and matches the most recent account in loginusers.vdf".to_owned()
+        )
+    );
+    let login_users = world
+        .scratch
+        .join("Steam")
+        .join("config")
+        .join("loginusers.vdf");
+    let marked = "\"AutoLogin\"		\"1\"";
+    let text = fs::read_to_string(&login_users).unwrap();
+    assert!(text.contains(marked), "the fixture marks an account");
+    fs::write(&login_users, text.replace(marked, "\"AutoLogin\"		\"0\"")).unwrap();
+    assert_eq!(
+        registry_check(),
+        (
+            HealthStatus::Ok,
+            "Present; loginusers.vdf marks no account as most recent, so there is nothing to compare it with".to_owned()
+        )
     );
 }

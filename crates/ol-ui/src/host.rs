@@ -657,7 +657,8 @@ impl LaunchHost {
     }
 
     fn show_job(&mut self, cx: &mut Context<Self>) {
-        if let Some(active) = &self.active {
+        if let Some(active) = &mut self.active {
+            active.instant = false;
             let (game, launcher, account) = (
                 active.game.clone(),
                 active.job.launcher,

@@ -5,9 +5,10 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use futures_lite::future::block_on;
 use ol_api::accounts::{NewAccount, Secret};
@@ -26,6 +27,7 @@ use time::macros::datetime;
 
 const VERSION: &str = "9.8.7";
 const MASK: u8 = 0xa7;
+const WAIT: Duration = Duration::from_secs(30);
 
 struct Reversible;
 
@@ -606,7 +608,9 @@ fn a_reset_waits_for_the_switch_that_runs() {
         confirm_close: true,
     }))
     .unwrap();
-    running.recv().unwrap();
+    running
+        .recv_timeout(WAIT)
+        .expect("the switch did not start");
     assert!(backend.is_busy());
     assert_eq!(
         refusal(block_on(backend.reset_vault())),
@@ -631,7 +635,13 @@ fn a_reset_waits_for_the_switch_that_runs() {
     );
     assert!(block_on(backend.account(&account.id)).unwrap().has_secret);
     release.send(()).unwrap();
-    assert_ne!(finished.recv().unwrap().state, JobState::Running);
+    assert_ne!(
+        finished
+            .recv_timeout(WAIT)
+            .expect("the switch did not report a final state")
+            .state,
+        JobState::Running
+    );
     assert!(!backend.is_busy());
     assert_eq!(backend.quit_question(), None);
     assert_eq!(refusal(block_on(backend.reset_vault())).0, "BAD_REQUEST");
@@ -998,7 +1008,9 @@ fn after_a_reset_the_switchs_own_thread_seals_with_the_new_key() {
     }))
     .unwrap();
     let last = loop {
-        let job = jobs.recv().unwrap();
+        let job = jobs
+            .recv_timeout(WAIT)
+            .expect("the switch did not report a final state");
         if job.state != JobState::Running {
             break job;
         }
@@ -1188,7 +1200,239 @@ fn a_switch_that_needs_the_vault_is_refused_before_the_launcher_is_touched_while
     let acted: Vec<String> = fake.log.snapshot()[before..]
         .iter()
         .filter_map(|event| event["op"].as_str().map(str::to_owned))
-        .filter(|op| op.starts_with("proc.") || op.starts_with("reg."))
+        .filter(|op| {
+            ["proc.", "reg.", "file.", "shell."]
+                .iter()
+                .any(|kind| op.starts_with(kind))
+        })
+        .collect();
+    assert_eq!(acted, Vec::<String>::new());
+    backend.shut_down();
+}
+
+// This user's DPAPI refusing the folder's key for as many tries as `refusals` holds, while it unwraps what it wrapped itself all along.
+#[derive(Clone)]
+struct Refuses {
+    refusals: Arc<AtomicUsize>,
+    made: Arc<Mutex<Vec<Vec<u8>>>>,
+}
+
+impl DataProtector for Refuses {
+    fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ProtectError> {
+        let wrapped = Reversible.protect(plain)?;
+        self.made.lock().unwrap().push(wrapped.clone());
+        Ok(wrapped)
+    }
+
+    fn unprotect(&self, protected: &[u8]) -> Result<Zeroizing<Vec<u8>>, ProtectError> {
+        let own = self
+            .made
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|made| made == protected);
+        let refused = !own
+            && self
+                .refusals
+                .try_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
+                    left.checked_sub(1)
+                })
+                .is_ok();
+        if refused {
+            return Err(ProtectError::Unprotect);
+        }
+        Reversible.unprotect(protected)
+    }
+}
+
+fn delete_probe(data_dir: &Path) {
+    let store = Store::open(&database_path(data_dir)).unwrap().0;
+    assert!(store.delete_secret(SecretKey::VaultProbe).unwrap());
+}
+
+// A lost key with no probe stored: the reset stores one no key opens before it replaces the key, so a clear that failed would still read as lost at the next start; the clear removes it with the rest, and the vault then reads as working, after a start too.
+#[test]
+fn a_reset_of_a_lost_key_with_no_probe_finishes_and_leaves_a_probe_that_opens() {
+    let scratch = Scratch::new("api-vault");
+    let data_dir = scratch.join("data");
+    let backend =
+        Backend::start_with_vault_of_data_folder(data_dir.clone(), VERSION, Box::new(Reversible));
+    let account =
+        block_on(backend.create_account(new_account("one@example.com", "placeholder-1"))).unwrap();
+    backend.shut_down();
+    delete_probe(&data_dir);
+
+    let backend =
+        Backend::start_with_vault_of_data_folder(data_dir.clone(), VERSION, Box::new(AnotherUser));
+    assert_eq!(
+        block_on(backend.vault_status()).unwrap().state(),
+        EncryptionState::KeyLost
+    );
+    let removed = block_on(backend.reset_vault()).unwrap().summary().unwrap();
+    assert_eq!(
+        (removed.passwords, removed.sessions, removed.kept),
+        (1, 0, 0)
+    );
+    assert_eq!(
+        block_on(backend.vault_status()).unwrap().readable,
+        Some(true)
+    );
+    assert!(!block_on(backend.account(&account.id)).unwrap().has_secret);
+    backend.shut_down();
+
+    let backend =
+        Backend::start_with_vault_of_data_folder(data_dir.clone(), VERSION, Box::new(AnotherUser));
+    assert_eq!(
+        block_on(backend.vault_status()).unwrap().state(),
+        EncryptionState::Working
+    );
+    backend.shut_down();
+    let new = OsCryptVault::open(&data_dir, &AnotherUser).unwrap();
+    let after = rows(&data_dir);
+    assert_eq!(
+        after.secrets.keys().collect::<Vec<_>>(),
+        [SecretKey::VaultProbe.as_str()]
+    );
+    let probe = Ciphertext::new(after.secrets[SecretKey::VaultProbe.as_str()].clone());
+    assert!(new.decrypt(&probe).unwrap().expose() == PROBE_VALUE);
+}
+
+// A key that opens only on the reset's own try, beside a probe it does not open: the reset does not answer that the secrets can be read, but clears what the key does not open and keeps what it does.
+#[test]
+fn a_key_that_opens_late_beside_a_probe_it_does_not_open_is_cleared_not_called_readable() {
+    let scratch = Scratch::new("api-vault");
+    let data_dir = scratch.join("data");
+    let backend =
+        Backend::start_with_vault_of_data_folder(data_dir.clone(), VERSION, Box::new(Reversible));
+    let account =
+        block_on(backend.create_account(new_account("one@example.com", "placeholder-1"))).unwrap();
+    backend.shut_down();
+    let key = fs::read(local_state_path(&data_dir)).unwrap();
+    Store::open(&database_path(&data_dir))
+        .unwrap()
+        .0
+        .put_secret(
+            SecretKey::VaultProbe,
+            &Ciphertext::new(vec![0xa5]),
+            "2026-11-06T16:46:23.000Z",
+        )
+        .unwrap();
+
+    let windows = Refuses {
+        refusals: Arc::new(AtomicUsize::new(usize::MAX)),
+        made: Arc::default(),
+    };
+    let backend = Backend::start_with_vault_of_data_folder(
+        data_dir.clone(),
+        VERSION,
+        Box::new(windows.clone()),
+    );
+    assert_eq!(
+        block_on(backend.vault_status()).unwrap().state(),
+        EncryptionState::KeyLost
+    );
+    windows.refusals.store(2, Ordering::SeqCst);
+    let answer = block_on(backend.reset_vault()).unwrap();
+    assert_eq!(windows.refusals.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        answer.summary(),
+        Some(VaultResetSummary {
+            passwords: 0,
+            sessions: 0,
+            secrets: 1,
+            kept: 1,
+        })
+    );
+    assert_eq!(
+        block_on(backend.vault_status()).unwrap().readable,
+        Some(true)
+    );
+    assert!(block_on(backend.account(&account.id)).unwrap().has_secret);
+    backend.shut_down();
+    assert!(
+        fs::read(local_state_path(&data_dir)).unwrap() == key,
+        "the key was replaced"
+    );
+}
+
+// The key file went missing and a start made a new key: a switch to an account whose saved sign-in the old key sealed would close Epic and stop at that sign-in, so it is refused before anything of the launcher is closed, started or written, and the preflight says so.
+#[test]
+fn a_switch_whose_saved_sign_in_the_key_does_not_open_is_refused_before_the_launcher_is_touched() {
+    let scratch = Scratch::new("api-vault");
+    let data_dir = scratch.join("data");
+    let fake = fake_machine(&scratch);
+    let start = || {
+        let mut launchers = ol_api::launchers::on_this_pc(fake.platform.clone());
+        launchers.epic = EpicMachine {
+            timing: EpicTiming::with(&fake.epic_timing),
+            default_dir: fake.epic_default_dir.clone(),
+            local_app_data: fake.local_app_data.clone(),
+            program_data: fake.program_data.clone(),
+        };
+        Backend::start_on_this_pc(
+            data_dir.clone(),
+            VERSION,
+            launchers,
+            Box::new(Reversible),
+            None,
+        )
+        .unwrap()
+    };
+    let backend = start();
+    let account =
+        block_on(backend.create_account(new_account("alt@example.com", "placeholder"))).unwrap();
+    let session = fake
+        .seed
+        .sessions
+        .iter()
+        .find(|session| session.launcher == LauncherId::Epic)
+        .unwrap();
+    block_on(backend.seed_session(
+        &account.id,
+        Some(session.launcher_uid.clone()),
+        Secret::new(session.blob.clone()),
+    ))
+    .unwrap();
+    block_on(backend.rescan()).unwrap();
+    backend.shut_down();
+    fs::remove_dir_all(data_dir.join("chromium")).unwrap();
+
+    let backend = start();
+    assert_eq!(
+        block_on(backend.vault_status()).unwrap().state(),
+        EncryptionState::KeyLost
+    );
+    let game = block_on(backend.library())
+        .unwrap()
+        .games
+        .into_iter()
+        .map(|entry| entry.game)
+        .find(|game| game.launcher == LauncherId::Epic)
+        .unwrap();
+    let before = fake.log.snapshot().len();
+    let preflight = block_on(backend.launch_preflight(&account.id, Some(&game.id))).unwrap();
+    let blocked = preflight
+        .blocked
+        .expect("the preflight lets the switch through");
+    assert!(blocked.contains("saved sign-in"), "{blocked}");
+    let refused = block_on(backend.start_launch(StartLaunch {
+        account_id: account.id.clone(),
+        game_id: Some(game.id.clone()),
+        confirm_close: true,
+    }));
+    assert_eq!(
+        refused.err().map(|error| error.code),
+        Some("VAULT_UNREADABLE")
+    );
+    assert!(!backend.is_busy());
+    let acted: Vec<String> = fake.log.snapshot()[before..]
+        .iter()
+        .filter_map(|event| event["op"].as_str().map(str::to_owned))
+        .filter(|op| {
+            ["proc.", "reg.", "file.", "shell."]
+                .iter()
+                .any(|kind| op.starts_with(kind))
+        })
         .collect();
     assert_eq!(acted, Vec::<String>::new());
     backend.shut_down();

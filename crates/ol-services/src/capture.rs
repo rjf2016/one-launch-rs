@@ -67,8 +67,9 @@ pub fn capture(
 fn capture_epic(epic: &EpicAdapter<'_>, account: &AccountRef) -> Result<(), AdapterError> {
     epic.require_install()?;
     let running = epic.is_running()?;
-    let text = epic.read_ini()?;
-    let current = epic.current_session(text.as_deref(), running)?;
+    let settings = epic.read_settings()?;
+    let current = epic.current_session_of(settings.as_ref(), running)?;
+    let text = settings.map(|settings| settings.text);
     let login = &account.login;
     let blob = text
         .as_deref()
@@ -108,8 +109,18 @@ fn capture_epic(epic: &EpicAdapter<'_>, account: &AccountRef) -> Result<(), Adap
             .owner
             .as_ref()
             .and_then(|owner| owner.launcher_uid.clone())
-            .or_else(|| current.logged_uid.clone())
+            .or_else(|| current.uid_of_the_file(running))
     };
+    if current.owner.is_none() && uid.is_none() {
+        let why = if current.logged_uid.is_some() {
+            "Epic Games Launcher signed in after it last saved its session, so the session on disk may be another account's"
+        } else {
+            "The session Epic Games Launcher remembers cannot be linked to an account"
+        };
+        return Err(blocked(format!(
+            "{why}. Sign in to the launcher as {login}, exit it so it saves the session, then save again."
+        )));
+    }
     if let (Some(uid), Some(own)) = (uid.as_deref(), linked(account))
         && differs(uid, own)
     {
@@ -152,9 +163,13 @@ fn capture_battlenet(
             "The last Battle.net run ended with a logout, so the remembered session cannot be attributed to an account. Sign in to the client, exit it, then save again.".to_owned(),
         ));
     }
-    if let Some(owner) = owned_by_another(current.owner.as_ref(), account) {
+    let owner = current.owner.as_ref();
+    // While the client runs its log names the owner, but the token kept is the one a saved sign-in matches, which may be another account's.
+    let holder = owned_by_another(owner, account)
+        .or_else(|| owned_by_another(current.token_owner.as_ref(), account));
+    if let Some(holder) = holder {
         return Err(blocked(format!(
-            "The session Battle.net currently remembers belongs to {owner}. Sign in to the client as {login} first."
+            "The session Battle.net currently remembers belongs to {holder}. Sign in to the client as {login} first."
         )));
     }
     let uid = if running {
@@ -166,6 +181,11 @@ fn capture_battlenet(
             .and_then(|owner| owner.launcher_uid.clone())
             .or_else(|| current.logged_uid.clone())
     };
+    if owner.is_none() && uid.is_none() {
+        return Err(blocked(format!(
+            "The session Battle.net remembers cannot be linked to an account. Sign in to the client as {login}, exit it, then save again."
+        )));
+    }
     if let (Some(uid), Some(own)) = (uid.as_deref(), linked(account))
         && differs(uid, own)
     {

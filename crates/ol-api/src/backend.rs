@@ -7,8 +7,8 @@ use async_channel::{Receiver, Sender, WeakSender};
 use ol_model::{
     Account, BackupSnapshot, Ciphertext, InstalledGame, LaunchJob, LaunchPreflight, LauncherId,
     LauncherInstall, LauncherSession, LauncherSessionState, LauncherStatus, LibraryScanResult,
-    LibrarySort, RecentLaunch, RememberedAccount, RestoreResult, SettingKey, Settings, Sidebar,
-    SwitchPlan, SwitchRecovery,
+    LibrarySort, RecentLaunch, RememberedAccount, RestoreResult, SecretKey, SettingKey, Settings,
+    Sidebar, SwitchPlan, SwitchRecovery,
 };
 use ol_platform_api::{Clipboard, DataProtector, Shell};
 use ol_services::accounts::{self, AccountError, AccountPatch, NewAccount};
@@ -1020,34 +1020,37 @@ impl Serving {
                 &reply,
                 store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::update(store, &id, &patch, &self.stamp())?)
+                    let account = accounts::update(store, &id, &patch, &self.stamp())?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(account)
                 }),
             ),
             Command::DeleteAccount(id, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::delete(store, &id)?)
+                    accounts::delete(store, &id)?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(())
                 }),
             ),
             Command::SetAccountPassword(id, password, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::set_password(
-                        store,
-                        self.vault(),
-                        &id,
-                        &password,
-                        &self.stamp(),
-                    )?)
+                    let account =
+                        accounts::set_password(store, self.vault(), &id, &password, &self.stamp())?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(account)
                 }),
             ),
             Command::ClearAccountPassword(id, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::clear_password(store, &id, &self.stamp())?)
+                    let account = accounts::clear_password(store, &id, &self.stamp())?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(account)
                 }),
             ),
             Command::Rescan(reply) => answer(&reply, store.and_then(|store| self.rescan(store))),
@@ -1170,16 +1173,21 @@ impl Serving {
                 store.and_then(|store| {
                     self.require_idle()?;
                     let account = accounts::require(store, &account_id)?;
-                    self.with_adapter(store, account.launcher, |_, _, adapter| {
-                        Ok(capture::capture(store, adapter, &account)?)
-                    })
+                    let captured =
+                        self.with_adapter(store, account.launcher, |_, _, adapter| {
+                            Ok(capture::capture(store, adapter, &account)?)
+                        })?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(captured)
                 }),
             ),
             Command::ForgetSession(account_id, reply) => answer(
                 &reply,
                 store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(capture::forget(store, &account_id)?)
+                    capture::forget(store, &account_id)?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(())
                 }),
             ),
             Command::UseShell(shell) => self.shell = Some(shell),
@@ -1339,14 +1347,26 @@ impl Serving {
                 .protector
                 .as_ref()
                 .ok_or(VaultResetRefusal::Unavailable)?;
+            let marked = vault_health::mark_reset_pending(store, &self.stamp())?;
+            let unmark = || {
+                if marked {
+                    let _ = store.delete_secret(SecretKey::VaultProbe);
+                }
+            };
             match OsCryptVault::replace_lost_key(&self.data_dir, &**protector) {
                 Ok(Recovered::Opened(vault)) => {
                     self.vault.put(VaultSlot::Open(Arc::new(vault)));
+                    unmark();
                     let _ = vault_health::ensure_probe(store, self.vault_access(), &self.stamp());
-                    return Ok(VaultReset::KeyReadable);
+                    if vault_health::status(store, self.vault_access())?.state()
+                        == EncryptionState::Working
+                    {
+                        return Ok(VaultReset::KeyReadable);
+                    }
                 }
                 Ok(Recovered::Replaced(vault)) => self.vault.put(VaultSlot::Open(Arc::new(vault))),
                 Err(error) => {
+                    unmark();
                     if matches!(error, KeyError::WindowsUnavailable) {
                         self.vault.put(VaultSlot::Unavailable);
                     }
