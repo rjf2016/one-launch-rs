@@ -1,20 +1,24 @@
+use std::cell::Cell;
+use std::rc::Rc;
+
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, ClickEvent, Context, DispatchPhase, Div, Entity, FocusHandle, FontWeight,
-    Keystroke, MouseButton, MouseUpEvent, NavigationDirection, Pixels, Stateful, Subscription, Svg,
-    Window, WindowControlArea, canvas, div, px, svg,
+    AnyElement, ClickEvent, Context, DispatchPhase, Div, Entity, EventEmitter, FocusHandle,
+    FontWeight, Keystroke, MouseButton, MouseUpEvent, NavigationDirection, Pixels, SharedString,
+    Stateful, Subscription, Svg, Window, WindowControlArea, canvas, div, px, svg,
 };
 use ol_api::Backend;
-use ol_model::{Game, LauncherId, Sidebar};
+use ol_api::settings::QuitQuestion;
+use ol_model::{Game, LaunchJob, LauncherId, SettingKey, Sidebar};
 use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::account::AccountPage;
 use crate::accounts::AccountsView;
 use crate::assets;
-use crate::host::{LaunchHost, overlay};
+use crate::host::{LaunchHost, PlayEnded, overlay};
 use crate::library::LibraryView;
-use crate::settings::SettingsView;
-use crate::widgets::{Button, Tone, panel_shadow, tip};
+use crate::settings::{SettingsTab, SettingsView};
+use crate::widgets::{Button, Tone, panel_shadow, spinner, tip};
 
 const SIDEBAR: f32 = 224.;
 const SIDEBAR_COLLAPSED: f32 = 60.;
@@ -49,7 +53,8 @@ pub(crate) enum Route {
         id: String,
         created: bool,
     },
-    Settings,
+    // The tab named, or the one last shown in this run.
+    Settings(Option<SettingsTab>),
     Play {
         game: Box<Game>,
         account: Option<String>,
@@ -87,12 +92,36 @@ pub(crate) struct Question {
     pub message: &'static str,
 }
 
+enum Asked {
+    Leave {
+        then: Route,
+        return_to: Option<Box<Game>>,
+    },
+    // A quit while a switch runs; its first answer keeps the app running.
+    Quit,
+    // "Quit anyway" was answered: no answer is left, only the line that the switch is being stopped.
+    Stopping,
+}
+
 struct Asking {
-    question: Question,
-    then: Route,
-    return_to: Option<Game>,
-    leave_leads: bool,
+    title: SharedString,
+    message: SharedString,
+    detail: Option<SharedString>,
+    keep: &'static str,
+    act: &'static str,
+    asked: Asked,
+    // The second answer carries the ring, and Enter gives it.
+    act_leads: bool,
     had_keyboard: Option<FocusHandle>,
+}
+
+// The user answered Quit anyway: the app is to quit.
+pub struct QuitAnyway;
+
+// A job the app followed has ended: the window may go to the tray.
+pub struct Played {
+    pub job: LaunchJob,
+    pub instant: bool,
 }
 
 // The Library lives as long as the window, so its posters stay decoded; the other screens are made afresh at each visit, as the Electron app's are.
@@ -123,10 +152,17 @@ pub struct Shell {
     // The user has toggled the sidebar in this run: the stored choice, should it arrive later, does not undo that.
     toggled: bool,
     fake_launchers: bool,
+    settings_tab: Rc<Cell<SettingsTab>>,
+    preview: bool,
     _page: Option<Subscription>,
     _keys: Subscription,
     _host: Subscription,
+    _played: Subscription,
 }
+
+impl EventEmitter<QuitAnyway> for Shell {}
+
+impl EventEmitter<Played> for Shell {}
 
 pub fn sidebar_width(open: bool) -> Pixels {
     px(if open { SIDEBAR } else { SIDEBAR_COLLAPSED })
@@ -155,6 +191,20 @@ impl Shell {
             }
         })
         .detach();
+        cx.spawn({
+            let backend = backend.clone();
+            async move |this, cx| {
+                let Ok(settings) = backend.settings().await else {
+                    return;
+                };
+                this.update(cx, |this, cx| {
+                    this.preview = settings.toggle(SettingKey::DryRun);
+                    cx.notify();
+                })
+                .ok();
+            }
+        })
+        .detach();
         let this = cx.weak_entity();
         let keys = cx.intercept_keystrokes(move |event, window, cx| {
             let taken = this
@@ -168,6 +218,12 @@ impl Shell {
         });
         let host = cx.new(|cx| LaunchHost::new(backend.clone(), cx));
         let from_host = cx.subscribe_in(&host, window, Self::on_go);
+        let played = cx.subscribe(&host, |_, _, ended: &PlayEnded, cx| {
+            cx.emit(Played {
+                job: ended.job.clone(),
+                instant: ended.instant,
+            });
+        });
         Self {
             library: cx.new(|cx| LibraryView::new(backend.clone(), host.clone(), window, cx)),
             backend,
@@ -177,10 +233,73 @@ impl Shell {
             sidebar_open: false,
             toggled: false,
             fake_launchers,
+            settings_tab: Rc::default(),
+            preview: false,
             _page: None,
             _keys: keys,
             _host: from_host,
+            _played: played,
         }
+    }
+
+    // A setting the backend stored: the sidebar's Preview mode card and the Settings page follow it.
+    pub fn setting_changed(
+        &mut self,
+        key: SettingKey,
+        value: Option<String>,
+        cx: &mut Context<Self>,
+    ) {
+        if key == SettingKey::DryRun {
+            self.preview = value
+                .as_deref()
+                .is_some_and(|value| value == "true" || value == "1");
+            cx.notify();
+        }
+        if let Page::Settings(page) = &self.page {
+            page.update(cx, |page, cx| page.setting_changed(key, value, cx));
+        }
+    }
+
+    // The question before a quit stops a running switch. Asked once at a time; it takes the place of a question about leaving a page.
+    pub fn ask_before_quit(
+        &mut self,
+        question: QuitQuestion,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if matches!(
+            self.asking,
+            Some(Asking {
+                asked: Asked::Quit | Asked::Stopping,
+                ..
+            })
+        ) {
+            return;
+        }
+        self.asking = Some(Asking {
+            title: question.title.into(),
+            message: question.message.into(),
+            detail: Some(question.detail.into()),
+            keep: question.keep,
+            act: question.quit,
+            asked: Asked::Quit,
+            act_leads: false,
+            had_keyboard: window.focused(cx),
+        });
+        window.blur(cx);
+        cx.notify();
+    }
+
+    fn open_preview_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Page::Settings(page) = &self.page {
+            page.update(cx, |page, cx| page.select_tab(SettingsTab::Advanced, cx));
+            return;
+        }
+        self.go(
+            Go::to(Route::Settings(Some(SettingsTab::Advanced))),
+            window,
+            cx,
+        );
     }
 
     pub fn library(&self) -> &Entity<LibraryView> {
@@ -196,13 +315,16 @@ impl Shell {
         let route = match screen {
             Screen::Library => Route::Library,
             Screen::Accounts => Route::Accounts,
-            Screen::Settings => Route::Settings,
+            Screen::Settings => Route::Settings(None),
         };
         self.go(Go::to(route), window, cx);
     }
 
     // An unguarded move is one a page makes when a create, a delete or an import has finished: it wins over a question still open.
     fn go(&mut self, go: Go, window: &mut Window, cx: &mut Context<Self>) {
+        if self.stopping() {
+            return;
+        }
         if self.asking.is_some() {
             if go.guarded {
                 return;
@@ -213,10 +335,16 @@ impl Shell {
             && let Some(question) = self.question(cx)
         {
             self.asking = Some(Asking {
-                question,
-                then: go.route,
-                return_to: go.return_to,
-                leave_leads: false,
+                title: question.title.into(),
+                message: question.message.into(),
+                detail: None,
+                keep: "Stay",
+                act: "Leave",
+                asked: Asked::Leave {
+                    then: go.route,
+                    return_to: go.return_to.map(Box::new),
+                },
+                act_leads: false,
                 had_keyboard: window.focused(cx),
             });
             window.blur(cx);
@@ -233,14 +361,47 @@ impl Shell {
         }
     }
 
-    fn answer(&mut self, leave: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn stopping(&self) -> bool {
+        matches!(
+            self.asking,
+            Some(Asking {
+                asked: Asked::Stopping,
+                ..
+            })
+        )
+    }
+
+    fn answer(&mut self, act: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.stopping() {
+            return;
+        }
         let Some(asking) = self.asking.take() else {
             return;
         };
-        if leave {
-            self.enter(asking.then, asking.return_to, window, cx);
-        } else if let Some(field) = &asking.had_keyboard {
-            window.focus(field, cx);
+        match asking.asked {
+            Asked::Leave { then, return_to } if act => {
+                self.enter(then, return_to.map(|game| *game), window, cx);
+            }
+            Asked::Quit if act => {
+                self.asking = Some(Asking {
+                    title: "Stopping the switch".into(),
+                    message:
+                        "One Launch quits once the switch has stopped and put back what it had to."
+                            .into(),
+                    detail: None,
+                    keep: "",
+                    act: "",
+                    asked: Asked::Stopping,
+                    act_leads: false,
+                    had_keyboard: None,
+                });
+                cx.emit(QuitAnyway);
+            }
+            _ => {
+                if let Some(field) = &asking.had_keyboard {
+                    window.focus(field, cx);
+                }
+            }
         }
         cx.notify();
     }
@@ -266,7 +427,13 @@ impl Shell {
                 play = Some((*game, account));
                 Page::Library
             }
-            Route::Settings => Page::Settings(cx.new(|_| SettingsView)),
+            Route::Settings(tab) => {
+                if let Some(tab) = tab {
+                    self.settings_tab.set(tab);
+                }
+                let tab = Rc::clone(&self.settings_tab);
+                Page::Settings(cx.new(|cx| SettingsView::new(backend, tab, cx)))
+            }
             Route::Accounts => {
                 let page = cx.new(|cx| AccountsView::new(backend, None, None, cx));
                 self._page = Some(cx.subscribe_in(&page, window, Self::on_go));
@@ -380,11 +547,11 @@ impl Shell {
             match keystroke.key.as_str() {
                 "escape" if none => self.answer(false, window, cx),
                 "enter" if none => {
-                    let leave = asking.leave_leads;
-                    self.answer(leave, window, cx);
+                    let act = asking.act_leads;
+                    self.answer(act, window, cx);
                 }
                 "tab" => {
-                    asking.leave_leads = !asking.leave_leads;
+                    asking.act_leads = !asking.act_leads;
                     cx.notify();
                 }
                 _ => {}
@@ -420,14 +587,29 @@ impl Shell {
         }
         // As in the Electron app: neither a dialog nor a text field gives these keys up.
         if only_control && !self.typing(window, cx) {
-            match keystroke.key.as_str() {
-                "b" => self.toggle_sidebar(cx),
-                "1" => self.navigate(Screen::Library, window, cx),
-                "2" => self.navigate(Screen::Accounts, window, cx),
-                "3" => self.navigate(Screen::Settings, window, cx),
-                _ => return self.on_page_key(keystroke, window, cx),
+            let taken = match keystroke.key.as_str() {
+                "b" => {
+                    self.toggle_sidebar(cx);
+                    true
+                }
+                "1" => {
+                    self.navigate(Screen::Library, window, cx);
+                    true
+                }
+                "2" => {
+                    self.navigate(Screen::Accounts, window, cx);
+                    true
+                }
+                "3" => {
+                    self.navigate(Screen::Settings, window, cx);
+                    true
+                }
+                _ => false,
+            };
+            // The Library's own Ctrl keys (Ctrl+F) come next; no other page has any.
+            if taken || !matches!(self.page, Page::Library) {
+                return taken;
             }
-            return true;
         }
         self.on_page_key(keystroke, window, cx)
     }
@@ -441,10 +623,10 @@ impl Shell {
         match &self.page {
             Page::Accounts(page) => page.update(cx, |page, cx| page.on_key(keystroke, cx)),
             Page::Account(page) => page.update(cx, |page, cx| page.on_key(keystroke, window, cx)),
+            Page::Settings(page) => page.update(cx, |page, cx| page.on_key(keystroke, cx)),
             Page::Library => self.library.update(cx, |library, cx| {
                 library.on_keystroke(keystroke, window, cx)
             }),
-            Page::Settings(_) => false,
         }
     }
 
@@ -478,7 +660,7 @@ impl Shell {
                             .map(|screen| self.nav_item(screen, open, cx)),
                     ),
             )
-            // The Preview mode and Update ready cards stand in this column, above the button.
+            // The Update ready card is to stand in this column too, under the Preview mode card.
             .child(
                 div()
                     .mt_auto()
@@ -487,8 +669,62 @@ impl Shell {
                     .gap(px(4.))
                     .px(px(8.))
                     .pb(px(12.))
+                    .children(self.preview.then(|| self.render_preview_card(open, cx)))
                     .child(self.render_toggle_row(open, glyph, toggle_tip, cx)),
             )
+    }
+
+    // The Electron app's Preview mode card: a click opens Settings on Advanced, where the switch is.
+    fn render_preview_card(&self, open: bool, cx: &mut Context<Self>) -> Stateful<Div> {
+        div()
+            .id("preview-card")
+            .flex()
+            .items_start()
+            .gap(px(8.))
+            .rounded(px(8.))
+            .border_1()
+            .px(px(11.))
+            .py(px(8.))
+            .text_size(px(12.))
+            .line_height(px(16.))
+            .text_color(color(theme::WARNING))
+            .whitespace_nowrap()
+            .cursor_pointer()
+            .map(|card| {
+                if open {
+                    card.border_color(alpha(theme::WARNING, 0.3))
+                        .bg(alpha(theme::WARNING, 0.1))
+                        .hover(|style| style.bg(alpha(theme::WARNING, 0.15)))
+                } else {
+                    card.border_color(gpui::transparent_black())
+                        .hover(|style| style.bg(alpha(theme::WARNING, 0.1)))
+                }
+            })
+            .tooltip(tip(
+                "Preview mode is on: Play shows what a switch would do instead of doing it. Turn it off in Settings, or from the preview itself.",
+            ))
+            .on_click(cx.listener(|this, _, window, cx| this.open_preview_settings(window, cx)))
+            .child(icon(assets::FLASK, 14., theme::WARNING).mt(px(1.)))
+            .when(open, |card| {
+                card.child(
+                    div()
+                        .w(px(164.))
+                        .flex_none()
+                        .whitespace_normal()
+                        .child(
+                            div()
+                                .font_weight(FontWeight::MEDIUM)
+                                .child("Preview mode is on"),
+                        )
+                        .child(
+                            div()
+                                .text_size(px(11.))
+                                .line_height(px(15.))
+                                .text_color(alpha(theme::WARNING, 0.8))
+                                .child("Play shows what would happen, nothing changes."),
+                        ),
+                )
+            })
     }
 
     fn render_toggle_row(
@@ -615,7 +851,16 @@ impl Shell {
                     .gap(px(12.))
                     .px(px(20.))
                     .py(px(16.))
-                    .child(icon(assets::UPDATE, 20., theme::WARNING).mt(px(2.)))
+                    .child(if matches!(asking.asked, Asked::Stopping) {
+                        div()
+                            .mt(px(2.))
+                            .child(spinner("stopping", 20., theme::WARNING))
+                            .into_any_element()
+                    } else {
+                        icon(assets::UPDATE, 20., theme::WARNING)
+                            .mt(px(2.))
+                            .into_any_element()
+                    })
                     .child(
                         div()
                             .min_w_0()
@@ -623,41 +868,56 @@ impl Shell {
                                 div()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(color(theme::TEXT_STRONG))
-                                    .child(asking.question.title),
+                                    .child(asking.title.clone()),
                             )
                             .child(
                                 div()
                                     .mt(px(4.))
+                                    .text_color(color(if asking.detail.is_some() {
+                                        theme::TEXT
+                                    } else {
+                                        theme::MUTED
+                                    }))
+                                    .child(asking.message.clone()),
+                            )
+                            .children(asking.detail.clone().map(|detail| {
+                                div()
+                                    .mt(px(8.))
                                     .text_color(color(theme::MUTED))
-                                    .child(asking.question.message),
-                            ),
+                                    .child(detail)
+                            })),
                     ),
             )
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_end()
-                    .gap(px(8.))
-                    .border_t_1()
-                    .border_color(color(theme::BORDER))
-                    .px(px(20.))
-                    .py(px(12.))
-                    .child(
-                        Button::new("stay", Tone::Ghost, "Stay")
-                            .leading(!asking.leave_leads)
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.answer(false, window, cx);
-                            })),
-                    )
-                    .child(
-                        Button::new("leave", Tone::Danger, "Leave")
-                            .leading(asking.leave_leads)
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.answer(true, window, cx);
-                            })),
-                    ),
-            );
+            .when(!matches!(asking.asked, Asked::Stopping), |card| {
+                card.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_end()
+                        .gap(px(8.))
+                        .border_t_1()
+                        .border_color(color(theme::BORDER))
+                        .px(px(20.))
+                        .py(px(12.))
+                        .child(
+                            Button::new("stay", Tone::Ghost, asking.keep)
+                                .leading(!asking.act_leads)
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.answer(false, window, cx);
+                                })),
+                        )
+                        .child(
+                            Button::new("leave", Tone::Danger, asking.act)
+                                .leading(asking.act_leads)
+                                .on_click(cx.listener(|this, click: &ClickEvent, window, cx| {
+                                    // The second click of a double click is not an answer.
+                                    if click.click_count() == 1 {
+                                        this.answer(true, window, cx);
+                                    }
+                                })),
+                        ),
+                )
+            });
         Some(
             div()
                 .id("confirm-backdrop")

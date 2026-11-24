@@ -58,30 +58,37 @@ pub fn read_log_since(files: &dyn FileReader, path: &str, mark: u64, max_bytes: 
     if !files.exists(path) {
         return String::new();
     }
-    let Ok(size) = files.size(path) else {
-        return String::new();
-    };
+    read_log_tail(files, path, mark, max_bytes).unwrap_or_default()
+}
+
+// As `read_log_since`, for a caller that has to tell a log that cannot be read from one with nothing new in it.
+pub fn read_log_tail(
+    files: &dyn FileReader,
+    path: &str,
+    mark: u64,
+    max_bytes: u64,
+) -> Result<String, AdapterError> {
+    let io = |error: std::io::Error| AdapterError::io(&error);
+    let size = files.size(path).map_err(io)?;
     let from = if size < mark { 0 } else { mark };
     let start = from.max(size.saturating_sub(max_bytes));
     if size <= start {
-        return String::new();
+        return Ok(String::new());
     }
     if start == from {
-        return files
-            .read_range(path, start, size - start)
-            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
-            .unwrap_or_default();
+        let bytes = files.read_range(path, start, size - start).map_err(io)?;
+        return Ok(String::from_utf8_lossy(&bytes).into_owned());
     }
     // A clipped read keeps its first line only when the byte before it ends a line: otherwise that line is cut, maybe inside a character.
-    let Ok(bytes) = files.read_range(path, start - 1, size - start + 1) else {
-        return String::new();
-    };
-    match bytes.split_first() {
+    let bytes = files
+        .read_range(path, start - 1, size - start + 1)
+        .map_err(io)?;
+    Ok(match bytes.split_first() {
         Some((b'\n', rest)) => String::from_utf8_lossy(rest).into_owned(),
         _ => String::from_utf8_lossy(&bytes)
             .split_once('\n')
             .map_or_else(String::new, |(_, rest)| rest.to_owned()),
-    }
+    })
 }
 
 #[cfg(test)]

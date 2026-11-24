@@ -47,12 +47,22 @@ pub struct JobSettled;
 
 impl EventEmitter<JobSettled> for LaunchHost {}
 
+// A job the app followed has ended, with whether it was a one-click Play from a card or the Recent strip that never showed its dialog: what decides whether the window goes to the tray.
+#[derive(Clone)]
+pub struct PlayEnded {
+    pub job: LaunchJob,
+    pub instant: bool,
+}
+
+impl EventEmitter<PlayEnded> for LaunchHost {}
+
 impl EventEmitter<Go> for LaunchHost {}
 
 // The job the app follows, with the game it was started for.
 struct Active {
     job: LaunchJob,
     game: Option<Game>,
+    instant: bool,
 }
 
 struct Request {
@@ -453,7 +463,11 @@ impl LaunchHost {
         match outcome {
             Ok(job) => {
                 let (job_id, direct) = (job.id.clone(), job.direct);
-                self.active = Some(Active { job, game });
+                let instant = self
+                    .request
+                    .as_ref()
+                    .is_some_and(|request| request.key == key && request.silent);
+                self.active = Some(Active { job, game, instant });
                 self.follow(job_id, cx);
                 let mut nothing_to_watch = false;
                 if let Some(request) = self.request_mut(key) {
@@ -508,12 +522,17 @@ impl LaunchHost {
         }
         let running = job.state == JobState::Running;
         let handing_over = job.attention.is_some() && running;
+        let ended = (!running).then(|| PlayEnded {
+            job: job.clone(),
+            instant: active.instant,
+        });
         active.job = job;
         if !handing_over && let Some(request) = &mut self.request {
             request.copied = None;
         }
-        if !running {
+        if let Some(ended) = ended {
             cx.emit(JobSettled);
+            cx.emit(ended);
         }
         self.changed(cx);
         running
@@ -632,7 +651,8 @@ impl LaunchHost {
     }
 
     fn show_job(&mut self, cx: &mut Context<Self>) {
-        if let Some(active) = &self.active {
+        if let Some(active) = &mut self.active {
+            active.instant = false;
             let (game, launcher, account) = (
                 active.game.clone(),
                 active.job.launcher,
@@ -755,8 +775,8 @@ impl LaunchHost {
         cx.notify();
     }
 
-    // True when the key is a dialog's: nothing behind the dialog hears it.
-    pub fn on_keystroke(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
+    // True when the key is a dialog's: nothing behind the dialog hears it. The Shell hands each key here, after its own question.
+    pub(crate) fn on_keystroke(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
         let held = keystroke.modifiers;
         // The window's own keys, Alt+F4 among them, reach Windows only when nothing stops them.
         if !self.is_modal() || held.alt || held.platform {

@@ -6,14 +6,16 @@ use std::sync::Arc;
 
 use ol_adapters::battlenet::{self, BattlenetAdapter, BattlenetConfig};
 use ol_adapters::epic::{self, EpicAdapter, EpicConfig};
+use ol_adapters::health::Known;
 use ol_adapters::riot::{self, Launched, RiotAdapter, RiotConfig};
 use ol_adapters::steam::{self, SteamAdapter, SteamConfig, SwitchPreflight, Timing};
 use ol_adapters::{AccountRef, AdapterError, Directory, GameRef};
 use ol_formats::battlenet::products::LaunchForm;
 use ol_formats::epic::manifests::LaunchUriForm;
 use ol_model::{
-    Account, InstalledGame, JobGame, LauncherId, LauncherSessionState, LibraryScanResult,
-    RememberedAccount, SettingKey, Settings, SwitchPlan,
+    Account, HealthCheck, HealthReport, HealthStatus, InstalledGame, JobGame, LauncherId,
+    LauncherInstall, LauncherSessionState, LauncherStatus, LibraryScanResult, RememberedAccount,
+    SettingKey, Settings, SwitchPlan,
 };
 use ol_platform_api::{CancelToken, Platform, RiotLocalLaunch};
 use ol_store::{Store, StoreError};
@@ -241,6 +243,52 @@ impl Adapter<'_> {
         }
     }
 
+    pub fn chosen_install_dir(&self) -> Option<String> {
+        match self {
+            Self::Steam(steam) => steam.chosen_install_dir(),
+            Self::Epic(epic) => epic.chosen_install_dir(),
+            Self::Battlenet(battlenet) => battlenet.chosen_install_dir(),
+            Self::Riot(riot) => riot.chosen_install_dir(),
+        }
+    }
+
+    pub fn detect_install(&self) -> Result<Option<LauncherInstall>, AdapterError> {
+        match self {
+            Self::Steam(steam) => steam.detect_install(),
+            Self::Epic(epic) => epic.detect_install(),
+            Self::Battlenet(battlenet) => battlenet.detect_install(),
+            Self::Riot(riot) => riot.detect_install(),
+        }
+    }
+
+    pub fn is_running(&self) -> Result<bool, AdapterError> {
+        match self {
+            Self::Steam(steam) => steam.is_running(),
+            Self::Epic(epic) => epic.is_running(),
+            Self::Battlenet(battlenet) => battlenet.is_running(),
+            Self::Riot(riot) => riot.is_running(),
+        }
+    }
+
+    // The install a program the user picked belongs to, when it is the launcher's own and is there. Reads only.
+    pub fn install_from_exe(&self, exe: &str) -> Option<LauncherInstall> {
+        match self {
+            Self::Steam(steam) => steam.install_from_exe(exe),
+            Self::Epic(epic) => epic.install_from_exe(exe),
+            Self::Battlenet(battlenet) => battlenet.install_from_exe(exe),
+            Self::Riot(riot) => riot.install_from_exe(exe),
+        }
+    }
+
+    pub fn health_checks(&self, known: &Known) -> Vec<HealthCheck> {
+        match self {
+            Self::Steam(steam) => steam.health_checks(known),
+            Self::Epic(epic) => epic.health_checks(known),
+            Self::Battlenet(battlenet) => battlenet.health_checks(known),
+            Self::Riot(riot) => riot.health_checks(known),
+        }
+    }
+
     // What the launcher's own files say about the session it remembers. None for a launcher that keeps a list of accounts instead.
     pub fn session_state(&self) -> Option<Result<LauncherSessionState, AdapterError>> {
         match self {
@@ -408,6 +456,21 @@ pub enum ServiceError {
     SnapshotGone,
     #[error("There is no interrupted switch to recover")]
     NothingToRecover,
+    #[error("That file is not {}. Choose {} in the folder {} is installed in.", .0.display_name(), .0.exe_name(), .0.display_name())]
+    NotALauncher(LauncherId),
+    #[error(r"Choose the program by its full path on a lettered drive, such as C:\Program Files\{}.", .0.exe_name())]
+    NotAPlainPath(LauncherId),
+    #[error(
+        "One Launch cannot read or store passwords and saved sign-ins right now, so it does not start this switch: it would close {} and stop halfway. Settings › Advanced › Encryption says why.",
+        .0.display_name()
+    )]
+    VaultClosed(LauncherId),
+    #[error(
+        "One Launch cannot read the {} it stored for this account, so it does not start this switch: it would close {} and stop halfway. Store it again on the account's page.",
+        if matches!(.0, LauncherId::Steam) { "password" } else { "saved sign-in" },
+        .0.display_name()
+    )]
+    SealedUnreadable(LauncherId),
 }
 
 impl ServiceError {
@@ -425,6 +488,10 @@ impl ServiceError {
             Self::Mismatch(_) => "BAD_REQUEST",
             Self::Busy => "BUSY",
             Self::DryRun => "DRY_RUN",
+            Self::NotALauncher(_) => "NOT_A_LAUNCHER",
+            Self::NotAPlainPath(_) => "BAD_REQUEST",
+            Self::VaultClosed(_) => "VAULT_UNAVAILABLE",
+            Self::SealedUnreadable(_) => "VAULT_UNREADABLE",
         }
     }
 
@@ -619,4 +686,145 @@ fn failed(launcher: LauncherId, error: String) -> LibraryScanResult {
         installed: true,
         error: Some(error),
     }
+}
+
+// What the Launchers tab shows of one launcher: the folder chosen with Locate, the install found, whether it runs, and its health. Whatever fails on the way is the row's attention, and what was found before it stays.
+pub fn status(
+    store: &Store,
+    launchers: &Launchers,
+    configs: &Configs,
+    data_dir: &Path,
+    launcher: LauncherId,
+) -> LauncherStatus {
+    let mut status = LauncherStatus {
+        implemented: true,
+        ..LauncherStatus::unreachable(launcher)
+    };
+    let directory = launchers.directory(store, launcher);
+    let adapter = match launchers.adapter(launcher, configs, &directory) {
+        Ok(adapter) => adapter,
+        Err(error) => {
+            status.attention = Some(error.to_string());
+            return status;
+        }
+    };
+    status.chosen_path = adapter.chosen_install_dir();
+    let pass = (|| {
+        status.install = adapter.detect_install()?;
+        if status.install.is_some() {
+            status.running = Some(adapter.is_running()?);
+        }
+        Ok::<_, AdapterError>(())
+    })();
+    if let Err(error) = pass {
+        status.attention = Some(error.to_string());
+        return status;
+    }
+    let known = Known {
+        install: status.install.clone(),
+        running: status.running,
+    };
+    let mut checks = adapter.health_checks(&known);
+    if status.install.is_some() {
+        if launcher != LauncherId::Steam {
+            checks.push(sessions_check(store, launcher));
+        }
+        checks.push(backups_check(launchers, configs, data_dir, launcher));
+    }
+    let checked_at = ol_store::iso_timestamp(launchers.platform.clock.now());
+    let mut report = HealthReport::of(launcher, checks, checked_at);
+    if status.install.is_none() {
+        report.status = HealthStatus::Absent;
+    }
+    status.health = Some(report);
+    status
+}
+
+fn status_if(warn: bool) -> HealthStatus {
+    if warn {
+        HealthStatus::Warn
+    } else {
+        HealthStatus::Ok
+    }
+}
+
+fn sessions_check(store: &Store, launcher: LauncherId) -> HealthCheck {
+    let check = |status, detail| HealthCheck {
+        id: "sessions",
+        label: "Session snapshots",
+        status,
+        detail,
+    };
+    match store.sessions_of(launcher) {
+        Ok(sessions) => {
+            let stale = sessions
+                .iter()
+                .filter(|session| session.stale_reason.is_some())
+                .count();
+            let tail = if stale > 0 {
+                format!(", {stale} marked stale")
+            } else {
+                String::new()
+            };
+            check(
+                status_if(stale > 0),
+                format!("{} stored{tail}", steam::plural(sessions.len(), "snapshot")),
+            )
+        }
+        Err(error) => check(
+            HealthStatus::Warn,
+            format!("Could not read the saved sign-ins: {error}"),
+        ),
+    }
+}
+
+fn backups_check(
+    launchers: &Launchers,
+    configs: &Configs,
+    data_dir: &Path,
+    launcher: LauncherId,
+) -> HealthCheck {
+    let check = |status, detail| HealthCheck {
+        id: "backups",
+        label: "Backups",
+        status,
+        detail,
+    };
+    match launchers.backups(data_dir, configs).list(launcher) {
+        Ok(snapshots) if snapshots.is_empty() => {
+            check(HealthStatus::Ok, "No snapshots yet".to_owned())
+        }
+        Ok(snapshots) => check(
+            HealthStatus::Ok,
+            format!(
+                "{} available for restore",
+                steam::plural(snapshots.len(), "snapshot")
+            ),
+        ),
+        Err(error) => check(
+            HealthStatus::Warn,
+            format!("Could not list the snapshots: {error}"),
+        ),
+    }
+}
+
+// The install a program the user picked belongs to, or the refusal that names the program to pick. Reads only; storing the folder is the caller's.
+pub fn locate(adapter: &Adapter<'_>, exe: &str) -> Result<LauncherInstall, ServiceError> {
+    if !on_a_lettered_drive(exe) {
+        return Err(ServiceError::NotAPlainPath(adapter.launcher()));
+    }
+    adapter
+        .install_from_exe(exe)
+        .ok_or(ServiceError::NotALauncher(adapter.launcher()))
+}
+
+// The folder found is stored and its program started later, from wherever the app then runs: a relative path, a share or a device path is refused, as for the app's own folders.
+fn on_a_lettered_drive(exe: &str) -> bool {
+    use std::path::{Component, Prefix};
+    let mut parts = Path::new(exe).components();
+    matches!(
+        (parts.next(), parts.next()),
+        (Some(Component::Prefix(prefix)), Some(Component::RootDir))
+            if matches!(prefix.kind(), Prefix::Disk(_))
+    )
 }

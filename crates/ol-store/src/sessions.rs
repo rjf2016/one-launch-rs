@@ -45,6 +45,19 @@ impl Store {
         Ok(found.flatten())
     }
 
+    // Every saved sign-in of one launcher, the newest first.
+    pub fn sessions_of(&self, launcher: LauncherId) -> Result<Vec<LauncherSession>, StoreError> {
+        let mut statement = self.conn.prepare(&format!(
+            "{SESSION} WHERE launcher = ?1 ORDER BY captured_at DESC"
+        ))?;
+        let rows = statement.query_map([launcher.as_str()], session)?;
+        Ok(rows
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .flatten()
+            .collect())
+    }
+
     // The saved sign-in of this launcher that holds exactly this, the newest when two do.
     pub fn session_by_fingerprint(
         &self,

@@ -61,6 +61,47 @@ impl Shell for WindowsShell {
         }
         Ok(())
     }
+
+    fn open_folder(&self, folder: &str) -> Result<(), ShellError> {
+        existing_folder(folder)?;
+        let target = wide(folder);
+        let com =
+            unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) };
+        let opened = unsafe {
+            ShellExecuteW(
+                None,
+                w!("open"),
+                PCWSTR(target.as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        if com.is_ok() {
+            unsafe { CoUninitialize() };
+        }
+        let code = opened.0 as isize;
+        if code <= 32 {
+            return Err(ShellError(format!(
+                "Windows could not open the folder (error {code})"
+            )));
+        }
+        Ok(())
+    }
+}
+
+// Explorer opens a folder that is there; anything else, a file among it, could start a program and is refused.
+fn existing_folder(folder: &str) -> Result<(), ShellError> {
+    let path = std::path::Path::new(folder);
+    let is_folder = path.is_absolute()
+        && std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir());
+    if is_folder {
+        Ok(())
+    } else {
+        Err(ShellError(
+            "One Launch opens only a folder that is there".to_owned(),
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -100,6 +141,26 @@ mod tests {
             assert!(!allowed(url), "{url}");
         }
         assert!(!allowed(&format!("steam://{}", "1".repeat(LONGEST))));
+    }
+
+    #[test]
+    fn only_a_folder_that_is_there_is_handed_to_explorer() {
+        let scratch = ol_testkit::Scratch::new("win-shell");
+        let file = scratch.join("note.txt");
+        std::fs::write(&file, b"x").unwrap();
+        for refused in [
+            file.to_str().unwrap().to_owned(),
+            scratch.join("missing").to_str().unwrap().to_owned(),
+            "relative".to_owned(),
+            String::new(),
+        ] {
+            let error = WindowsShell.open_folder(&refused).unwrap_err();
+            assert_eq!(
+                error.0, "One Launch opens only a folder that is there",
+                "{refused}"
+            );
+        }
+        assert!(existing_folder(scratch.path().to_str().unwrap()).is_ok());
     }
 
     #[test]

@@ -11,7 +11,7 @@ use thiserror::Error;
 
 pub use fake::FakeVault;
 pub use local_state::local_state_path;
-pub use os_crypt::{KeyError, OsCryptVault};
+pub use os_crypt::{KeyError, OsCryptVault, Recovered};
 pub use secret::Secret;
 
 pub const PROBE_VALUE: &str = "one-launch-vault-probe-v1";
@@ -40,4 +40,9 @@ impl VaultError {
 pub trait Vault {
     fn encrypt(&self, plaintext: &Secret) -> Result<Ciphertext, VaultError>;
     fn decrypt(&self, ciphertext: &Ciphertext) -> Result<Secret, VaultError>;
+
+    // Whether it has a key to seal and open with at all, asked without sealing anything.
+    fn has_key(&self) -> bool {
+        true
+    }
 }

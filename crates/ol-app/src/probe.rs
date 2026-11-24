@@ -1,5 +1,6 @@
 use std::cell::Cell;
 use std::fmt::Debug;
+use std::rc::Rc;
 use std::time::Duration;
 
 use anyhow::Context as _;
@@ -9,8 +10,10 @@ use ol_platform_win::probe::{self, Area, MenuKey, OuterRect};
 use ol_platform_win::tray::Tray;
 use ol_platform_win::window::AppWindow;
 
-use crate::TraySlot;
+use ol_model::SettingKey;
+
 use crate::capture::pause;
+use crate::{Life, TraySlot};
 
 const SETTLE: Duration = Duration::from_millis(1200);
 const BEAT: Duration = Duration::from_millis(700);
@@ -90,7 +93,8 @@ impl Layout {
     }
 }
 
-pub async fn run(tray: &TraySlot, failed: &Cell<bool>, cx: &mut AsyncApp) -> anyhow::Result<bool> {
+pub async fn run(life: &Rc<Life>, failed: &Cell<bool>, cx: &mut AsyncApp) -> anyhow::Result<bool> {
+    let tray = &life.tray;
     let window = AppWindow::on_this_thread().context("the GPUI window was not found")?;
     pause(SETTLE, cx).await;
     let mut report = Report { window, failed: 0 };
@@ -207,10 +211,33 @@ pub async fn run(tray: &TraySlot, failed: &Cell<bool>, cx: &mut AsyncApp) -> any
         report.skip("showing the window restores it");
     }
 
-    let held = with_tray(tray, probe::tray_is_shown) == Some(true);
+    let to_tray = |on: bool| {
+        let backend = life.backend.clone();
+        async move {
+            backend
+                .set_setting(SettingKey::WindowCloseToTray, on.to_string())
+                .await
+        }
+    };
+    let stored = to_tray(true).await;
+    pause(BEAT, cx).await;
+    let held = stored.is_ok() && with_tray(tray, probe::tray_is_shown) == Some(true);
     report.check("the shell holds the tray icon", held, held);
     let own = with_tray(tray, Tray::shows_app_icon) == Some(true);
     report.check("the tray icon is the app's own", own, own);
+
+    let stored = to_tray(false).await;
+    pause(BEAT, cx).await;
+    let gone = stored.is_ok() && tray.borrow().is_none();
+    report.check(
+        "turning Minimize One Launch to System Tray off removes the icon at once",
+        gone,
+        gone,
+    );
+    let stored = to_tray(true).await;
+    pause(BEAT, cx).await;
+    let back = stored.is_ok() && with_tray(tray, probe::tray_is_shown) == Some(true);
+    report.check("turning it on again puts the icon back", back, back);
     report.click(close);
     pause(BEAT, cx).await;
     let state = (

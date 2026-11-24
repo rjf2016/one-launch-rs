@@ -718,7 +718,8 @@ impl LibraryView {
         cx.notify();
     }
 
-    pub fn on_keystroke(
+    // The Shell hands each key here, before the bindings of whatever has the keyboard: a text field has its own for Ctrl+F.
+    pub(crate) fn on_keystroke(
         &mut self,
         keystroke: &Keystroke,
         window: &mut Window,

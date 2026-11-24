@@ -121,8 +121,9 @@ impl EpicAdapter<'_> {
         let both = ini_paths.len() > 1;
         let log_path = self.log_path();
         let running = self.is_running()?;
-        let ini_text = self.read_ini()?;
-        let current = self.current_session(ini_text.as_deref(), running)?;
+        let settings = self.read_settings()?;
+        let current = self.current_session_of(settings.as_ref(), running)?;
+        let ini_text = settings.map(|settings| settings.text);
         let stored = match &account.id {
             Some(id) => self.directory.session(id)?,
             None => None,

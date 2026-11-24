@@ -53,6 +53,7 @@ pub const COPY: &str = "icons/copy.svg";
 pub const SAVE: &str = "icons/save.svg";
 pub const SHIELD_CHECK: &str = "icons/shield-check.svg";
 pub const SHIELD_OFF: &str = "icons/shield-off.svg";
+pub const FOLDER_OPEN: &str = "icons/folder-open.svg";
 
 macro_rules! oracle_icon {
     ($file:literal) => {
@@ -119,6 +120,7 @@ const FILES: &[(&str, &[u8])] = &[
     (SAVE, oracle_icon!("lucide/Save.svg")),
     (SHIELD_CHECK, oracle_icon!("lucide/ShieldCheck.svg")),
     (SHIELD_OFF, oracle_icon!("lucide/ShieldOff.svg")),
+    (FOLDER_OPEN, oracle_icon!("lucide/FolderOpen.svg")),
     (MINIMIZE, caption_icon!(r#"<path d="M0 5.5h10"/>"#)),
     (
         MAXIMIZE,

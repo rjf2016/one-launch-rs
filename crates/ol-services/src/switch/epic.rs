@@ -271,10 +271,11 @@ impl Switch<'_> {
         }
         let saved = (|| -> Result<(bool, String), AdapterError> {
             let signed_out = "The launcher left no remembered session behind (signed out).";
-            let Some(text) = self.epic.read_ini()? else {
+            let Some(settings) = self.epic.read_settings()? else {
                 return Ok((false, signed_out.to_owned()));
             };
-            let fresh = self.epic.current_session(Some(&text), false)?;
+            let fresh = self.epic.current_session_of(Some(&settings), false)?;
+            let text = settings.text;
             let Some(blob) = session_blob_from_ini(&text) else {
                 return Ok((false, signed_out.to_owned()));
             };

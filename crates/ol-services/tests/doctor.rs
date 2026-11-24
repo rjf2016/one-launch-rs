@@ -43,13 +43,17 @@ impl DataProtector for Reversible {
 
 struct AnotherUser;
 
+// Another Windows user's DPAPI: it unwraps what it wrapped itself, and nothing wrapped for the user the folder came from.
 impl DataProtector for AnotherUser {
-    fn protect(&self, _: &[u8]) -> Result<Vec<u8>, ProtectError> {
-        Err(ProtectError::Protect)
+    fn protect(&self, plain: &[u8]) -> Result<Vec<u8>, ProtectError> {
+        Ok([b"another-user".as_slice(), plain].concat())
     }
 
-    fn unprotect(&self, _: &[u8]) -> Result<Zeroizing<Vec<u8>>, ProtectError> {
-        Err(ProtectError::Unprotect)
+    fn unprotect(&self, protected: &[u8]) -> Result<Zeroizing<Vec<u8>>, ProtectError> {
+        protected
+            .strip_prefix(b"another-user".as_slice())
+            .map(|plain| Zeroizing::new(plain.to_vec()))
+            .ok_or(ProtectError::Unprotect)
     }
 }
 

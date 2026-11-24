@@ -16,9 +16,13 @@ pub fn local_state_path(data_dir: &Path) -> PathBuf {
 }
 
 pub(crate) fn read_key(file: &Path) -> Result<Option<Vec<u8>>, KeyError> {
-    let Some(state) = read(file)? else {
-        return Ok(None);
-    };
+    match read(file)? {
+        Some(state) => key_in(&state),
+        None => Ok(None),
+    }
+}
+
+fn key_in(state: &Map<String, Value>) -> Result<Option<Vec<u8>>, KeyError> {
     let Some(os_crypt) = state.get("os_crypt") else {
         return Ok(None);
     };
@@ -38,16 +42,25 @@ pub(crate) fn read_key(file: &Path) -> Result<Option<Vec<u8>>, KeyError> {
     }
 }
 
-// Whatever else the file holds is Chromium's and is written back as it was. A key that is already there is never replaced: everything stored so far opens with it alone.
-pub(crate) fn write_key(file: &Path, wrapped: &[u8]) -> Result<(), KeyError> {
+// Whatever else the file holds is Chromium's and is written back as it was. A key that is already there is replaced only when `replacing` names it, as read when Windows would not unwrap it: everything stored so far opens with it alone.
+pub(crate) fn write_key(
+    file: &Path,
+    wrapped: &[u8],
+    replacing: Option<&[u8]>,
+) -> Result<(), KeyError> {
     let mut state = read(file)?.unwrap_or_default();
+    if let Some(current) = key_in(&state)?
+        && replacing.is_some_and(|lost| lost != current.as_slice())
+    {
+        return Err(KeyError::Changed);
+    }
     let os_crypt = state
         .entry("os_crypt")
         .or_insert_with(|| Value::Object(Map::new()));
     let Value::Object(os_crypt) = os_crypt else {
         return Err(KeyError::Malformed);
     };
-    if os_crypt.contains_key("encrypted_key") {
+    if os_crypt.contains_key("encrypted_key") && replacing.is_none() {
         return Err(KeyError::Write(io::ErrorKind::AlreadyExists.into()));
     }
     let key = [WRAPPED_PREFIX.as_slice(), wrapped].concat();
@@ -107,16 +120,23 @@ mod tests {
     fn a_key_that_is_there_is_not_written_over() {
         let scratch = Scratch::new("vault");
         let file = local_state_path(scratch.path());
-        write_key(&file, &[1; 40]).unwrap();
+        write_key(&file, &[1; 40], None).unwrap();
         let before = snapshot(scratch.path());
         assert_eq!(read_key(&file).unwrap(), Some(vec![1; 40]));
 
-        let refused = write_key(&file, &[2; 40]);
+        let refused = write_key(&file, &[2; 40], None);
         assert!(
             matches!(&refused, Err(KeyError::Write(error)) if error.kind() == io::ErrorKind::AlreadyExists),
             "{refused:?}"
         );
         assert!(before == snapshot(scratch.path()), "the folder changed");
+
+        let refused = write_key(&file, &[2; 40], Some(&[3; 40]));
+        assert!(matches!(refused, Err(KeyError::Changed)), "{refused:?}");
+        assert!(before == snapshot(scratch.path()), "the folder changed");
+
+        write_key(&file, &[2; 40], Some(&[1; 40])).unwrap();
+        assert_eq!(read_key(&file).unwrap(), Some(vec![2; 40]));
     }
 
     #[test]
@@ -131,7 +151,7 @@ mod tests {
         assert_eq!(read_key(&file).unwrap(), None);
         let before = snapshot(scratch.path());
 
-        let refused = write_key(&file, &[1; 40]);
+        let refused = write_key(&file, &[1; 40], None);
         assert!(matches!(refused, Err(KeyError::Malformed)), "{refused:?}");
         assert!(before == snapshot(scratch.path()), "the folder changed");
     }

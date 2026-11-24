@@ -1,5 +1,6 @@
 // The Steam adapter: everything it reads, and the two things it does to a process (ask Steam to shut down, hand a game link to the shell). It writes no launcher file and no registry value; the switch pipeline does that with what this module plans.
 
+mod health;
 mod plan;
 
 use std::collections::HashSet;

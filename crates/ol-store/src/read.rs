@@ -101,6 +101,15 @@ impl Store {
         Ok(settings)
     }
 
+    // Every row of the settings table as it is stored, the keys no version knows among them, in the order of their keys.
+    pub fn settings_rows(&self) -> Result<Vec<(String, String)>, StoreError> {
+        let mut statement = self
+            .conn
+            .prepare("SELECT key, value FROM settings ORDER BY key")?;
+        let rows = statement.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
     pub fn setting(&self, key: SettingKey) -> Result<Option<String>, StoreError> {
         self.stored_value(key.as_str())
     }

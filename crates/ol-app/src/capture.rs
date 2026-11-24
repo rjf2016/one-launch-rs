@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
@@ -7,10 +8,11 @@ use gpui::{
     ScrollEvent, ScrollSource, TouchPhase, Window, WindowHandle, point, px,
 };
 use ol_platform_win::own_process;
-use ol_platform_win::probe::{self, OuterRect};
+use ol_platform_win::probe::{self, Area, OuterRect};
 use ol_platform_win::window::AppWindow;
 use ol_ui::{LibraryFrame, LibraryView, Shell};
 
+use crate::Life;
 use crate::args::CapturePlan;
 
 const SETTLE: Duration = Duration::from_millis(1200);
@@ -21,11 +23,8 @@ const LONGEST_WAIT: u64 = 60_000;
 const MOST_SIDE: i32 = 8000;
 const MOST_STEPS: usize = 2000;
 
-pub async fn run(
-    plan: &CapturePlan,
-    window: WindowHandle<Shell>,
-    cx: &mut AsyncApp,
-) -> anyhow::Result<()> {
+pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyhow::Result<()> {
+    let window = life.window;
     let native = AppWindow::on_this_thread().context("the GPUI window was not found")?;
     pause(SETTLE, cx).await;
 
@@ -101,6 +100,29 @@ pub async fn run(
                 pause(STEP, cx).await;
                 continue;
             }
+            pressed @ (Step::Close | Step::Minimize) => {
+                let (width, _) = native.client_size().unwrap_or_default();
+                let scale = native.scale();
+                let at = |logical: f32| (logical * scale).round() as i32;
+                let (area, from_right) = if matches!(pressed, Step::Close) {
+                    (Area::Close, 23.)
+                } else {
+                    (Area::Minimize, 115.)
+                };
+                probe::click(native, area, width - at(from_right), at(20.));
+                pause(STEP, cx).await;
+                continue;
+            }
+            Step::TrayOpen => {
+                crate::show_window();
+                pause(STEP, cx).await;
+                continue;
+            }
+            Step::TrayQuit => {
+                crate::request_quit(life, cx);
+                pause(STEP, cx).await;
+                continue;
+            }
             Step::LogFrames => {
                 in_library(window, cx, |library, _, _| library.log_frames())?;
                 kept.clear();
@@ -166,7 +188,7 @@ pub async fn run(
     Ok(())
 }
 
-// A step of --capture-keys, or several joined by & and taken in one go: a key press; text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked with the left or the right button, given the second click of a double-click, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
+// A step of --capture-keys, or several joined by & and taken in one go: a key press; the window's close or minimise button pressed through Windows (`close`, `minimize`), the tray's Open (`tray-open`) or Quit (`tray-quit`); text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked with the left or the right button, clicked as the second click of a double click, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
 enum Step {
     Key(Keystroke),
     Type(String),
@@ -179,6 +201,10 @@ enum Step {
     Wheel(Point<Pixels>, Point<f32>, Modifiers),
     Drag(Point<Pixels>, Point<Pixels>),
     Wait(Duration),
+    Close,
+    Minimize,
+    TrayOpen,
+    TrayQuit,
     Size((i32, i32)),
     Resize {
         from: (i32, i32),
@@ -207,7 +233,13 @@ impl Step {
             return Ok(Self::Together(steps));
         }
         let Some((kind, rest)) = text.split_once(':') else {
-            return Self::key(text);
+            return match text {
+                "close" => Ok(Self::Close),
+                "minimize" => Ok(Self::Minimize),
+                "tray-open" => Ok(Self::TrayOpen),
+                "tray-quit" => Ok(Self::TrayQuit),
+                _ => Self::key(text),
+            };
         };
         let spot = |spot: &str| {
             spot.split_once('x')
@@ -362,6 +394,10 @@ impl Step {
             Self::Drag(..)
             | Self::Type(_)
             | Self::Wait(_)
+            | Self::Close
+            | Self::Minimize
+            | Self::TrayOpen
+            | Self::TrayQuit
             | Self::Size(_)
             | Self::Resize { .. }
             | Self::LogFrames
@@ -630,6 +666,10 @@ mod tests {
         };
         assert_eq!(text, "R&D");
         assert!(matches!(Step::parse("frames:log"), Ok(Step::LogFrames)));
+        assert!(matches!(Step::parse("close"), Ok(Step::Close)));
+        assert!(matches!(Step::parse("minimize"), Ok(Step::Minimize)));
+        assert!(matches!(Step::parse("tray-open"), Ok(Step::TrayOpen)));
+        assert!(matches!(Step::parse("tray-quit"), Ok(Step::TrayQuit)));
         assert!(matches!(Step::parse("frames:print"), Ok(Step::PrintFrames)));
         assert!(matches!(
             Step::parse("size:1000x600"),

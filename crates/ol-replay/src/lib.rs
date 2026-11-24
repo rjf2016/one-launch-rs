@@ -337,7 +337,7 @@ impl<'a> Replay<'a> {
                 }
                 for (key, value) in &fake.seed.settings {
                     if let Some(key) = SettingKey::parse(key) {
-                        block_on(backend.set_setting(key, value.clone()))?;
+                        block_on(backend.seed_setting(key, value.clone()))?;
                     }
                 }
             }

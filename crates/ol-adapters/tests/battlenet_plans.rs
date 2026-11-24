@@ -6,9 +6,12 @@ use std::fs;
 use std::sync::{Arc, Mutex};
 
 use ol_adapters::battlenet::{BattlenetAdapter, BattlenetConfig, Timing};
+use ol_adapters::health::Known;
 use ol_adapters::{AccountRef, AdapterError, Directory};
 use ol_formats::battlenet::products::LaunchForm;
-use ol_model::{LauncherId, LauncherSession, SwitchPlan, SwitchPlanStep};
+use ol_model::{
+    HealthCheck, HealthStatus, LauncherId, LauncherSession, SwitchPlan, SwitchPlanStep,
+};
 use ol_platform_api::Platform;
 use ol_platform_fake::{
     FakeClock, FakeProcesses, FakeRegistry, FakeShell, OpLog, ProcessKnobs, RegistryValue,
@@ -452,5 +455,128 @@ fn a_login_that_is_first_already_leaves_the_file_step_out() {
             let moved = "saved3@example.com,saved1@example.com,saved2@example.com";
             config_with(world, logins, moved);
         }],
+    );
+}
+
+fn health(world: &World) -> Vec<HealthCheck> {
+    let adapter = BattlenetAdapter::new(&world.platform, &world.config, &world.book);
+    let install = adapter.detect_install().unwrap();
+    adapter.health_checks(&Known {
+        install,
+        running: None,
+    })
+}
+
+fn health_check<'c>(checks: &'c [HealthCheck], id: &str) -> (HealthStatus, &'c str) {
+    let check = checks.iter().find(|check| check.id == id).unwrap();
+    (check.status, check.detail.as_str())
+}
+
+#[test]
+fn a_config_that_cannot_be_read_leaves_the_products_their_install_folders() {
+    let world = world();
+    fs::remove_file(world.config_file()).unwrap();
+    fs::create_dir(world.config_file()).unwrap();
+    let checks = health(&world);
+    assert_eq!(health_check(&checks, "config").0, HealthStatus::Fail);
+    let (status, detail) = health_check(&checks, "uninstall");
+    assert_eq!(status, HealthStatus::Ok, "{detail}");
+    assert!(
+        detail.ends_with("; 1 without an install folder"),
+        "{detail}"
+    );
+}
+
+#[test]
+fn a_product_db_that_cannot_be_read_is_a_warning_and_the_built_in_codes_stay() {
+    let world = world();
+    let agent = world
+        .scratch
+        .join("ProgramData")
+        .join("Battle.net")
+        .join("Agent");
+    fs::create_dir_all(agent.join("product.db")).unwrap();
+    let checks = health(&world);
+    let (status, detail) = health_check(&checks, "product-db");
+    assert_eq!(status, HealthStatus::Warn, "{detail}");
+    assert!(detail.starts_with("Could not read "), "{detail}");
+    assert!(
+        detail.contains("Launch codes come from the built-in table only: prometheus → "),
+        "{detail}"
+    );
+    assert!(!detail.contains("0 install records"), "{detail}");
+}
+
+#[test]
+fn a_log_folder_without_a_client_log_is_not_called_readable() {
+    let world = world();
+    let checks = health(&world);
+    let (status, detail) = health_check(&checks, "log");
+    assert_eq!(status, HealthStatus::Ok, "{detail}");
+    assert!(detail.starts_with("Readable; "), "{detail}");
+
+    let logs = world.scratch.join("Local").join("Battle.net").join("Logs");
+    for entry in fs::read_dir(&logs).unwrap() {
+        fs::remove_file(entry.unwrap().path()).unwrap();
+    }
+    let checks = health(&world);
+    let (status, detail) = health_check(&checks, "log");
+    assert_eq!(status, HealthStatus::Warn, "{detail}");
+    assert!(detail.starts_with("No client log in "), "{detail}");
+}
+
+#[test]
+fn a_saved_token_is_said_to_be_its_owners_whoever_the_log_names() {
+    let mut world = world();
+    client_running(&mut world);
+    let run = format!(
+        "{STARTED_LINE}
+{}
+",
+        signed_in_line("0b2c3d4e")
+    );
+    world.write_log(2, &run);
+    let checks = health(&world);
+    let (_, detail) = health_check(&checks, "token");
+    assert!(
+        detail.contains("; belongs to Main; the client log names Alt ("),
+        "{detail}"
+    );
+
+    world.registry.seed(TOKEN, RegistryValue::Binary(token(9)));
+    let checks = health(&world);
+    let (_, detail) = health_check(&checks, "token");
+    assert!(
+        detail.contains("; matches no saved sign-in; the client log names Alt ("),
+        "{detail}"
+    );
+}
+
+#[test]
+fn locate_takes_either_program_only_when_the_picked_one_is_there() {
+    let world = world();
+    let adapter = BattlenetAdapter::new(&world.platform, &world.config, &world.book);
+    let install = world.scratch.join("Battle.net");
+    let picked = |name: &str| install.join(name).to_str().unwrap().to_owned();
+    assert!(
+        adapter
+            .install_from_exe(&picked("Battle.net Launcher.exe"))
+            .is_some()
+    );
+    assert!(
+        adapter
+            .install_from_exe(&picked("battle.net.exe"))
+            .is_some()
+    );
+    fs::remove_file(install.join("Battle.net Launcher.exe")).unwrap();
+    assert!(
+        adapter
+            .install_from_exe(&picked("Battle.net Launcher.exe"))
+            .is_none()
+    );
+    assert!(
+        adapter
+            .install_from_exe(&picked("Battle.net.exe"))
+            .is_some()
     );
 }
