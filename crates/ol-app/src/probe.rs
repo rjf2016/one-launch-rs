@@ -211,11 +211,6 @@ pub async fn run(life: &Rc<Life>, failed: &Cell<bool>, cx: &mut AsyncApp) -> any
         report.skip("showing the window restores it");
     }
 
-    let held = with_tray(tray, probe::tray_is_shown) == Some(true);
-    report.check("the shell holds the tray icon", held, held);
-    let own = with_tray(tray, Tray::shows_app_icon) == Some(true);
-    report.check("the tray icon is the app's own", own, own);
-
     let to_tray = |on: bool| {
         let backend = life.backend.clone();
         async move {
@@ -224,6 +219,13 @@ pub async fn run(life: &Rc<Life>, failed: &Cell<bool>, cx: &mut AsyncApp) -> any
                 .await
         }
     };
+    let stored = to_tray(true).await;
+    pause(BEAT, cx).await;
+    let held = stored.is_ok() && with_tray(tray, probe::tray_is_shown) == Some(true);
+    report.check("the shell holds the tray icon", held, held);
+    let own = with_tray(tray, Tray::shows_app_icon) == Some(true);
+    report.check("the tray icon is the app's own", own, own);
+
     let stored = to_tray(false).await;
     pause(BEAT, cx).await;
     let gone = stored.is_ok() && tray.borrow().is_none();
