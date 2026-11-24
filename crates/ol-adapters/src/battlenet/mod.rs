@@ -36,7 +36,7 @@ use time::OffsetDateTime;
 
 pub use crate::epic::{UNOWNED_SESSION_PIN, id_tail};
 use crate::files::{
-    MAX_LAUNCHER_FILE_BYTES, read_launcher_bytes, read_launcher_text, read_log_since,
+    MAX_LAUNCHER_FILE_BYTES, read_launcher_bytes, read_launcher_text, read_log_since, read_log_tail,
 };
 use crate::running::game_with_running_process;
 use crate::{AccountRef, AdapterError, Directory};
@@ -465,9 +465,13 @@ impl<'a> BattlenetAdapter<'a> {
         if !files.exists(&path) {
             return Vec::new();
         }
-        read_launcher_bytes(files, &path, MAX_LAUNCHER_FILE_BYTES)
+        self.read_product_db().unwrap_or_default()
+    }
+
+    fn read_product_db(&self) -> Result<Vec<ProductDbEntry>, AdapterError> {
+        let files = self.platform.files.as_ref();
+        read_launcher_bytes(files, &self.product_db_path(), MAX_LAUNCHER_FILE_BYTES)
             .map(|bytes| parse_product_db(&bytes))
-            .unwrap_or_default()
     }
 
     fn codes_for(codename: &str, db: &[ProductDbEntry]) -> Option<ProductCodes> {
@@ -513,19 +517,33 @@ impl<'a> BattlenetAdapter<'a> {
 
     // The current run's log: the newest battle.net-*.log by name that is a run of the client and not a forwarder's.
     fn newest_client_log(&self) -> Option<String> {
+        self.client_log().ok().flatten()
+    }
+
+    fn client_log(&self) -> Result<Option<String>, AdapterError> {
         let files = self.platform.files.as_ref();
         let dir = self.log_dir();
         if !files.exists(&dir) {
-            return None;
+            return Ok(None);
         }
-        let mut names = files.list(&dir).ok()?;
+        let mut names = files.list(&dir).map_err(|error| AdapterError::io(&error))?;
         names.retain(|name| is_client_log_file(name));
         names.sort_by_cached_key(|name| std::cmp::Reverse(name.to_lowercase()));
-        names.iter().map(|name| join(&[&dir, name])).find(|path| {
+        Ok(names.iter().map(|name| join(&[&dir, name])).find(|path| {
             files
                 .read_range(path, 0, LOG_HEAD_BYTES)
                 .is_ok_and(|head| !is_forwarder_log(&String::from_utf8_lossy(&head)))
-        })
+        }))
+    }
+
+    // The current run's log, None when there is none, and an error when it is there and cannot be read.
+    pub(crate) fn read_current_run(&self) -> Result<Option<Vec<LogEvent>>, AdapterError> {
+        let Some(file) = self.client_log()? else {
+            return Ok(None);
+        };
+        let files = self.platform.files.as_ref();
+        let text = read_log_tail(files, &file, 0, MAX_LOG_TAIL_BYTES)?;
+        Ok(Some(parse_log_events(&text)))
     }
 
     pub fn log_mark(&self) -> LogMark {
@@ -577,10 +595,17 @@ impl<'a> BattlenetAdapter<'a> {
 
     // What the registry and the client's log say now, and whose the session is. Writes nothing.
     pub fn current_session(&self, running: bool) -> Result<CurrentSession, AdapterError> {
+        self.session_from(running, &self.current_run_events())
+    }
+
+    pub(crate) fn session_from(
+        &self,
+        running: bool,
+        events: &[LogEvent],
+    ) -> Result<CurrentSession, AdapterError> {
         let tokens = self.read_tokens()?;
-        let events = self.current_run_events();
-        let last_sign_in = last_sign_in(&events);
-        let signed_out = ended_signed_out(&events);
+        let last_sign_in = last_sign_in(events);
+        let signed_out = ended_signed_out(events);
         let logged_uid = match &last_sign_in {
             Some(SignInOutcome::SignedIn { account_id, .. }) if !account_id.is_empty() => {
                 Some(account_id.clone())

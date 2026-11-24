@@ -67,8 +67,9 @@ pub fn capture(
 fn capture_epic(epic: &EpicAdapter<'_>, account: &AccountRef) -> Result<(), AdapterError> {
     epic.require_install()?;
     let running = epic.is_running()?;
-    let text = epic.read_ini()?;
-    let current = epic.current_session(text.as_deref(), running)?;
+    let settings = epic.read_settings()?;
+    let current = epic.current_session_of(settings.as_ref(), running)?;
+    let text = settings.map(|settings| settings.text);
     let login = &account.login;
     let blob = text
         .as_deref()
