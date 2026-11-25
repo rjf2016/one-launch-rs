@@ -24,6 +24,7 @@ pub use assets::Assets;
 pub use library::{LibraryFrame, LibraryLoaded, LibraryView, SweepReport};
 pub use picker::{FilePicker, Script};
 pub use shell::{Played, QuitAnyway, Shell};
+pub use widgets::read_double_click_time_with;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Presence {
