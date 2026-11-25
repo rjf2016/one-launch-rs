@@ -435,6 +435,9 @@ impl Shell {
         cx: &mut Context<Self>,
     ) {
         let left = self.page.screen();
+        if let Some(asking) = &mut self.asking {
+            asking.had_keyboard = None;
+        }
         if let Page::Account(page) = &self.page {
             page.update(cx, |page, cx| page.leave(window, cx));
         }
