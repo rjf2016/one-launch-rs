@@ -13,7 +13,7 @@ use ol_ui_kit::theme::{self, alpha, color};
 use super::{AccountsView, IMPORTED_FLASH_STAYS};
 use crate::assets;
 use crate::shell::{Go, Route};
-use crate::widgets::{Button, FlashTone, PillTone, Tone, icon, panel_shadow, pill};
+use crate::widgets::{Appeared, Button, FlashTone, PillTone, Tone, icon, panel_shadow, pill};
 
 pub(super) struct Import {
     key: u64,
@@ -23,6 +23,7 @@ pub(super) struct Import {
     busy: bool,
     error: Option<SharedString>,
     body: ScrollHandle,
+    appeared: Appeared,
 }
 
 enum Remembered {
@@ -122,6 +123,7 @@ impl AccountsView {
             busy: false,
             error: None,
             body: ScrollHandle::new(),
+            appeared: Appeared::now(),
         });
         let backend = self.backend.clone();
         cx.spawn(async move |this, cx| {
@@ -566,10 +568,13 @@ impl AccountsView {
                         })
                         .disabled(busy || count == 0)
                         .leading(leads && import.import_leads())
-                        // The second click of the double-click that opened the dialog is no press on Import.
                         .on_click(cx.listener(
                             |this, click: &ClickEvent, _, cx| {
-                                if click.click_count() == 1 {
+                                if this
+                                    .import
+                                    .as_ref()
+                                    .is_some_and(|import| import.appeared.takes(click))
+                                {
                                     this.run_import(cx);
                                 }
                             },

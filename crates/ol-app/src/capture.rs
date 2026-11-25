@@ -10,7 +10,7 @@ use gpui::{
 use ol_platform_win::own_process;
 use ol_platform_win::probe::{self, Area, OuterRect};
 use ol_platform_win::window::AppWindow;
-use ol_ui::{LibraryFrame, LibraryView, Shell};
+use ol_ui::{FilePicker, LibraryFrame, LibraryView, Shell};
 
 use crate::Life;
 use crate::args::CapturePlan;
@@ -98,6 +98,14 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
             Step::Type(text) => {
                 native.post_text(&text);
                 pause(STEP, cx).await;
+                continue;
+            }
+            Step::Pick(answer) => {
+                cx.update(|cx| {
+                    if let Some(FilePicker::Scripted(script)) = cx.try_global::<FilePicker>() {
+                        script.borrow_mut().answer(answer);
+                    }
+                });
                 continue;
             }
             pressed @ (Step::Close | Step::Minimize) => {
@@ -188,10 +196,11 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
     Ok(())
 }
 
-// A step of --capture-keys, or several joined by & and taken in one go: a key press; the window's close or minimise button pressed through Windows (`close`, `minimize`), the tray's Open (`tray-open`) or Quit (`tray-quit`); text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked with the left or the right button, clicked as the second click of a double click, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
+// A step of --capture-keys, or several joined by & and taken in one go: a key press; the answer the next file dialog gets, a path (`pick:<path>`, with %2C for a comma) or a cancel (`pick-cancel`), for which no dialog is opened; the window's close or minimise button pressed through Windows (`close`, `minimize`), the tray's Open (`tray-open`) or Quit (`tray-quit`); text typed into whatever has the keyboard, with %2C for a comma; the pointer at a place of the client area, moved there, clicked with the left or the right button, clicked as the second click of a double click, dragged from there, turning the wheel there, with Shift held as Windows reports it, or the mouse's Back button pressed and let go there; a wait for something that takes its time, such as a fake switch; the client area set to a size, at once or in steps as an edge dragged by hand does; or the Library's frames logged from one step and printed at another.
 enum Step {
     Key(Keystroke),
     Type(String),
+    Pick(Option<String>),
     Move(Point<Pixels>),
     Click(Point<Pixels>),
     RightClick(Point<Pixels>),
@@ -220,6 +229,13 @@ impl Step {
         if let Some(typed) = text.strip_prefix("type:").filter(|typed| !typed.is_empty()) {
             return Ok(Self::Type(typed.replace("%2C", ",")));
         }
+        if let Some(path) = text.strip_prefix("pick:") {
+            // A path holds no colon past its drive, so one there is another step joined on with &.
+            if path.is_empty() || path.get(2..).is_some_and(|tail| tail.contains(':')) {
+                anyhow::bail!("{text} is not pick:<path> or pick-cancel, which go alone");
+            }
+            return Ok(Self::Pick(Some(path.replace("%2C", ","))));
+        }
         if text.contains('&') {
             let steps = text
                 .split('&')
@@ -238,6 +254,7 @@ impl Step {
                 "minimize" => Ok(Self::Minimize),
                 "tray-open" => Ok(Self::TrayOpen),
                 "tray-quit" => Ok(Self::TrayQuit),
+                "pick-cancel" => Ok(Self::Pick(None)),
                 _ => Self::key(text),
             };
         };
@@ -393,6 +410,7 @@ impl Step {
             }
             Self::Drag(..)
             | Self::Type(_)
+            | Self::Pick(_)
             | Self::Wait(_)
             | Self::Close
             | Self::Minimize
@@ -661,6 +679,15 @@ mod tests {
             panic!("a step that types");
         };
         assert_eq!(text, "gold, smurf");
+        let Ok(Step::Pick(Some(path))) = Step::parse(r"pick:D:\x\a%2Cb\steam.exe") else {
+            panic!("a step that answers the file dialog");
+        };
+        assert_eq!(path, r"D:\x\a,b\steam.exe");
+        let Ok(Step::Pick(Some(path))) = Step::parse(r"pick:D:\R&D\steam.exe") else {
+            panic!("a step that answers the file dialog with an ampersand in the path");
+        };
+        assert_eq!(path, r"D:\R&D\steam.exe");
+        assert!(matches!(Step::parse("pick-cancel"), Ok(Step::Pick(None))));
         let Ok(Step::Type(text)) = Step::parse("type:R&D") else {
             panic!("a step that types an ampersand");
         };
@@ -694,6 +721,10 @@ mod tests {
             "resize:1600x1150:1000x1150:5000",
             "wait:61000",
             "type:",
+            "pick:",
+            r"click:1x2&pick:D:\x.exe",
+            r"pick:D:\x.exe&click:1x2",
+            r"click:1x2&pick:D:\R&D\x.exe",
             "click:1x2&wait:5",
             "back:5",
             "second-click:5",

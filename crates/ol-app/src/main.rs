@@ -28,7 +28,7 @@ use ol_platform_win::own_process;
 use ol_platform_win::shell::WindowsShell;
 use ol_platform_win::tray::{MenuEntry, Tray, TrayEvent};
 use ol_platform_win::window::AppWindow;
-use ol_ui::{LibraryLoaded, Played, Presence, QuitAnyway, Shell};
+use ol_ui::{FilePicker, LibraryLoaded, Played, Presence, QuitAnyway, Shell};
 
 use crate::args::{Args, Check, DoctorVault};
 
@@ -180,6 +180,27 @@ impl FolderShell for RecordingShell {
     }
 }
 
+// The one place a run is handed the picker Locate asks with. A capture or a probe is run by agents, so it is answered from the run's steps and never opens a dialog on the owner's desktop.
+fn hand_picker(args: &Args, set: impl FnOnce(FilePicker)) -> FilePicker {
+    let picker = match Opener::for_run(args) {
+        Opener::Windows => FilePicker::Windows,
+        Opener::Recording => FilePicker::Scripted(Rc::default()),
+    };
+    set(picker.clone());
+    picker
+}
+
+fn report_picks(picker: &FilePicker) {
+    if let FilePicker::Scripted(script) = picker {
+        let asked = script.borrow().asked();
+        if asked > 0 {
+            println!(
+                "OneLaunch: the file dialog was asked for {asked} time(s), answered from the run's steps and not opened"
+            );
+        }
+    }
+}
+
 // What the window's close, the tray and the end of a Play act on: the settings that decide them, kept as the backend reports each change.
 struct Life {
     backend: Backend,
@@ -248,13 +269,16 @@ fn main() -> ExitCode {
     };
     let heard = use_clipboard(Board::for_run(&args).give(), &backend);
     let _recorded = hand_shell(&args, &backend);
+    let picker = Rc::new(RefCell::new(None));
     let failed = Rc::new(Cell::new(false));
     let tray = TraySlot::default();
     gpui_platform::application()
         .with_assets(ol_ui::Assets)
         .run({
             let (backend, failed, tray) = (backend.clone(), failed.clone(), tray.clone());
+            let picker = Rc::clone(&picker);
             move |cx| {
+                *picker.borrow_mut() = Some(hand_picker(&args, |given| cx.set_global(given)));
                 if let Err(error) = start(args, backend, machine, failed.clone(), tray, cx) {
                     eprintln!("OneLaunch: {error:#}");
                     failed.set(true);
@@ -271,6 +295,9 @@ fn main() -> ExitCode {
     backend.shut_down();
     if let Some(heard) = heard {
         heard();
+    }
+    if let Some(picker) = picker.borrow().as_ref() {
+        report_picks(picker);
     }
     if failed.get() {
         ExitCode::FAILURE
@@ -398,6 +425,7 @@ fn start(
             clock,
         },
     );
+    ol_ui::read_double_click_time_with(ol_platform_win::window::double_click_time);
     if !Board::for_run(&args).keys_reach_it() {
         ol_ui_kit::refuse_clipboard_keys(cx);
     }
@@ -762,6 +790,33 @@ mod tests {
         }
         assert_eq!(Opener::for_run(&parsed(&["--doctor"])), Opener::Recording);
         assert_eq!(Opener::for_run(&parsed(&[])), Opener::Windows);
+    }
+
+    // Locate's dialog is GPUI's `prompt_for_paths`, which only `FilePicker::Windows` reaches.
+    #[test]
+    fn a_capture_or_a_probe_never_opens_the_file_dialog() {
+        let checks: [&[&str]; 6] = [
+            &[r"--capture=D:\scratch\shot.png"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-keys=enter"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-size=960x600"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-focus"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-type=abc"],
+            &["--probe"],
+        ];
+        let handed = |arguments: &[&str]| {
+            let mut set = None;
+            let kept = hand_picker(&parsed(arguments), |given| set = Some(given));
+            (set.expect("the picker was handed on"), kept)
+        };
+        for check in checks {
+            let (set, kept) = handed(check);
+            assert!(
+                matches!(set, FilePicker::Scripted(_)) && matches!(kept, FilePicker::Scripted(_)),
+                "{check:?} could open the file dialog"
+            );
+        }
+        let (set, _) = handed(&[]);
+        assert!(matches!(set, FilePicker::Windows));
     }
 
     fn parsed(arguments: &[&str]) -> Args {

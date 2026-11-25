@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use gpui::prelude::*;
-use gpui::{AnyElement, ClickEvent, Context, Div, Keystroke, SharedString, Window, div, px};
+use gpui::{AnyElement, Context, Div, Keystroke, SharedString, Window, div, px};
 use ol_api::accounts::Secret;
 use ol_api::clipboard::{CopyField, CopyResult};
 use ol_api::{ApiError, Backend};
@@ -10,7 +10,7 @@ use ol_ui_kit::theme::{self, alpha, color};
 
 use super::{AccountPage, Kind, PASSWORD_LINE};
 use crate::assets;
-use crate::widgets::{Button, Flash, FlashTone, Tone, field, icon, panel, row};
+use crate::widgets::{Appeared, Button, Flash, FlashTone, Tone, field, icon, panel, row};
 
 const COPY_FLASH_STAYS: Duration = Duration::from_secs(4);
 
@@ -28,11 +28,6 @@ pub(crate) fn copy_note(field: CopyField, copied: &CopyResult) -> String {
     format!("{what} copied \u{b7} clipboard clears in {seconds}s while One Launch is open{history}")
 }
 
-// The first click of a double click opened the question; the second must not answer it.
-pub(super) fn single(click: &ClickEvent) -> bool {
-    click.click_count() == 1
-}
-
 // Ctrl+C and Ctrl+X, which copy or cut a password while the eye shows it.
 pub(super) fn copies_or_cuts(keystroke: &Keystroke) -> bool {
     let held = keystroke.modifiers;
@@ -44,7 +39,7 @@ pub(super) struct Keeping {
     pub editing: bool,
     pub busy: bool,
     pub error: Option<SharedString>,
-    pub confirm_remove: bool,
+    pub confirm_remove: Option<Appeared>,
 }
 
 impl AccountPage {
@@ -72,7 +67,7 @@ impl AccountPage {
             return;
         }
         self.keeping.editing = true;
-        self.keeping.confirm_remove = false;
+        self.keeping.confirm_remove = None;
         if let Some(password) = &self.password {
             password.focus(window, cx);
         }
@@ -188,7 +183,7 @@ impl AccountPage {
                 match removed {
                     Ok(account) => {
                         this.take_account(account, cx);
-                        this.keeping.confirm_remove = false;
+                        this.keeping.confirm_remove = None;
                         this.flash("Password removed", None, cx);
                     }
                     Err(error) => this.keeping.error = Some(error.message.into()),
@@ -373,12 +368,16 @@ impl AccountPage {
                 .glyph(assets::KEY)
                 .on_click(cx.listener(|this, _, window, cx| this.edit_password(window, cx))),
             ];
-            if stored && keeping.confirm_remove {
+            if stored && keeping.confirm_remove.is_some() {
                 buttons.push(
                     Button::new("password-remove-yes", Tone::Danger, "Confirm remove")
                         .disabled(busy)
                         .on_click(cx.listener(|this, click, _, cx| {
-                            if single(click) {
+                            if this
+                                .keeping
+                                .confirm_remove
+                                .is_some_and(|shown| shown.takes(click))
+                            {
                                 this.remove_password(cx);
                             }
                         })),
@@ -387,7 +386,7 @@ impl AccountPage {
                     Button::new("password-remove-cancel", Tone::Ghost, "Cancel")
                         .disabled(busy)
                         .on_click(cx.listener(|this, _, _, cx| {
-                            this.keeping.confirm_remove = false;
+                            this.keeping.confirm_remove = None;
                             cx.notify();
                         })),
                 );
@@ -395,7 +394,7 @@ impl AccountPage {
                 buttons.push(
                     Button::new("password-remove", Tone::Ghost, "Remove").on_click(cx.listener(
                         |this, _, _, cx| {
-                            this.keeping.confirm_remove = true;
+                            this.keeping.confirm_remove = Some(Appeared::now());
                             cx.notify();
                         },
                     )),
