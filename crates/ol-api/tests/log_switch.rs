@@ -29,6 +29,7 @@ use time::macros::datetime;
 const VERSION: &str = "9.8.7";
 const SCENARIO: &str = "fixtures/dev-only/fake-launchers/all-four";
 const WAIT: Duration = Duration::from_secs(10);
+const A_JOB: Duration = Duration::from_secs(120);
 const TYPED: [&str; 3] = ["Persona One again", "Gordon Renamed", "placeholder-pw-1"];
 // The redaction leaves these alone on purpose, as the Electron app's does: they name nobody.
 const NOT_A_NAME: [&str; 4] = ["main", "alt", "true", "false"];
@@ -81,8 +82,10 @@ impl Run {
     }
 
     fn ended(&self) -> LaunchJob {
+        let until = Instant::now() + A_JOB;
         loop {
-            let job = self.jobs.recv().expect("the job ends");
+            let left = until.saturating_duration_since(Instant::now());
+            let job = self.jobs.recv_timeout(left).expect("the job ends");
             if job.state != JobState::Running {
                 return job;
             }
@@ -717,7 +720,7 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
     let quitting = run.backend.clone();
     let quit = std::thread::spawn(move || quitting.shut_down());
     let until = Instant::now() + WAIT;
-    while !written(&logger).contains("stopping the running switch") {
+    while !written(&logger).contains("launch service stopping; aborting the running job") {
         assert!(Instant::now() < until, "the quit was not logged");
         std::thread::sleep(Duration::from_millis(5));
     }
