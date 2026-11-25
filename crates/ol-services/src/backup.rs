@@ -542,6 +542,7 @@ impl<'a> BackupService<'a> {
             bytes: manifest.files.iter().map(|file| file.bytes).sum(),
             pinned: manifest.pinned.clone(),
             path: folder.to_string_lossy().into_owned(),
+            holds_registry: !manifest.meta.is_empty(),
         }
     }
 }
@@ -581,6 +582,33 @@ mod tests {
             assert!(
                 backups.get(LauncherId::Steam, &taken.id).unwrap().is_some(),
                 "the snapshot just taken is there to restore"
+            );
+        }
+    }
+
+    #[test]
+    fn a_snapshot_says_whether_it_recorded_registry_values() {
+        let scratch = Scratch::new("backup-registry");
+        let files = ScratchFiles::new(&[scratch.path()], OpLog::new());
+        let clock = FakeClock::starting_at(datetime!(2026-11-06 16:46:23 UTC));
+        let backups = BackupService::new(scratch.path(), 5, &files, &clock, &FakeVault);
+        let mut meta = Map::new();
+        meta.insert("unifiedAuth".to_owned(), Value::from("sealed"));
+        for (meta, holds_registry) in [(Map::new(), false), (meta, true)] {
+            let taken = backups
+                .snapshot(&SnapshotRequest {
+                    launcher: LauncherId::Battlenet,
+                    reason: "Before switching",
+                    files: &[],
+                    meta,
+                    protect: None,
+                    pinned: None,
+                })
+                .unwrap();
+            let listed = backups.get(LauncherId::Battlenet, &taken.id).unwrap();
+            assert_eq!(
+                listed.map(|snapshot| snapshot.holds_registry),
+                Some(holds_registry)
             );
         }
     }

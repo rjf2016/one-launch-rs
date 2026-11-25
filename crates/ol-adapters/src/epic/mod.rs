@@ -25,7 +25,7 @@ use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
 use crate::files::{
-    MAX_LAUNCHER_FILE_BYTES, read_launcher_bytes, read_launcher_text, read_log_since,
+    MAX_LAUNCHER_FILE_BYTES, read_launcher_bytes, read_launcher_text, read_log_tail,
 };
 use crate::running::game_with_running_process;
 use crate::{AccountRef, AdapterError, Directory};
@@ -151,11 +151,53 @@ pub struct CurrentSession {
 
 impl CurrentSession {
     // The account the log names, when the file on disk is that sign-in's: a closed launcher's file older than the sign-in may be someone else's.
-    fn uid_of_the_file(&self, running: bool) -> Option<String> {
+    pub fn uid_of_the_file(&self, running: bool) -> Option<String> {
         self.logged_uid
             .clone()
             .filter(|_| running || self.disk_current)
     }
+}
+
+// The settings file the launcher uses, as it was read. No Debug: it holds the session.
+#[derive(Clone)]
+pub struct SettingsFile {
+    pub path: String,
+    pub text: String,
+    pub written_at: Option<OffsetDateTime>,
+}
+
+pub(crate) struct ManifestScan {
+    pub(crate) dir: String,
+    pub(crate) manifests: Vec<EpicItemManifest>,
+    pub(crate) unreadable: usize,
+}
+
+// The library games among the manifests, each app once, by name.
+pub(crate) fn games_from(manifests: Vec<EpicItemManifest>) -> Vec<InstalledGame> {
+    let mut games: Vec<InstalledGame> = Vec::new();
+    for manifest in manifests {
+        let known = games
+            .iter()
+            .any(|game| game.launcher_game_id == manifest.app_name);
+        if known || !is_library_game(&manifest) {
+            continue;
+        }
+        games.push(InstalledGame {
+            launcher: LauncherId::Epic,
+            library_path: Some(join(&[&manifest.install_location, ".."])),
+            size_on_disk_bytes: manifest
+                .install_size
+                .filter(|size| size.fract() == 0.0 && *size < 9.0e15)
+                .map(|size| size as i64),
+            last_played_at: None,
+            needs_update: false,
+            launcher_game_id: manifest.app_name,
+            name: manifest.display_name,
+            install_path: manifest.install_location,
+        });
+    }
+    games.sort_by_cached_key(|game| game.name.to_lowercase());
+    games
 }
 
 // The end of an account id, enough to tell two apart in a sentence without spelling one out.
@@ -366,56 +408,53 @@ impl<'a> EpicAdapter<'a> {
             .ok_or(AdapterError::NotInstalled(LauncherId::Epic))
     }
 
-    // Every .item file that reads, in the order of their names. One that does not read is passed over.
-    fn read_manifests(&self) -> Result<Vec<EpicItemManifest>, AdapterError> {
+    // Every .item file that reads, in the order of their names, and how many did not. None when there is no manifests folder.
+    pub(crate) fn scan_manifests(&self) -> Result<Option<ManifestScan>, AdapterError> {
         let files = self.platform.files.as_ref();
         let dir = self.manifests_dir()?;
         if !files.exists(&dir) {
-            return Ok(Vec::new());
+            return Ok(None);
         }
         let mut names = files.list(&dir).map_err(|error| AdapterError::io(&error))?;
         names.retain(|name| is_item_file(name));
         names.sort_by_cached_key(|name| name.to_lowercase());
-        Ok(names
-            .iter()
-            .filter_map(|name| {
-                let text = read_launcher_text(files, &join(&[&dir, name]), MAX_LAUNCHER_FILE_BYTES)
-                    .ok()?;
-                parse_item_manifest(&text).ok()
-            })
-            .collect())
+        let mut manifests = Vec::new();
+        let mut unreadable = 0;
+        for name in &names {
+            let parsed = read_launcher_text(files, &join(&[&dir, name]), MAX_LAUNCHER_FILE_BYTES)
+                .ok()
+                .and_then(|text| parse_item_manifest(&text).ok());
+            match parsed {
+                Some(manifest) => manifests.push(manifest),
+                None => unreadable += 1,
+            }
+        }
+        Ok(Some(ManifestScan {
+            dir,
+            manifests,
+            unreadable,
+        }))
+    }
+
+    fn read_manifests(&self) -> Result<Vec<EpicItemManifest>, AdapterError> {
+        Ok(self
+            .scan_manifests()?
+            .map(|scan| scan.manifests)
+            .unwrap_or_default())
     }
 
     pub fn list_installed_games(&self) -> Result<Vec<InstalledGame>, AdapterError> {
         self.require_install()?;
-        let mut games: Vec<InstalledGame> = Vec::new();
-        for manifest in self.read_manifests()? {
-            let known = games
-                .iter()
-                .any(|game| game.launcher_game_id == manifest.app_name);
-            if known || !is_library_game(&manifest) {
-                continue;
-            }
-            games.push(InstalledGame {
-                launcher: LauncherId::Epic,
-                library_path: Some(join(&[&manifest.install_location, ".."])),
-                size_on_disk_bytes: manifest
-                    .install_size
-                    .filter(|size| size.fract() == 0.0 && *size < 9.0e15)
-                    .map(|size| size as i64),
-                last_played_at: None,
-                needs_update: false,
-                launcher_game_id: manifest.app_name,
-                name: manifest.display_name,
-                install_path: manifest.install_location,
-            });
-        }
-        games.sort_by_cached_key(|game| game.name.to_lowercase());
-        Ok(games)
+        Ok(games_from(self.read_manifests()?))
     }
 
     // The settings file as text, or None when there is none. A file that is not UTF-8 text is refused (see `settings_text`).
     pub fn read_ini(&self) -> Result<Option<String>, AdapterError> {
+        Ok(self.read_settings()?.map(|settings| settings.text))
+    }
+
+    // As `read_ini`, with the time of the same file: the settings file is chosen once.
+    pub fn read_settings(&self) -> Result<Option<SettingsFile>, AdapterError> {
         let files = self.platform.files.as_ref();
         let file = self.settings_path();
         if !files.exists(&file) {
@@ -430,7 +469,13 @@ impl<'a> EpicAdapter<'a> {
                 },
             },
         )?;
-        settings_text(&file, &bytes).map(|text| Some(text.to_owned()))
+        let text = settings_text(&file, &bytes)?.to_owned();
+        let written_at = files.modified(&file).ok();
+        Ok(Some(SettingsFile {
+            path: file,
+            text,
+            written_at,
+        }))
     }
 
     fn first_log_line(&self, path: &str) -> Option<String> {
@@ -459,32 +504,56 @@ impl<'a> EpicAdapter<'a> {
 
     // What the launcher has logged since `mark`, or all of its log when it has started a new one since.
     pub fn events_since(&self, mark: &LogMark) -> Vec<LogEvent> {
-        let files = self.platform.files.as_ref();
-        let path = self.log_path();
-        if !files.exists(&path) {
+        if !self.platform.files.exists(&self.log_path()) {
             return Vec::new();
         }
-        let Ok(size) = files.size(&path) else {
-            return Vec::new();
-        };
+        self.read_events_since(mark).unwrap_or_default()
+    }
+
+    // As `events_since`, with an error for a log that is there and cannot be read.
+    pub(crate) fn read_events_since(&self, mark: &LogMark) -> Result<Vec<LogEvent>, AdapterError> {
+        let files = self.platform.files.as_ref();
+        let path = self.log_path();
+        let size = files
+            .size(&path)
+            .map_err(|error| AdapterError::io(&error))?;
         let opened = self.first_log_line(&path);
         let same_run = opened.is_some() && opened == mark.opened && size >= mark.size;
         let from = if same_run { mark.size } else { 0 };
-        parse_log_events(&read_log_since(files, &path, from, MAX_LOG_TAIL_BYTES))
+        Ok(parse_log_events(&read_log_tail(
+            files,
+            &path,
+            from,
+            MAX_LOG_TAIL_BYTES,
+        )?))
     }
 
     pub fn last_sign_in_in_log(&self) -> Option<SignInOutcome> {
         last_sign_in(&self.events_since(&LogMark::default()))
     }
 
-    // What is on disk now and whose it is. Reads the settings file's time and the launcher's log; writes nothing.
-    pub fn current_session(
+    // What is on disk now and whose it is, from the settings file as it was read, with its own time, and the launcher's log; writes nothing.
+    pub fn current_session_of(
         &self,
-        ini_text: Option<&str>,
+        settings: Option<&SettingsFile>,
         running: bool,
     ) -> Result<CurrentSession, AdapterError> {
+        self.session_from(
+            settings.map(|settings| settings.text.as_str()),
+            settings.and_then(|settings| settings.written_at),
+            running,
+            self.last_sign_in_in_log(),
+        )
+    }
+
+    pub(crate) fn session_from(
+        &self,
+        ini_text: Option<&str>,
+        written_at: Option<OffsetDateTime>,
+        running: bool,
+        last_sign_in: Option<SignInOutcome>,
+    ) -> Result<CurrentSession, AdapterError> {
         let disk = ini_text.map_or_else(EpicSessionOnDisk::absent, read_session_from_ini);
-        let last_sign_in = self.last_sign_in_in_log();
         let (logged_uid, signed_in_at) = match &last_sign_in {
             Some(SignInOutcome::SignedIn { account_id, at }) => (
                 Some(account_id.clone()).filter(|id| !id.is_empty()),
@@ -497,7 +566,6 @@ impl<'a> EpicAdapter<'a> {
             Some(uid) => self.directory.account_by_launcher_uid(uid)?,
             None => None,
         };
-        let written_at = self.platform.files.modified(&self.settings_path()).ok();
         let disk_current = ini_text.is_some()
             && match (signed_in_at, written_at) {
                 (None, _) | (_, None) => true,
@@ -525,7 +593,7 @@ impl<'a> EpicAdapter<'a> {
 
     pub fn session_state(&self) -> Result<LauncherSessionState, AdapterError> {
         let running = self.is_running()?;
-        let current = self.current_session(self.read_ini()?.as_deref(), running)?;
+        let current = self.current_session_of(self.read_settings()?.as_ref(), running)?;
         let owner_uid = || {
             current
                 .owner
@@ -565,11 +633,12 @@ impl<'a> EpicAdapter<'a> {
     // Every account that has signed in on this PC has sections named [<id>_...]. Only the session of the current one is remembered.
     pub fn list_remembered_accounts(&self) -> Result<Vec<RememberedAccount>, AdapterError> {
         self.require_install()?;
-        let Some(text) = self.read_ini()? else {
+        let Some(settings) = self.read_settings()? else {
             return Ok(Vec::new());
         };
+        let text = &settings.text;
         let mut ids: Vec<String> = Vec::new();
-        for id in section_names(&text)
+        for id in section_names(text)
             .iter()
             .filter_map(|name| account_of_section(name))
         {
@@ -578,7 +647,7 @@ impl<'a> EpicAdapter<'a> {
             }
         }
         let running = self.is_running()?;
-        let current = self.current_session(Some(&text), running)?;
+        let current = self.current_session_of(Some(&settings), running)?;
         let active = current
             .disk
             .remembered
@@ -725,10 +794,10 @@ impl<'a> EpicAdapter<'a> {
 
     // Whether the settings file, as it is now, remembers a session that no One Launch account owns. Only means something while the launcher is closed.
     pub fn holds_unowned_session(&self) -> Result<bool, AdapterError> {
-        let Some(text) = self.read_ini()? else {
+        let Some(settings) = self.read_settings()? else {
             return Ok(false);
         };
-        let session = self.current_session(Some(&text), false)?;
+        let session = self.current_session_of(Some(&settings), false)?;
         let owned = session.owner.is_some_and(|owner| owner.id.is_some());
         Ok(session.disk.remembered && !owned)
     }

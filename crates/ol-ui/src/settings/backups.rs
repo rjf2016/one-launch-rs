@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use gpui::prelude::*;
 use gpui::{
@@ -24,7 +24,8 @@ pub(super) struct Backups {
     seen: Vec<(LauncherId, String)>,
     seen_at: HashMap<LauncherId, HashMap<String, usize>>,
     dialog: Option<Restoring>,
-    dialogs: u64,
+    // Restores asked for and not yet answered, so a dialog closed during one and opened again cannot ask twice.
+    restoring: HashSet<(LauncherId, String)>,
     outcome: Option<Outcome>,
     visit: u64,
 }
@@ -40,7 +41,6 @@ struct List {
 }
 
 struct Restoring {
-    key: u64,
     snapshot: BackupSnapshot,
     busy: bool,
     error: Option<SharedString>,
@@ -63,6 +63,11 @@ impl Backups {
         self.list(launcher)
             .and_then(|list| list.snapshots.as_deref())
             .unwrap_or_default()
+    }
+
+    fn pending(&self, snapshot: &BackupSnapshot) -> bool {
+        self.restoring
+            .contains(&(snapshot.launcher, snapshot.id.clone()))
     }
 
     fn seen_at(&self, launcher: LauncherId, id: &str) -> Option<usize> {
@@ -95,6 +100,27 @@ impl Backups {
 
 fn plural(count: usize, one: &str) -> String {
     format!("{count} {one}{}", if count == 1 { "" } else { "s" })
+}
+
+fn when(snapshot: &BackupSnapshot, cx: &mut Context<SettingsView>) -> String {
+    let local = local_time(cx);
+    date_time(&snapshot.created_at, local.offset, local.clock)
+        .unwrap_or_else(|| snapshot.id.clone())
+}
+
+fn changes(snapshot: &BackupSnapshot) -> Vec<String> {
+    let mut changes = snapshot.files.clone();
+    match snapshot.launcher {
+        LauncherId::Steam => changes.push(
+            r"HKCU\Software\Valve\Steam\AutoLoginUser and RememberPassword (as recorded)"
+                .to_owned(),
+        ),
+        LauncherId::Battlenet if snapshot.holds_registry => changes.push(
+            r"HKCU\Software\Blizzard Entertainment\Battle.net\UnifiedAuth (as recorded)".to_owned(),
+        ),
+        _ => {}
+    }
+    changes
 }
 
 fn size(bytes: u64) -> String {
@@ -218,11 +244,10 @@ impl SettingsView {
         else {
             return;
         };
-        backups.dialogs += 1;
+        let busy = backups.pending(&snapshot);
         backups.dialog = Some(Restoring {
-            key: backups.dialogs,
             snapshot,
-            busy: false,
+            busy,
             error: None,
             restore_leads: false,
             appeared: Appeared::now(),
@@ -243,25 +268,23 @@ impl SettingsView {
 
     // A second press, or Enter with a click, finds the restore under way and does nothing.
     fn restore(&mut self, cx: &mut Context<Self>) {
-        let visit = self.backups.visit;
-        let Some(dialog) = self.backups.dialog.as_mut() else {
+        let backups = &mut self.backups;
+        let visit = backups.visit;
+        let Some(dialog) = backups.dialog.as_mut() else {
             return;
         };
-        if dialog.busy {
+        let (launcher, id) = (dialog.snapshot.launcher, dialog.snapshot.id.clone());
+        if dialog.busy || !backups.restoring.insert((launcher, id.clone())) {
             return;
         }
         dialog.busy = true;
         dialog.error = None;
-        let (key, launcher, id) = (
-            dialog.key,
-            dialog.snapshot.launcher,
-            dialog.snapshot.id.clone(),
-        );
+        backups.outcome = None;
         let backend = self.backend.clone();
         cx.spawn(async move |this, cx| {
             let restored = backend.restore_backup(launcher, &id).await;
             this.update(cx, |this, cx| {
-                this.restored(visit, key, launcher, restored, cx)
+                this.restored(visit, launcher, id, restored, cx)
             })
             .ok();
         })
@@ -269,19 +292,22 @@ impl SettingsView {
         cx.notify();
     }
 
-    // The dialog that asked shows a refusal; once it is closed, the panel does. A visit of the tab after the one that asked shows neither, and lists the launcher again.
+    // The dialog waiting on it shows a refusal; once it is closed, the panel does. A visit of the tab after the one that asked shows neither, unless its dialog waits on the same restore, and the launcher is listed again, as a restore that failed late may have left its undo snapshot.
     fn restored(
         &mut self,
         visit: u64,
-        key: u64,
         launcher: LauncherId,
+        id: String,
         restored: Result<RestoreResult, ApiError>,
         cx: &mut Context<Self>,
     ) {
         let backups = &mut self.backups;
-        let succeeded = restored.is_ok();
-        if visit == backups.visit {
-            let asked = backups.dialog.as_mut().filter(|dialog| dialog.key == key);
+        let key = (launcher, id);
+        backups.restoring.remove(&key);
+        let asked = backups.dialog.as_mut().filter(|dialog| {
+            dialog.busy && (dialog.snapshot.launcher, &dialog.snapshot.id) == (key.0, &key.1)
+        });
+        if asked.is_some() || visit == backups.visit {
             match (restored, asked) {
                 (Ok(result), asked) => {
                     if asked.is_some() {
@@ -298,7 +324,7 @@ impl SettingsView {
                 }
             }
         }
-        if succeeded && self.tab.get() == SettingsTab::Backups {
+        if self.tab.get() == SettingsTab::Backups {
             self.list_backups(Some(launcher), cx);
         }
         cx.notify();
@@ -525,8 +551,7 @@ impl SettingsView {
         cx: &mut Context<Self>,
     ) -> Div {
         let launcher = snapshot.launcher;
-        let local = local_time(cx);
-        let when = date_time(&snapshot.created_at, local.offset, local.clock).unwrap_or_default();
+        let when = when(snapshot, cx);
         let kept = snapshot.pinned.clone().map(|pinned| {
             div()
                 .id(SharedString::from(format!(
@@ -624,15 +649,8 @@ impl SettingsView {
         let snapshot = &dialog.snapshot;
         let launcher = snapshot.launcher;
         let name = launcher.display_name();
-        let local = local_time(cx);
-        let when = date_time(&snapshot.created_at, local.offset, local.clock).unwrap_or_default();
-        let mut files: Vec<String> = snapshot.files.clone();
-        if launcher == LauncherId::Steam {
-            files.push(
-                r"HKCU\Software\Valve\Steam\AutoLoginUser and RememberPassword (as recorded)"
-                    .to_owned(),
-            );
-        }
+        let when = when(snapshot, cx);
+        let files = changes(snapshot);
         let warning = if launcher == LauncherId::Steam {
             "Steam must be closed first. It rewrites loginusers.vdf when it exits, which would undo the restore.".to_owned()
         } else {
@@ -802,6 +820,45 @@ mod tests {
         assert_eq!(size(5 * 1024 * 1024 + 512 * 1024), "5.5 MB");
         assert_eq!(plural(1, "file"), "1 file");
         assert_eq!(plural(0, "snapshot"), "0 snapshots");
+    }
+
+    #[test]
+    fn the_dialog_names_the_registry_values_a_restore_puts_back() {
+        let snapshot = |launcher, files: &[&str], holds_registry| BackupSnapshot {
+            id: "2026-11-06T16-46-25.998Z".to_owned(),
+            launcher,
+            created_at: String::new(),
+            reason: String::new(),
+            files: files.iter().map(|file| (*file).to_owned()).collect(),
+            bytes: 0,
+            pinned: None,
+            path: String::new(),
+            holds_registry,
+        };
+        assert_eq!(
+            changes(&snapshot(LauncherId::Battlenet, &[], true)),
+            [r"HKCU\Software\Blizzard Entertainment\Battle.net\UnifiedAuth (as recorded)"]
+        );
+        assert_eq!(
+            changes(&snapshot(
+                LauncherId::Battlenet,
+                &["Battle.net.config"],
+                false
+            )),
+            ["Battle.net.config"]
+        );
+        assert_eq!(
+            changes(&snapshot(
+                LauncherId::Steam,
+                &["config/loginusers.vdf"],
+                true
+            )),
+            [
+                "config/loginusers.vdf",
+                r"HKCU\Software\Valve\Steam\AutoLoginUser and RememberPassword (as recorded)"
+            ]
+        );
+        assert!(changes(&snapshot(LauncherId::Epic, &[], true)).is_empty());
     }
 
     #[test]
