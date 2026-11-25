@@ -26,11 +26,12 @@ use serde_json::Map;
 use time::OffsetDateTime;
 
 use super::{
-    RestoreError, SwitchOptions, SwitchResult, SwitchSink, Thrown, job_steps, missing_riot_session,
-    restore_riot, write_riot_session,
+    RestoreError, SwitchOptions, SwitchResult, SwitchSink, Thrown, job_steps, log_started,
+    missing_riot_session, restore_riot, write_riot_session,
 };
 use crate::backup::{BackupError, BackupFile, BackupService, SnapshotRequest};
 use crate::launchers::ServiceError;
+use crate::log::Log;
 
 // The client was seen closed a moment ago. Only `seen_closed` makes one.
 struct Closed(());
@@ -256,6 +257,7 @@ fn attention_for(
 }
 
 struct Switch<'a> {
+    log: Log,
     riot: &'a RiotAdapter<'a>,
     platform: &'a Platform,
     backups: &'a BackupService<'a>,
@@ -722,6 +724,7 @@ impl Switch<'_> {
         self.stop_if_aborted()?;
         if running && !self.already_active {
             self.mark(STEP.close, JobStepStatus::Running, "");
+            self.log.info("asking the Riot Client to close", ());
             self.riot.shutdown(None, self.cancel)?;
             self.mark(STEP.close, JobStepStatus::Done, "Client closed.");
         }
@@ -807,7 +810,11 @@ impl Switch<'_> {
         if let Some(game) = self.riot.find_running_game(None).map_err(text)? {
             return Err(RiotAdapter::game_running_error(game, "restore").to_string());
         }
-        if self.riot.is_running().map_err(text)?
+        let running = self.riot.is_running().map_err(text)?;
+        if running {
+            self.log.info("asking the Riot Client to close", ());
+        }
+        if running
             && let Err(game @ AdapterError::GameRunning { .. }) =
                 self.riot.shutdown(None, &CancelToken::new())
         {
@@ -857,11 +864,20 @@ pub fn run_switch(
         }));
     }
 
+    log_started(
+        options,
+        LauncherId::Riot,
+        account,
+        plan.strategy,
+        context.already_active,
+        context.running,
+    );
     let (steps, index) = job_steps(&plan);
     let game = options
         .game
         .and_then(|game| Some((parse_product_id(game.launcher_game_id)?, game)));
     let mut switch = Switch {
+        log: options.log.child("riot"),
         riot,
         platform,
         backups,

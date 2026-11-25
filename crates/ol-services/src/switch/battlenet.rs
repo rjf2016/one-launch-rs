@@ -26,10 +26,11 @@ use time::OffsetDateTime;
 
 use super::{
     RestoreError, SwitchOptions, SwitchResult, SwitchSink, Thrown, delete_unified_auth, job_steps,
-    restore_battlenet, set_unified_auth, write_battlenet_config,
+    log_started, restore_battlenet, set_unified_auth, write_battlenet_config,
 };
 use crate::backup::{BackupError, BackupFile, BackupService, SnapshotRequest};
 use crate::launchers::ServiceError;
+use crate::log::Log;
 
 // Where a snapshot's manifest keeps the UnifiedAuth values: a JSON list of names, each with its bytes sealed by the vault.
 pub(super) const UNIFIED_AUTH_META: &str = "unifiedAuth";
@@ -235,6 +236,7 @@ pub(crate) fn store_session(
 }
 
 struct Switch<'a> {
+    log: Log,
     battlenet: &'a BattlenetAdapter<'a>,
     platform: &'a Platform,
     backups: &'a BackupService<'a>,
@@ -857,6 +859,7 @@ impl Switch<'_> {
         self.stop_if_aborted()?;
         if running && !self.already_active {
             self.mark(STEP.close, JobStepStatus::Running, "");
+            self.log.info("asking Battle.net to close", ());
             self.battlenet.shutdown(None, self.cancel)?;
             self.mark(STEP.close, JobStepStatus::Done, "Client closed.");
         }
@@ -942,6 +945,7 @@ impl Switch<'_> {
     fn roll_back(&self, backup_id: &str) -> Result<(), String> {
         let text = |error: AdapterError| error.to_string();
         if self.battlenet.is_running().map_err(text)? {
+            self.log.info("asking Battle.net to close", ());
             let closed = self.battlenet.shutdown(None, &CancelToken::new());
             if self.battlenet.is_running().map_err(text)? {
                 return Err(closed.err().map_or_else(
@@ -976,8 +980,17 @@ pub fn run_switch(
         }));
     }
 
+    log_started(
+        options,
+        LauncherId::Battlenet,
+        account,
+        plan.strategy,
+        context.already_active,
+        context.running,
+    );
     let (steps, index) = job_steps(&plan);
     let mut switch = Switch {
+        log: options.log.child("battlenet"),
         battlenet,
         platform,
         backups,

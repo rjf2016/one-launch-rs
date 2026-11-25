@@ -5,7 +5,7 @@ use ol_adapters::{AccountRef, AdapterError};
 use ol_formats::battlenet::client_log::SignInOutcome as BattlenetSignIn;
 use ol_formats::epic::launcher_log::SignInOutcome as EpicSignIn;
 use ol_formats::epic::session::session_blob_from_ini;
-use ol_model::{Account, LauncherSession};
+use ol_model::{Account, LauncherId, LauncherSession};
 use ol_store::Store;
 
 use crate::accounts::{self, AccountError};
@@ -238,8 +238,10 @@ fn capture_riot(riot: &RiotAdapter<'_>, account: &AccountRef) -> Result<(), Adap
     switch::riot::store_session(riot.directory(), account, session, file)
 }
 
-pub fn forget(store: &Store, account_id: &str) -> Result<(), AccountError> {
+// The launcher of the account whose sign-in was removed; None when it had none.
+pub fn forget(store: &Store, account_id: &str) -> Result<Option<LauncherId>, AccountError> {
     let account = accounts::require(store, account_id)?;
-    store.delete_session(&account.id)?;
-    Ok(())
+    Ok(store
+        .delete_session(&account.id)?
+        .then_some(account.launcher))
 }

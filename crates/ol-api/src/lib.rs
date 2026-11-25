@@ -3,7 +3,8 @@
 mod backend;
 
 pub use backend::{
-    ApiError, AppInfo, Backend, JobObserver, Library, SavedSignIn, SettingChange, StartLaunch,
+    ApiError, AppInfo, Backend, BackendStart, JobObserver, Library, SavedSignIn, SettingChange,
+    StartLaunch,
 };
 pub use ol_services::capture::Captured as CapturedSignIn;
 
@@ -21,8 +22,16 @@ pub mod settings {
         VaultReset, VaultResetRefusal, VaultResetSummary,
     };
     pub use ol_services::window::{
-        AfterPlay, CloseAction, QuitQuestion, START_HIDDEN_FLAG, close_request_action,
-        hide_after_instant_play, start_hidden,
+        AfterPlay, CloseAction, QuitAnswer, QuitQuestion, START_HIDDEN_FLAG, WindowLog,
+        close_request_action, hide_after_instant_play, start_hidden,
+    };
+}
+
+pub mod log {
+    pub use ol_model::LogLevel;
+    pub use ol_model::redact::{register_account_names, register_windows_user};
+    pub use ol_services::log::{
+        Fields, KEEP, LOG_NAME, Log, LogOptions, Logger, MAX_BYTES, log_panics,
     };
 }
 

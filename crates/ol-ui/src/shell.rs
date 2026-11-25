@@ -8,7 +8,7 @@ use gpui::{
     Stateful, Subscription, Svg, Window, WindowControlArea, canvas, div, px, svg,
 };
 use ol_api::Backend;
-use ol_api::settings::QuitQuestion;
+use ol_api::settings::{QuitAnswer, QuitQuestion};
 use ol_model::{Game, LaunchJob, LauncherId, SettingKey, Sidebar};
 use ol_ui_kit::theme::{self, alpha, color};
 
@@ -101,6 +101,13 @@ enum Asked {
     Quit,
     // "Quit anyway" was answered: no answer is left, only the line that the switch is being stopped.
     Stopping,
+}
+
+impl Asked {
+    // A question about quitting during a switch stays until it is answered, whatever page a finished import or delete moves to.
+    const fn gives_way_to_a_finished_move(&self) -> bool {
+        matches!(self, Self::Leave { .. })
+    }
 }
 
 struct Asking {
@@ -279,6 +286,7 @@ impl Shell {
         ) {
             return;
         }
+        self.backend.window_log().quit_asked(&question.job_id);
         self.asking = Some(Asking {
             title: question.title.into(),
             message: question.message.into(),
@@ -329,11 +337,13 @@ impl Shell {
         if self.stopping() {
             return;
         }
-        if self.asking.is_some() {
+        if let Some(asking) = &self.asking {
             if go.guarded {
                 return;
             }
-            self.asking = None;
+            if asking.asked.gives_way_to_a_finished_move() {
+                self.asking = None;
+            }
         }
         if go.guarded
             && let Some(question) = self.question(cx)
@@ -388,6 +398,7 @@ impl Shell {
                 self.enter(then, return_to.map(|game| *game), window, cx);
             }
             Asked::Quit if act => {
+                self.backend.window_log().quit_answered(QuitAnswer::Quit);
                 self.asking = Some(Asking {
                     title: "Stopping the switch".into(),
                     message:
@@ -403,7 +414,10 @@ impl Shell {
                 });
                 cx.emit(QuitAnyway);
             }
-            _ => {
+            other => {
+                if matches!(other, Asked::Quit) {
+                    self.backend.window_log().quit_answered(QuitAnswer::Keep);
+                }
                 if let Some(field) = &asking.had_keyboard {
                     window.focus(field, cx);
                 }
@@ -421,6 +435,9 @@ impl Shell {
         cx: &mut Context<Self>,
     ) {
         let left = self.page.screen();
+        if let Some(asking) = &mut self.asking {
+            asking.had_keyboard = None;
+        }
         if let Page::Account(page) = &self.page {
             page.update(cx, |page, cx| page.leave(window, cx));
         }
@@ -1113,4 +1130,20 @@ fn icon(path: &'static str, size: f32, hex: u32) -> Svg {
         .flex_none()
         .size(px(size))
         .text_color(color(hex))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_leave_question_gives_way_to_a_finished_move() {
+        let leave = Asked::Leave {
+            then: Route::Library,
+            return_to: None,
+        };
+        assert!(leave.gives_way_to_a_finished_move());
+        assert!(!Asked::Quit.gives_way_to_a_finished_move());
+        assert!(!Asked::Stopping.gives_way_to_a_finished_move());
+    }
 }

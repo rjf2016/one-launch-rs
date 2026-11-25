@@ -5,6 +5,7 @@ mod game;
 mod health;
 mod launcher;
 mod preference;
+pub mod redact;
 mod secret;
 mod settings;
 mod switching;

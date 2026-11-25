@@ -3,6 +3,7 @@
 use std::fmt;
 use std::sync::LazyLock;
 
+use ol_model::redact::{register_account_ids, register_account_names};
 use regex::Regex;
 use thiserror::Error;
 
@@ -109,14 +110,16 @@ fn read_users(root: &VdfObject) -> Result<Vec<(SteamLoginUser, &VdfObject)>, Log
         else {
             continue;
         };
+        let persona_name = entry
+            .string("PersonaName")
+            .map(js::trim)
+            .unwrap_or_default();
+        register_account_names([account_name, persona_name]);
+        register_account_ids([id.as_str()]);
         let user = SteamLoginUser {
             steam_id64: id,
             account_name: account_name.to_owned(),
-            persona_name: entry
-                .string("PersonaName")
-                .map(js::trim)
-                .unwrap_or_default()
-                .to_owned(),
+            persona_name: persona_name.to_owned(),
             remember_password: entry.flag("RememberPassword"),
             most_recent: MostRecentKey::ALL
                 .iter()

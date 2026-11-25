@@ -1,3 +1,4 @@
+use ol_model::redact::{register_account_ids, register_account_names};
 use ol_model::{
     Account, ArtworkSource, Ciphertext, Game, GameArtwork, LastLaunch, LauncherId, LibrarySort,
     SecretKey, SettingKey, Settings, Sidebar,
@@ -206,14 +207,18 @@ pub(crate) fn account(row: &Row<'_>) -> rusqlite::Result<Option<Account>> {
     let Some(launcher) = LauncherId::parse(&row.get::<_, String>(1)?) else {
         return Ok(None);
     };
+    let (display_name, login): (String, String) = (row.get(2)?, row.get(3)?);
+    let launcher_uid: Option<String> = row.get(6)?;
+    register_account_names([&login, &display_name]);
+    register_account_ids(&launcher_uid);
     Ok(Some(Account {
         id: row.get(0)?,
         launcher,
-        display_name: row.get(2)?,
-        login: row.get(3)?,
+        display_name,
+        login,
         has_secret: row.get::<_, i64>(4)? == 1,
         has_session: row.get::<_, i64>(5)? == 1,
-        launcher_uid: row.get(6)?,
+        launcher_uid,
         tags: tags(&row.get::<_, String>(7)?),
         notes: row.get(8)?,
         last_used_at: row.get(9)?,

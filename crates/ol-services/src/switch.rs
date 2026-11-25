@@ -22,11 +22,12 @@ use ol_platform_api::{
 };
 use ol_runtime::Aborted;
 use ol_vault::Secret;
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 use time::OffsetDateTime;
 
 use crate::backup::{BackupError, BackupService, Restorable};
 use crate::launchers::{Adapter, ServiceError};
+use crate::log::Log;
 
 const SNAPSHOT_RELATIVE: &str = "config/loginusers.vdf";
 const AUTO_LOGIN_USER: &str = "AutoLoginUser";
@@ -81,6 +82,12 @@ fn restore_steam(
             lines.push(format!("{REMEMBER_PASSWORD} (removed)"));
         }
     }
+    backups.log_restored(
+        LauncherId::Steam,
+        id,
+        restorable.files.len(),
+        Some(lines.len()),
+    );
     Ok(RestoreResult {
         launcher: LauncherId::Steam,
         id: id.to_owned(),
@@ -107,6 +114,7 @@ fn restore_epic(
     let targets: Vec<&str> = targets.iter().map(String::as_str).collect();
     let restorable = backups.read_for_restore(LauncherId::Epic, id, &targets)?;
     write_restored(platform.files.as_ref(), &restorable)?;
+    backups.log_restored(LauncherId::Epic, id, restorable.files.len(), None);
     Ok(RestoreResult {
         launcher: LauncherId::Epic,
         id: id.to_owned(),
@@ -172,6 +180,12 @@ fn restore_battlenet(
             lines.push(format!("UnifiedAuth\\{} (removed)", token.name));
         }
     }
+    backups.log_restored(
+        LauncherId::Battlenet,
+        id,
+        restorable.files.len(),
+        Some(lines.len()),
+    );
     Ok(RestoreResult {
         launcher: LauncherId::Battlenet,
         id: id.to_owned(),
@@ -217,6 +231,7 @@ fn restore_riot(
         write_riot_session(platform.files.as_ref(), path, content, ready)
             .map_err(BackupError::Io)?;
     }
+    backups.log_restored(LauncherId::Riot, id, restorable.files.len(), None);
     Ok(RestoreResult {
         launcher: LauncherId::Riot,
         id: id.to_owned(),
@@ -283,6 +298,76 @@ pub struct SwitchOptions<'a> {
     pub cancel: &'a CancelToken,
     // The game a launch follows the switch with. Only Riot's client is started differently for one.
     pub game: Option<GameRef<'a>>,
+    pub log: &'a Log,
+}
+
+// The Electron app names a switch's lines after its launcher, all but Steam's.
+fn line(launcher: LauncherId, what: &str) -> String {
+    match launcher {
+        LauncherId::Steam => what.to_owned(),
+        other => format!("{} {what}", other.as_str()),
+    }
+}
+
+fn log_started(
+    options: &SwitchOptions<'_>,
+    launcher: LauncherId,
+    account: &AccountRef,
+    strategy: SwitchStrategy,
+    already_active: bool,
+    running: bool,
+) {
+    options.log.child(launcher.as_str()).info(
+        &line(launcher, "switch started"),
+        json!({
+            "accountId": account.id,
+            "strategy": strategy.as_str(),
+            "alreadyActive": already_active,
+            "running": running,
+        }),
+    );
+}
+
+fn log_outcome(log: &Log, launcher: LauncherId, account: &AccountRef, switched: &SwitchResult) {
+    let log = log.child(launcher.as_str());
+    let at = |what: &str| line(launcher, what);
+    let account_id = &account.id;
+    if switched.ok {
+        log.info(
+            &at("switch finished"),
+            json!({ "accountId": account_id, "backupId": switched.backup_id }),
+        );
+        return;
+    }
+    if switched.cancelled {
+        log.info(
+            &at("switch stopped"),
+            json!({ "accountId": account_id, "backupId": switched.backup_id, "restored": switched.restored }),
+        );
+    } else if switched.needs_sign_in {
+        return;
+    } else {
+        log.error(
+            &at("switch failed"),
+            json!({
+                "accountId": account_id,
+                "backupId": switched.backup_id,
+                "modified": switched.restored.is_some(),
+                "error": switched.error,
+            }),
+        );
+    }
+    match switched.restored {
+        Some(true) => log.warn(
+            &at("switch rolled back from backup"),
+            json!({ "backupId": switched.backup_id }),
+        ),
+        Some(false) => log.error(
+            &at("rollback failed"),
+            json!({ "backupId": switched.backup_id }),
+        ),
+        None => {}
+    }
 }
 
 // No Debug: it names the account.
@@ -348,7 +433,7 @@ pub fn run_switch(
     options: &SwitchOptions<'_>,
     sink: &mut dyn SwitchSink,
 ) -> Result<SwitchResult, ServiceError> {
-    match adapter {
+    let switched = match adapter {
         Adapter::Steam(steam) => {
             steam::run_switch(steam, platform, backups, account, options, sink)
         }
@@ -357,7 +442,11 @@ pub fn run_switch(
             battlenet::run_switch(battlenet, platform, backups, account, options, sink)
         }
         Adapter::Riot(riot) => riot::run_switch(riot, platform, backups, account, options, sink),
+    };
+    if let Ok(switched) = &switched {
+        log_outcome(options.log, adapter.launcher(), account, switched);
     }
+    switched
 }
 
 // Puts a snapshot of a launcher's files back, from Settings or after a crash. Refused while the launcher runs; what is there now is snapshotted first, so restoring the wrong one can be undone.

@@ -18,15 +18,17 @@ use ol_model::{
 };
 use ol_platform_api::{CancelToken, Hive, Platform, ProcessArg};
 use ol_runtime::wait_until;
+use serde_json::json;
 use time::OffsetDateTime;
 
 use super::{
     AUTO_LOGIN_USER, REMEMBER_PASSWORD, SNAPSHOT_RELATIVE, SwitchOptions, SwitchResult, SwitchSink,
-    Thrown, job_steps, restore_steam, set_auto_login_user, set_remember_password, snapshot_meta,
-    write_login_users,
+    Thrown, job_steps, log_started, restore_steam, set_auto_login_user, set_remember_password,
+    snapshot_meta, write_login_users,
 };
 use crate::backup::{BackupFile, BackupService, SnapshotRequest};
 use crate::launchers::ServiceError;
+use crate::log::Log;
 
 // Puts a snapshot back from Settings or after a crash. Refused while Steam runs, because Steam rewrites loginusers.vdf when it exits; what is there now is snapshotted first, so restoring the wrong one can be undone.
 pub fn restore_backup(
@@ -171,6 +173,7 @@ fn attention_for(
 }
 
 struct Switch<'a> {
+    log: Log,
     steam: &'a SteamAdapter<'a>,
     platform: &'a Platform,
     backups: &'a BackupService<'a>,
@@ -415,10 +418,19 @@ impl Switch<'_> {
         let password = password.filter(|password| !password.expose().is_empty());
         self.mark(STEP.login, JobStepStatus::Running, "");
         if self.is_running()? {
+            self.log.info("asking steam to shut down", ());
             self.steam.shutdown(None, self.cancel)?;
         }
         let previous = self.active_user()?.unwrap_or(0);
         let login = self.account.login.clone();
+        self.log.info(
+            if password.is_some() {
+                "starting steam with credentials"
+            } else {
+                "starting steam on its sign-in form"
+            },
+            json!({ "accountId": self.account.id }),
+        );
         match &password {
             Some(password) => self.start_steam(&[
                 ProcessArg::Plain("-login"),
@@ -731,6 +743,7 @@ impl Switch<'_> {
         self.stop_if_aborted()?;
         if running && !already_active {
             self.mark(STEP.close, JobStepStatus::Running, "");
+            self.log.info("asking steam to shut down", ());
             self.steam.shutdown(None, self.cancel)?;
             self.mark(STEP.close, JobStepStatus::Done, "Steam closed.");
         }
@@ -754,6 +767,7 @@ impl Switch<'_> {
     fn roll_back(&self, backup_id: &str) -> Result<(), String> {
         let text = |error: AdapterError| error.to_string();
         if self.steam.is_running().map_err(text)? {
+            self.log.info("asking steam to shut down", ());
             let closed = self.steam.shutdown(None, &CancelToken::new());
             if self.steam.is_running().map_err(text)? {
                 return Err(closed.err().map_or_else(
@@ -799,12 +813,21 @@ pub fn run_switch(
         }));
     }
 
+    log_started(
+        options,
+        LauncherId::Steam,
+        account,
+        plan.strategy,
+        context.already_active,
+        plan.running,
+    );
     let (steps, index) = job_steps(&plan);
     let login = context
         .target
         .as_ref()
         .map_or_else(|| account.login.clone(), |user| user.account_name.clone());
     let mut switch = Switch {
+        log: options.log.child("steam"),
         steam,
         platform,
         backups,

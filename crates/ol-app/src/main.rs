@@ -17,6 +17,7 @@ use std::time::Duration;
 use gpui::{App, AsyncApp, Window, WindowHandle};
 use ol_api::Backend;
 use ol_api::library::HourClock;
+use ol_api::log::{Log, LogOptions, Logger, log_panics, register_windows_user};
 use ol_api::settings::{
     AfterPlay, CloseAction, Folder, close_request_action, hide_after_instant_play,
 };
@@ -38,6 +39,7 @@ const TITLE: &str = "One Launch";
 const FAKE_TITLE: &str = "One Launch (fake launchers)";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const COPY_DELAY: Duration = Duration::from_millis(250);
+const LOG_CLOSE: Duration = Duration::from_secs(2);
 
 type TraySlot = Rc<RefCell<Option<Tray>>>;
 
@@ -259,8 +261,27 @@ fn main() -> ExitCode {
     if let Some(vault) = args.doctor {
         return doctor(&args.data_dir, vault);
     }
+    let logger = open_log(&args.data_dir);
+    let exit = run(args, &logger.log());
+    logger.close(LOG_CLOSE);
+    exit
+}
+
+// The Windows user is registered before the first line, so no line can name them.
+fn open_log(data_dir: &Path) -> Arc<Logger> {
+    let folders = ol_platform_win::machine::folders();
+    register_windows_user(
+        folders.user_profile.as_deref(),
+        folders.user_name.as_deref(),
+    );
+    let logger = Arc::new(Logger::for_data_folder(data_dir, LogOptions::default()));
+    log_panics(Arc::clone(&logger));
+    logger
+}
+
+fn run(args: Args, log: &Log) -> ExitCode {
     // Started first: the database opens on its own thread while the window is being made.
-    let (backend, machine) = match start_backend(&args) {
+    let (backend, machine) = match start_backend(&args, log) {
         Ok(started) => started,
         Err(problem) => {
             eprintln!("OneLaunch: {problem:#}");
@@ -279,8 +300,10 @@ fn main() -> ExitCode {
             let picker = Rc::clone(&picker);
             move |cx| {
                 *picker.borrow_mut() = Some(hand_picker(&args, |given| cx.set_global(given)));
-                if let Err(error) = start(args, backend, machine, failed.clone(), tray, cx) {
+                if let Err(error) = start(args, backend.clone(), machine, failed.clone(), tray, cx)
+                {
                     eprintln!("OneLaunch: {error:#}");
+                    backend.window_log().fatal_during_startup();
                     failed.set(true);
                     cx.quit();
                 }
@@ -290,7 +313,7 @@ fn main() -> ExitCode {
     let icon = tray.borrow_mut().take();
     if icon.is_some() {
         drop(icon);
-        println!("OneLaunch: tray icon removed");
+        backend.window_log().tray_removed();
     }
     backend.shut_down();
     if let Some(heard) = heard {
@@ -338,10 +361,10 @@ fn fake_folder(_: &Args) -> Option<(&'static str, &Path)> {
 }
 
 #[cfg(not(feature = "fake"))]
-fn start_backend(args: &Args) -> anyhow::Result<(Backend, Machine)> {
+fn start_backend(args: &Args, log: &Log) -> anyhow::Result<(Backend, Machine)> {
     if !args.real_launchers {
         return Ok((
-            Backend::start_with_vault_of_data_folder(
+            Backend::logging_to(log.clone()).start_with_vault_of_data_folder(
                 args.data_dir.clone(),
                 VERSION,
                 Box::new(Dpapi),
@@ -352,14 +375,15 @@ fn start_backend(args: &Args) -> anyhow::Result<(Backend, Machine)> {
     use anyhow::Context as _;
 
     // A key Windows does not unwrap does not stop the start: the vault comes up with its key lost, for the Encryption panel's reset.
-    let backend = Backend::start_on_this_pc(
-        args.data_dir.clone(),
-        VERSION,
-        real_launchers(),
-        Box::new(Dpapi),
-        None,
-    )
-    .context("the vault of --data-dir could not be opened")?;
+    let backend = Backend::logging_to(log.clone())
+        .start_on_this_pc(
+            args.data_dir.clone(),
+            VERSION,
+            real_launchers(),
+            Box::new(Dpapi),
+            None,
+        )
+        .context("the vault of --data-dir could not be opened")?;
     Ok((backend, Machine::None))
 }
 
@@ -390,10 +414,10 @@ fn real_launchers() -> ol_api::launchers::Launchers {
 }
 
 #[cfg(feature = "fake")]
-fn start_backend(args: &Args) -> anyhow::Result<(Backend, Machine)> {
+fn start_backend(args: &Args, log: &Log) -> anyhow::Result<(Backend, Machine)> {
     let Some(machine) = &args.fake else {
         return Ok((
-            Backend::start_with_vault_of_data_folder(
+            Backend::logging_to(log.clone()).start_with_vault_of_data_folder(
                 args.data_dir.clone(),
                 VERSION,
                 Box::new(Dpapi),
@@ -401,7 +425,7 @@ fn start_backend(args: &Args) -> anyhow::Result<(Backend, Machine)> {
             Machine::None,
         ));
     };
-    let (backend, seed) = fake::start(&args.data_dir, machine, VERSION)?;
+    let (backend, seed) = fake::start(&args.data_dir, machine, VERSION, log)?;
     Ok((backend, Machine::Fake(seed)))
 }
 
@@ -490,8 +514,13 @@ fn start(
                 life.hide_to_tray.get(),
             );
             if hide_after_instant_play(after) {
-                cx.spawn(async |_| hide_window("after an instant launch"))
-                    .detach();
+                let (log, job) = (life.backend.window_log(), played.job.id.clone());
+                cx.spawn(async move |_| {
+                    if hide_window() {
+                        log.hidden_after_instant_launch(&job);
+                    }
+                })
+                .detach();
             }
         }
     })
@@ -517,7 +546,7 @@ fn start(
                         add_tray_icon(&life, cx);
                     } else if !life.close_to_tray.get() && shown {
                         drop(life.tray.borrow_mut().take());
-                        println!("OneLaunch: tray icon removed");
+                        life.backend.window_log().tray_removed();
                     }
                 }
                 let _ = life.window.update(cx, |shell, _, cx| {
@@ -542,10 +571,14 @@ fn start(
                 return false;
             }
             let tray = life.close_to_tray.get() && life.tray.borrow().is_some();
-            match close_request_action(life.quitting.get(), tray, life.backend.is_busy()) {
+            let action = close_request_action(life.quitting.get(), tray, life.backend.is_busy());
+            life.backend.window_log().close_requested(action);
+            match action {
                 CloseAction::Close => true,
                 CloseAction::Hide => {
-                    hide_window("by the close button");
+                    if hide_window() {
+                        life.backend.window_log().hidden_to_tray();
+                    }
                     false
                 }
                 // A start still being prepared has no job to ask about: it is stopped, and the window closes.
@@ -599,13 +632,10 @@ fn after_the_next_frame(window: &mut Window, what: &'static str) {
     });
 }
 
-// After the first paint and not before it, as in the Electron app: the copy must not hold up the window. Neither line names the folder, which can run through the user's profile.
+// After the first paint and not before it, as in the Electron app: the copy must not hold up the window.
 async fn copy_database(backend: &Backend, cx: &AsyncApp) {
     capture::pause(COPY_DELAY, cx).await;
-    match backend.back_up_database().await {
-        Ok(()) => println!("OneLaunch: database copied"),
-        Err(error) => eprintln!("OneLaunch: database copy failed ({})", error.code),
-    }
+    let _ = backend.back_up_database().await;
 }
 
 fn add_tray_icon(life: &Rc<Life>, cx: &AsyncApp) {
@@ -613,12 +643,13 @@ fn add_tray_icon(life: &Rc<Life>, cx: &AsyncApp) {
     let heard = Rc::clone(life);
     match Tray::new(life.title, move |event| on_tray_event(event, &heard, &cx)) {
         Ok(icon) => {
-            println!("OneLaunch: tray icon added");
             *life.tray.borrow_mut() = Some(icon);
+            life.backend.window_log().tray_added();
         }
-        Err(error) => {
-            eprintln!("OneLaunch: tray icon unavailable; closing the window quits: {error}");
-        }
+        Err(error) => life
+            .backend
+            .window_log()
+            .tray_unavailable(error.code(), error.hresult()),
     }
 }
 
@@ -633,7 +664,7 @@ fn on_tray_event(event: TrayEvent, life: &Rc<Life>, cx: &AsyncApp) {
         ]),
     };
     match chosen {
-        Some(0) => show_window(),
+        Some(0) => show_from_tray(life),
         Some(2) => {
             let life = Rc::clone(life);
             cx.spawn(async move |cx| request_quit(&life, cx)).detach();
@@ -648,26 +679,26 @@ fn show_window() {
     }
 }
 
-fn hide_window(why: &str) {
-    if let Some(window) = AppWindow::on_this_thread() {
-        window.hide();
-        println!("OneLaunch: window hidden to the tray {why}");
-    }
+fn show_from_tray(life: &Life) {
+    show_window();
+    life.backend.window_log().shown_from_tray();
+}
+
+fn hide_window() -> bool {
+    let Some(window) = AppWindow::on_this_thread() else {
+        return false;
+    };
+    window.hide();
+    true
 }
 
 // "Quit anyway": the window and the tray stay while the switch is asked to stop and puts back what it must; the app quits once the job has ended. The Electron app gives up after 10 s; this waits for the switch's own timeouts.
 fn quit_after_the_switch(life: &Rc<Life>, cx: &mut App) {
     life.stopping.set(true);
-    let running = life.backend.running_job();
-    println!(
-        "OneLaunch: quit anyway: {}",
-        if running.is_some() {
-            "stopping the switch first"
-        } else {
-            "no switch runs any more"
-        }
-    );
-    if let Some(job) = running {
+    if life.backend.is_busy() {
+        life.backend.window_log().stopping_for_quit();
+    }
+    if let Some(job) = life.backend.running_job() {
         let _ = life.backend.cancel_launch(&job.id);
     }
     let life = Rc::clone(life);
@@ -676,7 +707,6 @@ fn quit_after_the_switch(life: &Rc<Life>, cx: &mut App) {
             capture::pause(Duration::from_millis(100), cx).await;
         }
         life.quitting.set(true);
-        println!("OneLaunch: the switch has stopped; quitting");
         quit(cx);
     })
     .detach();

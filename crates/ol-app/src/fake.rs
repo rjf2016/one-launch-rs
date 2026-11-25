@@ -8,6 +8,7 @@ use ol_api::launchers::{
     BattlenetMachine, BattlenetTiming, EpicMachine, EpicTiming, NewAccount, RiotMachine,
     RiotTiming, Secret, SteamTiming,
 };
+use ol_api::log::Log;
 use ol_api::{ApiError, Backend};
 use ol_model::SettingKey;
 use ol_sim::Seed;
@@ -42,6 +43,7 @@ pub fn start(
     data_dir: &Path,
     machine: &FakeMachine,
     version: &str,
+    log: &Log,
 ) -> anyhow::Result<(Backend, Seed)> {
     let folder = &machine.folder;
     let scenario = folder.join(SCENARIO);
@@ -106,7 +108,12 @@ pub fn start(
         fake.program_data.clone(),
     )
     .with_local_launch(fake.riot_launch.clone());
-    let backend = Backend::start_with(data_dir.to_path_buf(), version, launchers, None);
+    let backend = Backend::logging_to(log.clone()).start_with(
+        data_dir.to_path_buf(),
+        version,
+        launchers,
+        None,
+    );
     Ok((backend, fake.seed))
 }
 

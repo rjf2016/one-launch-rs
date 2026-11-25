@@ -1,5 +1,6 @@
 // The Riot Client's remembered session: the `riot-client` block under `psl` › `authorization` in RiotGamesPrivateSettings.yaml. The block holds bearer tokens, so nothing here prints a value, no reason for a refusal quotes the file, and what a user is shown of a sign-in is the start of a SHA-256. The reader fails closed: a block that is not in the shape a real client writes reads as unexpected, never as a session or a sign-out. It understands space-indented maps, one scalar on a line and one-line list items, and nothing more of YAML, on purpose.
 
+use ol_model::redact::{register_account_ids, register_account_names};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use zeroize::Zeroize;
@@ -408,10 +409,12 @@ fn name_of(value: Option<&JsValue>) -> Option<String> {
 
 fn riot_id_of(claims: &JsObject) -> Option<RiotId> {
     let account = claims.get("acct")?.as_object()?;
-    Some(RiotId {
+    let id = RiotId {
         game_name: name_of(account.get("game_name"))?,
         tag_line: name_of(account.get("tag_line"))?,
-    })
+    };
+    register_account_names([id.game_name.clone(), id.text()]);
+    Some(id)
 }
 
 // Reads the session block. The rest of the file, the device cookie and the cookies of older builds, is never looked at.
@@ -451,6 +454,7 @@ pub fn read_session(text: &str) -> SessionRead {
     };
     let named = claims.as_object().and_then(|claims| {
         let account_id = text_of(claims.get("sub")).filter(|sub| is_uuid(sub))?;
+        register_account_ids([&account_id]);
         Some((account_id.to_ascii_lowercase(), riot_id_of(claims)))
     });
     claims.wipe();

@@ -26,6 +26,9 @@ pub struct Folders {
     pub app_data: Option<String>,
     pub local_app_data: Option<String>,
     pub program_data: Option<String>,
+    // For the log, which masks the user's name and profile folder wherever they stand.
+    pub user_profile: Option<String>,
+    pub user_name: Option<String>,
 }
 
 #[expect(
@@ -43,5 +46,7 @@ pub fn folders() -> Folders {
         app_data: variable("APPDATA"),
         local_app_data: variable("LOCALAPPDATA"),
         program_data: variable("ProgramData"),
+        user_profile: variable("USERPROFILE"),
+        user_name: variable("USERNAME"),
     }
 }
