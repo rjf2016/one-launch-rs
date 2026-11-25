@@ -38,7 +38,6 @@ struct Name {
 #[derive(Default)]
 pub struct AccountNames {
     stored: HashSet<String>,
-    users: HashSet<String>,
     by_first: HashMap<char, Vec<Name>>,
 }
 
@@ -129,15 +128,16 @@ impl AccountNames {
             let units = name.encode_utf16().count();
             if !(MIN_NAME_LENGTH..=MAX_NAME_LENGTH).contains(&units)
                 || NOT_A_NAME.contains(&name.as_str())
-                || self.stored.contains(&name)
             {
                 continue;
             }
-            if self.stored.len() >= MAX_ACCOUNT_NAMES {
-                return;
+            if !self.stored.contains(&name) {
+                if self.stored.len() >= MAX_ACCOUNT_NAMES {
+                    return;
+                }
+                self.stored.insert(name.clone());
             }
             self.insert_both(written, &name, ACCOUNT_MASK);
-            self.stored.insert(name);
         }
     }
 
@@ -145,8 +145,7 @@ impl AccountNames {
         let written = user.trim_matches(is_js_space);
         let name = written.to_lowercase();
         let units = name.encode_utf16().count();
-        if !(MIN_USER_LENGTH..=MAX_NAME_LENGTH).contains(&units) || !self.users.insert(name.clone())
-        {
+        if !(MIN_USER_LENGTH..=MAX_NAME_LENGTH).contains(&units) {
             return;
         }
         self.insert_both(written, &name, USER_MASK);
@@ -258,5 +257,21 @@ mod tests {
             "[ACCOUNT], bobsled, [ACCOUNT], gordon_x"
         );
         assert!(matches!(names.mask("nothing here"), Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn a_second_spelling_of_a_stored_name_is_masked_too() {
+        let kelvin = "\u{212a}elvin";
+        let mut names = AccountNames::new();
+        names.add(["kelvin", kelvin]);
+        assert_eq!(names.len(), 1);
+        assert_eq!(
+            names.mask(&format!("kelvin {kelvin}")),
+            "[ACCOUNT] [ACCOUNT]"
+        );
+        let mut users = AccountNames::new();
+        users.add_user("kelvin");
+        users.add_user(kelvin);
+        assert_eq!(users.mask(&format!("kelvin {kelvin}")), "[USER] [USER]");
     }
 }
