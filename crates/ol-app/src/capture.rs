@@ -229,6 +229,13 @@ impl Step {
         if let Some(typed) = text.strip_prefix("type:").filter(|typed| !typed.is_empty()) {
             return Ok(Self::Type(typed.replace("%2C", ",")));
         }
+        if let Some(path) = text.strip_prefix("pick:") {
+            // A path holds no colon past its drive, so one there is another step joined on with &.
+            if path.is_empty() || path.get(2..).is_some_and(|tail| tail.contains(':')) {
+                anyhow::bail!("{text} is not pick:<path> or pick-cancel, which go alone");
+            }
+            return Ok(Self::Pick(Some(path.replace("%2C", ","))));
+        }
         if text.contains('&') {
             let steps = text
                 .split('&')
@@ -269,7 +276,6 @@ impl Step {
                 .filter(|milliseconds| *milliseconds <= LONGEST_WAIT)
                 .map(|milliseconds| Self::Wait(Duration::from_millis(milliseconds))),
             "type" => (!rest.is_empty()).then(|| Self::Type(rest.replace("%2C", ","))),
-            "pick" => (!rest.is_empty()).then(|| Self::Pick(Some(rest.replace("%2C", ",")))),
             "move" => spot(rest).map(Self::Move),
             "click" => spot(rest).map(Self::Click),
             "right-click" => spot(rest).map(Self::RightClick),
@@ -324,7 +330,6 @@ impl Step {
             let form = match kind {
                 "wait" => "wait:<milliseconds up to 60000>",
                 "type" => "type:<text>",
-                "pick" => "pick:<path> or pick-cancel",
                 "move" | "click" | "right-click" | "second-click" | "back" => {
                     "move:<x>x<y>, click:<x>x<y>, right-click:<x>x<y>, second-click:<x>x<y> or back:<x>x<y>"
                 }
@@ -678,6 +683,10 @@ mod tests {
             panic!("a step that answers the file dialog");
         };
         assert_eq!(path, r"D:\x\a,b\steam.exe");
+        let Ok(Step::Pick(Some(path))) = Step::parse(r"pick:D:\R&D\steam.exe") else {
+            panic!("a step that answers the file dialog with an ampersand in the path");
+        };
+        assert_eq!(path, r"D:\R&D\steam.exe");
         assert!(matches!(Step::parse("pick-cancel"), Ok(Step::Pick(None))));
         let Ok(Step::Type(text)) = Step::parse("type:R&D") else {
             panic!("a step that types an ampersand");
@@ -714,6 +723,8 @@ mod tests {
             "type:",
             "pick:",
             r"click:1x2&pick:D:\x.exe",
+            r"pick:D:\x.exe&click:1x2",
+            r"click:1x2&pick:D:\R&D\x.exe",
             "click:1x2&wait:5",
             "back:5",
             "second-click:5",
