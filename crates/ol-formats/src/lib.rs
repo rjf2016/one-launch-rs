@@ -18,6 +18,7 @@ pub mod epic {
     pub mod launcher_log;
     pub mod manifests;
     pub mod session;
+    pub mod steam_ids;
 }
 
 pub mod riot {

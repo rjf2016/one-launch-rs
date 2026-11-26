@@ -5,13 +5,17 @@ use std::time::Duration;
 
 use async_channel::{Receiver, Sender, WeakSender};
 use ol_model::{
-    Account, BackupSnapshot, Ciphertext, InstalledGame, LaunchJob, LaunchPreflight, LauncherId,
-    LauncherInstall, LauncherSession, LauncherSessionState, LauncherStatus, LibraryScanResult,
-    LibrarySort, RecentLaunch, RememberedAccount, RestoreResult, SecretKey, SettingKey, Settings,
-    Sidebar, SwitchPlan, SwitchRecovery,
+    Account, ArtworkKind, ArtworkStatus, BackupSnapshot, Ciphertext, Game, InstalledGame,
+    LaunchJob, LaunchPreflight, LauncherId, LauncherInstall, LauncherSession, LauncherSessionState,
+    LauncherStatus, LibraryScanResult, LibrarySort, RecentLaunch, RememberedAccount, RestoreResult,
+    SecretKey, SettingKey, Settings, Sidebar, SwitchPlan, SwitchRecovery,
 };
-use ol_platform_api::{Clipboard, DataProtector, Shell};
+use ol_platform_api::http::HttpClient;
+use ol_platform_api::{CancelToken, Clipboard, DataProtector, Shell, WebPage};
 use ol_services::accounts::{self, AccountError, AccountPatch, NewAccount};
+use ol_services::artwork::{
+    self, Artwork, ArtworkError, Fetched, Job, KeySource, Outcome, Prepared,
+};
 use ol_services::capture::{self, Captured};
 use ol_services::clipboard::{self, ClipboardService, CopyError, CopyField, CopyResult, Timer};
 use ol_services::data_folder::{self, Folder, OpenError};
@@ -36,6 +40,7 @@ use ol_store::{Store, StoreError};
 use ol_vault::{KeyError, OsCryptVault, Recovered, Secret, Vault, VaultError};
 use serde_json::{Value, json};
 use thiserror::Error;
+use time::OffsetDateTime;
 
 const RECENT_LAUNCHES_MOST: u32 = 50;
 
@@ -128,6 +133,24 @@ impl From<VaultResetRefusal> for ApiError {
 
 impl From<AutostartError> for ApiError {
     fn from(error: AutostartError) -> Self {
+        Self {
+            code: error.code(),
+            message: error.to_string(),
+        }
+    }
+}
+
+impl From<ArtworkError> for ApiError {
+    fn from(error: ArtworkError) -> Self {
+        Self {
+            code: error.code(),
+            message: error.to_string(),
+        }
+    }
+}
+
+impl From<VaultError> for ApiError {
+    fn from(error: VaultError) -> Self {
         Self {
             code: error.code(),
             message: error.to_string(),
@@ -229,6 +252,19 @@ enum Command {
     UseShell(Arc<dyn Shell>),
     OpenFolder(Folder, Reply<()>),
     Copy(String, CopyField, Reply<CopyResult>),
+    UseHttp(Arc<dyn HttpClient>),
+    ArtworkStatus(Reply<ArtworkStatus>),
+    WatchArtwork(Sender<ArtworkStatus>),
+    RefreshArtwork(Option<String>, bool, Reply<usize>),
+    SetManualArtwork(String, ArtworkKind, PathBuf, Reply<Game>),
+    SetArtworkKey(Secret, Reply<()>),
+    RemoveArtworkKey(Reply<()>),
+    OpenPage(WebPage, Reply<()>),
+    // Asked by a lookup, from its own thread, at the moment it needs the key.
+    ArtworkKey(Reply<Option<Secret>>),
+    // A lookup's end, handed over from its own thread.
+    ArtworkDone(Box<(Job, Fetched)>),
+    StopArtwork,
     #[cfg(feature = "fake")]
     SeedSession(String, Option<String>, ol_vault::Secret, Reply<()>),
     // Work a switch hands over from its own thread: a question about accounts or saved sign-ins.
@@ -285,6 +321,17 @@ impl Command {
             Self::UseShell(_) => "shell:use",
             Self::OpenFolder(..) => "app:openPath",
             Self::Copy(..) => "accounts:copy",
+            Self::UseHttp(_) => "artwork:use",
+            Self::ArtworkStatus(_) => "artwork:status",
+            Self::WatchArtwork(_) => "artwork:watch",
+            Self::RefreshArtwork(..) => "artwork:refresh",
+            Self::SetManualArtwork(..) => "artwork:setManual",
+            Self::SetArtworkKey(..) => "vault:setSecret",
+            Self::RemoveArtworkKey(_) => "vault:deleteSecret",
+            Self::OpenPage(..) => "app:openUrl",
+            Self::ArtworkKey(_) => "artwork:key",
+            Self::ArtworkDone(_) => "artwork:done",
+            Self::StopArtwork => "artwork:stop",
             #[cfg(feature = "fake")]
             Self::SeedSession(..) => "sessions:seed",
             Self::OnStore(_) => "store:work",
@@ -327,6 +374,23 @@ impl StoreThread for DatabaseThread {
         self.0
             .as_ref()
             .is_some_and(|commands| commands.send_blocking(Command::OnStore(work)).is_ok())
+    }
+}
+
+// The vault's key as a lookup reaches it from its own thread.
+struct KeyDesk(Sender<Command>);
+
+impl KeySource for KeyDesk {
+    fn api_key(&self) -> Result<Option<Secret>, String> {
+        let closing = || "One Launch is closing".to_owned();
+        let (reply, answer) = async_channel::bounded(1);
+        self.0
+            .send_blocking(Command::ArtworkKey(reply))
+            .map_err(|_| closing())?;
+        answer
+            .recv_blocking()
+            .map_err(|_| closing())?
+            .map_err(|error| error.message)
     }
 }
 
@@ -600,6 +664,7 @@ impl Backend {
         let has_launchers = launchers.is_some();
         let folder = data_dir.clone();
         let serving = Serving {
+            artwork: ArtworkDesk::new(&data_dir, &log),
             data_dir,
             launchers,
             vault: Arc::default(),
@@ -979,6 +1044,60 @@ impl Backend {
             .await
     }
 
+    // Until this is called no artwork is looked up, so a run that is handed no client never reaches the internet. The client is the only thing in the app that could.
+    pub fn use_http(&self, http: Arc<dyn HttpClient>) {
+        let _ = self.commands.send_blocking(Command::UseHttp(http));
+    }
+
+    // The artwork queue and the Library's state, as the Electron app's artwork:status answers them.
+    pub async fn artwork_status(&self) -> Result<ArtworkStatus, ApiError> {
+        self.ask(Command::ArtworkStatus).await
+    }
+
+    // The answer hears the artwork status as it is now, and from then on each time it changes: a lookup queued, started or ended, a key stored or removed, a scan finished, the Library changed. Every caller is told, until it lets its answer go.
+    pub fn artwork_changes(&self) -> Receiver<ArtworkStatus> {
+        let (changes, heard) = async_channel::unbounded();
+        let _ = self.commands.send_blocking(Command::WatchArtwork(changes));
+        heard
+    }
+
+    // Queues a lookup for one game, or for every installed game without a `game_id`, and answers how many were queued. `force` downloads again what is cached: for one game that replaces a picture the user chose, for all it leaves those alone.
+    pub async fn refresh_artwork(
+        &self,
+        game_id: Option<&str>,
+        force: bool,
+    ) -> Result<usize, ApiError> {
+        let game_id = game_id.map(str::to_owned);
+        self.ask(|reply| Command::RefreshArtwork(game_id, force, reply))
+            .await
+    }
+
+    // Makes a picture the user picked the game's own: `picked` is the file from the window's dialog. It is checked like a download and copied into the cache; nothing is asked of the internet.
+    pub async fn set_manual_artwork(
+        &self,
+        game_id: &str,
+        kind: ArtworkKind,
+        picked: PathBuf,
+    ) -> Result<Game, ApiError> {
+        let game_id = game_id.to_owned();
+        self.ask(|reply| Command::SetManualArtwork(game_id, kind, picked, reply))
+            .await
+    }
+
+    // Stores the SteamGridDB key, sealed by the vault. Only a run of 20 to 64 letters and digits is taken.
+    pub async fn set_steamgriddb_key(&self, key: Secret) -> Result<(), ApiError> {
+        self.ask(|reply| Command::SetArtworkKey(key, reply)).await
+    }
+
+    pub async fn remove_steamgriddb_key(&self) -> Result<(), ApiError> {
+        self.ask(Command::RemoveArtworkKey).await
+    }
+
+    // Shows one of the app's fixed web pages in the user's browser, through the shell this run was given.
+    pub async fn open_page(&self, page: WebPage) -> Result<(), ApiError> {
+        self.ask(|reply| Command::OpenPage(page, reply)).await
+    }
+
     // Stores a sign-in for an account as it is given, encrypted like any other. Only a build with the fake launchers has it: the app itself saves a sign-in only from the launcher's own file.
     #[cfg(feature = "fake")]
     pub async fn seed_session(
@@ -1002,6 +1121,8 @@ impl Backend {
                 json!({ "jobId": job.id }),
             );
         }
+        // No lookup is started from here on, and one on its way asks nothing more and writes nothing.
+        let _ = self.commands.send_blocking(Command::StopArtwork);
         self.jobs.close();
         // A start the database's thread had in hand when the board closed has its thread in the slot once this is answered.
         let (reply, drained) = async_channel::bounded(1);
@@ -1064,7 +1185,43 @@ struct Serving {
     last_preflight: LastPreflight,
     recovery: Recovery,
     clipboard: Option<ClipboardService>,
+    artwork: ArtworkDesk,
     log: Log,
+}
+
+// The artwork queue with what the backend keeps around it.
+struct ArtworkDesk {
+    service: Artwork,
+    // The one way to the internet. None until a run hands one in.
+    http: Option<Arc<dyn HttpClient>>,
+    cancel: CancelToken,
+    watch: Vec<Sender<ArtworkStatus>>,
+    told: Option<ArtworkStatus>,
+    has_key: bool,
+    // Moves when the games or their artwork change, so whoever shows the Library reads it again.
+    revision: u64,
+    scanned: bool,
+}
+
+impl ArtworkDesk {
+    fn new(data_dir: &Path, log: &Log) -> Self {
+        Self {
+            service: Artwork::new(data_dir, log),
+            http: None,
+            cancel: CancelToken::new(),
+            watch: Vec::new(),
+            told: None,
+            has_key: false,
+            revision: 0,
+            scanned: false,
+        }
+    }
+
+    fn status(&self) -> ArtworkStatus {
+        self.service
+            .queue
+            .status(self.has_key, self.revision, self.scanned)
+    }
 }
 
 impl Serving {
@@ -1105,6 +1262,7 @@ impl Serving {
                 self.open_vault(vault);
                 self.store_probe(store);
                 self.log_vault(store);
+                self.read_key_state(store);
             }
             Err(error) => log.error(
                 "the data folder could not be opened",
@@ -1114,6 +1272,7 @@ impl Serving {
         while let Ok(command) = requests.recv_blocking() {
             let store = opened.as_ref().map_err(ApiError::clone);
             self.handle(command, store);
+            self.tell_artwork();
         }
         drop(opened);
         log.info("exit", ());
@@ -1207,8 +1366,11 @@ impl Serving {
                 said.answer(&reply, store.and_then(|store| Ok(store.settings()?)));
             }
             Command::SetSetting(key, value, reply) => {
-                let changed = store.and_then(|store| Ok(setting::change(store, key, &value)?));
-                if changed.is_ok() {
+                let changed = store
+                    .as_ref()
+                    .map_err(ApiError::clone)
+                    .and_then(|store| Ok(setting::change(store, key, &value)?));
+                if let Ok(changed) = &changed {
                     if key == SettingKey::LogLevel
                         && let Some(level) = ol_model::LogLevel::parse(&value)
                     {
@@ -1219,6 +1381,11 @@ impl Serving {
                         json!({ "key": key.as_str(), "value": value }),
                     );
                     self.changed(key, Some(&value));
+                    if changed.turns_artwork_on
+                        && let Ok(store) = store
+                    {
+                        self.queue_missing_artwork(store, &ipc);
+                    }
                 }
                 said.answer(&reply, changed.map(|_| ()));
             }
@@ -1251,7 +1418,13 @@ impl Serving {
                 }),
             ),
             Command::ResetVault(reply) => {
-                let reset = store.and_then(|store| self.reset_vault(store));
+                let reset = store
+                    .as_ref()
+                    .map_err(ApiError::clone)
+                    .and_then(|store| self.reset_vault(store));
+                if let (Ok(_), Ok(store)) = (&reset, &store) {
+                    self.read_key_state(store);
+                }
                 if let Ok(reset) = &reset {
                     match reset.summary() {
                         Some(removed) => ipc.warn("vault reset by user", removed_counts(&removed)),
@@ -1389,7 +1562,8 @@ impl Serving {
                 said.answer(&reply, cleared);
             }
             Command::Rescan(reply) => {
-                said.answer(&reply, store.and_then(|store| self.rescan(store)))
+                let scanned = store.and_then(|store| self.rescan(store));
+                said.answer(&reply, scanned);
             }
             Command::InstalledGames(launcher, reply) => said.answer(
                 &reply,
@@ -1603,6 +1777,104 @@ impl Serving {
                     previous.clear_if_unchanged();
                 }
             }
+            Command::UseHttp(http) => self.artwork.http = Some(http),
+            Command::ArtworkStatus(reply) => said.answer(&reply, Ok(self.artwork.status())),
+            Command::WatchArtwork(changes) => {
+                if changes.try_send(self.artwork.status()).is_ok() {
+                    self.artwork.watch.push(changes);
+                }
+            }
+            Command::RefreshArtwork(game_id, force, reply) => {
+                let queued = store
+                    .as_ref()
+                    .map_err(ApiError::clone)
+                    .and_then(|store| self.refresh_artwork(store, game_id.as_deref(), force));
+                if let Ok(queued) = &queued {
+                    ipc.info(
+                        "artwork refresh queued",
+                        json!({ "gameId": game_id, "force": force, "queued": queued }),
+                    );
+                }
+                said.answer(&reply, queued);
+                if let Ok(store) = store {
+                    self.pump_artwork(store);
+                }
+            }
+            Command::SetManualArtwork(game_id, kind, picked, reply) => {
+                let now = self.time();
+                let set = store.and_then(|store| {
+                    Ok(self
+                        .artwork
+                        .service
+                        .set_manual(store, &game_id, kind, &picked, now)?)
+                });
+                if set.is_ok() {
+                    self.artwork.revision += 1;
+                }
+                said.answer(&reply, set);
+            }
+            Command::SetArtworkKey(key, reply) => {
+                let stored = store
+                    .as_ref()
+                    .map_err(ApiError::clone)
+                    .and_then(|store| self.store_artwork_key(store, &key));
+                if stored.is_ok() {
+                    ipc.info(
+                        "secret stored",
+                        json!({ "key": SecretKey::SteamGridDbApiKey.as_str() }),
+                    );
+                }
+                said.answer(&reply, stored);
+                if let Ok(store) = store {
+                    self.read_key_state(store);
+                }
+            }
+            Command::RemoveArtworkKey(reply) => {
+                let removed = store.as_ref().map_err(ApiError::clone).and_then(|store| {
+                    store.delete_secret(SecretKey::SteamGridDbApiKey)?;
+                    Ok(())
+                });
+                if removed.is_ok() {
+                    ipc.info(
+                        "secret deleted",
+                        json!({ "key": SecretKey::SteamGridDbApiKey.as_str() }),
+                    );
+                }
+                said.answer(&reply, removed);
+                if let Ok(store) = store {
+                    self.read_key_state(store);
+                }
+            }
+            Command::OpenPage(page, reply) => said.answer(&reply, self.open_page(page)),
+            Command::ArtworkKey(reply) => {
+                if self.artwork.cancel.is_cancelled() {
+                    answer(&reply, Err(ApiError::stopped()));
+                } else {
+                    answer(&reply, store.and_then(|store| self.artwork_key(store)));
+                }
+            }
+            Command::ArtworkDone(done) => {
+                let (job, fetched) = *done;
+                let game_id = job.wanted.game_id.clone();
+                let now = self.time();
+                let outcome = match &store {
+                    Ok(store) => {
+                        let (outcome, changed) =
+                            self.artwork.service.finish(store, &job, fetched, now);
+                        self.artwork.revision += u64::from(changed);
+                        outcome
+                    }
+                    Err(_) => Outcome::Failed,
+                };
+                self.artwork.service.queue.finish(&game_id, outcome);
+                if let Ok(store) = store {
+                    self.pump_artwork(store);
+                }
+            }
+            Command::StopArtwork => {
+                self.artwork.service.queue.stop();
+                self.artwork.cancel.cancel();
+            }
             Command::Copy(account_id, field, reply) => {
                 let copied = store.and_then(|store| {
                     Ok(clipboard::copy_account_field(
@@ -1664,6 +1936,137 @@ impl Serving {
 
     fn now(&self, launchers: &Launchers) -> String {
         ol_store::iso_timestamp(launchers.platform.clock.now())
+    }
+
+    // The machine's clock when there is one, as `stamp` reads it.
+    fn time(&self) -> OffsetDateTime {
+        self.launchers
+            .as_ref()
+            .map_or_else(OffsetDateTime::now_utc, |launchers| {
+                launchers.platform.clock.now()
+            })
+    }
+
+    fn read_key_state(&mut self, store: &Store) {
+        self.artwork.has_key = store
+            .secret(SecretKey::SteamGridDbApiKey)
+            .is_ok_and(|stored| stored.is_some());
+    }
+
+    // Whoever watches hears the status when it is not the one they heard last.
+    fn tell_artwork(&mut self) {
+        let status = self.artwork.status();
+        if self.artwork.told == Some(status) {
+            return;
+        }
+        self.artwork.told = Some(status);
+        self.artwork
+            .watch
+            .retain(|watch| watch.try_send(status).is_ok());
+    }
+
+    fn store_artwork_key(&self, store: &Store, key: &Secret) -> Result<(), ApiError> {
+        if !artwork::looks_like_a_key(key.expose()) {
+            return Err(ArtworkError::NotAKey.into());
+        }
+        let sealed = self.vault().encrypt(key)?;
+        store.put_secret(SecretKey::SteamGridDbApiKey, &sealed, &self.stamp())?;
+        Ok(())
+    }
+
+    // Read out of the vault for the one lookup that asks, and kept nowhere.
+    fn artwork_key(&self, store: &Store) -> Result<Option<Secret>, ApiError> {
+        match store.secret(SecretKey::SteamGridDbApiKey)? {
+            Some(sealed) => Ok(Some(self.vault().decrypt(&sealed)?)),
+            None => Ok(None),
+        }
+    }
+
+    fn open_page(&self, page: WebPage) -> Result<(), ApiError> {
+        let refused = |message: String| ApiError {
+            code: "OPEN_FAILED",
+            message,
+        };
+        let shell = self
+            .shell
+            .as_ref()
+            .ok_or_else(|| refused("This build of One Launch cannot open web pages.".to_owned()))?;
+        shell
+            .open_page(page)
+            .map_err(|error| refused(error.to_string()))
+    }
+
+    fn refresh_artwork(
+        &mut self,
+        store: &Store,
+        game_id: Option<&str>,
+        force: bool,
+    ) -> Result<usize, ApiError> {
+        if self.artwork.http.is_none() {
+            return Err(ArtworkError::NoNetwork.into());
+        }
+        let now = self.time();
+        Ok(self.artwork.service.refresh(store, game_id, force, now)?)
+    }
+
+    // After a scan, and when looking up by itself is turned on: what is missing is queued. A run without a way to the internet queues nothing.
+    fn queue_missing_artwork(&mut self, store: &Store, log: &Log) {
+        if self.artwork.http.is_none() {
+            return;
+        }
+        let now = self.time();
+        match self.artwork.service.enqueue_after_scan(store, now) {
+            Ok(0) => {}
+            Ok(queued) => log.info("artwork queued", json!({ "queued": queued })),
+            Err(error) => log.warn(
+                "artwork could not be queued",
+                json!({ "code": error.code(), "error": error.to_string() }),
+            ),
+        }
+        self.pump_artwork(store);
+    }
+
+    // Starts lookups while fewer run than may. A game that needs nothing asked ends here; any other gets a thread of its own, which holds no database and no file of the cache.
+    fn pump_artwork(&mut self, store: &Store) {
+        while let Some((game_id, force)) = self.artwork.service.queue.take_next() {
+            let ended = match self.artwork.service.prepare(store, &game_id, force) {
+                Ok(Prepared::Nothing) => Some(Outcome::Done),
+                Ok(Prepared::Lookup(job)) => (!self.start_lookup(job)).then_some(Outcome::Failed),
+                Err(error) => {
+                    self.log.child("artwork").error(
+                        "artwork job crashed",
+                        json!({ "gameId": game_id, "error": error.to_string() }),
+                    );
+                    Some(Outcome::Failed)
+                }
+            };
+            if let Some(ended) = ended {
+                self.artwork.service.queue.finish(&game_id, ended);
+            }
+        }
+    }
+
+    fn start_lookup(&self, job: Box<Job>) -> bool {
+        let (Some(http), Some(commands)) = (self.artwork.http.clone(), self.commands.upgrade())
+        else {
+            return false;
+        };
+        let cancel = self.artwork.cancel.clone();
+        let lookup = move || {
+            let keys = KeyDesk(commands.clone());
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                artwork::fetch(&*http, &keys, &job.wanted, &cancel)
+            }));
+            let fetched = ran.unwrap_or_else(|_| Fetched {
+                crashed: Some("the lookup stopped unexpectedly".to_owned()),
+                ..Fetched::default()
+            });
+            let _ = commands.send_blocking(Command::ArtworkDone(Box::new((*job, fetched))));
+        };
+        thread::Builder::new()
+            .name("artwork".to_owned())
+            .spawn(lookup)
+            .is_ok()
     }
 
     // The machine's clock when there is one, so a fake machine's rows carry its time; else the system's.
@@ -1907,12 +2310,34 @@ impl Serving {
         )?)
     }
 
-    fn rescan(&self, store: &Store) -> Result<Vec<LibraryScanResult>, ApiError> {
+    // The launchers are read again, and then, as in the Electron app, the artwork of games that are gone is removed and what is missing is queued.
+    fn rescan(&mut self, store: &Store) -> Result<Vec<LibraryScanResult>, ApiError> {
+        let scanned = self.scan(store);
+        self.artwork.scanned = true;
+        let scanned = scanned?;
+        if self.launchers.is_none() {
+            return Ok(scanned);
+        }
+        match self.artwork.service.prune(store) {
+            Ok(removed) => self.artwork.revision += u64::from(removed > 0),
+            Err(error) => self.log.child("artwork").warn(
+                "artwork could not be pruned",
+                json!({ "code": error.code(), "error": error.to_string() }),
+            ),
+        }
+        let log = self.log.clone();
+        self.queue_missing_artwork(store, &log);
+        Ok(scanned)
+    }
+
+    fn scan(&mut self, store: &Store) -> Result<Vec<LibraryScanResult>, ApiError> {
         let Some(launchers) = &self.launchers else {
             return Ok(Vec::new());
         };
         let configs = launchers.configs(&store.settings()?, &self.data_dir);
-        let scanned = launchers::scan_library(store, launchers, &configs, &self.now(launchers));
+        let (scanned, changed) =
+            launchers::scan_library(store, launchers, &configs, &self.now(launchers));
+        self.artwork.revision += u64::from(changed);
         let log = self.log.child("scan");
         for result in &scanned {
             let launcher = result.launcher.as_str();
@@ -1940,7 +2365,7 @@ impl Serving {
         Ok(scanned)
     }
 
-    fn rescan_after_folder_change(&self, store: &Store, launcher: LauncherId) {
+    fn rescan_after_folder_change(&mut self, store: &Store, launcher: LauncherId) {
         if let Err(error) = self.rescan(store) {
             self.log.child("ipc").warn(
                 "rescan after a launcher folder change failed",
@@ -2165,6 +2590,7 @@ mod tests {
 
         let (commands, _requests) = async_channel::unbounded();
         let mut serving = Serving {
+            artwork: ArtworkDesk::new(&data_dir, &Log::off()),
             data_dir: data_dir.clone(),
             launchers: None,
             vault: Arc::default(),
@@ -2198,6 +2624,42 @@ mod tests {
         let status = vault_health::status(&store, serving.vault_access()).unwrap();
         assert_eq!(status.state(), EncryptionState::Working);
         assert_eq!(status.readable, Some(true));
+    }
+
+    #[test]
+    fn a_lookup_that_asks_for_the_key_after_a_quit_is_not_handed_it() {
+        let scratch = Scratch::new("api-artwork-key");
+        let data_dir = scratch.path().to_path_buf();
+        let (commands, _requests) = async_channel::unbounded();
+        let mut serving = Serving {
+            artwork: ArtworkDesk::new(&data_dir, &Log::off()),
+            data_dir: data_dir.clone(),
+            launchers: None,
+            vault: Arc::default(),
+            protector: None,
+            shell: None,
+            settings_watch: None,
+            jobs: JobBoard::default(),
+            on_job: Arc::new(|_| {}),
+            commands: commands.downgrade(),
+            job_thread: Arc::default(),
+            last_preflight: LastPreflight::default(),
+            recovery: Recovery::default(),
+            clipboard: None,
+            log: Log::off(),
+        };
+        let (store, _) = Store::open(&ol_store::database_path(&data_dir)).unwrap();
+        serving.open_vault(VaultSource::DataFolder(Box::new(Mine)));
+        let key = Secret::new("placeholderkey0000000000".to_owned());
+        serving.store_artwork_key(&store, &key).unwrap();
+        let ask = |serving: &mut Serving| {
+            let (reply, answer) = async_channel::bounded(1);
+            serving.handle(Command::ArtworkKey(reply), Ok(&store));
+            answer.try_recv().unwrap()
+        };
+        assert!(ask(&mut serving).unwrap().is_some());
+        serving.handle(Command::StopArtwork, Ok(&store));
+        assert_eq!(ask(&mut serving).err(), Some(ApiError::stopped()));
     }
 
     // A clock that runs something once, the next time it is read.

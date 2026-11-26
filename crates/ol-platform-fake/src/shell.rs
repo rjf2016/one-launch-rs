@@ -1,4 +1,4 @@
-use ol_platform_api::{Shell, ShellError};
+use ol_platform_api::{Shell, ShellError, WebPage};
 
 use crate::OpLog;
 
@@ -16,6 +16,11 @@ impl FakeShell {
 impl Shell for FakeShell {
     fn open_url(&self, url: &str) -> Result<(), ShellError> {
         self.log.record("shell.open", [("url", url.into())]);
+        Ok(())
+    }
+
+    fn open_page(&self, page: WebPage) -> Result<(), ShellError> {
+        self.log.record("shell.page", [("url", page.url().into())]);
         Ok(())
     }
 

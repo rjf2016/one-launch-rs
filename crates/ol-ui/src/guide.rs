@@ -155,6 +155,7 @@ pub struct SetupGuide {
     reads: u64,
     games: Option<usize>,
     preview: bool,
+    artwork_on: bool,
     accounts: Option<usize>,
     remembered: Vec<(LauncherId, Remembered)>,
     selected: Vec<Key>,
@@ -191,6 +192,7 @@ impl SetupGuide {
             reads: 0,
             games: None,
             preview: false,
+            artwork_on: SettingKey::ArtworkAutoFetch.default_on(),
             accounts: None,
             remembered: Vec::new(),
             selected: Vec::new(),
@@ -212,6 +214,7 @@ impl SetupGuide {
             if let Ok(settings) = backend.settings().await {
                 this.update(cx, |this, cx| {
                     this.preview = settings.toggle(SettingKey::DryRun);
+                    this.artwork_on = settings.toggle(SettingKey::ArtworkAutoFetch);
                     cx.notify();
                 })
                 .ok();
@@ -817,6 +820,23 @@ impl SetupGuide {
                     .text_color(color(theme::MUTED))
                     .child(icon(assets::GAMEPAD, 16., theme::ACCENT))
                     .child(games),
+            )
+            .child(
+                div()
+                    .mt(px(8.))
+                    .flex()
+                    .items_start()
+                    .gap(px(8.))
+                    .text_size(px(12.))
+                    .line_height(px(19.5))
+                    .text_color(color(theme::MUTED))
+                    .child(icon(assets::IMAGES, 16., theme::ACCENT).mt(px(2.)))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .child(artwork_line(self.artwork_on)),
+                    ),
             )
     }
 
@@ -1959,6 +1979,15 @@ fn phase_demo(stage: usize) -> Div {
                 .text_color(color(theme::FAINT))
                 .child("What you see when you press Play."),
         )
+}
+
+// A notice and no question: covers are looked up unless the user turned that off.
+fn artwork_line(on: bool) -> &'static str {
+    if on {
+        "Covers are downloaded for you from Steam; only game names and store ids are sent, never anything about your accounts. Games Steam does not sell need a free SteamGridDB key (Settings \u{203a} Artwork)."
+    } else {
+        "Cover art downloads are off. Settings \u{203a} Artwork turns them on; only game names and store ids are ever sent, never anything about your accounts."
+    }
 }
 
 #[cfg(test)]

@@ -4198,6 +4198,7 @@ dependencies = [
  "base64 0.23.1",
  "ed25519-dalek",
  "futures-lite",
+ "image",
  "ol-adapters",
  "ol-formats",
  "ol-model",

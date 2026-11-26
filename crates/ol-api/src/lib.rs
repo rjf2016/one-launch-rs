@@ -54,6 +54,12 @@ pub mod accounts {
     pub use ol_vault::Secret;
 }
 
+// What the Artwork tab needs beside the artwork status, which is `ol_model::ArtworkStatus`.
+pub mod artwork {
+    pub use ol_platform_api::WebPage;
+    pub use ol_services::artwork::{KEY_REFUSED, looks_like_a_key};
+}
+
 // What the launch dialog, its banner and the recovery dialog say about a switch.
 pub mod launch {
     pub use ol_services::accounts::in_pick_order;

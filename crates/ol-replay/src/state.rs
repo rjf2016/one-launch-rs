@@ -403,6 +403,15 @@ pub fn read(
          FROM launcher_sessions s JOIN accounts a ON a.id = s.account_id ORDER BY a.launcher, a.login",
     )?;
 
+    let artwork = table(
+        "SELECT a.game_id, a.source, a.grid_path, a.hero_path, a.logo_path, a.fetched_at
+         FROM artwork a JOIN games g ON g.id = a.game_id ORDER BY g.launcher, g.launcher_game_id",
+    )?;
+    let attempts = table(
+        "SELECT t.game_id, t.attempted_at, t.error
+         FROM artwork_attempts t JOIN games g ON g.id = t.game_id ORDER BY g.launcher, g.launcher_game_id",
+    )?;
+
     let mut snapshots = Map::new();
     let copies = fs::read_dir(data_dir.join("backups").join("db"))
         .map(Iterator::count)
@@ -443,6 +452,8 @@ pub fn read(
             "user_version": version,
             "tables": {
                 "accounts": as_values(accounts),
+                "artwork": as_values(artwork),
+                "artwork_attempts": as_values(attempts),
                 "games": as_values(games),
                 "launch_history": as_values(history),
                 "launcher_sessions": as_values(sessions),

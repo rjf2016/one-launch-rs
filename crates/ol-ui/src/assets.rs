@@ -59,6 +59,9 @@ pub const ARROW_RIGHT: &str = "icons/arrow-right.svg";
 pub const REPEAT: &str = "icons/repeat.svg";
 pub const USER_PLUS: &str = "icons/user-plus.svg";
 pub const EYE_PREVIEW: &str = "icons/eye-preview.svg";
+pub const IMAGES: &str = "icons/images.svg";
+pub const IMAGE_PLUS: &str = "icons/image-plus.svg";
+pub const EXTERNAL_LINK: &str = "icons/external-link.svg";
 
 macro_rules! oracle_icon {
     ($file:literal) => {
@@ -131,6 +134,9 @@ const FILES: &[(&str, &[u8])] = &[
     (REPEAT, oracle_icon!("lucide/Repeat.svg")),
     (USER_PLUS, oracle_icon!("lucide/UserPlus.svg")),
     (EYE_PREVIEW, oracle_icon!("lucide/Eye.svg")),
+    (IMAGES, oracle_icon!("lucide/Images.svg")),
+    (IMAGE_PLUS, oracle_icon!("lucide/ImagePlus.svg")),
+    (EXTERNAL_LINK, oracle_icon!("lucide/ExternalLink.svg")),
     (MINIMIZE, caption_icon!(r#"<path d="M0 5.5h10"/>"#)),
     (
         MAXIMIZE,

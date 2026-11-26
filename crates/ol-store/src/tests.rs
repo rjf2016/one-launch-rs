@@ -1287,3 +1287,91 @@ fn a_forgotten_sign_in_takes_its_row_alone() {
     assert!(!store.delete_session(&epic_alt).unwrap());
     assert!(!store.delete_session("no-such-account").unwrap());
 }
+
+#[test]
+fn an_artwork_row_and_a_recorded_miss_are_written_and_removed_each_alone() {
+    let scratch = data_folder();
+    let (store, _) = Store::open(&database_path(scratch.path())).unwrap();
+    let games = rows(&store.conn, "SELECT * FROM games ORDER BY id");
+    let id_of_game = |launcher_game_id: &str| {
+        let found = store
+            .installed_games()
+            .unwrap()
+            .into_iter()
+            .find(|game| game.launcher_game_id == launcher_game_id);
+        found.expect("the fixture has this game").id
+    };
+    let (rocket, hearthstone, fortnite) = (
+        id_of_game("252950"),
+        id_of_game("hs_beta"),
+        id_of_game("Fortnite"),
+    );
+    let (rocket, hearthstone, fortnite) =
+        (rocket.as_str(), hearthstone.as_str(), fortnite.as_str());
+
+    let stored = store.artwork_row(rocket).unwrap().unwrap();
+    assert_eq!(stored.source, "steamcdn");
+    assert_eq!(stored.grid_path, Some(format!("{rocket}/grid.jpg")));
+    assert_eq!(stored.logo_path, Some(format!("{rocket}/logo.png")));
+    assert_eq!(store.artwork_row(fortnite).unwrap(), None);
+    assert_eq!(store.artwork_attempt(rocket).unwrap(), None);
+    assert_eq!(
+        store.artwork_attempt(hearthstone).unwrap().as_deref(),
+        Some("2026-11-05T19:30:10.000Z")
+    );
+    let mut known = store.artwork_game_ids().unwrap();
+    known.sort();
+    assert_eq!(known.len(), 6);
+    assert!(known.contains(&hearthstone.to_owned()) && known.contains(&rocket.to_owned()));
+
+    let own = crate::ArtworkRow {
+        source: "manual".to_owned(),
+        grid_path: Some(format!("{fortnite}/grid.webp")),
+        hero_path: None,
+        logo_path: None,
+        fetched_at: Some("2026-11-22T10:00:00.000Z".to_owned()),
+    };
+    store.put_artwork(fortnite, &own).unwrap();
+    assert_eq!(store.artwork_row(fortnite).unwrap(), Some(own.clone()));
+    let replaced = crate::ArtworkRow {
+        source: "steamgriddb".to_owned(),
+        hero_path: Some(format!("{fortnite}/hero.png")),
+        ..own
+    };
+    store.put_artwork(fortnite, &replaced).unwrap();
+    assert_eq!(store.artwork_row(fortnite).unwrap(), Some(replaced));
+    assert_eq!(store.artwork_row(rocket).unwrap(), Some(stored));
+    let unknown = crate::ArtworkRow {
+        source: "gog".to_owned(),
+        ..crate::ArtworkRow::default()
+    };
+    assert!(store.put_artwork(fortnite, &unknown).is_err());
+    assert!(store.put_artwork("no-such-game", &unknown).is_err());
+
+    store
+        .record_artwork_attempt(fortnite, "2026-11-22T10:00:00.000Z", "No artwork found")
+        .unwrap();
+    store
+        .record_artwork_attempt(
+            fortnite,
+            "2026-11-23T10:00:00.000Z",
+            "Steam search: HTTP 500",
+        )
+        .unwrap();
+    let game = store.game(fortnite).unwrap().unwrap();
+    assert_eq!(
+        game.artwork_error.as_deref(),
+        Some("Steam search: HTTP 500")
+    );
+    assert_eq!(
+        game.artwork.map(|art| art.source),
+        Some(ArtworkSource::SteamGridDb)
+    );
+    store.clear_artwork_attempt(fortnite).unwrap();
+    assert_eq!(store.artwork_attempt(fortnite).unwrap(), None);
+    assert!(store.artwork_attempt(hearthstone).unwrap().is_some());
+    store.delete_artwork(fortnite).unwrap();
+    assert_eq!(store.artwork_row(fortnite).unwrap(), None);
+    assert_eq!(store.artwork_game_ids().unwrap().len(), 6);
+    assert_eq!(rows(&store.conn, "SELECT * FROM games ORDER BY id"), games);
+}

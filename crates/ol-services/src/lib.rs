@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 pub mod accounts;
+pub mod artwork;
 pub mod backup;
 pub mod capture;
 pub mod clipboard;

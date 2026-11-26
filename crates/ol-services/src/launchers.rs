@@ -659,14 +659,15 @@ pub fn import_accounts(
     Ok(result)
 }
 
-// Reads every launcher this build knows again and brings the games table in line. A launcher that is not installed counts as having no games; any other failure, and a list that could not be read whole, is reported on its entry and leaves its rows alone.
+// Reads every launcher this build knows again and brings the games table in line. A launcher that is not installed counts as having no games; any other failure, and a list that could not be read whole, is reported on its entry and leaves its rows alone. Answers, beside each launcher's result, whether any row changed.
 pub fn scan_library(
     store: &Store,
     launchers: &Launchers,
     configs: &Configs,
     now: &str,
-) -> Vec<LibraryScanResult> {
-    Launchers::IMPLEMENTED
+) -> (Vec<LibraryScanResult>, bool) {
+    let changed = std::cell::Cell::new(false);
+    let scanned = Launchers::IMPLEMENTED
         .into_iter()
         .map(|launcher| {
             let sync = |games: &[InstalledGame], installed: bool| match store.sync_games(
@@ -675,14 +676,17 @@ pub fn scan_library(
                 now,
                 || Uuid::new_v4().to_string(),
             ) {
-                Ok(sync) => LibraryScanResult {
-                    launcher,
-                    added: sync.added,
-                    updated: sync.updated,
-                    removed: sync.removed,
-                    installed,
-                    error: None,
-                },
+                Ok(sync) => {
+                    changed.set(changed.get() || sync.changed);
+                    LibraryScanResult {
+                        launcher,
+                        added: sync.added,
+                        updated: sync.updated,
+                        removed: sync.removed,
+                        installed,
+                        error: None,
+                    }
+                }
                 Err(error) => failed(launcher, error.to_string()),
             };
             let directory = launchers.directory(store, launcher);
@@ -704,7 +708,8 @@ pub fn scan_library(
                 Err(error) => failed(launcher, error.to_string()),
             }
         })
-        .collect()
+        .collect();
+    (scanned, changed.get())
 }
 
 fn failed(launcher: LauncherId, error: String) -> LibraryScanResult {

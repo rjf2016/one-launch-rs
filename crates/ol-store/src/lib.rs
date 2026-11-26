@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod artwork;
 mod backup;
 mod error;
 mod launchers;
@@ -17,6 +18,7 @@ use rusqlite::Connection;
 use time::OffsetDateTime;
 use time::macros::format_description;
 
+pub use artwork::ArtworkRow;
 pub use error::StoreError;
 pub use launchers::{AccountUpdate, GameSync, NewAccount};
 pub use open::{MigrationReport, Snapshot};

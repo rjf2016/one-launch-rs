@@ -2,6 +2,7 @@
 
 pub mod atomic;
 pub mod contract;
+pub mod http;
 mod ports;
 pub mod protected;
 
@@ -9,7 +10,7 @@ pub use ports::{
     CancelToken, Clipboard, ClipboardError, Clock, FileReader, FileWriter, Files, Hive, Platform,
     ProcessArg, ProcessError, ProcessInfo, ProcessLister, ProcessRunner, Processes, Registry,
     RegistryData, RegistryError, RegistryNamedValue, RegistryReader, RegistryWriter,
-    RiotLaunchError, RiotLaunchRequest, RiotLocalLaunch, Shell, ShellError,
+    RiotLaunchError, RiotLaunchRequest, RiotLocalLaunch, Shell, ShellError, WebPage,
 };
 
 use thiserror::Error;
