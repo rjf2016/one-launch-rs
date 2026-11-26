@@ -330,6 +330,7 @@ pub struct BackupSnapshot {
     pub bytes: u64,
     pub pinned: Option<String>,
     pub path: String,
+    pub holds_registry: bool,
 }
 
 #[derive(Clone, PartialEq, Eq)]

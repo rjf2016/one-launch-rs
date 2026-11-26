@@ -5,7 +5,8 @@
 use ol_model::{Ciphertext, SecretKey};
 use ol_services::install::{self, UpdateStatus, UpdateUnavailable};
 use ol_services::vault_health::{
-    EncryptionState, VaultAccess, VaultResetSummary, clear_stored_secrets, ensure_probe, status,
+    EncryptionState, VaultAccess, VaultResetSummary, clear_stored_secrets, ensure_probe,
+    mark_reset_pending, status,
 };
 use ol_store::{Store, database_path};
 use ol_testkit::Scratch;
@@ -56,6 +57,29 @@ fn the_probe_is_stored_once_and_a_wrong_one_is_never_written_over() {
         status(&store, VaultAccess::Unavailable).unwrap().state(),
         EncryptionState::Unavailable
     );
+}
+
+// A reset about to replace the key with no probe stored leaves one that no key opens: until the clear goes through, every look reads the key as lost, at the next start too, and a start puts in no probe of the new key beside it.
+#[test]
+fn a_reset_with_no_probe_reads_as_lost_until_its_clear_goes_through() {
+    let scratch = Scratch::new("services-vault");
+    let store = store(&scratch);
+    let open = VaultAccess::Open(&FakeVault);
+    assert!(mark_reset_pending(&store, NOW).unwrap());
+    assert!(!mark_reset_pending(&store, NOW).unwrap());
+    drop(store);
+
+    let store = self::store(&scratch);
+    assert!(!ensure_probe(&store, open, NOW).unwrap());
+    assert_eq!(
+        status(&store, open).unwrap().state(),
+        EncryptionState::KeyLost
+    );
+    let removed = clear_stored_secrets(&store, &FakeVault, NOW).unwrap();
+    assert_eq!(removed.secrets, 1);
+    assert!(ensure_probe(&store, open, NOW).unwrap());
+    assert_eq!(status(&store, open).unwrap().readable, Some(true));
+    assert!(!mark_reset_pending(&store, NOW).unwrap());
 }
 
 #[test]

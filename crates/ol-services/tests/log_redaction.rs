@@ -204,6 +204,39 @@ fn json_inside_a_string_is_redacted_however_often_it_was_escaped() {
 }
 
 #[test]
+fn a_quoted_secret_is_masked_up_to_its_closing_quote() {
+    let names = names(&[]);
+    for (text, masked) in [
+        (
+            r#"sign-in password="violet meadow lantern" sent"#,
+            r#"sign-in password="[REDACTED]" sent"#,
+        ),
+        (
+            "secret: 'violet meadow' and more",
+            "secret: '[REDACTED]' and more",
+        ),
+        (
+            r#"body {\"password\":\"violet meadow\",\"next\":1}"#,
+            r#"body {\"password\":\"[REDACTED]\",\"next\":1}"#,
+        ),
+        (
+            r#"{"token":"violet meadow","pwd":""}"#,
+            r#"{"token":"[REDACTED]","pwd":"[REDACTED]"}"#,
+        ),
+        ("pwd=violet meadow", "pwd=[REDACTED] meadow"),
+        (r#"token="violet meadow"#, r#"token="[REDACTED] meadow"#),
+    ] {
+        assert_eq!(redact_string(&names, text), masked, "{text}");
+    }
+    let in_field = line(
+        &names,
+        "m",
+        Some(json!({ "note": r#"password="violet meadow lantern""# })),
+    );
+    assert_absent(&in_field, "meadow");
+}
+
+#[test]
 fn the_fields_stay_json_whatever_the_rules_take_out() {
     let names = names(&["gordon_f"]);
     let written = line(

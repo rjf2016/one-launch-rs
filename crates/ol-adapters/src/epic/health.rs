@@ -3,12 +3,12 @@
 use std::collections::BTreeSet;
 
 use ol_formats::epic::ini::section_names;
-use ol_formats::epic::launcher_log::SignInOutcome;
-use ol_formats::epic::manifests::{is_item_file, parse_item_manifest, parse_launcher_installed};
-use ol_formats::winpath::{join, normalize_launcher_path};
+use ol_formats::epic::launcher_log::{LogEvent, SignInOutcome, last_sign_in};
+use ol_formats::epic::manifests::parse_launcher_installed;
+use ol_formats::winpath::{join, normalize_launcher_path, same_path};
 use ol_model::{HealthCheck, HealthStatus, InstallSource, InstalledGame, LauncherInstall};
 
-use super::{CurrentSession, EXE, EpicAdapter, account_of_section};
+use super::{EXE, EpicAdapter, LogMark, account_of_section, games_from};
 use crate::AdapterError;
 use crate::files::{MAX_LAUNCHER_FILE_BYTES, read_launcher_text};
 use crate::health::{Checks, Known, chosen_folder_check, is_named, source_label};
@@ -30,6 +30,7 @@ impl EpicAdapter<'_> {
             return None;
         }
         self.install_at(join(&[&exe, "..", "..", "..", ".."]), InstallSource::User)
+            .filter(|install| same_path(&install.exe_path, &exe))
     }
 
     pub fn launcher_installed_path(&self) -> String {
@@ -73,38 +74,27 @@ impl EpicAdapter<'_> {
         let running = checks.process(EXE, known.running.map_or_else(|| self.is_running(), Ok));
 
         let games = self.manifest_checks(&mut checks);
-        self.launcher_installed_check(&mut checks, &games);
-        let current = self.settings_check(&mut checks, running);
-        self.log_check(&mut checks, current.as_ref());
+        self.launcher_installed_check(&mut checks, games.as_deref());
+        let log = self
+            .platform
+            .files
+            .exists(&self.log_path())
+            .then(|| self.read_events_since(&LogMark::default()));
+        let last = match &log {
+            Some(Ok(events)) => last_sign_in(events),
+            _ => None,
+        };
+        self.settings_check(&mut checks, running, last);
+        self.log_check(&mut checks, log);
         checks.0
     }
 
-    fn manifest_checks(&self, checks: &mut Checks) -> Vec<InstalledGame> {
-        let files = self.platform.files.as_ref();
-        let scanned = (|| {
-            let dir = self.manifests_dir()?;
-            if !files.exists(&dir) {
-                return Ok(None);
-            }
-            let names = files.list(&dir).map_err(|error| AdapterError::io(&error))?;
-            let (mut read, mut unreadable) = (0, 0);
-            for name in names.iter().filter(|name| is_item_file(name)) {
-                let parsed =
-                    read_launcher_text(files, &join(&[&dir, name]), MAX_LAUNCHER_FILE_BYTES)
-                        .map_err(|error| error.to_string())
-                        .and_then(|text| {
-                            parse_item_manifest(&text).map_err(|error| error.to_string())
-                        });
-                match parsed {
-                    Ok(_) => read += 1,
-                    Err(_) => unreadable += 1,
-                }
-            }
-            let games = self.list_installed_games()?;
-            Ok::<_, AdapterError>(Some((dir, read, unreadable, games)))
-        })();
-        match scanned {
-            Ok(Some((dir, read, unreadable, games))) => {
+    // The installed games, or None when the scan failed or passed over a manifest it could not read.
+    fn manifest_checks(&self, checks: &mut Checks) -> Option<Vec<InstalledGame>> {
+        match self.scan_manifests() {
+            Ok(Some(scan)) => {
+                let (read, unreadable) = (scan.manifests.len(), scan.unreadable);
+                let games = games_from(scan.manifests);
                 let unreadable_text = if unreadable > 0 {
                     format!(", {unreadable} unreadable")
                 } else {
@@ -115,12 +105,13 @@ impl EpicAdapter<'_> {
                     "Manifests",
                     status_if(unreadable > 0),
                     format!(
-                        "{} in {dir}{unreadable_text}; {}",
+                        "{} in {}{unreadable_text}; {}",
                         plural(read, ".item manifest"),
+                        scan.dir,
                         plural(games.len(), "installed game")
                     ),
                 );
-                games
+                (unreadable == 0).then_some(games)
             }
             Ok(None) => {
                 let dir = self.manifests_dir().unwrap_or_default();
@@ -132,7 +123,7 @@ impl EpicAdapter<'_> {
                         "{dir} not found. No Epic games are installed, or the launcher has never installed one."
                     ),
                 );
-                Vec::new()
+                Some(Vec::new())
             }
             Err(error) => {
                 checks.add(
@@ -141,12 +132,12 @@ impl EpicAdapter<'_> {
                     HealthStatus::Fail,
                     format!("Could not scan the manifests: {error}"),
                 );
-                Vec::new()
+                None
             }
         }
     }
 
-    fn launcher_installed_check(&self, checks: &mut Checks, games: &[InstalledGame]) {
+    fn launcher_installed_check(&self, checks: &mut Checks, games: Option<&[InstalledGame]>) {
         let files = self.platform.files.as_ref();
         let installed = self.launcher_installed_path();
         if !files.exists(&installed) {
@@ -164,6 +155,7 @@ impl EpicAdapter<'_> {
         match parsed {
             Ok(entries) => {
                 let missing = games
+                    .unwrap_or_default()
                     .iter()
                     .filter(|game| {
                         !entries
@@ -180,15 +172,18 @@ impl EpicAdapter<'_> {
                         "entries"
                     }
                 );
-                let tail = if missing > 0 {
-                    format!("; {missing} installed game(s) not listed there")
-                } else {
-                    ", agrees with the manifests".to_owned()
+                let tail = match (missing, games) {
+                    (0, Some(_)) => ", agrees with the manifests".to_owned(),
+                    (0, None) => {
+                        "; not every manifest could be read, so the cross-check is incomplete"
+                            .to_owned()
+                    }
+                    (_, _) => format!("; {missing} installed game(s) not listed there"),
                 };
                 checks.add(
                     "launcher-installed",
                     "LauncherInstalled.dat",
-                    status_if(missing > 0),
+                    status_if(missing > 0 || games.is_none()),
                     format!("{entries_text}{tail}"),
                 );
             }
@@ -201,7 +196,12 @@ impl EpicAdapter<'_> {
         }
     }
 
-    fn settings_check(&self, checks: &mut Checks, running: Option<bool>) -> Option<CurrentSession> {
+    fn settings_check(
+        &self,
+        checks: &mut Checks,
+        running: Option<bool>,
+        last: Option<SignInOutcome>,
+    ) {
         let path = self.settings_path();
         let paths = self.settings_paths();
         if paths.is_empty() {
@@ -211,18 +211,23 @@ impl EpicAdapter<'_> {
                 HealthStatus::Warn,
                 format!("{path} not found. The launcher has not run for this Windows user yet."),
             );
-            return None;
+            return;
         }
         let read = (|| {
-            let text = self.read_ini()?.unwrap_or_default();
+            let settings = self.read_settings()?;
             let running = match running {
                 Some(running) => running,
                 None => self.is_running()?,
             };
-            let current = self.current_session(Some(&text), running)?;
-            Ok::<_, AdapterError>((text, current))
+            let written_at = settings.as_ref().and_then(|settings| settings.written_at);
+            let (path, text) = settings.map_or_else(
+                || (path.clone(), String::new()),
+                |settings| (settings.path, settings.text),
+            );
+            let current = self.session_from(Some(&text), written_at, running, last)?;
+            Ok::<_, AdapterError>((path, text, current))
         })();
-        let (text, current) = match read {
+        let (path, text, current) = match read {
             Ok(read) => read,
             Err(error @ AdapterError::LauncherFile { .. }) => {
                 checks.add(
@@ -231,7 +236,7 @@ impl EpicAdapter<'_> {
                     HealthStatus::Fail,
                     error.to_string(),
                 );
-                return None;
+                return;
             }
             Err(error) => {
                 checks.add(
@@ -240,7 +245,7 @@ impl EpicAdapter<'_> {
                     HealthStatus::Fail,
                     format!("Could not read {path}: {error}"),
                 );
-                return None;
+                return;
             }
         };
         let ids: BTreeSet<String> = section_names(&text)
@@ -285,12 +290,11 @@ impl EpicAdapter<'_> {
                 plural(ids.len(), "account")
             ),
         );
-        Some(current)
     }
 
-    fn log_check(&self, checks: &mut Checks, current: Option<&CurrentSession>) {
+    fn log_check(&self, checks: &mut Checks, log: Option<Result<Vec<LogEvent>, AdapterError>>) {
         let path = self.log_path();
-        if !self.platform.files.exists(&path) {
+        let Some(log) = log else {
             checks.add(
                 "log",
                 "Launcher log",
@@ -298,12 +302,20 @@ impl EpicAdapter<'_> {
                 format!("{path} not found. Sign-ins cannot be confirmed until the launcher has run once."),
             );
             return;
-        }
-        let last = match current {
-            Some(current) => current.last_sign_in.clone(),
-            None => self.last_sign_in_in_log(),
         };
-        let (status, detail) = match last {
+        let events = match log {
+            Ok(events) => events,
+            Err(error) => {
+                checks.add(
+                    "log",
+                    "Launcher log",
+                    HealthStatus::Warn,
+                    format!("Could not read {path}: {error}"),
+                );
+                return;
+            }
+        };
+        let (status, detail) = match last_sign_in(&events) {
             None => (
                 HealthStatus::Ok,
                 "Readable; no sign-in attempt in the current log".to_owned(),

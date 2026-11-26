@@ -532,6 +532,7 @@ fn start(args: Args, started: Start, cx: &mut App) {
             clock,
         },
     );
+    ol_ui::read_double_click_time_with(ol_platform_win::window::double_click_time);
     if !Board::for_run(&args).keys_reach_it() {
         ol_ui_kit::refuse_clipboard_keys(cx);
     }

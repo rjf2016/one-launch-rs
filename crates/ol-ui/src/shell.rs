@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, ClickEvent, Context, DispatchPhase, Div, Entity, EventEmitter, FontWeight,
-    Keystroke, MouseButton, MouseUpEvent, NavigationDirection, Pixels, SharedString, Stateful,
-    Subscription, Svg, Window, WindowControlArea, canvas, div, px, svg,
+    AnyElement, ClickEvent, Context, DispatchPhase, Div, Entity, EventEmitter, FocusHandle,
+    FontWeight, Keystroke, MouseButton, MouseUpEvent, NavigationDirection, Pixels, SharedString,
+    Stateful, Subscription, Svg, Window, WindowControlArea, canvas, div, px, svg,
 };
 use ol_api::Backend;
 use ol_api::settings::{QuitAnswer, QuitQuestion};
@@ -126,6 +126,7 @@ struct Asking {
     // The second answer carries the ring, and Enter gives it.
     act_leads: bool,
     appeared: Appeared,
+    had_keyboard: Option<FocusHandle>,
 }
 
 // The user answered Quit anyway: the app is to quit.
@@ -355,6 +356,7 @@ impl Shell {
             asked: Asked::Quit,
             act_leads: false,
             appeared: Appeared::now(),
+            had_keyboard: window.focused(cx),
         });
         window.blur(cx);
         cx.notify();
@@ -475,6 +477,7 @@ impl Shell {
                 },
                 act_leads: false,
                 appeared: Appeared::now(),
+                had_keyboard: window.focused(cx),
             });
             window.blur(cx);
             cx.notify();
@@ -524,11 +527,18 @@ impl Shell {
                     asked: Asked::Stopping,
                     act_leads: false,
                     appeared: Appeared::now(),
+                    had_keyboard: None,
                 });
                 cx.emit(QuitAnyway);
             }
-            Asked::Quit => self.backend.window_log().quit_answered(QuitAnswer::Keep),
-            _ => {}
+            other => {
+                if matches!(other, Asked::Quit) {
+                    self.backend.window_log().quit_answered(QuitAnswer::Keep);
+                }
+                if let Some(field) = &asking.had_keyboard {
+                    window.focus(field, cx);
+                }
+            }
         }
         cx.notify();
     }
@@ -542,6 +552,9 @@ impl Shell {
         cx: &mut Context<Self>,
     ) {
         let left = self.page.screen();
+        if let Some(asking) = &mut self.asking {
+            asking.had_keyboard = None;
+        }
         if let Page::Account(page) = &self.page {
             page.update(cx, |page, cx| page.leave(window, cx));
         }

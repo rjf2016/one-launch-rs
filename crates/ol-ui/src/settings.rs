@@ -172,10 +172,11 @@ enum SelfTest {
     Failed(SharedString),
 }
 
-// Writes of one setting not answered yet, and the newest of them: only its answer may say the setting was refused.
+// Writes of one setting not answered yet, and the newest of them: only its answer may say the setting was refused. `changed` says a change came from elsewhere meanwhile, so the page reads the setting again once they are all answered.
 struct Pending {
     count: u32,
     newest: u64,
+    changed: bool,
 }
 
 pub struct SettingsView {
@@ -282,14 +283,15 @@ impl SettingsView {
         cx.notify();
     }
 
-    // A setting stored elsewhere, from the launch dialog's Turn preview off, say. A write of this page's own that is still out decides that setting.
+    // A setting stored elsewhere, from the launch dialog's Turn preview off, say. While a write of this page's own is still out, the setting is read again once that write is answered, as whichever was stored last.
     pub fn setting_changed(
         &mut self,
         key: SettingKey,
         value: Option<String>,
         cx: &mut Context<Self>,
     ) {
-        if self.pending.contains_key(&key) {
+        if let Some(pending) = self.pending.get_mut(&key) {
+            pending.changed = true;
             return;
         }
         match (value, &mut self.settings) {
@@ -387,6 +389,7 @@ impl SettingsView {
         let pending = self.pending.entry(key).or_insert(Pending {
             count: 0,
             newest: write,
+            changed: false,
         });
         pending.count += 1;
         pending.newest = write;
@@ -412,6 +415,7 @@ impl SettingsView {
         };
         pending.count = pending.count.saturating_sub(1);
         let newest = pending.newest == write;
+        let changed_meanwhile = pending.count == 0 && pending.changed;
         if pending.count == 0 {
             self.pending.remove(&key);
         }
@@ -419,6 +423,8 @@ impl SettingsView {
             && newest
         {
             self.refused = Some((Refused::Setting(key), error.message.into()));
+            self.reload(cx);
+        } else if changed_meanwhile {
             self.reload(cx);
         }
         cx.notify();

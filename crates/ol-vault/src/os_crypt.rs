@@ -99,6 +99,12 @@ impl OsCryptVault {
         let wrapped = protector
             .protect(key.as_slice())
             .map_err(|_| KeyError::Wrap)?;
+        if !protector
+            .unprotect(&wrapped)
+            .is_ok_and(|back| back.as_slice() == key.as_slice())
+        {
+            return Err(KeyError::WindowsUnavailable);
+        }
         local_state::write_key(file, &wrapped, replacing)?;
         Self::with_key(key.as_slice())
     }
@@ -612,6 +618,20 @@ mod tests {
         let scratch = Scratch::new("vault");
         let refused = OsCryptVault::open_or_create(scratch.path(), &CannotWrap);
         assert!(matches!(refused, Err(KeyError::Wrap)));
+        assert!(snapshot(scratch.path()).is_empty());
+    }
+
+    #[test]
+    fn a_new_key_windows_cannot_unwrap_is_never_written() {
+        let scratch = Scratch::new("vault");
+        assert!(matches!(
+            OsCryptVault::open_or_create(scratch.path(), &UnwrapsNothing),
+            Err(KeyError::WindowsUnavailable)
+        ));
+        assert!(matches!(
+            OsCryptVault::replace_lost_key(scratch.path(), &UnwrapsNothing),
+            Err(KeyError::WindowsUnavailable)
+        ));
         assert!(snapshot(scratch.path()).is_empty());
     }
 

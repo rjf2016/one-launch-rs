@@ -15,9 +15,11 @@ pub const STEAM_ID_MASK: &str = "[STEAMID]";
 // Cutting before redaction could leave the start of a secret too short for its pattern to match.
 pub const MAX_TEXT_LENGTH: usize = 8 * 1024;
 const MAX_DEPTH: i64 = 6;
+const KEY: &str = r"(?i-u:pass(?:word|wd|phrase)?|pwd|secret|token|api[_-]?key|apikey|authorization|cookie|session|refresh[_-]?token|access[_-]?token|credentials?|private[_-]?key)";
 
 struct Rules {
     id_tail: Regex,
+    quoted_value: Regex,
     key_value: Regex,
     ini_data: Regex,
     steam_login: Regex,
@@ -41,8 +43,11 @@ static RULES: LazyLock<Rules> = LazyLock::new(|| {
     let boundary = r"(?-u:\b)";
     Rules {
         id_tail: rule("\u{2026}[0-9A-Za-z_-]{3,}"),
+        quoted_value: rule(&format!(
+            r#"{boundary}({KEY}){boundary}(\\?["']?{space}*[=:]{space}*)(?:(\\")(?:[^"\\\r\n]|\\[^"\r\n])*\\"|(")[^"\r\n]*"|(')[^'\r\n]*')"#
+        )),
         key_value: rule(&format!(
-            r#"{boundary}((?i-u:pass(?:word|wd|phrase)?|pwd|secret|token|api[_-]?key|apikey|authorization|cookie|session|refresh[_-]?token|access[_-]?token|credentials?|private[_-]?key)){boundary}(\\?["']?{space}*[=:]{space}*)(\\?["']?)(?:[^{spaces}"',;&}}\\]|\\[^{spaces}"])+"#
+            r#"{boundary}({KEY}){boundary}(\\?["']?{space}*[=:]{space}*)(\\?["']?)(?:[^{spaces}"',;&}}\\]|\\[^{spaces}"])+"#
         )),
         ini_data: rule(&format!(r"({boundary}Data{space}*={space}*){not_space}+")),
         steam_login: rule(&format!(
@@ -85,6 +90,11 @@ pub fn redact_string(names: &AccountNames, text: &str) -> String {
     let rules = &*RULES;
     let text = Cow::Borrowed(text);
     let text = replaced(text, &rules.id_tail, "\u{2026}[REDACTED]");
+    let text = replaced(
+        text,
+        &rules.quoted_value,
+        "${1}${2}${3}${4}${5}[REDACTED]${3}${4}${5}",
+    );
     let text = replaced(text, &rules.key_value, "${1}${2}${3}[REDACTED]");
     let text = replaced(text, &rules.ini_data, "${1}[REDACTED]");
     let text = replaced(text, &rules.steam_login, "${1}[REDACTED]");

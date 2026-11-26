@@ -1,5 +1,6 @@
 use std::ffi::c_void;
 use std::ptr;
+use std::time::Duration;
 
 use thiserror::Error;
 use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
@@ -11,6 +12,7 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::Storage::Xps::{PRINT_WINDOW_FLAGS, PW_CLIENTONLY, PrintWindow};
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForWindow, MDT_EFFECTIVE_DPI};
+use windows::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime;
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumThreadWindows, GetClassNameW, GetClientRect, GetForegroundWindow, GetWindowPlacement,
     GetWindowRect, IsIconic, IsWindowVisible, IsZoomed, MONITORINFOF_PRIMARY, PW_RENDERFULLCONTENT,
@@ -76,6 +78,11 @@ unsafe extern "system" fn keep_display(
 
 // GPUI gives out a window's handle only through raw-window-handle, which is not an approved dependency; this is the class gpui-pre-windows 0.3.12 registers in window.rs.
 const GPUI_WINDOW_CLASS: &str = "Zed::Window";
+
+// Read at every ask, as gpui-pre-windows 0.3.12 (window.rs, ClickState) reads it again when the setting changes.
+pub fn double_click_time() -> Duration {
+    Duration::from_millis(u64::from(unsafe { GetDoubleClickTime() }))
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AppWindow(isize);

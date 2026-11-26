@@ -7,8 +7,8 @@ use async_channel::{Receiver, Sender, WeakSender};
 use ol_model::{
     Account, BackupSnapshot, Ciphertext, InstalledGame, LaunchJob, LaunchPreflight, LauncherId,
     LauncherInstall, LauncherSession, LauncherSessionState, LauncherStatus, LibraryScanResult,
-    LibrarySort, RecentLaunch, RememberedAccount, RestoreResult, SettingKey, Settings, Sidebar,
-    SwitchPlan, SwitchRecovery,
+    LibrarySort, RecentLaunch, RememberedAccount, RestoreResult, SecretKey, SettingKey, Settings,
+    Sidebar, SwitchPlan, SwitchRecovery,
 };
 use ol_platform_api::{Clipboard, DataProtector, Shell};
 use ol_services::accounts::{self, AccountError, AccountPatch, NewAccount};
@@ -1327,7 +1327,9 @@ impl Serving {
             Command::UpdateAccount(id, patch, reply) => {
                 let updated = store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::update(store, &id, &patch, &self.stamp())?)
+                    let account = accounts::update(store, &id, &patch, &self.stamp())?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(account)
                 });
                 if updated.is_ok() {
                     let fields: Vec<&str> = [
@@ -1347,7 +1349,9 @@ impl Serving {
             Command::DeleteAccount(id, reply) => {
                 let deleted = store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::delete(store, &id)?)
+                    accounts::delete(store, &id)?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(())
                 });
                 if deleted.is_ok() {
                     ipc.info("account deleted", json!({ "id": id }));
@@ -1357,13 +1361,10 @@ impl Serving {
             Command::SetAccountPassword(id, password, reply) => {
                 let set = store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::set_password(
-                        store,
-                        self.vault(),
-                        &id,
-                        &password,
-                        &self.stamp(),
-                    )?)
+                    let account =
+                        accounts::set_password(store, self.vault(), &id, &password, &self.stamp())?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(account)
                 });
                 if set.is_ok() {
                     ipc.info("account password updated", json!({ "id": id }));
@@ -1373,7 +1374,9 @@ impl Serving {
             Command::ClearAccountPassword(id, reply) => {
                 let cleared = store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(accounts::clear_password(store, &id, &self.stamp())?)
+                    let account = accounts::clear_password(store, &id, &self.stamp())?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(account)
                 });
                 if cleared.is_ok() {
                     ipc.info("account password removed", json!({ "id": id }));
@@ -1554,9 +1557,12 @@ impl Serving {
                 let captured = store.and_then(|store| {
                     self.require_idle()?;
                     let account = accounts::require(store, &account_id)?;
-                    self.with_adapter(store, account.launcher, |_, _, adapter| {
-                        Ok(capture::capture(store, adapter, &account)?)
-                    })
+                    let captured =
+                        self.with_adapter(store, account.launcher, |_, _, adapter| {
+                            Ok(capture::capture(store, adapter, &account)?)
+                        })?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(captured)
                 });
                 if let Ok(captured) = &captured {
                     self.log.child("launchers").info(
@@ -1573,7 +1579,9 @@ impl Serving {
             Command::ForgetSession(account_id, reply) => {
                 let forgotten = store.and_then(|store| {
                     self.require_idle()?;
-                    Ok(capture::forget(store, &account_id)?)
+                    let forgotten = capture::forget(store, &account_id)?;
+                    self.last_preflight = LastPreflight::default();
+                    Ok(forgotten)
                 });
                 if let Ok(Some(launcher)) = &forgotten {
                     self.log.child("launchers").info(
@@ -1754,14 +1762,26 @@ impl Serving {
                 .protector
                 .as_ref()
                 .ok_or(VaultResetRefusal::Unavailable)?;
+            let marked = vault_health::mark_reset_pending(store, &self.stamp())?;
+            let unmark = || {
+                if marked {
+                    let _ = store.delete_secret(SecretKey::VaultProbe);
+                }
+            };
             match OsCryptVault::replace_lost_key(&self.data_dir, &**protector) {
                 Ok(Recovered::Opened(vault)) => {
                     self.vault.put(VaultSlot::Open(Arc::new(vault)));
+                    unmark();
                     self.store_probe(store);
-                    return Ok(VaultReset::KeyReadable);
+                    if vault_health::status(store, self.vault_access())?.state()
+                        == EncryptionState::Working
+                    {
+                        return Ok(VaultReset::KeyReadable);
+                    }
                 }
                 Ok(Recovered::Replaced(vault)) => self.vault.put(VaultSlot::Open(Arc::new(vault))),
                 Err(error) => {
+                    unmark();
                     if matches!(error, KeyError::WindowsUnavailable) {
                         self.vault.put(VaultSlot::Unavailable);
                     }
