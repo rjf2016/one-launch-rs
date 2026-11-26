@@ -453,13 +453,16 @@ fn a_quit_does_not_wait_for_a_lookup_and_what_arrives_after_it_is_not_kept() {
     let status = run.status();
     assert_eq!((status.running, status.queued), (2, 2));
 
-    let quit = std::time::Instant::now();
-    run.backend.shut_down();
-    assert!(
-        quit.elapsed() < Duration::from_secs(5),
-        "the quit waited for a lookup"
-    );
+    let quitting = run.backend.clone();
+    let (quit_done, quit_ended) = channel();
+    let quit = std::thread::spawn(move || {
+        quitting.shut_down();
+        let _ = quit_done.send(());
+    });
+    let in_time = quit_ended.recv_timeout(Duration::from_secs(5)).is_ok();
     drop(release);
+    quit.join().unwrap();
+    assert!(in_time, "the quit waited for a lookup");
     std::thread::sleep(Duration::from_millis(200));
     assert!(http.asked().len() <= 2, "a stopped lookup asked on");
     assert_eq!(snapshot(&run.data_dir().join("artwork")).len(), 0);
