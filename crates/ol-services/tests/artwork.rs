@@ -130,6 +130,7 @@ struct Library {
     scratch: Scratch,
     store: Store,
     art: Artwork,
+    now: OffsetDateTime,
 }
 
 impl Library {
@@ -141,6 +142,7 @@ impl Library {
             scratch,
             store,
             art,
+            now: NOW,
         }
     }
 
@@ -212,7 +214,7 @@ impl Library {
                 Prepared::Nothing => Outcome::Done,
                 Prepared::Lookup(job) => {
                     let fetched = fetch(http, keys, &job.wanted, &cancel);
-                    self.art.finish(&self.store, &job, fetched, NOW).0
+                    self.art.finish(&self.store, &job, fetched, self.now).0
                 }
             };
             self.art.queue.finish(&id, outcome);
@@ -224,7 +226,7 @@ impl Library {
     fn look_up(&mut self, game_id: &str, http: &RecordingHttp, keys: &Keys) -> Outcome {
         assert_eq!(
             self.art
-                .refresh(&self.store, Some(game_id), true, NOW)
+                .refresh(&self.store, Some(game_id), true, self.now)
                 .unwrap(),
             1
         );
@@ -754,8 +756,8 @@ fn a_download_that_is_not_a_whole_picture_within_the_limits_is_not_kept() {
     let grid = format!("{CDN}/1/library_600x900.jpg");
     let mut cut_short = png();
     cut_short.truncate(60);
-    let mut bomb = png();
-    bomb[16..24].copy_from_slice(&[0, 1, 0x86, 0xa0, 0, 1, 0x86, 0xa0]);
+    let mut header_off_its_checksum = png();
+    header_off_its_checksum[16..24].copy_from_slice(&[0, 1, 0x86, 0xa0, 0, 1, 0x86, 0xa0]);
     let mut renamed = b"GIF89a".to_vec();
     renamed.extend([0; 64]);
     let over = HttpResponse {
@@ -798,7 +800,15 @@ fn a_download_that_is_not_a_whole_picture_within_the_limits_is_not_kept() {
             "Steam CDN grid: unrecognised image data".to_owned(),
         ),
         (
-            picture("image/png", bomb),
+            picture("image/png", header_off_its_checksum),
+            "Steam CDN grid: unrecognised image data".to_owned(),
+        ),
+        (
+            picture("image/png", solid_png(8193, 1, [200, 60, 70])),
+            "Steam CDN grid: unrecognised image data".to_owned(),
+        ),
+        (
+            picture("image/png", solid_png(1, 8193, [200, 60, 70])),
             "Steam CDN grid: unrecognised image data".to_owned(),
         ),
         (status(503), "Steam CDN grid: HTTP 503".to_owned()),
@@ -816,6 +826,29 @@ fn a_download_that_is_not_a_whole_picture_within_the_limits_is_not_kept() {
         assert!(told.starts_with(&miss), "{told}");
         assert_eq!(library.files(&id), Vec::<String>::new(), "{miss}");
         assert_eq!(library.row(&id), None);
+    }
+}
+
+#[test]
+fn a_picture_as_wide_or_as_tall_as_the_library_draws_is_kept() {
+    for (width, height) in [(8192, 1), (1, 8192)] {
+        let mut library = Library::new();
+        let id = library.install(LauncherId::Steam, "1", "One");
+        let http = Web::default()
+            .with(
+                format!("{CDN}/1/library_600x900.jpg"),
+                picture("image/png", solid_png(width, height, [200, 60, 70])),
+            )
+            .http();
+        assert_eq!(
+            library.look_up(&id, &http, &Keys::none()),
+            Outcome::Done,
+            "{width}x{height}"
+        );
+        assert_eq!(
+            library.row(&id).unwrap().grid_path,
+            Some(format!("{id}/grid.png"))
+        );
     }
 }
 
@@ -895,14 +928,27 @@ fn a_miss_is_not_asked_again_by_itself_for_seven_days() {
             .unwrap(),
         1
     );
+    library.now = later(1, 0);
     library.run(&http, &Keys::none());
+    assert_eq!(
+        library.store.artwork_attempt(&id).unwrap().as_deref(),
+        Some("2026-11-23T10:00:00.000Z")
+    );
     assert_eq!(
         library
             .art
-            .enqueue_after_scan(&library.store, later(7, 0))
+            .enqueue_after_scan(&library.store, later(7, 86_399))
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        library
+            .art
+            .enqueue_after_scan(&library.store, later(8, 0))
             .unwrap(),
         1
     );
+    library.now = later(8, 0);
     library.run(&http, &Keys::none());
 
     library
@@ -1027,6 +1073,7 @@ fn a_file_that_is_too_large_or_no_picture_is_refused_as_the_users_own() {
         ("notes.png", b"just some text, long enough".to_vec()),
         ("cut.png", cut_short),
         ("empty.png", Vec::new()),
+        ("wide.png", solid_png(8193, 1, [200, 60, 70])),
     ] {
         let error = refused(&mut library, name, &content);
         assert!(matches!(error, ArtworkError::BadImage), "{name}");
@@ -1245,6 +1292,46 @@ fn only_what_is_missing_on_disk_is_asked_for_again_and_a_kind_keeps_one_file() {
 }
 
 #[test]
+fn a_refresh_that_cannot_write_every_picture_leaves_the_row_and_its_files_as_they_were() {
+    let mut library = Library::new();
+    let id = library.install(LauncherId::Steam, "252950", "Rocket League");
+    library.look_up(
+        &id,
+        &Web::default().steam_pictures("252950").http(),
+        &Keys::none(),
+    );
+    fs::create_dir(library.folder(&id).join("hero.jpg")).unwrap();
+    let jpeg = Web::default()
+        .with(
+            format!("{CDN}/252950/library_600x900.jpg"),
+            picture("image/jpeg", encoded(ImageFormat::Jpeg)),
+        )
+        .with(
+            format!("{CDN}/252950/library_hero.jpg"),
+            picture("image/jpeg", encoded(ImageFormat::Jpeg)),
+        )
+        .http();
+    assert_eq!(library.look_up(&id, &jpeg, &Keys::none()), Outcome::Failed);
+    let row = library.row(&id).unwrap();
+    assert_eq!(row, steam_row(&id));
+    for named in [row.grid_path, row.hero_path, row.logo_path] {
+        let named = named.unwrap();
+        assert!(
+            library.scratch.join("artwork").join(&named).is_file(),
+            "{named}"
+        );
+    }
+    assert_eq!(
+        fs::read(library.folder(&id).join("grid.png")).unwrap(),
+        png()
+    );
+    assert_eq!(
+        library.files(&id),
+        ["grid.png", "hero.jpg", "hero.png", "logo.png"]
+    );
+}
+
+#[test]
 fn a_launchers_icon_an_earlier_version_stored_stands_in_until_a_cover_is_found() {
     let mut library = Library::new();
     let id = library.install(LauncherId::Riot, "valorant.live", "VALORANT");
@@ -1327,6 +1414,139 @@ fn a_launchers_icon_an_earlier_version_stored_stands_in_until_a_cover_is_found()
         1
     );
     assert_eq!(library.run(&cover, &Keys::stored()), [Outcome::Done]);
+    let row = library.row(&id).unwrap();
+    assert_eq!(row.source, "steamgriddb");
+    assert_eq!(row.grid_path, Some(format!("{id}/grid.png")));
+    assert_eq!(row.hero_path, Some(format!("{id}/hero.png")));
+    assert_eq!(library.files(&id), ["grid.png", "hero.png"]);
+    assert_eq!(library.miss(&id), None);
+}
+
+fn steam_hero_only(app_id: &str) -> RecordingHttp {
+    Web::default()
+        .with(
+            format!("{CDN}/{app_id}/library_hero.jpg"),
+            picture("image/jpeg", encoded(ImageFormat::Jpeg)),
+        )
+        .http()
+}
+
+#[test]
+fn a_forced_refresh_that_finds_no_cover_keeps_the_one_there() {
+    let mut library = Library::new();
+    let id = library.install(LauncherId::Steam, "252950", "Rocket League");
+    let http = Web::default().steam_pictures("252950").http();
+    library.look_up(&id, &http, &Keys::none());
+    assert_eq!(library.row(&id), Some(steam_row(&id)));
+
+    assert_eq!(
+        library.look_up(&id, &steam_hero_only("252950"), &Keys::none()),
+        Outcome::Done
+    );
+    assert_eq!(
+        library.row(&id),
+        Some(ArtworkRow {
+            hero_path: Some(format!("{id}/hero.jpg")),
+            ..steam_row(&id)
+        })
+    );
+    assert_eq!(library.files(&id), ["grid.png", "hero.jpg", "logo.png"]);
+    assert_eq!(library.miss(&id), None);
+}
+
+#[test]
+fn a_forced_refresh_keeps_the_users_own_cover_when_only_a_hero_comes_back() {
+    let mut library = Library::new();
+    let id = library.install(LauncherId::Steam, "252950", "Rocket League");
+    let chosen = library.scratch.join("chosen.jpg");
+    fs::write(&chosen, encoded(ImageFormat::Jpeg)).unwrap();
+    library
+        .art
+        .set_manual(&library.store, &id, ArtworkKind::Grid, &chosen, NOW)
+        .unwrap();
+
+    assert_eq!(
+        library.look_up(&id, &steam_hero_only("252950"), &Keys::none()),
+        Outcome::Done
+    );
+    let row = library.row(&id).unwrap();
+    assert_eq!(row.source, "manual");
+    assert_eq!(row.grid_path, Some(format!("{id}/grid.jpg")));
+    assert_eq!(row.hero_path, Some(format!("{id}/hero.jpg")));
+    assert_eq!(library.files(&id), ["grid.jpg", "hero.jpg"]);
+    assert_eq!(
+        library
+            .art
+            .refresh(&library.store, None, true, NOW)
+            .unwrap(),
+        0,
+        "a refresh of all still leaves the user's own picture alone"
+    );
+}
+
+#[test]
+fn a_forced_refresh_keeps_a_stand_in_until_a_cover_is_found() {
+    let mut library = Library::new();
+    let id = library.install(LauncherId::Riot, "valorant.live", "VALORANT");
+    fs::create_dir_all(library.folder(&id)).unwrap();
+    fs::write(library.folder(&id).join("grid.ico"), b"an icon").unwrap();
+    library
+        .store
+        .put_artwork(
+            &id,
+            &ArtworkRow {
+                source: "launcher".to_owned(),
+                grid_path: Some(format!("{id}/grid.ico")),
+                hero_path: None,
+                logo_path: None,
+                fetched_at: Some("2026-11-01T00:00:00.000Z".to_owned()),
+            },
+        )
+        .unwrap();
+    let autocomplete = format!("{SGDB}/search/autocomplete/VALORANT");
+    let hero_only = Web::default()
+        .with(
+            &autocomplete,
+            json(200, &recorded("autocomplete-rocket-league.json")),
+        )
+        .with(
+            format!("{SGDB}/heroes/game/5267?{FILTER}"),
+            json(200, &recorded("heroes-game-5267.json")),
+        )
+        .with(
+            "https://cdn2.steamgriddb.com/hero/cccc3333.jpg",
+            picture("image/png", png()),
+        )
+        .http();
+    assert_eq!(
+        library.look_up(&id, &hero_only, &Keys::stored()),
+        Outcome::Done
+    );
+    let row = library.row(&id).unwrap();
+    assert_eq!(row.source, "launcher");
+    assert_eq!(row.grid_path, Some(format!("{id}/grid.ico")));
+    assert_eq!(row.hero_path, Some(format!("{id}/hero.png")));
+    assert_eq!(library.files(&id), ["grid.ico", "hero.png"]);
+    assert_eq!(
+        library.miss(&id).as_deref(),
+        Some("SteamGridDB: no grid; SteamGridDB: no logo")
+    );
+
+    let cover = Web::default()
+        .with(
+            &autocomplete,
+            json(200, &recorded("autocomplete-rocket-league.json")),
+        )
+        .with(
+            format!("{SGDB}/grids/game/5267?dimensions=600x900&{FILTER}"),
+            json(200, &recorded("grids-steam-252950.json")),
+        )
+        .with(
+            "https://cdn2.steamgriddb.com/grid/aaaa1111.png",
+            picture("image/png", png()),
+        )
+        .http();
+    assert_eq!(library.look_up(&id, &cover, &Keys::stored()), Outcome::Done);
     let row = library.row(&id).unwrap();
     assert_eq!(row.source, "steamgriddb");
     assert_eq!(row.grid_path, Some(format!("{id}/grid.png")));

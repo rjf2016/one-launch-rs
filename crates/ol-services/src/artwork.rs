@@ -543,11 +543,7 @@ impl Artwork {
         {
             return Ok(Prepared::Nothing);
         }
-        let mut have = if force {
-            Kinds::new()
-        } else {
-            from_row(row.as_ref())
-        };
+        let mut have = from_row(row.as_ref());
         // A cached file that was deleted is as good as never fetched.
         have.retain(|(_, kept)| on_disk(&self.dir, &kept.rel_path));
         let stand_in = of(&have, ArtworkKind::Grid)
@@ -558,7 +554,7 @@ impl Artwork {
         }
         let missing: Vec<ArtworkKind> = ArtworkKind::ALL
             .into_iter()
-            .filter(|kind| of(&have, *kind).is_none())
+            .filter(|kind| force || of(&have, *kind).is_none())
             .collect();
         if missing.is_empty() {
             return Ok(Prepared::Nothing);
@@ -644,20 +640,48 @@ impl Artwork {
             );
             return Ok(Outcome::Failed);
         }
-        let mut stored = Kinds::new();
-        let mut kinds = Vec::new();
+        let mut written = Kinds::new();
+        let source = match self.write(store, job, &fetched, &error, &stamp, &mut written) {
+            Ok(source) => source,
+            Err(error) => {
+                self.discard(store, game_id, &written);
+                return Err(error);
+            }
+        };
+        for (kind, kept) in &written {
+            self.sweep(game_id, *kind, &kept.rel_path);
+        }
+        let kinds: Vec<&str> = written.iter().map(|(kind, _)| kind.as_str()).collect();
+        self.log.info(
+            "artwork cached",
+            json!({ "gameId": game_id, "name": name, "kinds": kinds, "source": source.as_str() }),
+        );
+        Ok(Outcome::Done)
+    }
+
+    // The files of a lookup, and then its row. Answers the row's source; `written` holds each file moved into place, also when a later step failed.
+    fn write(
+        &self,
+        store: &Store,
+        job: &Job,
+        fetched: &Fetched,
+        error: &str,
+        stamp: &str,
+        written: &mut Kinds,
+    ) -> Result<ArtworkSource, ArtworkError> {
+        let game_id = job.wanted.game_id.as_str();
         for (kind, image, source) in &fetched.found {
             let rel_path = self.store_file(game_id, *kind, image.ext, &image.bytes)?;
             put(
-                &mut stored,
+                written,
                 *kind,
                 Kept {
                     rel_path,
                     source: *source,
                 },
             );
-            kinds.push(kind.as_str());
         }
+        let mut stored = written.clone();
         // Still no cover: the icon keeps standing in, and the miss stays on record.
         let keeps_stand_in = of(&stored, ArtworkKind::Grid).is_none() && job.stand_in.is_some();
         if let Some(stand_in) = job.stand_in.clone().filter(|_| keeps_stand_in) {
@@ -666,15 +690,12 @@ impl Artwork {
         let source = of(&stored, ArtworkKind::Grid)
             .or_else(|| of(&job.have, ArtworkKind::Grid))
             .map_or(fetched.found[0].2, |grid| grid.source);
-        let mut found = if job.force {
-            Kinds::new()
-        } else {
-            job.have.clone()
-        };
+        // A forced refresh replaces a picture only by one it downloaded.
+        let mut found = job.have.clone();
         for (kind, kept) in stored {
             put(&mut found, kind, kept);
         }
-        let attempt_error = keeps_stand_in.then_some(error.as_str());
+        let attempt_error = keeps_stand_in.then_some(error);
         self.commit(
             store,
             game_id,
@@ -682,13 +703,9 @@ impl Artwork {
             source,
             job.force,
             attempt_error,
-            &stamp,
+            stamp,
         )?;
-        self.log.info(
-            "artwork cached",
-            json!({ "gameId": game_id, "name": name, "kinds": kinds, "source": source.as_str() }),
-        );
-        Ok(Outcome::Done)
+        Ok(source)
     }
 
     #[expect(clippy::too_many_arguments, reason = "one row, written in one place")]
@@ -766,7 +783,7 @@ impl Artwork {
             },
         )];
         let stamp = ol_store::iso_timestamp(now);
-        self.commit(
+        let committed = self.commit(
             store,
             game_id,
             &found,
@@ -774,7 +791,12 @@ impl Artwork {
             false,
             None,
             &stamp,
-        )?;
+        );
+        if let Err(error) = committed {
+            self.discard(store, game_id, &found);
+            return Err(error.into());
+        }
+        self.sweep(game_id, kind, &found[0].1.rel_path);
         self.log.info(
             "manual artwork set",
             json!({ "gameId": game_id, "kind": kind.as_str() }),
@@ -782,7 +804,7 @@ impl Artwork {
         store.game(game_id)?.ok_or_else(missing)
     }
 
-    // Written beside its place and moved over it, and then every other file of the same kind goes, so a kind has one file whatever its type was before. Answers the path the row stores.
+    // Written beside its place and moved over it. Answers the path the row stores. The other files of the kind stay until the row names this one.
     fn store_file(
         &self,
         game_id: &str,
@@ -804,14 +826,44 @@ impl Artwork {
             let _ = fs::remove_file(&temporary);
         }
         written.map_err(not_stored)?;
+        Ok(rel_path)
+    }
+
+    // Once the row names `rel_path`, every other file of its kind goes, so a kind has one file whatever its type was before.
+    fn sweep(&self, game_id: &str, kind: ArtworkKind, rel_path: &str) {
+        let Some(name) = rel_path.rsplit('/').next() else {
+            return;
+        };
         let prefix = format!("{}.", kind.as_str());
-        for entry in fs::read_dir(&folder).into_iter().flatten().flatten() {
+        for entry in fs::read_dir(self.dir.join(game_id))
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
             let other = entry.file_name().to_string_lossy().into_owned();
             if other != name && other.starts_with(&prefix) && !other.ends_with(".tmp") {
                 let _ = fs::remove_file(entry.path());
             }
         }
-        Ok(rel_path)
+    }
+
+    // After a failed write: a file this job moved in under a name the row does not hold goes again. One the row names stays, whatever it holds now.
+    fn discard(&self, store: &Store, game_id: &str, written: &Kinds) {
+        let Ok(row) = store.artwork_row(game_id) else {
+            return;
+        };
+        let named: Vec<&String> = row
+            .iter()
+            .flat_map(|row| [&row.grid_path, &row.hero_path, &row.logo_path])
+            .flatten()
+            .collect();
+        for (_, kept) in written {
+            if !named.contains(&&kept.rel_path)
+                && let Some(file) = artwork_file(&self.dir, &kept.rel_path)
+            {
+                let _ = fs::remove_file(file);
+            }
+        }
     }
 }
 
