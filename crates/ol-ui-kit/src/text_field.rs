@@ -58,12 +58,6 @@ impl TextField {
         }
     }
 
-    pub fn clearing_on_escape(self, cx: &mut App) -> Self {
-        self.state
-            .update(cx, |state, _| state.set_clean_on_escape(true));
-        self
-    }
-
     pub fn limited_to(self, most: usize, cx: &mut App) -> Self {
         self.limit.set(Some(most));
         let limit = Rc::clone(&self.limit);

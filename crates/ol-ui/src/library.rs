@@ -333,6 +333,23 @@ fn asks(clicked: Clicked, game: &Game, job_running: bool) -> Ask {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SearchEscape {
+    Pass,
+    Leave,
+    ClearAndLeave,
+}
+
+fn escape_in_search(keystroke: &Keystroke, typing: bool, empty: bool) -> SearchEscape {
+    let held = keystroke.modifiers;
+    let bare = !held.control && !held.alt && !held.shift && !held.platform && !held.function;
+    match (keystroke.key == "escape" && bare && typing, empty) {
+        (false, _) => SearchEscape::Pass,
+        (true, true) => SearchEscape::Leave,
+        (true, false) => SearchEscape::ClearAndLeave,
+    }
+}
+
 impl LibraryView {
     pub fn new(
         backend: Backend,
@@ -340,8 +357,7 @@ impl LibraryView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let search =
-            TextField::new("Search games (Ctrl+F)", false, window, cx).clearing_on_escape(cx);
+        let search = TextField::new("Search games (Ctrl+F)", false, window, cx);
         search.set_disabled(true, cx);
         let this = cx.weak_entity();
         let search_changed = search.on_change(cx, {
@@ -912,6 +928,18 @@ impl LibraryView {
             cx.notify();
             return true;
         }
+        match escape_in_search(keystroke, self.typing(window, cx), self.search.is_empty(cx)) {
+            SearchEscape::Pass => {}
+            SearchEscape::Leave => {
+                window.blur(cx);
+                return true;
+            }
+            SearchEscape::ClearAndLeave => {
+                self.search.clear(window, cx);
+                window.blur(cx);
+                return true;
+            }
+        }
         let held = keystroke.modifiers;
         let only_control =
             held.control && !held.alt && !held.shift && !held.platform && !held.function;
@@ -1359,6 +1387,11 @@ impl LibraryView {
                         window,
                         cx,
                     )
+                    .on_mouse_down_out(cx.listener(|this, _, window, cx| {
+                        if this.typing(window, cx) {
+                            window.blur(cx);
+                        }
+                    }))
                     .flex_grow(1.)
                     .flex_basis(px(256.))
                     .min_w(px(256.))
@@ -2221,6 +2254,28 @@ mod tests {
             }
         }
         games
+    }
+
+    #[test]
+    fn escape_in_the_search_field_clears_any_text_and_takes_the_keyboard_away() {
+        let escape = Keystroke::parse("escape").unwrap();
+        assert_eq!(
+            escape_in_search(&escape, true, false),
+            SearchEscape::ClearAndLeave
+        );
+        assert_eq!(escape_in_search(&escape, true, true), SearchEscape::Leave);
+        assert_eq!(escape_in_search(&escape, false, false), SearchEscape::Pass);
+        assert_eq!(escape_in_search(&escape, false, true), SearchEscape::Pass);
+        for other in ["shift-escape", "ctrl-escape", "alt-escape", "a", "enter"] {
+            let other = Keystroke::parse(other).unwrap();
+            for (typing, empty) in [(true, true), (true, false), (false, false)] {
+                assert_eq!(
+                    escape_in_search(&other, typing, empty),
+                    SearchEscape::Pass,
+                    "{other:?}"
+                );
+            }
+        }
     }
 
     #[test]

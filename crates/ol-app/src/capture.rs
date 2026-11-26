@@ -221,6 +221,16 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
             "is not"
         }
     );
+    let keyboard = in_library(window, cx, |library, window, cx| {
+        if library.typing(window, cx) {
+            "in the Library's search field"
+        } else if window.focused(cx).is_some() {
+            "in another element"
+        } else {
+            "held by nothing"
+        }
+    })?;
+    println!("OneLaunch: at the shot the keyboard is {keyboard}");
     let shot = native.capture()?;
     image::save_buffer(
         &plan.file,
