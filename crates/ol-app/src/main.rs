@@ -835,7 +835,8 @@ fn open(args: Args, opened: Opened, cx: &mut App) -> anyhow::Result<()> {
         });
         cx.observe_window_bounds(window, {
             let life = Rc::clone(&life);
-            move |_, _, cx| {
+            move |_, window, cx| {
+                saw_maximized(window.is_maximized(), &life.pending_maximize);
                 let settled = Rc::clone(&life);
                 let timer = cx.spawn(async move |_, cx| {
                     cx.background_executor().timer(BOUNDS_SETTLE).await;
@@ -929,8 +930,20 @@ fn remember_bounds(life: &Life, window: &Window) {
         whole(bounds.origin.y),
         whole(bounds.size.width),
         whole(bounds.size.height),
-        maximized || life.pending_maximize.get(),
+        stored_maximized(maximized, &life.pending_maximize),
     ));
+}
+
+fn stored_maximized(maximized: bool, pending: &Cell<bool>) -> bool {
+    saw_maximized(maximized, pending);
+    maximized || pending.get()
+}
+
+// A maximise the user made is the one that was pending; a restore after it is theirs too.
+fn saw_maximized(maximized: bool, pending: &Cell<bool>) {
+    if maximized {
+        pending.set(false);
+    }
 }
 
 fn presence_for(args: &Args) -> Presence {
@@ -1224,6 +1237,15 @@ mod tests {
         assert!(!second_start_quiet(&person));
         assert!(takes_focus(true, false));
         assert!(!takes_focus(false, false));
+    }
+
+    #[test]
+    fn a_window_maximised_and_restored_by_hand_is_stored_restored() {
+        let pending = Cell::new(true);
+        assert!(stored_maximized(false, &pending));
+        assert!(stored_maximized(true, &pending));
+        assert!(!stored_maximized(false, &pending));
+        assert!(!stored_maximized(false, &Cell::new(false)));
     }
 
     #[test]

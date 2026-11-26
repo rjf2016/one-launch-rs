@@ -1223,8 +1223,13 @@ impl Serving {
                 said.answer(&reply, changed.map(|_| ()));
             }
             Command::SetWindowBounds(bounds) => {
-                if let Ok(store) = store {
-                    let _ = store.set_setting(SettingKey::WindowBounds, &bounds);
+                if let Ok(store) = store
+                    && let Err(error) = store.set_setting(SettingKey::WindowBounds, &bounds)
+                {
+                    self.log.warn(
+                        "the window's place could not be stored",
+                        json!({ "code": error.code() }),
+                    );
                 }
             }
             #[cfg(feature = "fake")]
