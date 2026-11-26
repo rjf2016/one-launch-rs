@@ -1847,7 +1847,11 @@ impl Serving {
             }
             Command::OpenPage(page, reply) => said.answer(&reply, self.open_page(page)),
             Command::ArtworkKey(reply) => {
-                answer(&reply, store.and_then(|store| self.artwork_key(store)));
+                if self.artwork.cancel.is_cancelled() {
+                    answer(&reply, Err(ApiError::stopped()));
+                } else {
+                    answer(&reply, store.and_then(|store| self.artwork_key(store)));
+                }
             }
             Command::ArtworkDone(done) => {
                 let (job, fetched) = *done;
@@ -2620,6 +2624,42 @@ mod tests {
         let status = vault_health::status(&store, serving.vault_access()).unwrap();
         assert_eq!(status.state(), EncryptionState::Working);
         assert_eq!(status.readable, Some(true));
+    }
+
+    #[test]
+    fn a_lookup_that_asks_for_the_key_after_a_quit_is_not_handed_it() {
+        let scratch = Scratch::new("api-artwork-key");
+        let data_dir = scratch.path().to_path_buf();
+        let (commands, _requests) = async_channel::unbounded();
+        let mut serving = Serving {
+            artwork: ArtworkDesk::new(&data_dir, &Log::off()),
+            data_dir: data_dir.clone(),
+            launchers: None,
+            vault: Arc::default(),
+            protector: None,
+            shell: None,
+            settings_watch: None,
+            jobs: JobBoard::default(),
+            on_job: Arc::new(|_| {}),
+            commands: commands.downgrade(),
+            job_thread: Arc::default(),
+            last_preflight: LastPreflight::default(),
+            recovery: Recovery::default(),
+            clipboard: None,
+            log: Log::off(),
+        };
+        let (store, _) = Store::open(&ol_store::database_path(&data_dir)).unwrap();
+        serving.open_vault(VaultSource::DataFolder(Box::new(Mine)));
+        let key = Secret::new("placeholderkey0000000000".to_owned());
+        serving.store_artwork_key(&store, &key).unwrap();
+        let ask = |serving: &mut Serving| {
+            let (reply, answer) = async_channel::bounded(1);
+            serving.handle(Command::ArtworkKey(reply), Ok(&store));
+            answer.try_recv().unwrap()
+        };
+        assert!(ask(&mut serving).unwrap().is_some());
+        serving.handle(Command::StopArtwork, Ok(&store));
+        assert_eq!(ask(&mut serving).err(), Some(ApiError::stopped()));
     }
 
     // A clock that runs something once, the next time it is read.
