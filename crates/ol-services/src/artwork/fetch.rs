@@ -247,10 +247,7 @@ impl Asking<'_> {
         let key = key.expose();
         fetched
             .problems
-            .extend(problems.into_iter().map(|problem| match key.is_empty() {
-                true => problem,
-                false => problem.replace(key, "[key]"),
-            }));
+            .extend(problems.into_iter().map(|problem| redacted(problem, key)));
     }
 
     fn steamgriddb(
@@ -331,7 +328,8 @@ impl Asking<'_> {
             return Err(match body.get("errors") {
                 Some(Value::Array(errors)) => {
                     let said: Vec<String> = errors.iter().map(js_string).collect();
-                    cut_utf16(&said.join(", "), 200).to_owned()
+                    // Redacted before the cut, which could otherwise leave a start of the key too short to be found.
+                    cut_utf16(&redacted(said.join(", "), key.expose()), 200).to_owned()
                 }
                 _ => "request failed".to_owned(),
             });
@@ -386,6 +384,13 @@ impl Asking<'_> {
             return Err("unrecognised image data".to_owned());
         }
         Ok(Download { bytes, ext })
+    }
+}
+
+fn redacted(text: String, key: &str) -> String {
+    match key.is_empty() {
+        true => text,
+        false => text.replace(key, "[key]"),
     }
 }
 

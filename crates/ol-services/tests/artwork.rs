@@ -602,6 +602,28 @@ fn what_steamgriddb_refuses_is_told_in_the_electron_apps_words_and_never_with_th
 }
 
 #[test]
+fn a_key_the_api_repeats_across_the_cut_is_kept_in_no_part() {
+    let autocomplete = format!("{SGDB}/search/autocomplete/Some%20Game");
+    for before in ["e".repeat(190), "\u{1f600}".repeat(95)] {
+        let echoing = format!(r#"{{"success":false,"errors":["{before}{KEY}"]}}"#);
+        let mut library = Library::new();
+        let id = library.install(LauncherId::Epic, "Some", "Some Game");
+        let http = Web::default()
+            .with(&autocomplete, json(200, &echoing))
+            .http();
+        assert_eq!(
+            library.look_up(&id, &http, &Keys::stored()),
+            Outcome::Failed
+        );
+        let told = library.miss(&id).unwrap();
+        for most in 4..=KEY.len() {
+            assert!(!told.contains(&KEY[..most]), "{told}");
+        }
+        assert_eq!(told, format!("SteamGridDB: {before}[key]"));
+    }
+}
+
+#[test]
 fn a_picture_steamgriddb_names_on_another_host_is_never_asked_for() {
     let mut library = Library::new();
     let id = library.install(LauncherId::Steam, "7", "Seven");
