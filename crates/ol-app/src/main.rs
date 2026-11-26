@@ -15,7 +15,10 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use gpui::{App, AsyncApp, Bounds, Task, Window, WindowBounds, WindowHandle, point, px, size};
+use gpui::{
+    App, AsyncApp, Bounds, CursorHideMode, Task, Window, WindowBounds, WindowHandle, point, px,
+    size,
+};
 use ol_api::Backend;
 use ol_api::library::HourClock;
 use ol_api::log::{Log, LogOptions, Logger, log_panics, register_windows_user};
@@ -591,7 +594,8 @@ struct Start {
     instance: Rc<Instance>,
 }
 
-fn start(args: Args, started: Start, cx: &mut App) {
+fn set_up(args: &Args, cx: &mut App) {
+    cx.set_cursor_hide_mode(CursorHideMode::Never);
     let clock = if ol_platform_win::clock::uses_24_hour_clock() {
         HourClock::TwentyFour
     } else {
@@ -605,9 +609,13 @@ fn start(args: Args, started: Start, cx: &mut App) {
         },
     );
     ol_ui::read_double_click_time_with(ol_platform_win::window::double_click_time);
-    if !Board::for_run(&args).keys_reach_it() {
+    if !Board::for_run(args).keys_reach_it() {
         ol_ui_kit::refuse_clipboard_keys(cx);
     }
+}
+
+fn start(args: Args, started: Start, cx: &mut App) {
+    set_up(&args, cx);
     // Read before the window, so it opens where it was and a database that cannot be opened shows no window.
     cx.spawn(async move |cx| {
         let Start {
@@ -1427,6 +1435,38 @@ mod tests {
         assert!(!second_start_quiet(&person));
         assert!(takes_focus(true, false));
         assert!(!takes_focus(false, false));
+    }
+
+    #[test]
+    fn no_key_ever_hides_the_pointer_whichever_way_the_app_starts() {
+        let checks: [&[&str]; 5] = [
+            &[],
+            &[r"--capture=D:\scratch\shot.png"],
+            &[
+                r"--capture=D:\scratch\shot.png",
+                "--capture-focus",
+                "--capture-keys=a",
+            ],
+            &[r"--capture=D:\scratch\shot.png", "--capture-type=abc"],
+            &["--probe"],
+        ];
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        gpui_platform::headless().run({
+            let seen = Rc::clone(&seen);
+            move |cx| {
+                for check in checks {
+                    cx.set_cursor_hide_mode(CursorHideMode::default());
+                    set_up(&parsed(check), cx);
+                    seen.borrow_mut().push((check, cx.cursor_hide_mode()));
+                }
+                cx.quit();
+            }
+        });
+        let seen = seen.borrow();
+        assert_eq!(seen.len(), checks.len());
+        for (check, mode) in seen.iter() {
+            assert_eq!(*mode, CursorHideMode::Never, "{check:?}");
+        }
     }
 
     #[test]
