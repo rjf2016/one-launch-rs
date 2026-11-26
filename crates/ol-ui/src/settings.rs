@@ -758,8 +758,8 @@ impl SettingsView {
                 self.ring = true;
                 self.select_tab(SettingsTab::SHOWN[to], cx);
             }
-            Control::ArtworkRescan if press => self.rescan_for_artwork(cx),
-            Control::ArtworkRefreshAll if press => self.refresh_all_artwork(cx),
+            Control::ArtworkRescan if press => self.rescan_for_artwork(window, cx),
+            Control::ArtworkRefreshAll if press => self.refresh_all_artwork(window, cx),
             Control::GetKey if press => self.get_key(cx),
             Control::RemoveKey if press => self.remove_key(cx),
             Control::Toggle(setting) if press => self.toggle(setting, cx),

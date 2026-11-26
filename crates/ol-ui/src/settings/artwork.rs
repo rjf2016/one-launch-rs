@@ -27,11 +27,39 @@ pub(super) struct Artwork {
     message: Option<SharedString>,
     // How long the field's text was at its last change: a text that grows by more than a character at once was pasted.
     typed: usize,
+    // A key given while Rescan or Refresh all ran, acted on at its end: true unless it was given by Enter.
+    deferred: Option<bool>,
     _field: Subscription,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Given {
+    Save,
+    Refuse,
+    Nothing,
 }
 
 fn games(count: usize) -> &'static str {
     if count == 1 { "game" } else { "games" }
+}
+
+// What the field's text comes to when it is given by Enter, or quietly by leaving the field.
+fn given(text: &str, quiet: bool) -> Given {
+    let typed = text.trim();
+    if typed.is_empty() {
+        Given::Nothing
+    } else if looks_like_a_key(typed) {
+        Given::Save
+    } else if quiet {
+        Given::Nothing
+    } else {
+        Given::Refuse
+    }
+}
+
+// While a key is stored or removed the field takes none; while Rescan or Refresh all runs a key given waits for its end.
+fn waits(busy: Option<Busy>) -> bool {
+    matches!(busy, Some(Busy::Rescan | Busy::Refresh))
 }
 
 impl Artwork {
@@ -44,6 +72,7 @@ impl Artwork {
             busy: None,
             message: None,
             typed: 0,
+            deferred: None,
             _field: heard,
         }
     }
@@ -105,7 +134,7 @@ impl SettingsView {
                 self.artwork.typed = text.chars().count();
                 // A pasted key is stored at once, as in the Electron app.
                 if pasted && looks_like_a_key(text.trim()) {
-                    self.save_key(window, cx);
+                    self.try_save_key(true, window, cx);
                 }
             }
             FieldEvent::Enter => self.try_save_key(false, window, cx),
@@ -119,19 +148,27 @@ impl SettingsView {
 
     // Enter, or the keyboard leaving the field: what looks like a key is stored. What does not is said so after Enter, and left alone otherwise.
     fn try_save_key(&mut self, quiet: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if waits(self.artwork.busy) {
+            self.artwork.deferred = Some(self.artwork.deferred.unwrap_or(true) && quiet);
+            return;
+        }
         if self.artwork.busy.is_some() {
             return;
         }
         let text = self.artwork.field.text(cx);
-        let typed = text.trim();
-        if typed.is_empty() {
-            return;
+        match given(&text, quiet) {
+            Given::Save => self.save_key(window, cx),
+            Given::Refuse => {
+                self.artwork.message = Some(KEY_REFUSED.into());
+                cx.notify();
+            }
+            Given::Nothing => {}
         }
-        if looks_like_a_key(typed) {
-            self.save_key(window, cx);
-        } else if !quiet {
-            self.artwork.message = Some(KEY_REFUSED.into());
-            cx.notify();
+    }
+
+    fn try_deferred_key(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(quiet) = self.artwork.deferred.take() {
+            self.try_save_key(quiet, window, cx);
         }
     }
 
@@ -218,16 +255,16 @@ impl SettingsView {
         cx.notify();
     }
 
-    pub(super) fn refresh_all_artwork(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn refresh_all_artwork(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.artwork.busy.is_some() {
             return;
         }
         self.artwork.message = None;
         self.artwork_busy(Some(Busy::Refresh), cx);
         let backend = self.backend.clone();
-        cx.spawn(async move |this, cx| {
+        cx.spawn_in(window, async move |this, cx| {
             let queued = backend.refresh_artwork(None, true).await;
-            this.update(cx, |this, cx| {
+            this.update_in(cx, |this, window, cx| {
                 this.artwork.message = Some(match queued {
                     Ok(queued) => format!(
                         "Re-fetching artwork for {queued} {}. Images you chose yourself are kept.",
@@ -237,27 +274,29 @@ impl SettingsView {
                     Err(error) => error.message.into(),
                 });
                 this.artwork_busy(None, cx);
+                this.try_deferred_key(window, cx);
             })
             .ok();
         })
         .detach();
     }
 
-    pub(super) fn rescan_for_artwork(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn rescan_for_artwork(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.artwork.busy.is_some() {
             return;
         }
         self.artwork.message = None;
         self.artwork_busy(Some(Busy::Rescan), cx);
         let backend = self.backend.clone();
-        cx.spawn(async move |this, cx| {
+        cx.spawn_in(window, async move |this, cx| {
             let scanned = backend.rescan().await;
-            this.update(cx, |this, cx| {
+            this.update_in(cx, |this, window, cx| {
                 this.artwork.message = Some(match scanned {
                     Ok(scanned) => rescanned(&scanned).into(),
                     Err(error) => error.message.into(),
                 });
                 this.artwork_busy(None, cx);
+                this.try_deferred_key(window, cx);
             })
             .ok();
         })
@@ -273,18 +312,18 @@ impl SettingsView {
             .turning(state.busy == Some(Busy::Rescan))
             .disabled(busy)
             .leading(self.ringed_on(Control::ArtworkRescan))
-            .on_click(cx.listener(|this, _, _, cx| {
+            .on_click(cx.listener(|this, _, window, cx| {
                 this.clicked(Control::ArtworkRescan);
-                this.rescan_for_artwork(cx);
+                this.rescan_for_artwork(window, cx);
             }));
         let refresh_all = Button::new("artwork-refresh-all", Tone::Secondary, "Refresh all")
             .glyph(assets::IMAGES)
             .tip("Fetch every cover again; images you chose yourself are kept")
             .disabled(busy)
             .leading(self.ringed_on(Control::ArtworkRefreshAll))
-            .on_click(cx.listener(|this, _, _, cx| {
+            .on_click(cx.listener(|this, _, window, cx| {
                 this.clicked(Control::ArtworkRefreshAll);
-                this.refresh_all_artwork(cx);
+                this.refresh_all_artwork(window, cx);
             }));
         let actions = div()
             .flex()
@@ -502,5 +541,23 @@ mod tests {
         );
         assert_eq!(rescanned(&[]), "Library rescanned: 0 added, 0 removed.");
         assert_eq!((games(1), games(0), games(2)), ("game", "games", "games"));
+    }
+
+    #[test]
+    fn a_key_given_while_rescan_or_refresh_all_runs_waits_for_its_end() {
+        assert!(waits(Some(Busy::Rescan)));
+        assert!(waits(Some(Busy::Refresh)));
+        assert!(!waits(Some(Busy::Key)));
+        assert!(!waits(None));
+    }
+
+    #[test]
+    fn a_key_is_stored_and_other_text_is_refused_only_after_enter() {
+        let key = "a".repeat(32);
+        assert_eq!(given(&key, false), Given::Save);
+        assert_eq!(given(&format!("  {key} "), true), Given::Save);
+        assert_eq!(given("not a key", false), Given::Refuse);
+        assert_eq!(given("not a key", true), Given::Nothing);
+        assert_eq!(given("  ", false), Given::Nothing);
     }
 }
