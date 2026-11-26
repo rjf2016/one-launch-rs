@@ -41,7 +41,7 @@ pub const fn close_request_action(
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AfterPlay {
-    // The job was started by a click on a card or on the Recent strip, not from the launch dialog.
+    // The job was started by a click on the Recent strip, not from the launch dialog.
     pub instant: bool,
     pub direct: bool,
     pub done: bool,

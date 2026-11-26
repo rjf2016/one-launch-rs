@@ -18,7 +18,7 @@ use crate::account::AccountPage;
 use crate::accounts::AccountsView;
 use crate::assets;
 use crate::guide::{GuideDone, GuideExit, SetupGuide};
-use crate::host::{LaunchHost, PlayEnded, overlay};
+use crate::host::{Ask, LaunchHost, PlayEnded, overlay};
 use crate::library::{LibraryView, OpenArtworkSettings};
 use crate::settings::{KnownStatuses, SettingsAsk, SettingsTab, SettingsView};
 use crate::whats_new::{WhatsNewCard, WhatsNewDone};
@@ -626,7 +626,7 @@ impl Shell {
         });
         if let Some((game, account)) = play {
             self.host
-                .update(cx, |host, cx| host.open(game, account, false, cx));
+                .update(cx, |host, cx| host.open(game, account, Ask::ListOrJob, cx));
         }
         cx.notify();
     }

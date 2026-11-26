@@ -49,7 +49,7 @@ pub struct JobSettled;
 
 impl EventEmitter<JobSettled> for LaunchHost {}
 
-// A job the app followed has ended, with whether it was a one-click Play from a card or the Recent strip that never showed its dialog: what decides whether the window goes to the tray.
+// A job the app followed has ended, with whether it was a one-click Play from the Recent strip that never showed its dialog: what decides whether the window goes to the tray.
 #[derive(Clone)]
 pub struct PlayEnded {
     pub job: LaunchJob,
@@ -59,6 +59,22 @@ pub struct PlayEnded {
 impl EventEmitter<PlayEnded> for LaunchHost {}
 
 impl EventEmitter<Go> for LaunchHost {}
+
+// What a click asks of the Play flow.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ask {
+    // The account list, also over a finished job of the same game.
+    List,
+    // The account list, or the finished job of the same game.
+    ListOrJob,
+    // A one-click Play as the account given: the dialog shows only when something needs the user.
+    AtOnce,
+}
+
+// A running job is always the one shown; a finished one only when it was for the same game, or a plain switch to the same account, and the click asked to see it.
+pub(crate) fn shows_job(ask: Ask, running: bool, same: bool) -> bool {
+    running || (ask == Ask::ListOrJob && same)
+}
 
 // The job the app follows, with the game it was started for.
 struct Active {
@@ -226,20 +242,13 @@ impl LaunchHost {
         self.request.as_mut().filter(|request| request.key == key)
     }
 
-    // Opens the Play flow for a game. `instant` plays at once as `account`, and shows the dialog only when something needs the user.
-    pub fn open(
-        &mut self,
-        game: Game,
-        account: Option<String>,
-        instant: bool,
-        cx: &mut Context<Self>,
-    ) {
+    pub fn open(&mut self, game: Game, account: Option<String>, ask: Ask, cx: &mut Context<Self>) {
         let launcher = game.launcher;
-        self.open_for(Some(game), launcher, account, instant, cx);
+        self.open_for(Some(game), launcher, account, ask, cx);
     }
 
     pub fn open_switch(&mut self, launcher: LauncherId, account: String, cx: &mut Context<Self>) {
-        self.open_for(None, launcher, Some(account), false, cx);
+        self.open_for(None, launcher, Some(account), Ask::ListOrJob, cx);
     }
 
     fn open_for(
@@ -247,7 +256,7 @@ impl LaunchHost {
         game: Option<Game>,
         launcher: LauncherId,
         account: Option<String>,
-        instant: bool,
+        ask: Ask,
         cx: &mut Context<Self>,
     ) {
         // The start under way reports to the request that asked for it.
@@ -259,6 +268,7 @@ impl LaunchHost {
             return;
         }
         self.serial += 1;
+        let instant = ask == Ask::AtOnce;
         let mut request = Request {
             key: self.serial,
             game,
@@ -279,23 +289,23 @@ impl LaunchHost {
             shown: (instant, discriminant(&Stage::Pick)),
             appeared: Appeared::now(),
         };
-        // A running job is always the one shown, under its own game's name; a finished one only when it was for this game, or a plain switch to this account, and the user asked to see it.
         let follows = match &self.active {
-            Some(active) if active.job.state == JobState::Running => {
-                let asked = (
-                    std::mem::replace(&mut request.game, active.game.clone()),
-                    std::mem::replace(&mut request.launcher, active.job.launcher),
-                );
-                request.asked_for = Some(asked);
-                true
-            }
             Some(active) => {
-                !instant
-                    && match (&active.game, &request.game) {
-                        (Some(played), Some(asked)) => played.id == asked.id,
-                        (None, None) => request.wanted.as_deref() == Some(&*active.job.account.id),
-                        _ => false,
-                    }
+                let running = active.job.state == JobState::Running;
+                let same = match (&active.game, &request.game) {
+                    (Some(played), Some(asked)) => played.id == asked.id,
+                    (None, None) => request.wanted.as_deref() == Some(&*active.job.account.id),
+                    _ => false,
+                };
+                // A running job is shown under its own game's name.
+                if running {
+                    let asked = (
+                        std::mem::replace(&mut request.game, active.game.clone()),
+                        std::mem::replace(&mut request.launcher, active.job.launcher),
+                    );
+                    request.asked_for = Some(asked);
+                }
+                shows_job(ask, running, same)
             }
             None => false,
         };
@@ -637,7 +647,7 @@ impl LaunchHost {
         match asked {
             Some((game, launcher, wanted)) => {
                 self.request = None;
-                self.open_for(game, launcher, wanted, false, cx);
+                self.open_for(game, launcher, wanted, Ask::List, cx);
             }
             None => self.back_to_pick(cx),
         }
@@ -668,7 +678,7 @@ impl LaunchHost {
                 active.job.launcher,
                 active.job.account.id.clone(),
             );
-            self.open_for(game, launcher, Some(account), false, cx);
+            self.open_for(game, launcher, Some(account), Ask::ListOrJob, cx);
         }
     }
 
