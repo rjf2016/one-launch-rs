@@ -1,16 +1,17 @@
 // Battle.net's health check and Locate. Reads only; no token is ever named, only how long it is and the start of its fingerprint.
 
-use ol_formats::battlenet::client_log::SignInOutcome;
+use ol_formats::battlenet::client_log::{LogEvent, SignInOutcome, last_sign_in};
 use ol_formats::battlenet::products::parse_aggregate;
 use ol_formats::battlenet::session::{TokenValue, fingerprint_of};
 use ol_formats::epic::session::short_fingerprint;
 use ol_formats::winpath::{join, normalize_launcher_path};
 use ol_model::{HealthCheck, HealthStatus, InstallSource, LauncherInstall};
 
-use super::{BattlenetAdapter, CurrentSession, EXE, LAUNCHER_EXE, UNIFIED_AUTH_PATH, id_tail};
+use super::{BattlenetAdapter, EXE, LAUNCHER_EXE, UNIFIED_AUTH_PATH, id_tail};
 use crate::files::{MAX_LAUNCHER_FILE_BYTES, read_launcher_text};
 use crate::health::{Checks, Known, chosen_folder_check, is_named, source_label};
 use crate::steam::plural;
+use crate::{AccountRef, AdapterError};
 
 fn status_if(warn: bool) -> HealthStatus {
     if warn {
@@ -33,7 +34,7 @@ impl BattlenetAdapter<'_> {
     // Either program will do: the shortcuts point at Battle.net Launcher.exe, which sits beside the client.
     pub fn install_from_exe(&self, exe: &str) -> Option<LauncherInstall> {
         let exe = normalize_launcher_path(exe);
-        if !is_named(&exe, &[EXE, LAUNCHER_EXE]) {
+        if !is_named(&exe, &[EXE, LAUNCHER_EXE]) || !self.platform.files.exists(&exe) {
             return None;
         }
         self.install_at(join(&[&exe, ".."]), InstallSource::User)
@@ -88,8 +89,10 @@ impl BattlenetAdapter<'_> {
 
         self.product_checks(&mut checks);
         self.config_check(&mut checks);
-        let current = self.token_checks(&mut checks, running);
-        self.log_check(&mut checks, current.as_ref());
+        let log = self.read_current_run();
+        let events = log.as_ref().ok().and_then(Option::as_deref);
+        self.token_checks(&mut checks, running, events.unwrap_or_default());
+        self.log_check(&mut checks, &log);
         checks.0
     }
 
@@ -97,7 +100,17 @@ impl BattlenetAdapter<'_> {
         let files = self.platform.files.as_ref();
         let games = match self.uninstall_entries() {
             Ok(entries) => {
-                let games = self.list_installed_games().unwrap_or_default();
+                let mut games: Vec<(String, String)> = entries
+                    .iter()
+                    .filter(|entry| {
+                        entry
+                            .install_path
+                            .as_ref()
+                            .is_some_and(|path| files.exists(path))
+                    })
+                    .map(|entry| (entry.codename.clone(), entry.name.clone()))
+                    .collect();
+                games.sort_by_cached_key(|(_, name)| name.to_lowercase());
                 let missing = entries.len().saturating_sub(games.len());
                 let detail = if entries.is_empty() {
                     "No Blizzard products in the Uninstall key. No Battle.net games are installed, or the Agent has never installed one.".to_owned()
@@ -138,29 +151,28 @@ impl BattlenetAdapter<'_> {
 
         let db_path = self.product_db_path();
         if files.exists(&db_path) {
-            let db = self.product_db();
+            let read = self.read_product_db();
+            let db = read.as_deref().unwrap_or_default();
             let codes: Vec<String> = games
                 .iter()
-                .map(|game| match Self::codes_for(&game.launcher_game_id, &db) {
-                    Some(codes) => format!(
-                        "{} → {} / {}",
-                        game.launcher_game_id, codes.program_code, codes.tact_code
-                    ),
-                    None => format!("{} → unknown", game.launcher_game_id),
+                .map(|(codename, _)| match Self::codes_for(codename, db) {
+                    Some(codes) => {
+                        format!("{codename} → {} / {}", codes.program_code, codes.tact_code)
+                    }
+                    None => format!("{codename} → unknown"),
                 })
                 .collect();
             let unknown: Vec<&str> = games
                 .iter()
-                .filter(|game| Self::codes_for(&game.launcher_game_id, &db).is_none())
-                .map(|game| game.name.as_str())
+                .filter(|(codename, _)| Self::codes_for(codename, db).is_none())
+                .map(|(_, name)| name.as_str())
                 .collect();
             let unverified: Vec<&str> = games
                 .iter()
-                .filter(|game| {
-                    Self::codes_for(&game.launcher_game_id, &db)
-                        .is_some_and(|codes| !codes.verified)
+                .filter(|(codename, _)| {
+                    Self::codes_for(codename, db).is_some_and(|codes| !codes.verified)
                 })
-                .map(|game| game.name.as_str())
+                .map(|(_, name)| name.as_str())
                 .collect();
             let codes = if codes.is_empty() {
                 "none needed".to_owned()
@@ -180,14 +192,20 @@ impl BattlenetAdapter<'_> {
                     unverified.join(", ")
                 )
             };
-            checks.add(
-                "product-db",
-                "product.db",
-                status_if(!unknown.is_empty()),
-                format!(
+            let detail = match &read {
+                Ok(db) => format!(
                     "{}; launch codes: {codes}{unknown_text}{unverified_text}",
                     plural(db.len(), "install record")
                 ),
+                Err(error) => format!(
+                    "Could not read {db_path}: {error}. Launch codes come from the built-in table only: {codes}{unknown_text}{unverified_text}"
+                ),
+            };
+            checks.add(
+                "product-db",
+                "product.db",
+                status_if(read.is_err() || !unknown.is_empty()),
+                detail,
             );
         } else {
             checks.add(
@@ -308,8 +326,8 @@ impl BattlenetAdapter<'_> {
         );
     }
 
-    fn token_checks(&self, checks: &mut Checks, running: bool) -> Option<CurrentSession> {
-        let current = match self.current_session(running) {
+    fn token_checks(&self, checks: &mut Checks, running: bool, events: &[LogEvent]) {
+        let current = match self.session_from(running, events) {
             Ok(current) => current,
             Err(error) => {
                 checks.add(
@@ -318,7 +336,7 @@ impl BattlenetAdapter<'_> {
                     HealthStatus::Warn,
                     format!("Could not read {UNIFIED_AUTH_PATH}: {error}"),
                 );
-                return None;
+                return;
             }
         };
         let owner_uid = current
@@ -327,13 +345,18 @@ impl BattlenetAdapter<'_> {
             .and_then(|owner| owner.launcher_uid.clone())
             .or_else(|| current.logged_uid.clone());
         let prefs = self.read_user_prefs(owner_uid.as_deref());
-        let who = match (current.remembered(), &current.owner) {
-            (true, Some(owner)) => format!("belongs to {}", owner.display_name),
-            (true, None) if current.signed_out => {
+        let logged = |owner: &AccountRef| format!("; the client log names {}", owner.display_name);
+        let who = match (current.remembered(), &current.token_owner, &current.owner) {
+            (false, _, _) => "no remembered session (signed out)".to_owned(),
+            (true, Some(stored), Some(owner)) if owner != stored => {
+                format!("belongs to {}{}", stored.display_name, logged(owner))
+            }
+            (true, Some(stored), _) => format!("belongs to {}", stored.display_name),
+            (true, None, Some(owner)) => format!("matches no saved sign-in{}", logged(owner)),
+            (true, None, None) if current.signed_out => {
                 "left over from a run that ended with a logout".to_owned()
             }
-            (true, None) => "not linked to any One Launch account".to_owned(),
-            (false, _) => "no remembered session (signed out)".to_owned(),
+            (true, None, None) => "not linked to any One Launch account".to_owned(),
         };
         let token = current
             .token
@@ -370,10 +393,9 @@ impl BattlenetAdapter<'_> {
                 ),
             );
         }
-        Some(current)
     }
 
-    fn log_check(&self, checks: &mut Checks, current: Option<&CurrentSession>) {
+    fn log_check(&self, checks: &mut Checks, log: &Result<Option<Vec<LogEvent>>, AdapterError>) {
         let dir = self.log_dir();
         if !self.platform.files.exists(&dir) {
             checks.add(
@@ -386,7 +408,30 @@ impl BattlenetAdapter<'_> {
             );
             return;
         }
-        let (status, detail) = match current.and_then(|current| current.last_sign_in.as_ref()) {
+        let events = match log {
+            Ok(Some(events)) => events,
+            Ok(None) => {
+                checks.add(
+                    "log",
+                    "Client log",
+                    HealthStatus::Warn,
+                    format!(
+                        "No client log in {dir}. Sign-ins cannot be confirmed until the client has run once."
+                    ),
+                );
+                return;
+            }
+            Err(error) => {
+                checks.add(
+                    "log",
+                    "Client log",
+                    HealthStatus::Warn,
+                    format!("Could not read the client log in {dir}: {error}"),
+                );
+                return;
+            }
+        };
+        let (status, detail) = match last_sign_in(events).as_ref() {
             None => (
                 HealthStatus::Ok,
                 "Readable; no sign-in in the current log".to_owned(),

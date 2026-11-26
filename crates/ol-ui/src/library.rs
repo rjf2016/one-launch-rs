@@ -829,7 +829,7 @@ impl LibraryView {
         self.menu = None;
         self.card_menu = None;
         self.clear_search_and_filter(window, cx);
-        if matches!(self.load, Load::Ready) {
+        if !matches!(self.load, Load::Pending) {
             self.reload(cx);
         }
     }

@@ -309,6 +309,16 @@ enum Step {
 
 impl Step {
     fn parse(text: &str) -> anyhow::Result<Self> {
+        if let Some(typed) = text.strip_prefix("type:").filter(|typed| !typed.is_empty()) {
+            return Ok(Self::Type(typed.replace("%2C", ",")));
+        }
+        if let Some(path) = text.strip_prefix("pick:") {
+            // A path holds no colon past its drive, so one there is another step joined on with &.
+            if path.is_empty() || path.get(2..).is_some_and(|tail| tail.contains(':')) {
+                anyhow::bail!("{text} is not pick:<path> or pick-cancel, which go alone");
+            }
+            return Ok(Self::Pick(Some(path.replace("%2C", ","))));
+        }
         if text.contains('&') {
             let steps = text
                 .split('&')
@@ -354,7 +364,6 @@ impl Step {
                 .filter(|milliseconds| *milliseconds <= LONGEST_WAIT)
                 .map(|milliseconds| Self::Wait(Duration::from_millis(milliseconds))),
             "type" => (!rest.is_empty()).then(|| Self::Type(rest.replace("%2C", ","))),
-            "pick" => (!rest.is_empty()).then(|| Self::Pick(Some(rest.replace("%2C", ",")))),
             "move" => spot(rest).map(Self::Move),
             "click" => spot(rest).map(Self::Click),
             "right-click" => spot(rest).map(Self::RightClick),
@@ -382,8 +391,11 @@ impl Step {
                 .and_then(|(from, to)| Some(Self::Drag(spot(from)?, spot(to)?))),
             "size" => size(rest).map(Self::Size),
             "window-at" => rest.split_once('x').and_then(|(x, y)| {
-                let side =
-                    |side: &str| side.parse::<i32>().ok().filter(|side| side.abs() <= 20_000);
+                let side = |side: &str| {
+                    side.parse::<i32>()
+                        .ok()
+                        .filter(|side| (-20_000..=20_000).contains(side))
+                };
                 Some(Self::WindowAt(side(x)?, side(y)?))
             }),
             "frames" => match rest {
@@ -414,7 +426,6 @@ impl Step {
             let form = match kind {
                 "wait" => "wait:<milliseconds up to 60000>",
                 "type" => "type:<text>",
-                "pick" => "pick:<path> or pick-cancel",
                 "move" | "click" | "right-click" | "second-click" | "back" => {
                     "move:<x>x<y>, click:<x>x<y>, right-click:<x>x<y>, second-click:<x>x<y> or back:<x>x<y>"
                 }
@@ -775,7 +786,15 @@ mod tests {
             panic!("a step that answers the file dialog");
         };
         assert_eq!(path, r"D:\x\a,b\steam.exe");
+        let Ok(Step::Pick(Some(path))) = Step::parse(r"pick:D:\R&D\steam.exe") else {
+            panic!("a step that answers the file dialog with an ampersand in the path");
+        };
+        assert_eq!(path, r"D:\R&D\steam.exe");
         assert!(matches!(Step::parse("pick-cancel"), Ok(Step::Pick(None))));
+        let Ok(Step::Type(text)) = Step::parse("type:R&D") else {
+            panic!("a step that types an ampersand");
+        };
+        assert_eq!(text, "R&D");
         assert!(matches!(Step::parse("frames:log"), Ok(Step::LogFrames)));
         assert!(matches!(Step::parse("close"), Ok(Step::Close)));
         assert!(matches!(Step::parse("minimize"), Ok(Step::Minimize)));
@@ -787,6 +806,10 @@ mod tests {
         assert!(matches!(
             Step::parse("window-at:-5000x-5000"),
             Ok(Step::WindowAt(-5000, -5000))
+        ));
+        assert!(matches!(
+            Step::parse("window-at:-20000x20000"),
+            Ok(Step::WindowAt(-20_000, 20_000))
         ));
         assert!(matches!(Step::parse("tray-open"), Ok(Step::TrayOpen)));
         assert!(matches!(Step::parse("tray-quit"), Ok(Step::TrayQuit)));
@@ -816,12 +839,18 @@ mod tests {
             "type:",
             "pick:",
             r"click:1x2&pick:D:\x.exe",
+            r"pick:D:\x.exe&click:1x2",
+            r"click:1x2&pick:D:\R&D\x.exe",
             "click:1x2&wait:5",
             "back:5",
             "second-click:5",
             "frames:all",
             "window-at:1",
             "window-at:99999x0",
+            "window-at:20001x0",
+            "window-at:0x-20001",
+            "window-at:-2147483648x0",
+            "window-at:0x-2147483648",
             "click:1x2&second-start",
         ] {
             assert!(Step::parse(refused).is_err(), "{refused}");

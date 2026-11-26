@@ -271,6 +271,23 @@ fn a_write_refused_for_anything_but_the_marks_is_an_error_and_never_a_plain_copy
 }
 
 #[test]
+fn a_text_with_a_nul_is_refused_before_the_clipboard_is_touched_and_the_earlier_copy_stays_due() {
+    let board = board();
+    board.service.copy_sensitive(&secret(PASSWORD)).unwrap();
+    let cut_short = "made-up\u{0}-rest";
+    let refused = board
+        .service
+        .copy_sensitive(&secret(cut_short))
+        .unwrap_err();
+    assert!(matches!(refused, ClipboardError::Refused(_)));
+    assert!(!format!("{refused} {refused:?}").contains("made-up"));
+    assert!(board.clipboard.holds(PASSWORD));
+    assert_eq!(board.ops(), ["clip.write"]);
+    board.wait(30);
+    assert!(board.clipboard.is_empty());
+}
+
+#[test]
 fn a_password_of_any_letters_is_cleared_after_the_clipboard_changed_and_holds_it_again() {
     let letters = "h\u{e4}rse-b\u{f6}ttery-\u{1f600}-made-up";
     let board = board();

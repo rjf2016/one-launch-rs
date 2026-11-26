@@ -67,6 +67,42 @@ fn a_new_run_counts_the_file_it_finds() {
 }
 
 #[test]
+fn a_rotation_cut_short_after_the_live_file_moved_is_finished_by_the_next() {
+    let scratch = Scratch::new("log-interrupted");
+    let dir = scratch.join("logs");
+    fs::create_dir_all(&dir).unwrap();
+    for n in 1..=3 {
+        fs::write(
+            dir.join(format!("onelaunch.{n}.log")),
+            format!("older {n}\n"),
+        )
+        .unwrap();
+    }
+    fs::write(dir.join("onelaunch.rotating.log"), "cut short\n").unwrap();
+    fs::write(dir.join("onelaunch.log"), "z".repeat(90)).unwrap();
+    let mut sink = FileSink::new(&dir, 100, 4);
+    sink.write_lines(&["0123456789a".to_owned()]).unwrap();
+    assert_eq!(
+        files(&dir),
+        [
+            "onelaunch.1.log",
+            "onelaunch.2.log",
+            "onelaunch.3.log",
+            "onelaunch.4.log",
+            "onelaunch.log"
+        ]
+    );
+    assert_eq!(read(&dir.join("onelaunch.log")), "0123456789a");
+    assert_eq!(read(&dir.join("onelaunch.1.log")), "z".repeat(90));
+    assert_eq!(read(&dir.join("onelaunch.2.log")), "cut short\n");
+    assert_eq!(read(&dir.join("onelaunch.3.log")), "older 1\n");
+    assert_eq!(read(&dir.join("onelaunch.4.log")), "older 2\n");
+    sink.write_lines(&["b".repeat(95)]).unwrap();
+    assert_eq!(read(&dir.join("onelaunch.1.log")), "0123456789a");
+    assert!(!dir.join("onelaunch.rotating.log").exists());
+}
+
+#[test]
 fn the_default_limits_are_the_electron_apps() {
     let options = LogOptions::default();
     assert_eq!((options.max_bytes, options.keep), (1024 * 1024, 5));

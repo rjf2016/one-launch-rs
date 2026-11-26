@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use ol_model::SecretKey;
+use ol_model::{Ciphertext, SecretKey};
 use ol_store::{ClearedSecrets, Sealed, Store, StoreError};
 use ol_vault::{PROBE_VALUE, Secret, Vault, VaultError};
 use thiserror::Error;
@@ -124,6 +124,17 @@ pub fn ensure_probe(
     Ok(true)
 }
 
+// A reset about to replace the key stores, when there is no probe, one that no key opens: a clear that then fails still reads as "Key lost", at the next start too, instead of the start sealing a new probe beside secrets nothing opens. Answers whether it stored one.
+pub fn mark_reset_pending(store: &Store, now: &str) -> Result<bool, StoreError> {
+    if store.secret(SecretKey::VaultProbe)?.is_some() {
+        return Ok(false);
+    }
+    let mut unopenable = b"v10".to_vec();
+    unopenable.resize(3 + 12 + 16, 0);
+    store.put_secret(SecretKey::VaultProbe, &Ciphertext::new(unopenable), now)?;
+    Ok(true)
+}
+
 // What a reset removed, as the note under the banner counts it, and how many sealed values it kept because they still open.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct VaultResetSummary {
@@ -214,7 +225,7 @@ pub fn clear_stored_secrets(
     vault: &dyn Vault,
     now: &str,
 ) -> Result<VaultResetSummary, StoreError> {
-    let opens = |sealed: Sealed<'_>, value: &ol_model::Ciphertext| match sealed {
+    let opens = |sealed: Sealed<'_>, value: &Ciphertext| match sealed {
         Sealed::Secret(key) if key == SecretKey::VaultProbe.as_str() => vault
             .decrypt(value)
             .is_ok_and(|text| text.expose() == PROBE_VALUE),

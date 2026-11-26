@@ -1,5 +1,6 @@
 use std::cell::Cell;
 use std::rc::Rc;
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use gpui::prelude::*;
@@ -17,8 +18,17 @@ const TURN: Duration = Duration::from_secs(1);
 const PULSE: Duration = Duration::from_secs(2);
 const FLASH_STAYS: Duration = Duration::from_secs(3);
 const ERROR_FLASH_STAYS: Duration = Duration::from_secs(6);
-// Windows' double-click time as it ships, read from no setting.
+// Windows' double-click time as it ships, for a run that was handed no way to read the setting.
 const SECOND_CLICK: Duration = Duration::from_millis(500);
+static DOUBLE_CLICK_TIME: OnceLock<fn() -> Duration> = OnceLock::new();
+
+pub fn read_double_click_time_with(read: fn() -> Duration) {
+    let _ = DOUBLE_CLICK_TIME.set(read);
+}
+
+fn double_click_time() -> Duration {
+    DOUBLE_CLICK_TIME.get().map_or(SECOND_CLICK, |read| read())
+}
 
 pub fn icon(path: &'static str, size: f32, hex: u32) -> Svg {
     svg()
@@ -318,12 +328,13 @@ impl Appeared {
     }
 
     pub fn takes(self, click: &ClickEvent) -> bool {
-        takes_click(click.click_count(), self.0.elapsed())
+        takes_click(click.click_count(), self.0.elapsed(), double_click_time())
     }
 }
 
-fn takes_click(count: usize, since: Duration) -> bool {
-    count <= 1 || since >= SECOND_CLICK
+// GPUI counts a click as the next of a run when it comes within the double-click time of the one before.
+fn takes_click(count: usize, since: Duration, double_click: Duration) -> bool {
+    count <= 1 || since >= double_click
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -926,11 +937,23 @@ mod tests {
 
     #[test]
     fn a_confirmation_ignores_only_the_second_click_of_the_double_click_that_brought_it() {
-        assert!(takes_click(1, Duration::ZERO));
-        assert!(!takes_click(2, Duration::from_millis(120)));
-        assert!(!takes_click(3, SECOND_CLICK - Duration::from_millis(1)));
-        assert!(takes_click(2, SECOND_CLICK));
-        assert!(takes_click(3, Duration::from_secs(2)));
+        assert!(takes_click(1, Duration::ZERO, SECOND_CLICK));
+        assert!(!takes_click(2, Duration::from_millis(120), SECOND_CLICK));
+        assert!(!takes_click(
+            3,
+            SECOND_CLICK - Duration::from_millis(1),
+            SECOND_CLICK
+        ));
+        assert!(takes_click(2, SECOND_CLICK, SECOND_CLICK));
+        assert!(takes_click(3, Duration::from_secs(2), SECOND_CLICK));
+    }
+
+    #[test]
+    fn a_slower_double_click_setting_holds_the_second_click_off_longer() {
+        let slow = Duration::from_millis(900);
+        assert!(!takes_click(2, Duration::from_millis(700), slow));
+        assert!(takes_click(2, slow, slow));
+        assert!(takes_click(1, Duration::from_millis(700), slow));
     }
 
     fn trigger(x: f32, y: f32, width: f32) -> Bounds<gpui::Pixels> {

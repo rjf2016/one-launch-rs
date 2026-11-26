@@ -8,8 +8,8 @@ use std::time::{Duration, Instant};
 
 use thiserror::Error;
 use windows::Win32::Foundation::{
-    CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HINSTANCE, HWND, LPARAM, LRESULT,
-    WPARAM,
+    CloseHandle, ERROR_ACCESS_DENIED, ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HINSTANCE, HWND,
+    LPARAM, LRESULT, WPARAM,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::CreateMutexW;
@@ -90,10 +90,17 @@ pub fn name_for(data_dir: &Path) -> Result<String, InstanceError> {
 
 pub fn claim(data_dir: &Path) -> Result<Claim, InstanceError> {
     let name = name_for(data_dir)?;
-    let lock = wide(&format!("Local\\{name}"));
+    // Global, so a copy this user runs in another session holds the folder too.
+    let lock = wide(&format!("Global\\{name}"));
     unsafe {
-        let mutex =
-            CreateMutexW(None, false, PCWSTR(lock.as_ptr())).map_err(InstanceError::Lock)?;
+        let mutex = match CreateMutexW(None, false, PCWSTR(lock.as_ptr())) {
+            Ok(mutex) => mutex,
+            // The lock is there under a descriptor this token may not open: another account's, or this one's elevated.
+            Err(error) if error.code() == ERROR_ACCESS_DENIED.to_hresult() => {
+                return Ok(Claim::Second);
+            }
+            Err(error) => return Err(InstanceError::Lock(error)),
+        };
         if GetLastError() == ERROR_ALREADY_EXISTS {
             let _ = CloseHandle(mutex);
             return Ok(Claim::Second);
@@ -299,6 +306,14 @@ mod tests {
         );
         assert_eq!(name, name_for(Path::new("D:/scratch/data")).unwrap());
         assert_ne!(name, name_for(Path::new(r"D:\scratch\data2")).unwrap());
+        assert_eq!(
+            name_for(Path::new(r"D:\scratch\Ärger")).unwrap(),
+            name_for(Path::new(r"D:\SCRATCH\äRGER")).unwrap()
+        );
+        assert_ne!(
+            name_for(Path::new(r"D:\scratch\straße")).unwrap(),
+            name_for(Path::new(r"D:\scratch\strasse")).unwrap()
+        );
         assert!(name.starts_with("OneLaunch.Instance."));
         assert_eq!(name.len(), "OneLaunch.Instance.".len() + 16);
     }

@@ -15,11 +15,12 @@ use ol_api::launchers::{
 };
 use ol_api::{ApiError, Backend, StartLaunch};
 use ol_model::{Account, JobState, LaunchJob, LauncherId, LauncherSession};
+use ol_platform_fake::RegistryValue;
 use ol_sim::FakeLaunchers;
 use ol_store::{Store, database_path};
 use ol_testkit::{Scratch, oracle, snapshot};
 use ol_vault::{FakeVault, Vault};
-use serde_json::Value;
+use serde_json::{Value, json};
 use time::macros::datetime;
 
 const VERSION: &str = "9.8.7";
@@ -29,6 +30,9 @@ const RIOT_SESSION_FILE: &str =
 const EPIC_SETTINGS: &str =
     "localappdata/EpicGamesLauncher/Saved/Config/Windows/GameUserSettings.ini";
 const NEW_UID: &str = "44444444-4444-4444-8444-444444444444";
+const EPIC_LOG: &str = "localappdata/EpicGamesLauncher/Saved/Logs/EpicGamesLauncher.log";
+const BATTLENET_LOGS: &str = "localappdata/Battle.net/Logs";
+const UNIFIED_AUTH: &str = r"HKCU\Software\Blizzard Entertainment\Battle.net\UnifiedAuth";
 
 struct Fakes {
     scratch: Scratch,
@@ -403,6 +407,80 @@ fn a_save_is_refused_with_the_electron_apps_words_when_there_is_nothing_to_save(
             "SWITCH_BLOCKED",
             "Riot Games: The Riot Client has no saved sign-in. Sign in to it as riot_main with “Stay signed in” ticked, exit the client, then save again.".to_owned()
         )
+    );
+    fakes.backend.shut_down();
+}
+
+// Each case is the account whose sign-in the launcher's files hold, refused because nothing on this PC says the files are that account's.
+fn refused_and_nothing_saved(fakes: &Fakes, launcher: LauncherId, login: &str) -> String {
+    let account = fakes.account(launcher, login);
+    let before = block_on(fakes.backend.session(&account.id))
+        .unwrap()
+        .session;
+    let (code, message) = refusal(fakes.capture(launcher, login));
+    assert_eq!(code, "SWITCH_BLOCKED");
+    let after = block_on(fakes.backend.session(&account.id))
+        .unwrap()
+        .session;
+    assert!(
+        after == before,
+        "{launcher:?}: a refused save changed what was saved"
+    );
+    message
+}
+
+#[test]
+fn a_closed_launchers_sign_in_that_nothing_ties_to_an_account_is_not_saved() {
+    let fakes = fakes_with(&|launchers| fs::remove_file(launchers.join(EPIC_LOG)).unwrap());
+    assert_eq!(
+        refused_and_nothing_saved(&fakes, LauncherId::Epic, "main@example.com"),
+        "Epic Games: The session Epic Games Launcher remembers cannot be linked to an account. Sign in to the launcher as main@example.com, exit it so it saves the session, then save again."
+    );
+    fakes.backend.shut_down();
+
+    let fakes = self::fakes();
+    let before_the_sign_in =
+        std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_767_225_600);
+    fs::File::options()
+        .write(true)
+        .open(fakes.scratch.join("launchers").join(EPIC_SETTINGS))
+        .unwrap()
+        .set_modified(before_the_sign_in)
+        .unwrap();
+    assert_eq!(
+        refused_and_nothing_saved(&fakes, LauncherId::Epic, "main@example.com"),
+        "Epic Games: Epic Games Launcher signed in after it last saved its session, so the session on disk may be another account's. Sign in to the launcher as main@example.com, exit it so it saves the session, then save again."
+    );
+    fakes.backend.shut_down();
+
+    let fakes = self::fakes();
+    let logs = fakes.scratch.join("launchers").join(BATTLENET_LOGS);
+    for log in fs::read_dir(&logs).unwrap() {
+        fs::remove_file(log.unwrap().path()).unwrap();
+    }
+    assert_eq!(
+        refused_and_nothing_saved(&fakes, LauncherId::Battlenet, "saved1@example.com"),
+        "Battle.net: The session Battle.net remembers cannot be linked to an account. Sign in to the client as saved1@example.com, exit it, then save again."
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_running_battlenet_keeping_another_accounts_token_is_not_saved() {
+    let fakes = fakes_with(&|launchers| {
+        let knobs = json!({ "knobs": { "battlenet": { "runningAs": "0a1b2c3d" } } });
+        ol_sim::write_knobs(launchers, &knobs).unwrap();
+    });
+    fakes.fake.registry.seed(
+        &format!(r"{UNIFIED_AUTH}\B1B1B1B1"),
+        RegistryValue::Binary(
+            "01000000d08c9ddf0002abababababababababababababababababababababababababababababababababababababab"
+                .to_owned(),
+        ),
+    );
+    assert_eq!(
+        refused_and_nothing_saved(&fakes, LauncherId::Battlenet, "saved1@example.com"),
+        "Battle.net: The session Battle.net currently remembers belongs to Alt. Sign in to the client as saved1@example.com first."
     );
     fakes.backend.shut_down();
 }

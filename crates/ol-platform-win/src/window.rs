@@ -1,16 +1,18 @@
 use std::ffi::c_void;
 use std::ptr;
+use std::time::Duration;
 
 use thiserror::Error;
 use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
     BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleDC, CreateDIBSection, DIB_RGB_COLORS,
     DeleteDC, DeleteObject, EnumDisplayMonitors, GdiFlush, GetDC, GetMonitorInfoW, HDC, HMONITOR,
-    MONITORINFO, ReleaseDC, SelectObject,
+    MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromRect, ReleaseDC, SelectObject,
 };
 use windows::Win32::Storage::Xps::{PRINT_WINDOW_FLAGS, PW_CLIENTONLY, PrintWindow};
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForWindow, MDT_EFFECTIVE_DPI};
+use windows::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime;
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumThreadWindows, GetClassNameW, GetClientRect, GetForegroundWindow, GetWindowPlacement,
     GetWindowRect, IsIconic, IsWindowVisible, IsZoomed, MONITORINFOF_PRIMARY, PW_RENDERFULLCONTENT,
@@ -21,6 +23,18 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::BOOL;
 
 const SCREEN_LIMIT: i32 = 1 << 24;
+
+// A placement counts from its monitor's work area, not the screen: a taskbar on the left or the top shifts it, a second monitor by itself does not.
+fn in_workspace(screen: RECT, monitor: RECT, work: RECT) -> RECT {
+    let dx = work.left.saturating_sub(monitor.left);
+    let dy = work.top.saturating_sub(monitor.top);
+    RECT {
+        left: screen.left.saturating_sub(dx),
+        top: screen.top.saturating_sub(dy),
+        right: screen.right.saturating_sub(dx),
+        bottom: screen.bottom.saturating_sub(dy),
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Display {
@@ -76,6 +90,11 @@ unsafe extern "system" fn keep_display(
 
 // GPUI gives out a window's handle only through raw-window-handle, which is not an approved dependency; this is the class gpui-pre-windows 0.3.12 registers in window.rs.
 const GPUI_WINDOW_CLASS: &str = "Zed::Window";
+
+// Read at every ask, as gpui-pre-windows 0.3.12 (window.rs, ClickState) reads it again when the setting changes.
+pub fn double_click_time() -> Duration {
+    Duration::from_millis(u64::from(unsafe { GetDoubleClickTime() }))
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AppWindow(isize);
@@ -201,11 +220,21 @@ impl AppWindow {
             if GetWindowPlacement(hwnd, &mut placement).is_err() {
                 return;
             }
-            placement.rcNormalPosition = RECT {
+            let screen = RECT {
                 left: left.saturating_sub(wide / 2),
                 top: top.saturating_sub(tall / 2),
                 right: right.saturating_add(wide - wide / 2),
                 bottom: bottom.saturating_add(tall - tall / 2),
+            };
+            let mut monitor = MONITORINFO {
+                cbSize: size_of::<MONITORINFO>() as u32,
+                ..Default::default()
+            };
+            let found = MonitorFromRect(&screen, MONITOR_DEFAULTTONEAREST);
+            placement.rcNormalPosition = if GetMonitorInfoW(found, &mut monitor).as_bool() {
+                in_workspace(screen, monitor.rcMonitor, monitor.rcWork)
+            } else {
+                screen
             };
             placement.showCmd = SW_HIDE.0 as u32;
             let _ = SetWindowPlacement(hwnd, &placement);
@@ -294,4 +323,55 @@ unsafe extern "system" fn keep_gpui_window(hwnd: HWND, found: LPARAM) -> BOOL {
     }
     unsafe { *(found.0 as *mut isize) = hwnd.0 as isize };
     false.into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rect(left: i32, top: i32, right: i32, bottom: i32) -> RECT {
+        RECT {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+
+    #[test]
+    fn a_place_on_the_screen_is_moved_into_its_monitors_work_area() {
+        let window = rect(300, 200, 1100, 800);
+        let primary = rect(0, 0, 2560, 1440);
+        assert_eq!(
+            in_workspace(window, primary, rect(0, 0, 2560, 1392)),
+            window
+        );
+        assert_eq!(
+            in_workspace(window, primary, rect(48, 0, 2560, 1440)),
+            rect(252, 200, 1052, 800)
+        );
+        assert_eq!(
+            in_workspace(window, primary, rect(0, 48, 2560, 1440)),
+            rect(300, 152, 1100, 752)
+        );
+        let second = rect(2560, 0, 5120, 1440);
+        let there = rect(3000, 200, 3800, 800);
+        assert_eq!(
+            in_workspace(there, second, rect(2560, 0, 5120, 1392)),
+            there
+        );
+        assert_eq!(
+            in_workspace(there, second, rect(2608, 0, 5120, 1440)),
+            rect(2952, 200, 3752, 800)
+        );
+        let left = rect(-2560, -300, 0, 1140);
+        assert_eq!(
+            in_workspace(
+                rect(-2000, -100, -1200, 500),
+                left,
+                rect(-2560, -252, 0, 1140)
+            ),
+            rect(-2000, -148, -1200, 452)
+        );
+    }
 }

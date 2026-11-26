@@ -161,20 +161,17 @@ impl SteamAdapter<'_> {
                 ),
             ),
             Ok(Some(auto_login_user)) => {
-                let agrees = users
-                    .iter()
-                    .find(|user| user.most_recent)
-                    .is_none_or(|user| {
-                        user.account_name.to_lowercase() == auto_login_user.to_lowercase()
-                    });
+                let agrees = users.iter().find(|user| user.most_recent).map(|user| {
+                    user.account_name.to_lowercase() == auto_login_user.to_lowercase()
+                });
                 checks.add(
                     "registry",
                     "Registry AutoLoginUser",
-                    status_if(!agrees),
-                    if agrees {
-                        "Present and matches the most recent account in loginusers.vdf"
-                    } else {
-                        "Present but names a different account than loginusers.vdf marks as most recent"
+                    status_if(agrees == Some(false)),
+                    match agrees {
+                        Some(true) => "Present and matches the most recent account in loginusers.vdf",
+                        Some(false) => "Present but names a different account than loginusers.vdf marks as most recent",
+                        None => "Present; loginusers.vdf marks no account as most recent, so there is nothing to compare it with",
                     },
                 );
             }

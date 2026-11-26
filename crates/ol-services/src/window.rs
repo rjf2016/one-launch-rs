@@ -130,12 +130,14 @@ pub fn placement_from(raw: Option<&str>, work_areas: &[Rect]) -> Placement {
     }
 }
 
+const GRAB: f64 = 64.;
+
 pub fn display_for(bounds: &Rect, work_areas: &[Rect]) -> Option<usize> {
     let grabbed = |area: &Rect| {
-        bounds.x < area.x + area.width - 64.
-            && bounds.x + bounds.width > area.x + 64.
+        bounds.x < area.x + area.width - GRAB
+            && bounds.x + bounds.width > area.x + GRAB
             && bounds.y >= area.y - 8.
-            && bounds.y < area.y + area.height - 64.
+            && bounds.y < area.y + area.height - GRAB
     };
     let across =
         |area: &Rect| (bounds.x + bounds.width).min(area.x + area.width) - bounds.x.max(area.x);
@@ -150,8 +152,16 @@ pub fn display_for(bounds: &Rect, work_areas: &[Rect]) -> Option<usize> {
 
 // `placement_from` keeps any size, as its recorded cases want; Windows cuts a window larger than the screen.
 pub fn fit(bounds: Rect, area: &Rect) -> Rect {
+    let width = bounds.width.min(area.width).max(MIN_WINDOW.0);
+    // A width cut from the right can take the whole title bar off the display `display_for` chose.
+    let x = if bounds.x + width > area.x + GRAB {
+        bounds.x
+    } else {
+        area.x
+    };
     Rect {
-        width: bounds.width.min(area.width).max(MIN_WINDOW.0),
+        x,
+        width,
         height: bounds.height.min(area.height).max(MIN_WINDOW.1),
         ..bounds
     }
@@ -281,5 +291,32 @@ impl WindowLog {
 
     pub fn shown_for_second_start(&self) {
         self.0.info("window shown for a second start", ());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_place_cut_to_its_display_keeps_its_title_bar_on_that_display() {
+        let area = Rect {
+            x: 0.,
+            y: 0.,
+            width: 1920.,
+            height: 1040.,
+        };
+        let wide = Rect {
+            x: -3000.,
+            y: 100.,
+            width: 3200.,
+            height: 800.,
+        };
+        assert_eq!(display_for(&wide, &[area]), Some(0));
+        let fitted = fit(wide, &area);
+        assert_eq!(display_for(&fitted, &[area]), Some(0));
+        assert_eq!((fitted.x, fitted.y, fitted.width), (0., 100., 1920.));
+        let kept = Rect { x: 100., ..wide };
+        assert_eq!(fit(kept, &area).x, 100.);
     }
 }

@@ -470,6 +470,12 @@ pub enum ServiceError {
         .0.display_name()
     )]
     VaultClosed(LauncherId),
+    #[error(
+        "One Launch cannot read the {} it stored for this account, so it does not start this switch: it would close {} and stop halfway. Store it again on the account's page.",
+        if matches!(.0, LauncherId::Steam) { "password" } else { "saved sign-in" },
+        .0.display_name()
+    )]
+    SealedUnreadable(LauncherId),
 }
 
 impl ServiceError {
@@ -490,6 +496,7 @@ impl ServiceError {
             Self::NotALauncher(_) => "NOT_A_LAUNCHER",
             Self::NotAPlainPath(_) => "BAD_REQUEST",
             Self::VaultClosed(_) => "VAULT_UNAVAILABLE",
+            Self::SealedUnreadable(_) => "VAULT_UNREADABLE",
         }
     }
 

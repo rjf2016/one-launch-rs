@@ -82,6 +82,61 @@ fn key_of(launcher: LauncherId, entry: &RememberedAccount) -> Key {
     (launcher, id.clone())
 }
 
+fn reconcile(
+    selected: &mut Vec<Key>,
+    imported: &[Key],
+    launcher: LauncherId,
+    before: &[RememberedAccount],
+    after: Option<&[RememberedAccount]>,
+) {
+    let Some(after) = after else {
+        selected.retain(|(held, _)| *held != launcher);
+        return;
+    };
+    let importable = |entry: &RememberedAccount| {
+        entry.linked_account_id.is_none() && !imported.contains(&key_of(launcher, entry))
+    };
+    selected.retain(|key| {
+        key.0 != launcher
+            || after
+                .iter()
+                .any(|entry| key_of(launcher, entry) == *key && importable(entry))
+    });
+    for entry in after {
+        let key = key_of(launcher, entry);
+        let known = before.iter().any(|seen| key_of(launcher, seen) == key);
+        if !known && importable(entry) && !selected.contains(&key) {
+            selected.push(key);
+        }
+    }
+}
+
+// The backend gives its reasons for leaving an entry out only in words.
+const ALREADY_IN: &str = "already in One Launch";
+
+fn settle(
+    selected: &mut Vec<Key>,
+    imported: &mut Vec<Key>,
+    launcher: LauncherId,
+    ids: Vec<String>,
+    skipped: &[(String, &'static str)],
+) -> Vec<&'static str> {
+    let mut refused = Vec::new();
+    for id in ids {
+        let key = (launcher, id);
+        selected.retain(|held| *held != key);
+        match skipped.iter().find(|(skipped, _)| *skipped == key.1) {
+            Some((_, reason)) if *reason != ALREADY_IN => refused.push(*reason),
+            _ => imported.push(key),
+        }
+    }
+    refused
+}
+
+fn advances(then: bool, step: usize, failed: bool, refused: usize, selected: &[Key]) -> bool {
+    then && step == ACCOUNTS && !failed && refused == 0 && selected.is_empty()
+}
+
 fn plural(count: usize, one: &str, many: &str) -> String {
     format!("{count} {}", if count == 1 { one } else { many })
 }
@@ -274,16 +329,19 @@ impl SetupGuide {
         };
         match answer {
             Ok(entries) => {
-                self.selected.retain(|(held, _)| *held != launcher);
-                for entry in &entries {
-                    let key = key_of(launcher, entry);
-                    if entry.linked_account_id.is_none() && !self.imported.contains(&key) {
-                        self.selected.push(key);
-                    }
-                }
+                reconcile(
+                    &mut self.selected,
+                    &self.imported,
+                    launcher,
+                    list.entries(),
+                    Some(&entries),
+                );
                 *list = Remembered::Ready(entries);
             }
-            Err(error) => *list = Remembered::Failed(error.message.into()),
+            Err(error) => {
+                reconcile(&mut self.selected, &self.imported, launcher, &[], None);
+                *list = Remembered::Failed(error.message.into());
+            }
         }
         cx.notify();
     }
@@ -379,6 +437,7 @@ impl SetupGuide {
         cx.spawn(async move |this, cx| {
             let mut total = 0;
             let mut failure = None;
+            let mut refused = Vec::new();
             for (launcher, ids) in chosen {
                 let result: Result<ImportResult, ApiError> =
                     backend.import_accounts(launcher, ids.clone()).await;
@@ -386,9 +445,13 @@ impl SetupGuide {
                     Ok(result) => {
                         total += result.accounts.len();
                         this.update(cx, |this, _| {
-                            let keys: Vec<Key> = ids.into_iter().map(|id| (launcher, id)).collect();
-                            this.selected.retain(|key| !keys.contains(key));
-                            this.imported.extend(keys);
+                            refused.extend(settle(
+                                &mut this.selected,
+                                &mut this.imported,
+                                launcher,
+                                ids,
+                                &result.skipped,
+                            ));
                         })
                         .ok();
                     }
@@ -400,15 +463,32 @@ impl SetupGuide {
             }
             this.update(cx, |this, cx| {
                 this.importing = false;
-                this.flash = Some(match &failure {
-                    Some(error) => Flash::new(
+                this.flash = Some(match (&failure, refused.first()) {
+                    (Some(error), _) => Flash::new(
                         format!("Could not import: {error}"),
                         FlashTone::Error,
                         None,
                         |this: &mut Self| &mut this.flash,
                         cx,
                     ),
-                    None => Flash::new(
+                    (None, Some(reason)) => {
+                        let left = plural(refused.len(), "account", "accounts");
+                        Flash::new(
+                            if total == 0 {
+                                format!("Could not import {left}: {reason}")
+                            } else {
+                                format!(
+                                    "Imported {}; could not import {left}: {reason}",
+                                    plural(total, "account", "accounts")
+                                )
+                            },
+                            FlashTone::Error,
+                            None,
+                            |this: &mut Self| &mut this.flash,
+                            cx,
+                        )
+                    }
+                    (None, None) => Flash::new(
                         if total == 0 {
                             "Nothing new to import".to_owned()
                         } else {
@@ -420,7 +500,13 @@ impl SetupGuide {
                         cx,
                     ),
                 });
-                if failure.is_none() && then && this.step == ACCOUNTS {
+                if advances(
+                    then,
+                    this.step,
+                    failure.is_some(),
+                    refused.len(),
+                    &this.selected,
+                ) {
                     this.go(READY, cx);
                 }
                 cx.notify();
@@ -524,6 +610,15 @@ impl SetupGuide {
             Primary::ImportThenNext => self.run_import(true, cx),
             Primary::Finish(exit) => self.finish(exit, cx),
         }
+    }
+
+    fn retry_statuses(&mut self, cx: &mut Context<Self>) {
+        if self.busy() || !matches!(self.statuses, Statuses::Failed(_)) {
+            return;
+        }
+        self.statuses = Statuses::Loading;
+        self.read_statuses(cx);
+        cx.notify();
     }
 
     pub fn on_key(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
@@ -642,6 +737,9 @@ impl SetupGuide {
     fn render_launchers(&self, cx: &mut Context<Self>) -> Div {
         let found = self.found();
         let lead = match found {
+            None if matches!(self.statuses, Statuses::Failed(_)) => {
+                "One Launch could not check which launchers are installed on this PC.".to_owned()
+            }
             None => "One Launch is checking which launchers are installed on this PC.".to_owned(),
             Some(0) => "No launcher was found on this PC. Install one, or point One Launch at one that is installed somewhere unusual.".to_owned(),
             Some(count) => format!(
@@ -652,8 +750,21 @@ impl SetupGuide {
         let list: AnyElement = match &self.statuses {
             Statuses::Failed(error) => div()
                 .mt(px(20.))
-                .text_color(color(theme::DANGER))
-                .child(format!("Could not check launchers: {error}"))
+                .flex()
+                .flex_col()
+                .items_start()
+                .gap(px(12.))
+                .child(
+                    div()
+                        .text_color(color(theme::DANGER))
+                        .child(format!("Could not check launchers: {error}")),
+                )
+                .child(
+                    Button::new("guide-retry", Tone::Secondary, "Try again")
+                        .glyph(assets::RETRY)
+                        .disabled(self.busy())
+                        .on_click(cx.listener(|this, _, _, cx| this.retry_statuses(cx))),
+                )
                 .into_any_element(),
             Statuses::Loading => boxed(
                 LauncherId::ALL
@@ -966,7 +1077,9 @@ impl SetupGuide {
                 })
                 .sum();
             let count = self.selected.len();
-            let summary = if statuses.is_none() {
+            let summary = if let Statuses::Failed(error) = &self.statuses {
+                format!("Could not check launchers: {error}")
+            } else if statuses.is_none() {
                 "Checking your launchers…".to_owned()
             } else if loading {
                 "Reading what your launchers remember…".to_owned()
@@ -1002,7 +1115,13 @@ impl SetupGuide {
                             div()
                                 .text_size(px(12.))
                                 .line_height(px(16.))
-                                .text_color(color(theme::MUTED))
+                                .text_color(color(
+                                    if matches!(self.statuses, Statuses::Failed(_)) {
+                                        theme::DANGER
+                                    } else {
+                                        theme::MUTED
+                                    },
+                                ))
                                 .child(summary),
                         )
                         .child(
@@ -1874,6 +1993,127 @@ fn artwork_line(on: bool) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn entry(uid: &str, login: &str, linked: bool) -> RememberedAccount {
+        RememberedAccount {
+            launcher: LauncherId::Steam,
+            launcher_uid: uid.to_owned(),
+            login: login.to_owned(),
+            persona_name: String::new(),
+            remember_password: true,
+            most_recent: false,
+            last_login_at: None,
+            session_may_be_expired: false,
+            linked_account_id: linked.then(|| "account-1".to_owned()),
+        }
+    }
+
+    fn steam(id: &str) -> Key {
+        (LauncherId::Steam, id.to_owned())
+    }
+
+    fn battlenet(id: &str) -> Key {
+        (LauncherId::Battlenet, id.to_owned())
+    }
+
+    #[test]
+    fn a_refresh_keeps_what_the_user_chose_and_selects_only_what_is_new() {
+        let before = [
+            entry("uid-1", "user_1", false),
+            entry("uid-2", "user_2", false),
+        ];
+        let after = [
+            entry("uid-1", "user_1", false),
+            entry("uid-2", "user_2", false),
+            entry("uid-3", "user_3", false),
+            entry("uid-4", "user_4", true),
+        ];
+        let mut selected = vec![steam("uid-2"), battlenet("saved@example.com")];
+        reconcile(&mut selected, &[], LauncherId::Steam, &before, Some(&after));
+        assert_eq!(
+            selected,
+            [
+                steam("uid-2"),
+                battlenet("saved@example.com"),
+                steam("uid-3")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_refresh_lets_go_of_entries_the_launcher_forgot_or_that_got_linked() {
+        let before = [
+            entry("uid-1", "user_1", false),
+            entry("uid-2", "user_2", false),
+        ];
+        let after = [entry("uid-2", "user_2", true)];
+        let mut selected = vec![steam("uid-1"), steam("uid-2")];
+        reconcile(&mut selected, &[], LauncherId::Steam, &before, Some(&after));
+        assert!(selected.is_empty());
+    }
+
+    #[test]
+    fn a_first_read_selects_every_entry_that_can_be_imported() {
+        let after = [
+            entry("uid-1", "user_1", false),
+            entry("uid-2", "user_2", true),
+            entry("uid-3", "user_3", false),
+        ];
+        let mut selected = Vec::new();
+        reconcile(
+            &mut selected,
+            &[steam("uid-3")],
+            LauncherId::Steam,
+            &[],
+            Some(&after),
+        );
+        assert_eq!(selected, [steam("uid-1")]);
+    }
+
+    #[test]
+    fn a_read_that_fails_drops_that_launchers_choices_only() {
+        let mut selected = vec![steam("uid-1"), battlenet("saved@example.com")];
+        reconcile(&mut selected, &[], LauncherId::Steam, &[], None);
+        assert_eq!(selected, [battlenet("saved@example.com")]);
+    }
+
+    #[test]
+    fn only_accounts_the_import_made_or_found_in_one_launch_count_as_imported() {
+        let mut selected = vec![steam("uid-1"), steam("uid-2"), steam("uid-3")];
+        let mut imported = Vec::new();
+        let refused = settle(
+            &mut selected,
+            &mut imported,
+            LauncherId::Steam,
+            vec!["uid-1".to_owned(), "uid-2".to_owned(), "uid-3".to_owned()],
+            &[
+                ("uid-2".to_owned(), "already in One Launch"),
+                ("uid-3".to_owned(), "not remembered by the launcher"),
+            ],
+        );
+        assert_eq!(imported, [steam("uid-1"), steam("uid-2")]);
+        assert!(selected.is_empty());
+        assert_eq!(refused, ["not remembered by the launcher"]);
+    }
+
+    #[test]
+    fn the_guide_moves_on_only_when_nothing_chosen_is_left_unimported() {
+        let mut selected = vec![steam("uid-1"), battlenet("saved@example.com")];
+        let mut imported = Vec::new();
+        let refused = settle(
+            &mut selected,
+            &mut imported,
+            LauncherId::Steam,
+            vec!["uid-1".to_owned()],
+            &[],
+        );
+        assert_eq!(selected, [battlenet("saved@example.com")]);
+        assert!(!advances(true, ACCOUNTS, false, refused.len(), &selected));
+        assert!(!advances(true, ACCOUNTS, false, 1, &[]));
+        assert!(!advances(true, ACCOUNTS, true, 0, &[]));
+        assert!(!advances(false, ACCOUNTS, false, 0, &[]));
+        assert!(advances(true, ACCOUNTS, false, 0, &[]));
+    }
 
     #[test]
     fn the_demo_runs_each_phase_in_turn_and_holds_all_done() {

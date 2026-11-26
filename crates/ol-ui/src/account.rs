@@ -82,11 +82,13 @@ fn blank(text: &str) -> bool {
         .is_empty()
 }
 
-fn validate(draft: &Draft) -> Errors {
+// `stored` is the account as it was read: stored notes past the limit, left as they are, are not sent and so do not stop a save.
+fn validate(draft: &Draft, stored: Option<&Draft>) -> Errors {
+    let notes_sent = stored.is_none_or(|stored| stored.notes != draft.notes);
     Errors {
         name: blank(&draft.name).then(|| "Display name is required.".into()),
         login: blank(&draft.login).then(|| "Login is required.".into()),
-        notes: (draft.notes.encode_utf16().count() > NOTES_MOST)
+        notes: (notes_sent && draft.notes.encode_utf16().count() > NOTES_MOST)
             .then(|| format!("Notes must be at most {NOTES_MOST} characters.").into()),
     }
 }
@@ -437,10 +439,18 @@ impl AccountPage {
             Kind::Edit { .. } => self.dirty(cx),
         };
         if shown {
-            validate(&self.draft(cx))
+            self.validate(&self.draft(cx))
         } else {
             Errors::default()
         }
+    }
+
+    fn validate(&self, draft: &Draft) -> Errors {
+        let stored = match self.kind {
+            Kind::Create => None,
+            Kind::Edit { .. } => Some(&self.baseline),
+        };
+        validate(draft, stored)
     }
 
     pub fn leave_question(&self, cx: &App) -> Option<Question> {
@@ -540,7 +550,7 @@ impl AccountPage {
         self.commit_tag(window, cx);
         self.touched = true;
         let draft = self.draft(cx);
-        if validate(&draft).any() {
+        if self.validate(&draft).any() {
             return cx.notify();
         }
         let password = self
@@ -593,7 +603,7 @@ impl AccountPage {
         }
         self.commit_tag(window, cx);
         let draft = self.draft(cx);
-        if self.account.is_none() || !self.dirty(cx) || validate(&draft).any() {
+        if self.account.is_none() || !self.dirty(cx) || self.validate(&draft).any() {
             return;
         }
         let was = &self.baseline;
@@ -664,13 +674,12 @@ impl AccountPage {
         .detach();
     }
 
-    fn stops(&self) -> Vec<Stop<'_>> {
-        let mut stops = vec![
-            Stop::Line(&self.name),
-            Stop::Line(&self.login),
-            Stop::Line(&self.tag_field),
-            Stop::Lines(&self.notes),
-        ];
+    fn stops(&self, cx: &App) -> Vec<Stop<'_>> {
+        let mut stops = vec![Stop::Line(&self.name), Stop::Line(&self.login)];
+        if !self.tag_field.is_disabled(cx) {
+            stops.push(Stop::Line(&self.tag_field));
+        }
+        stops.push(Stop::Lines(&self.notes));
         stops.extend(
             self.password
                 .as_ref()
@@ -728,7 +737,7 @@ impl AccountPage {
                 true
             }
             "tab" => {
-                let stops = self.stops();
+                let stops = self.stops(cx);
                 let Some(at) = stops.iter().position(|stop| stop.is_focused(window, cx)) else {
                     return false;
                 };
@@ -1197,5 +1206,37 @@ impl Render for AccountPage {
             .child(self.render_advanced(launcher, window, cx))
             .children(self.render_danger(cx));
         scroll_page("account-page", &self.scroll, self.render_header(cx), body).into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn notes_past_the_limit_stop_only_a_save_that_sends_them() {
+        let long = "n".repeat(NOTES_MOST + 1);
+        let stored = Draft {
+            name: "Main".to_owned(),
+            login: "player".to_owned(),
+            notes: long.clone(),
+            ..Draft::default()
+        };
+        let renamed = Draft {
+            name: "Smurf".to_owned(),
+            ..stored.clone()
+        };
+        assert!(!validate(&renamed, Some(&stored)).any());
+        let longer = Draft {
+            notes: format!("{long}n"),
+            ..stored.clone()
+        };
+        assert!(validate(&longer, Some(&stored)).notes.is_some());
+        assert!(validate(&stored, None).notes.is_some());
+        let fits = Draft {
+            notes: "n".repeat(NOTES_MOST),
+            ..stored.clone()
+        };
+        assert!(!validate(&fits, None).any());
     }
 }

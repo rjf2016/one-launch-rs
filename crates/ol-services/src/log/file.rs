@@ -116,20 +116,22 @@ impl FileSink {
         for n in 1..=self.keep {
             refuse_link(&self.rotated_path(n))?;
         }
+        // A rotation that failed after the live file was moved aside is finished first, or every later one would find its file in the way.
         if fs::symlink_metadata(&moving).is_ok() {
-            return Err(io::Error::new(
-                io::ErrorKind::AlreadyExists,
-                "an earlier rotation did not finish",
-            ));
+            self.shift_in(&moving)?;
         }
         fs::rename(&live, &moving)?;
+        self.shift_in(&moving)
+    }
+
+    fn shift_in(&self, moving: &Path) -> io::Result<()> {
         if self.keep == 0 {
-            return gone_is_fine(fs::remove_file(&moving));
+            return gone_is_fine(fs::remove_file(moving));
         }
         gone_is_fine(fs::remove_file(self.rotated_path(self.keep)))?;
         for n in (1..self.keep).rev() {
             gone_is_fine(fs::rename(self.rotated_path(n), self.rotated_path(n + 1)))?;
         }
-        fs::rename(&moving, self.rotated_path(1))
+        fs::rename(moving, self.rotated_path(1))
     }
 }

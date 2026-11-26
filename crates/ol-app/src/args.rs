@@ -56,6 +56,7 @@ impl Args {
         let mut steps = false;
         let mut real_launchers = false;
         let mut relaunched = false;
+        let mut start_hidden = false;
         #[cfg(feature = "fake")]
         let (mut fake_folder, mut fake_scenario, mut fake_fixtures) = (None, None, None);
         for argument in arguments {
@@ -73,6 +74,7 @@ impl Args {
                 continue;
             }
             if argument == ol_api::settings::START_HIDDEN_FLAG {
+                start_hidden = true;
                 continue;
             }
             if argument == RELAUNCHED {
@@ -145,6 +147,12 @@ impl Args {
         let data_dir = data_dir.ok_or("refusing to start without --data-dir=<folder>")?;
         if !data_dir.is_absolute() {
             return Err("--data-dir=<folder> must be an absolute path".to_owned());
+        }
+        if start_hidden && plan.sweep.is_some() {
+            return Err(
+                "--capture-sweep does not go with --start-hidden: a window in the tray draws no frames"
+                    .to_owned(),
+            );
         }
         if fake_vault && !doctor {
             return Err("--fake-vault needs --doctor".to_owned());
@@ -316,6 +324,21 @@ mod tests {
             ])
             .is_ok()
         );
+    }
+
+    #[test]
+    fn a_sweep_does_not_go_with_a_start_in_the_tray() {
+        let sweep = [
+            r"--data-dir=D:\scratch",
+            r"--capture=D:\a.png",
+            "--capture-sweep=50",
+        ];
+        assert!(parse(&sweep).is_ok());
+        for at in [0, sweep.len()] {
+            let mut arguments = sweep.to_vec();
+            arguments.insert(at, "--start-hidden");
+            assert!(parse(&arguments).is_err(), "{arguments:?}");
+        }
     }
 
     #[test]
