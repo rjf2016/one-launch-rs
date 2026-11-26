@@ -23,8 +23,8 @@ pub mod settings {
     };
     pub use ol_services::window::{
         AfterPlay, CloseAction, MIN_WINDOW, Placement, QuitAnswer, QuitQuestion, Rect,
-        START_HIDDEN_FLAG, WindowLog, bounds_setting, close_request_action, display_for, fit,
-        hide_after_instant_play, placement_from, start_hidden,
+        START_HIDDEN_FLAG, WindowAfterPlay, WindowLog, bounds_setting, close_request_action,
+        display_for, fit, hide_after_play, placement_from, start_hidden, window_after_play,
     };
 }
 

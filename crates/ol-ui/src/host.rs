@@ -49,11 +49,10 @@ pub struct JobSettled;
 
 impl EventEmitter<JobSettled> for LaunchHost {}
 
-// A job the app followed has ended, with whether it was a one-click Play from the Recent strip that never showed its dialog: what decides whether the window goes to the tray.
+// A job the app followed has ended: what decides whether the window goes to the tray.
 #[derive(Clone)]
 pub struct PlayEnded {
     pub job: LaunchJob,
-    pub instant: bool,
 }
 
 impl EventEmitter<PlayEnded> for LaunchHost {}
@@ -80,7 +79,6 @@ pub(crate) fn shows_job(ask: Ask, running: bool, same: bool) -> bool {
 struct Active {
     job: LaunchJob,
     game: Option<Game>,
-    instant: bool,
 }
 
 struct Request {
@@ -483,11 +481,7 @@ impl LaunchHost {
         match outcome {
             Ok(job) => {
                 let (job_id, direct) = (job.id.clone(), job.direct);
-                let instant = self
-                    .request
-                    .as_ref()
-                    .is_some_and(|request| request.key == key && request.silent);
-                self.active = Some(Active { job, game, instant });
+                self.active = Some(Active { job, game });
                 self.follow(job_id, cx);
                 let mut nothing_to_watch = false;
                 if let Some(request) = self.request_mut(key) {
@@ -542,10 +536,7 @@ impl LaunchHost {
         }
         let running = job.state == JobState::Running;
         let handing_over = job.attention.is_some() && running;
-        let ended = (!running).then(|| PlayEnded {
-            job: job.clone(),
-            instant: active.instant,
-        });
+        let ended = (!running).then(|| PlayEnded { job: job.clone() });
         active.job = job;
         if !handing_over && let Some(request) = &mut self.request {
             request.copied = None;
@@ -665,14 +656,28 @@ impl LaunchHost {
         }
     }
 
+    // The window went to the tray as the job ended: the dialog that shows the job goes as its X takes it, and the banner stands for the job while it lasts.
+    pub fn close_finished_job(&mut self, job_id: &str, cx: &mut Context<Self>) {
+        let shows_it = self
+            .request
+            .as_ref()
+            .is_some_and(|request| matches!(request.stage, Stage::Job))
+            && self
+                .active
+                .as_ref()
+                .is_some_and(|active| active.job.id == job_id);
+        if shows_it {
+            self.dismiss(cx);
+        }
+    }
+
     fn finish(&mut self, cx: &mut Context<Self>) {
         self.active = None;
         self.close(cx);
     }
 
     fn show_job(&mut self, cx: &mut Context<Self>) {
-        if let Some(active) = &mut self.active {
-            active.instant = false;
+        if let Some(active) = &self.active {
             let (game, launcher, account) = (
                 active.game.clone(),
                 active.job.launcher,

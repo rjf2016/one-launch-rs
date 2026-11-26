@@ -1,4 +1,4 @@
-// The rules of the window that the settings decide: what a close does, when a one-click Play sends the window to the tray, when a start stays in the tray, and the question asked before quitting during a switch.
+// The rules of the window that the settings decide: what a close does, when a Play sends the window to the tray, when a start stays in the tray, and the question asked before quitting during a switch.
 
 use ol_model::LaunchJob;
 use serde_json::json;
@@ -41,8 +41,6 @@ pub const fn close_request_action(
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AfterPlay {
-    // The job was started by a click on the Recent strip, not from the launch dialog.
-    pub instant: bool,
     pub direct: bool,
     pub done: bool,
     pub hand_off: bool,
@@ -52,16 +50,14 @@ pub struct AfterPlay {
 }
 
 impl AfterPlay {
-    // The flags of a finished job; the caller says how it was started and what the tray and the settings are.
+    // The flags of a finished job; the caller says what the tray and the settings are.
     pub fn of(
         job: &LaunchJob,
-        instant: bool,
         tray_present: bool,
         close_to_tray: bool,
         hide_to_tray: bool,
     ) -> Self {
         Self {
-            instant,
             direct: job.direct,
             done: job.state == ol_model::JobState::Done,
             hand_off: job.hand_off.is_some(),
@@ -72,15 +68,32 @@ impl AfterPlay {
     }
 }
 
-// Only a one-click Play that went straight to the game and ended well hides the window: a switch, a failure or a launch that still needs the user keeps it where its progress is.
-pub const fn hide_after_instant_play(after: AfterPlay) -> bool {
-    after.instant
-        && after.direct
+// Only a Play that went straight to the game and ended well hides the window, from the dialog or from the Recent strip: a switch, a launcher One Launch had to start, a failure or a launch that still needs the user keeps it where its progress is.
+pub const fn hide_after_play(after: AfterPlay) -> bool {
+    after.direct
         && after.done
         && !after.hand_off
         && after.tray_present
         && after.close_to_tray
         && after.hide_to_tray
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WindowAfterPlay {
+    Hide,
+    Kept,
+    LeaveAlone,
+}
+
+// What the window does once a job ends. A window already in the tray is left alone, as in the Electron app; a minimised one is shown and still hides.
+pub const fn window_after_play(after: AfterPlay, for_game: bool, shown: bool) -> WindowAfterPlay {
+    if !shown || !for_game || !after.done || !after.hide_to_tray {
+        WindowAfterPlay::LeaveAlone
+    } else if hide_after_play(after) {
+        WindowAfterPlay::Hide
+    } else {
+        WindowAfterPlay::Kept
+    }
 }
 
 pub const START_HIDDEN_FLAG: &str = "--start-hidden";
@@ -225,10 +238,23 @@ impl WindowLog {
         self.0.info("window hidden to the tray", ());
     }
 
-    pub fn hidden_after_instant_launch(&self, job_id: &str) {
+    pub fn hidden_after_launch(&self, job_id: &str) {
         self.0.info(
-            "window hidden to the tray after an instant launch",
+            "window hidden to the tray after a launch",
             json!({ "jobId": job_id }),
+        );
+    }
+
+    pub fn kept_after_launch(&self, job_id: &str, after: AfterPlay) {
+        self.0.info(
+            "window kept after a launch",
+            json!({
+                "jobId": job_id,
+                "direct": after.direct,
+                "handOff": after.hand_off,
+                "tray": after.tray_present,
+                "closeToTray": after.close_to_tray,
+            }),
         );
     }
 

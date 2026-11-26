@@ -1,13 +1,34 @@
 #![forbid(unsafe_code)]
 
-// Every case of oracle/l1 for the window's close rule, the hide after a one-click Play and the start in the tray, run against the port.
+// Every case of oracle/l1 for the window's close rule, the hide after a Play and the start in the tray, run against the port.
 
-use ol_services::window::{AfterPlay, close_request_action, hide_after_instant_play, start_hidden};
-use ol_testkit::vectors::{Answer, run};
+use ol_services::window::{
+    AfterPlay, WindowAfterPlay, close_request_action, hide_after_play, start_hidden,
+    window_after_play,
+};
+use ol_testkit::vectors::{Answer, Case, Vectors, run};
 use serde_json::Value;
 
 fn flag(value: &Value, name: &str) -> bool {
     value[name].as_bool().expect("a flag")
+}
+
+fn after_play(state: &Value) -> AfterPlay {
+    AfterPlay {
+        direct: flag(state, "direct"),
+        done: flag(state, "done"),
+        hand_off: flag(state, "handOff"),
+        tray_present: flag(state, "trayPresent"),
+        close_to_tray: flag(state, "closeToTray"),
+        hide_to_tray: flag(state, "hideToTray"),
+    }
+}
+
+// Here every Play is held to the rule the Electron app keeps for a one-click Play (plan/GAPS.md, "Since the first run on real launchers"): the recorded row that counts is the one-click row of the same six flags.
+fn whatever_started_the_play(state: &Value) -> Value {
+    let mut counted = state.clone();
+    counted["instant"] = Value::Bool(true);
+    counted
 }
 
 #[test]
@@ -27,22 +48,131 @@ fn a_close_closes_hides_or_asks_as_in_the_electron_app() {
 }
 
 #[test]
-fn only_a_one_click_play_that_went_straight_to_the_game_hides_the_window() {
-    run("l1/core/hideAfterInstantPlay.json", &[], |case| {
-        let state = &case.args[0];
-        Answer::Out(
-            hide_after_instant_play(AfterPlay {
-                instant: flag(state, "instant"),
-                direct: flag(state, "direct"),
-                done: flag(state, "done"),
-                hand_off: flag(state, "handOff"),
-                tray_present: flag(state, "trayPresent"),
-                close_to_tray: flag(state, "closeToTray"),
-                hide_to_tray: flag(state, "hideToTray"),
-            })
-            .into(),
-        )
-    });
+fn a_play_that_went_straight_to_the_game_hides_the_window_however_it_was_started() {
+    let file = "l1/core/hideAfterInstantPlay.json";
+    let recorded = Vectors::load(file);
+    let answer_of = |state: &Value| {
+        recorded
+            .cases
+            .iter()
+            .find(|case| case.args[0] == *state)
+            .and_then(Case::out)
+            .unwrap_or_else(|| panic!("no recorded row for {state}"))
+    };
+    let failures: Vec<String> = recorded
+        .cases
+        .iter()
+        .filter_map(|case| {
+            let state = &case.args[0];
+            let expected = answer_of(&whatever_started_the_play(state));
+            let actual = Value::Bool(hide_after_play(after_play(state)));
+            (actual != expected).then(|| format!("{}: {actual}, expected {expected}", case.id))
+        })
+        .collect();
+    assert_eq!(recorded.cases.len(), 128);
+    assert!(
+        failures.is_empty(),
+        "{} of {} cases of {file} differ:\n{}",
+        failures.len(),
+        recorded.cases.len(),
+        failures.join("\n")
+    );
+}
+
+#[test]
+fn the_window_after_a_play_hides_is_kept_or_is_left_alone() {
+    let hides = AfterPlay {
+        direct: true,
+        done: true,
+        hand_off: false,
+        tray_present: true,
+        close_to_tray: true,
+        hide_to_tray: true,
+    };
+    assert_eq!(window_after_play(hides, true, true), WindowAfterPlay::Hide);
+    for kept in [
+        AfterPlay {
+            direct: false,
+            ..hides
+        },
+        AfterPlay {
+            hand_off: true,
+            ..hides
+        },
+        AfterPlay {
+            tray_present: false,
+            ..hides
+        },
+        AfterPlay {
+            close_to_tray: false,
+            ..hides
+        },
+    ] {
+        assert_eq!(
+            window_after_play(kept, true, true),
+            WindowAfterPlay::Kept,
+            "{kept:?}"
+        );
+    }
+    for (after, for_game, shown) in [
+        (hides, true, false),
+        (
+            AfterPlay {
+                direct: false,
+                ..hides
+            },
+            true,
+            false,
+        ),
+        (
+            AfterPlay {
+                done: false,
+                ..hides
+            },
+            true,
+            true,
+        ),
+        (
+            AfterPlay {
+                done: false,
+                direct: false,
+                ..hides
+            },
+            true,
+            true,
+        ),
+        (
+            AfterPlay {
+                hide_to_tray: false,
+                ..hides
+            },
+            true,
+            true,
+        ),
+        (
+            AfterPlay {
+                hide_to_tray: false,
+                direct: false,
+                ..hides
+            },
+            true,
+            true,
+        ),
+        (
+            AfterPlay {
+                direct: false,
+                ..hides
+            },
+            false,
+            true,
+        ),
+    ] {
+        assert_eq!(
+            window_after_play(after, for_game, shown),
+            WindowAfterPlay::LeaveAlone,
+            "{after:?}, a game's: {for_game}, shown: {shown}"
+        );
+    }
 }
 
 #[test]

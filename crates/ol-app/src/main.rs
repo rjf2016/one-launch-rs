@@ -20,8 +20,8 @@ use ol_api::Backend;
 use ol_api::library::HourClock;
 use ol_api::log::{Log, LogOptions, Logger, log_panics, register_windows_user};
 use ol_api::settings::{
-    AfterPlay, CloseAction, Folder, Rect, bounds_setting, close_request_action, display_for, fit,
-    hide_after_instant_play, placement_from, start_hidden,
+    AfterPlay, CloseAction, Folder, Rect, WindowAfterPlay, bounds_setting, close_request_action,
+    display_for, fit, placement_from, start_hidden, window_after_play,
 };
 use ol_model::{SettingKey, Settings};
 use ol_platform_api::{Shell as FolderShell, ShellError, WebPage};
@@ -839,20 +839,33 @@ fn open(args: Args, opened: Opened, cx: &mut App) -> anyhow::Result<()> {
         move |_, played: &Played, cx| {
             let after = AfterPlay::of(
                 &played.job,
-                played.instant,
                 life.tray.borrow().is_some(),
                 life.close_to_tray.get(),
                 life.hide_to_tray.get(),
             );
-            if hide_after_instant_play(after) {
-                let (log, job) = (life.backend.window_log(), played.job.id.clone());
-                cx.spawn(async move |_| {
-                    if hide_window() {
-                        log.hidden_after_instant_launch(&job);
+            let (life, job, for_game) = (
+                Rc::clone(&life),
+                played.job.id.clone(),
+                played.job.game.is_some(),
+            );
+            cx.spawn(async move |cx| {
+                let Some(native) = AppWindow::on_this_thread() else {
+                    return;
+                };
+                let log = life.backend.window_log();
+                match window_after_play(after, for_game, native.is_visible()) {
+                    WindowAfterPlay::Hide => {
+                        native.hide();
+                        log.hidden_after_launch(&job);
+                        let _ = life.window.update(cx, |shell, _, cx| {
+                            shell.close_finished_job(&job, cx);
+                        });
                     }
-                })
-                .detach();
-            }
+                    WindowAfterPlay::Kept => log.kept_after_launch(&job, after),
+                    WindowAfterPlay::LeaveAlone => {}
+                }
+            })
+            .detach();
         }
     })
     .detach();
