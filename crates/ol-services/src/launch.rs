@@ -370,6 +370,7 @@ pub fn prepare(
         attention: None,
         direct: direct.is_some(),
         switched: false,
+        game_seen: false,
         hand_off: None,
         backup_id: None,
         restored: None,
@@ -600,11 +601,22 @@ pub fn run(
             .inspect_err(|error| {
                 crate::launchers::log_adapter_failure(&launchers.log, error, "launchGame");
             })?;
+        let detail = format!("Sent {}", launched.command);
         if let Some(step) = &mut sink.launch_step {
-            step.detail = format!("Sent {}", launched.command);
+            step.detail.clone_from(&detail);
         }
         sink.set_launch(JobStepStatus::Done);
+        sink.job.game_seen = launched.game_seen;
         sink.job.hand_off = launched.hand_off;
+        log.info(
+            "launch command sent",
+            json!({
+                "jobId": job_id,
+                "seen": sink.job.game_seen,
+                "handOff": sink.job.hand_off.is_some(),
+                "detail": detail,
+            }),
+        );
         Ok(())
     };
 

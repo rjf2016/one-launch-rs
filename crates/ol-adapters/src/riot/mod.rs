@@ -40,7 +40,7 @@ use crate::files::{
     MAX_LAUNCHER_FILE_BYTES, read_launcher_bytes, read_launcher_text, read_log_since,
 };
 use crate::steam::seconds;
-use crate::{AccountRef, AdapterError, Directory};
+use crate::{AccountRef, AdapterError, Directory, Launched};
 
 pub use plan::{CLOSE_MESSAGE, PlanContext, STEP};
 pub use processes::ClientImage;
@@ -187,12 +187,6 @@ pub struct CurrentSession {
     pub session: Option<RiotSession>,
     // The One Launch account the sign-in belongs to: by a saved copy's fingerprint first, then by the account id the file itself names.
     pub owner: Option<AccountRef>,
-}
-
-// What a launch came to: what was sent, and what is left for the user to do in the client's window.
-pub struct Launched {
-    pub command: String,
-    pub hand_off: Option<String>,
 }
 
 struct ProductRecord {
@@ -1072,17 +1066,14 @@ impl<'a> RiotAdapter<'a> {
                 "The Riot Client opened on its login page instead of signing in ({detail}), so {name} was not started. Sign in there with “Stay signed in” ticked and press Play; One Launch saves the sign-in at the next switch."
             )));
         }
-        let sent = |what: String| Launched {
-            command: format!("{command} ({how}{what})"),
-            hand_off: None,
-        };
+        let said = |what: &str| format!("{command} ({how}{what})");
         if matches!(play, Some(PlayOutcome::Started)) {
-            return Ok(sent(
-                "One Launch pressed Play and the Riot Client started the game".to_owned(),
-            ));
+            return Ok(Launched::started(said(
+                "One Launch pressed Play and the Riot Client started the game",
+            )));
         }
         if stopped || matches!(play, Some(PlayOutcome::Stopped)) {
-            return Ok(sent("stopped watching for the game start".to_owned()));
+            return Ok(Launched::sent(said("stopped watching for the game start")));
         }
         if page_shown {
             let why = declined
@@ -1098,13 +1089,13 @@ impl<'a> RiotAdapter<'a> {
                 hand_off: Some(format!(
                     "Press Play in the Riot Client window to start {name}; it is open on the game's page."
                 )),
-                ..sent(format!(
+                ..Launched::sent(said(&format!(
                     "the Riot Client opened the game's page{why}{pressed}"
-                ))
+                )))
             });
         }
         if seen {
-            return Ok(sent("the Riot Client started the game".to_owned()));
+            return Ok(Launched::started(said("the Riot Client started the game")));
         }
         let waited_for = seconds(timing.launch_confirm);
         Err(AdapterError::Failed(if accepted {

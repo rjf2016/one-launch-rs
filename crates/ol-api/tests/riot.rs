@@ -1198,7 +1198,7 @@ fn the_lockfiles_password_is_in_no_plan_job_error_or_log_and_play_is_pressed_thr
     ];
     let states = fakes.play(ALT);
     let last = states.last().unwrap();
-    assert!(last.state == JobState::Done && last.hand_off.is_none());
+    assert!(last.state == JobState::Done && last.hand_off.is_none() && last.game_seen);
     assert!(detail(last, "launch").ends_with(
         "--launch-product=valorant --launch-patchline=live (the switch started the client with these arguments; One Launch pressed Play and the Riot Client started the game)"
     ));
@@ -1237,7 +1237,7 @@ fn with_the_setting_off_or_a_request_the_client_refuses_the_launch_hands_play_ov
     .unwrap();
     let states = fakes.play(ALT);
     let last = states.last().unwrap();
-    assert!(last.state == JobState::Done && last.switched);
+    assert!(last.state == JobState::Done && last.switched && !last.game_seen);
     assert_eq!(last.hand_off.as_deref(), Some(HAND_OFF));
     assert!(detail(last, "launch").ends_with(
         "(the switch started the client with these arguments; the Riot Client opened the game's page: Auto-launch is disabled)"
@@ -1259,7 +1259,7 @@ fn with_the_setting_off_or_a_request_the_client_refuses_the_launch_hands_play_ov
     let fakes = self::fakes(Some(&refuses));
     let states = fakes.play(ALT);
     let last = states.last().unwrap();
-    assert!(last.state == JobState::Done);
+    assert!(last.state == JobState::Done && !last.game_seen);
     assert_eq!(last.hand_off.as_deref(), Some(HAND_OFF));
     assert!(detail(last, "launch").ends_with(
         "the Riot Client opened the game's page: Auto-launch is disabled; the launch request was not taken: the Riot Client answered the launch request with HTTP 500)"
@@ -1387,6 +1387,7 @@ fn a_client_that_runs_as_the_account_is_left_alone_and_the_game_is_handed_to_it(
     assert!(detail(last, "launch").ends_with(
         "--launch-product=valorant --launch-patchline=live (One Launch pressed Play and the Riot Client started the game)"
     ));
+    assert!(last.game_seen && last.hand_off.is_none());
     assert_eq!(asked_of_the_machine(&fakes), ["proc.start", "riot.launch"]);
     assert!(fakes.on_disk() == before);
     assert!(
@@ -1394,6 +1395,25 @@ fn a_client_that_runs_as_the_account_is_left_alone_and_the_game_is_handed_to_it(
             .unwrap()
             .is_empty()
     );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn a_watch_for_the_game_start_that_was_stopped_hands_the_game_over_without_seeing_it_start() {
+    let knobs = json!({ "knobs": { "riot": { "runningAs": MAIN_UID } } });
+    let fakes = fakes(Some(&knobs));
+    fakes.stop_at("launch");
+    let states = fakes.play(MAIN);
+    let last = states.last().unwrap();
+    assert!(
+        last.state == JobState::Done && last.direct,
+        "{:?}",
+        last.error
+    );
+    assert!(!last.game_seen && last.hand_off.is_none());
+    assert!(detail(last, "launch").ends_with(
+        "--launch-product=valorant --launch-patchline=live (stopped watching for the game start)"
+    ));
     fakes.backend.shut_down();
 }
 

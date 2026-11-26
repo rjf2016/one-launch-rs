@@ -75,6 +75,7 @@ fn job(value: &Value) -> LaunchJob {
         attention: None,
         direct: false,
         switched: value["switched"] == true,
+        game_seen: false,
         hand_off: None,
         backup_id: None,
         restored: value["restored"].as_bool(),

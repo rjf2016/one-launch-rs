@@ -9,8 +9,8 @@ use gpui::{
 };
 use ol_api::clipboard::CopyField;
 use ol_api::launch::{
-    PhaseNames, failed_note, group_steps, phase_label, plan_phases, sentence, stopped_note,
-    update_note,
+    PhaseNames, done_pill, failed_note, group_steps, phase_label, plan_phases, sent_note, sentence,
+    stopped_note, update_note,
 };
 use ol_api::library::{date_time, relative};
 use ol_model::{
@@ -600,20 +600,18 @@ fn hand_over(
 }
 
 fn outcome(job: &LaunchJob, client: &str, plays: bool) -> Option<Div> {
-    let account = &job.account.display_name;
     match job.state {
         JobState::Running => None,
         JobState::Done => {
-            let said = if job.game.is_some() && job.hand_off.is_none() {
-                "Launched as"
-            } else {
-                "Switched to"
-            };
-            let mut launched = div().flex().flex_col().gap(px(12.)).child(pill(
-                PillTone::Ok,
-                Some(assets::CHECK),
-                format!("{said} {account}"),
-            ));
+            let mut launched = div()
+                .flex()
+                .flex_col()
+                .gap(px(12.))
+                .child(pill(PillTone::Ok, Some(assets::CHECK), done_pill(job)))
+                .children(
+                    sent_note(job)
+                        .map(|note| small(div()).text_color(color(theme::MUTED)).child(note)),
+                );
             if let Some(hand_off) = &job.hand_off {
                 launched = launched.child(
                     div()

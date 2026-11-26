@@ -7,9 +7,9 @@ use std::sync::Arc;
 use ol_adapters::battlenet::{self, BattlenetAdapter, BattlenetConfig};
 use ol_adapters::epic::{self, EpicAdapter, EpicConfig};
 use ol_adapters::health::Known;
-use ol_adapters::riot::{self, Launched, RiotAdapter, RiotConfig};
+use ol_adapters::riot::{self, RiotAdapter, RiotConfig};
 use ol_adapters::steam::{self, SteamAdapter, SteamConfig, SwitchPreflight, Timing};
-use ol_adapters::{AccountRef, AdapterError, Directory, GameRef};
+use ol_adapters::{AccountRef, AdapterError, Directory, GameRef, Launched};
 use ol_formats::battlenet::products::LaunchForm;
 use ol_formats::epic::manifests::LaunchUriForm;
 use ol_model::{
@@ -227,16 +227,14 @@ impl Adapter<'_> {
         started_by_switch: bool,
         cancel: &CancelToken,
     ) -> Result<Launched, AdapterError> {
-        let sent = |command: String| Launched {
-            command,
-            hand_off: None,
-        };
         match self {
-            Self::Steam(steam) => steam.launch_game(&game.launcher_game_id).map(sent),
-            Self::Epic(epic) => epic.launch_game(&game.launcher_game_id).map(sent),
-            Self::Battlenet(battlenet) => battlenet
-                .launch_game(&game.launcher_game_id, &game.name, cancel)
-                .map(sent),
+            Self::Steam(steam) => steam
+                .launch_game(&game.launcher_game_id)
+                .map(Launched::sent),
+            Self::Epic(epic) => epic.launch_game(&game.launcher_game_id).map(Launched::sent),
+            Self::Battlenet(battlenet) => {
+                battlenet.launch_game(&game.launcher_game_id, &game.name, cancel)
+            }
             Self::Riot(riot) => riot.launch_game(
                 &game.launcher_game_id,
                 &game.name,

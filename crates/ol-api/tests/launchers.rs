@@ -523,6 +523,12 @@ fn a_stored_password_goes_to_steams_command_line_and_nowhere_else() {
     let job = fakes.finished();
     assert_eq!(job.id, started.id);
     assert!(job.state == JobState::Done, "{:?}", job.error);
+    assert!(!job.game_seen && job.hand_off.is_none());
+    let launch = job.steps.iter().find(|step| step.id == "launch").unwrap();
+    assert!(
+        launch.status == JobStepStatus::Done
+            && launch.detail.starts_with("Sent steam://rungameid/")
+    );
     let login = job.steps.iter().find(|step| step.id == "login").unwrap();
     assert!(login.status == JobStepStatus::Done && login.detail == "Steam started with -login.");
     assert_eq!(

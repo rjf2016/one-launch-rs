@@ -284,6 +284,8 @@ pub struct LaunchJob {
     // The launcher already ran as the account, so the job went straight to the game: nothing written, copied or journalled.
     pub direct: bool,
     pub switched: bool,
+    // The launcher was seen starting the game, not only handed it.
+    pub game_seen: bool,
     pub hand_off: Option<String>,
     pub backup_id: Option<String>,
     pub restored: Option<bool>,

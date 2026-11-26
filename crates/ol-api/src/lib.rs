@@ -65,8 +65,9 @@ pub mod launch {
     pub use ol_services::accounts::in_pick_order;
     pub use ol_services::launch::UNWOUND;
     pub use ol_services::phases::{
-        Phase, PhaseId, PhaseNames, Recommend, RecoveryCopy, banner_text, failed_note, group_steps,
-        phase_label, plan_phases, recovery_copy, sentence, stopped_note, update_note,
+        Phase, PhaseId, PhaseNames, Recommend, RecoveryCopy, banner_text, done_pill, failed_note,
+        group_steps, phase_label, plan_phases, recovery_copy, sent_note, sentence, stopped_note,
+        update_note,
     };
 }
 

@@ -651,6 +651,7 @@ fn a_client_that_runs_as_the_account_is_left_alone_and_the_game_starts_at_once()
     let last = states.last().unwrap();
     assert!(last.state == JobState::Done && last.direct && last.backup_id.is_none());
     assert!(detail(last, "launch").ends_with("--exec=launch Pro (Battle.net started the game)"));
+    assert!(last.game_seen && last.hand_off.is_none());
     assert_eq!(asked_of_the_machine(&fakes), ["proc.start"]);
     assert_eq!(fakes.tokens(), before);
     assert!(fs::read(fakes.config_file()).unwrap() == fixture_config());
@@ -658,6 +659,42 @@ fn a_client_that_runs_as_the_account_is_left_alone_and_the_game_starts_at_once()
         block_on(fakes.backend.backups(LauncherId::Battlenet))
             .unwrap()
             .is_empty()
+    );
+    fakes.backend.shut_down();
+}
+
+#[test]
+fn the_link_form_and_a_watch_that_was_stopped_hand_the_game_over_without_seeing_it_start() {
+    let knobs = json!({ "knobs": { "battlenet": { "runningAs": account_id_of(MAIN) } } });
+    let fakes = fakes(Some(&knobs));
+    block_on(
+        fakes
+            .backend
+            .set_setting(ol_model::SettingKey::BattlenetLaunch, "uri".to_owned()),
+    )
+    .unwrap();
+    let link = "Sent battlenet://game/pro";
+
+    let states = fakes.play(MAIN);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done && last.direct);
+    assert!(!last.game_seen && last.hand_off.is_none());
+    assert_eq!(
+        detail(last, "launch"),
+        format!(
+            "{link} (this link only opens the game page: press Play there, or switch the Battle.net launch setting to the launch command)"
+        )
+    );
+    assert_eq!(asked_of_the_machine(&fakes), ["shell.open"]);
+
+    fakes.stop_at("launch");
+    let states = fakes.play(MAIN);
+    let last = states.last().unwrap();
+    assert!(last.state == JobState::Done && last.direct);
+    assert!(!last.game_seen && last.hand_off.is_none());
+    assert_eq!(
+        detail(last, "launch"),
+        format!("{link} (stopped watching for the game start)")
     );
     fakes.backend.shut_down();
 }
