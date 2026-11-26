@@ -261,10 +261,14 @@ pub fn at_start(settings: &Settings, version: &str, recovery_pending: bool) -> A
     }
     let last_seen = settings.get(SettingKey::WhatsNewLastSeen);
     if settings.get(SettingKey::WhatsNewEnabled) == Some("false") {
-        return if last_seen == Some(version) {
-            AtStart::Nothing
-        } else {
+        let advances = is_version(version)
+            && last_seen
+                .filter(|seen| is_version(seen))
+                .is_none_or(|seen| compare_versions(version, seen) == Ordering::Greater);
+        return if advances {
             AtStart::RecordSeen
+        } else {
+            AtStart::Nothing
         };
     }
     pick_whats_new(version, last_seen).map_or(AtStart::Nothing, AtStart::Show)
@@ -335,6 +339,31 @@ mod tests {
         assert_eq!(
             at_start(&Settings::default(), "0.0.0", false),
             AtStart::Nothing
+        );
+    }
+
+    #[test]
+    fn with_the_notes_off_an_older_build_leaves_the_newer_mark_and_a_newer_build_moves_it() {
+        let mut settings = Settings::default();
+        settings.insert(SettingKey::WhatsNewEnabled, "false".to_owned());
+        assert_eq!(
+            at_start(&settings, "1.0.0-beta.3", false),
+            AtStart::RecordSeen
+        );
+        settings.insert(SettingKey::WhatsNewLastSeen, "1.0.0-beta.4".to_owned());
+        assert_eq!(at_start(&settings, "1.0.0-beta.3", false), AtStart::Nothing);
+        assert_eq!(
+            at_start(&settings, "1.0.0-beta.5", false),
+            AtStart::RecordSeen
+        );
+        assert_eq!(
+            at_start(&settings, "not-a-version", false),
+            AtStart::Nothing
+        );
+        settings.insert(SettingKey::WhatsNewLastSeen, "soon".to_owned());
+        assert_eq!(
+            at_start(&settings, "1.0.0-beta.3", false),
+            AtStart::RecordSeen
         );
     }
 

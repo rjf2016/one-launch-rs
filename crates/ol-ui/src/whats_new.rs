@@ -33,6 +33,7 @@ pub struct WhatsNewCard {
     version: String,
     list: PageScroll,
     picture: Option<(Arc<RenderImage>, f32)>,
+    undecoded: bool,
     closing: bool,
 }
 
@@ -69,13 +70,15 @@ impl WhatsNewCard {
         if let Some(bytes) = bytes {
             let decoding = cx.background_executor().spawn(async move { decode(bytes) });
             cx.spawn(async move |this, cx| {
-                if let Some((picture, ratio)) = decoding.await {
-                    this.update(cx, |this, cx| {
-                        this.picture = Some((Arc::new(picture), ratio));
-                        cx.notify();
-                    })
-                    .ok();
-                }
+                let decoded = decoding.await;
+                this.update(cx, |this, cx| {
+                    match decoded {
+                        Some((picture, ratio)) => this.picture = Some((Arc::new(picture), ratio)),
+                        None => this.undecoded = true,
+                    }
+                    cx.notify();
+                })
+                .ok();
             })
             .detach();
         }
@@ -85,8 +88,13 @@ impl WhatsNewCard {
             version,
             list: PageScroll::default(),
             picture: None,
+            undecoded: false,
             closing: false,
         }
+    }
+
+    pub fn take_picture(&mut self) -> Option<Arc<RenderImage>> {
+        self.picture.take().map(|(picture, _)| picture)
     }
 
     // A write that fails still closes the card: it then comes back at the next start.
@@ -143,14 +151,24 @@ impl WhatsNewCard {
             Tone::Battlenet => theme::BATTLENET,
             Tone::Riot => theme::RIOT,
         };
-        let picture = self.picture.as_ref().map(|(picture, ratio)| {
-            div().mb(px(24.)).w_full().aspect_ratio(*ratio).child(
-                img(picture.clone())
-                    .size_full()
-                    .object_fit(ObjectFit::Contain)
-                    .rounded(px(8.)),
-            )
-        });
+        let picture = match &self.picture {
+            Some((picture, ratio)) => Some(
+                div().mb(px(24.)).w_full().aspect_ratio(*ratio).child(
+                    img(picture.clone())
+                        .size_full()
+                        .object_fit(ObjectFit::Contain)
+                        .rounded(px(8.)),
+                ),
+            ),
+            // As a browser shows an image's alt text in its place when the image cannot be read.
+            None if self.undecoded => self
+                .release
+                .image
+                .as_ref()
+                .and_then(|image| image.alt)
+                .map(|alt| div().mb(px(24.)).text_color(color(theme::MUTED)).child(alt)),
+            None => None,
+        };
         let intro = self.release.intro.map(|intro| {
             div()
                 .mb(px(24.))

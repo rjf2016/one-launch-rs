@@ -413,8 +413,11 @@ impl Shell {
         }
         let (backend, version) = (self.backend.clone(), self.backend.app_info().version);
         let card = cx.new(|cx| WhatsNewCard::new(backend, release, version, cx));
-        let done = cx.subscribe(&card, |this, _, _: &WhatsNewDone, cx| {
+        let done = cx.subscribe_in(&card, window, |this, card, _: &WhatsNewDone, window, cx| {
             this.welcome = None;
+            if let Some(picture) = card.update(cx, |card, _| card.take_picture()) {
+                cx.drop_image(picture, Some(window));
+            }
             cx.notify();
         });
         self.welcome = Some(Welcome::WhatsNew { card, _done: done });
