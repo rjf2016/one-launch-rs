@@ -312,6 +312,8 @@ fn riot_knobs(fields: &Map<String, Value>) -> RiotKnobs {
         updates_pending: strings(fields.get("updatesPending")),
         direct_launch: flag("directLaunch") == Some(true),
         press_play_fails: flag("pressPlayFails") == Some(true),
+        press_play_ignored: flag("pressPlayIgnored") == Some(true),
+        dependency_update_ms: fields.get("dependencyUpdateMs").and_then(Value::as_u64),
         game_quits_after_ms: fields.get("gameQuitsAfterMs").and_then(Value::as_u64),
     }
 }

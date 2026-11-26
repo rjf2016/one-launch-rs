@@ -678,7 +678,13 @@ fn the_link_form_and_a_watch_that_was_stopped_hand_the_game_over_without_seeing_
     let states = fakes.play(MAIN);
     let last = states.last().unwrap();
     assert!(last.state == JobState::Done && last.direct);
-    assert!(!last.game_seen && last.hand_off.is_none());
+    assert!(!last.game_seen);
+    assert_eq!(
+        last.hand_off.as_deref(),
+        Some(
+            "Press Play in the Battle.net window to start Overwatch; the launch link only opens the game's page."
+        )
+    );
     assert_eq!(
         detail(last, "launch"),
         format!(

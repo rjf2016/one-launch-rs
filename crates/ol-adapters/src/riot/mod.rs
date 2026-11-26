@@ -12,8 +12,8 @@ use std::time::Duration;
 
 use ol_formats::js;
 use ol_formats::riot::client_log::{
-    FailReason, LogEvent, STUB_LOG_MARK, STUB_LOG_MAX_BYTES, SignInOutcome, SignedInHow,
-    exited_cleanly, game_started, is_client_log_file, last_sign_in, launch_accepted,
+    FailReason, LogEvent, NOT_UP_TO_DATE, STUB_LOG_MARK, STUB_LOG_MAX_BYTES, SignInOutcome,
+    SignedInHow, exited_cleanly, game_started, is_client_log_file, last_sign_in, launch_accepted,
     launch_declined, launch_page_shown, parse_log_events, products_needing_update,
     startup_finished,
 };
@@ -1079,16 +1079,23 @@ impl<'a> RiotAdapter<'a> {
             let why = declined
                 .map(|reason| format!(": {reason}"))
                 .unwrap_or_default();
-            let pressed = match play {
+            let pressed = match &play {
                 Some(PlayOutcome::Declined(reason) | PlayOutcome::Silent(reason)) => {
                     format!("; {reason}")
                 }
                 _ => String::new(),
             };
-            return Ok(Launched {
-                hand_off: Some(format!(
+            let hand_off = if matches!(play, Some(PlayOutcome::Silent(_))) {
+                format!(
+                    "One Launch pressed Play, but {name} has not started yet. Look at the Riot Client window: it may be updating the game or something it needs first."
+                )
+            } else {
+                format!(
                     "Press Play in the Riot Client window to start {name}; it is open on the game's page."
-                )),
+                )
+            };
+            return Ok(Launched {
+                hand_off: Some(hand_off),
                 ..Launched::sent(said(&format!(
                     "the Riot Client opened the game's page{why}{pressed}"
                 )))
@@ -1098,6 +1105,11 @@ impl<'a> RiotAdapter<'a> {
             return Ok(Launched::started(said("the Riot Client started the game")));
         }
         let waited_for = seconds(timing.launch_confirm);
+        if declined.as_deref() == Some(NOT_UP_TO_DATE) {
+            return Err(AdapterError::Failed(format!(
+                "{name} did not start within {waited_for} s: the Riot Client is still updating it or something it needs. When the Riot Client has finished, press Play there."
+            )));
+        }
         Err(AdapterError::Failed(if accepted {
             format!(
                 "{name} did not start within {waited_for} s. Look at the Riot Client window: the game may need an update or a repair, or the client may be waiting for you."

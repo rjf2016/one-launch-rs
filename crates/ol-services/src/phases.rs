@@ -214,10 +214,32 @@ fn only_sent(job: &LaunchJob) -> bool {
     job.state == JobState::Done && job.game.is_some() && job.hand_off.is_none() && !job.game_seen
 }
 
+// A job that ended well with the game's page open in its launcher and Play left to the user.
+pub fn handed_over(job: &LaunchJob) -> bool {
+    job.state == JobState::Done && job.hand_off.is_some()
+}
+
+// The Launch phase of a hand-over is drawn as still to come: the game has not started, and starting it is the user's.
+pub fn waits_for_you(job: &LaunchJob, phase: PhaseId) -> bool {
+    phase == PhaseId::Launch && handed_over(job)
+}
+
+// What a hand-over says of the account: nothing was switched when the launcher already ran as it.
+fn handed_over_as(job: &LaunchJob) -> String {
+    let account = &job.account.display_name;
+    if job.direct {
+        format!("Signed in as {account}")
+    } else {
+        format!("Switched to {account}")
+    }
+}
+
 // The pill of a job that ended well.
 pub fn done_pill(job: &LaunchJob) -> String {
     let account = &job.account.display_name;
-    if job.game.is_none() || job.hand_off.is_some() {
+    if job.hand_off.is_some() {
+        handed_over_as(job)
+    } else if job.game.is_none() {
         format!("Switched to {account}")
     } else if job.game_seen {
         format!("Launched as {account}")
@@ -252,7 +274,8 @@ pub fn banner_text(job: &LaunchJob) -> String {
         }
         (JobState::Running, None) => format!("Switching to {account}\u{2026}"),
         (JobState::Done, _) if job.hand_off.is_some() => format!(
-            "Switched to {account}. {}",
+            "{}. {}",
+            handed_over_as(job),
             job.hand_off.as_deref().unwrap_or_default()
         ),
         (JobState::Done, Some(game)) if job.game_seen => format!("Launched {game} as {account}"),

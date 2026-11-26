@@ -879,9 +879,14 @@ impl<'a> BattlenetAdapter<'a> {
             (Ok(true), _) => Ok(Launched::started(format!(
                 "{command} (Battle.net started the game)"
             ))),
-            (Ok(false), LaunchCommand::Uri(_)) => Ok(Launched::sent(format!(
-                "{command} (this link only opens the game page: press Play there, or switch the Battle.net launch setting to the launch command)"
-            ))),
+            (Ok(false), LaunchCommand::Uri(_)) => Ok(Launched {
+                hand_off: Some(format!(
+                    "Press Play in the Battle.net window to start {name}; the launch link only opens the game's page."
+                )),
+                ..Launched::sent(format!(
+                    "{command} (this link only opens the game page: press Play there, or switch the Battle.net launch setting to the launch command)"
+                ))
+            }),
             (Ok(false), LaunchCommand::Exec(_)) => Err(AdapterError::Failed(format!(
                 "{name} did not start within {} s of the launch command. Look at the Battle.net window: the game may need an update or a repair, or the client may be busy updating itself.",
                 crate::steam::seconds(timing.launch_confirm)

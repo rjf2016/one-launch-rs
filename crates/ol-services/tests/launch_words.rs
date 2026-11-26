@@ -3,7 +3,7 @@
 // How a job that ended well is worded: "Launched" only where the launcher was seen starting the game, and "Sent" where the game was only handed to it. This differs from the Electron app on purpose; oracle/l1 holds its words.
 
 use ol_model::{JobAccount, JobGame, JobState, LaunchJob, LauncherId};
-use ol_services::phases::{banner_text, done_pill, sent_note};
+use ol_services::phases::{PhaseId, banner_text, done_pill, handed_over, sent_note, waits_for_you};
 
 const GAMES: [(LauncherId, &str); 4] = [
     (LauncherId::Steam, "Rocket League"),
@@ -86,20 +86,68 @@ fn a_game_the_launcher_was_seen_starting_is_launched() {
     }
 }
 
-#[test]
-fn a_hand_over_keeps_its_words() {
-    let hand_off =
-        "Press Play in the Riot Client window to start VALORANT; it is open on the game's page.";
-    let job = LaunchJob {
-        hand_off: Some(hand_off.to_owned()),
+const HAND_OFF: &str =
+    "Press Play in the Riot Client window to start VALORANT; it is open on the game's page.";
+
+fn handed_over_job(direct: bool) -> LaunchJob {
+    LaunchJob {
+        direct,
+        hand_off: Some(HAND_OFF.to_owned()),
         ..done(LauncherId::Riot, Some("VALORANT"))
-    };
-    assert_eq!(done_pill(&job), "Switched to Persona Two");
-    assert_eq!(sent_note(&job), None);
+    }
+}
+
+#[test]
+fn a_hand_over_says_switched_only_when_the_job_switched() {
+    let switched = handed_over_job(false);
+    assert_eq!(done_pill(&switched), "Switched to Persona Two");
+    assert_eq!(sent_note(&switched), None);
     assert_eq!(
-        banner_text(&job),
-        format!("Switched to Persona Two. {hand_off}")
+        banner_text(&switched),
+        format!("Switched to Persona Two. {HAND_OFF}")
     );
+
+    let direct = handed_over_job(true);
+    assert_eq!(done_pill(&direct), "Signed in as Persona Two");
+    assert_eq!(sent_note(&direct), None);
+    assert_eq!(
+        banner_text(&direct),
+        format!("Signed in as Persona Two. {HAND_OFF}")
+    );
+}
+
+#[test]
+fn the_launch_phase_of_a_hand_over_waits_for_you_and_nothing_else_does() {
+    for direct in [false, true] {
+        let job = handed_over_job(direct);
+        assert!(handed_over(&job));
+        for phase in PhaseId::ORDER {
+            assert_eq!(waits_for_you(&job, phase), phase == PhaseId::Launch);
+        }
+    }
+    for state in [
+        JobState::Running,
+        JobState::Failed,
+        JobState::Cancelled,
+        JobState::NeedsSignIn,
+    ] {
+        let job = LaunchJob {
+            state,
+            ..handed_over_job(false)
+        };
+        assert!(!handed_over(&job));
+        assert!(!waits_for_you(&job, PhaseId::Launch));
+    }
+    for (launcher, game) in GAMES {
+        for game_seen in [false, true] {
+            let job = LaunchJob {
+                game_seen,
+                ..done(launcher, Some(game))
+            };
+            assert!(!handed_over(&job));
+            assert!(!waits_for_you(&job, PhaseId::Launch));
+        }
+    }
 }
 
 #[test]
