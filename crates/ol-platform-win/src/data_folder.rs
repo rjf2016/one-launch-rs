@@ -4,6 +4,8 @@ use std::os::windows::ffi::OsStringExt;
 use std::path::{Component, Path, PathBuf, Prefix, absolute};
 
 use thiserror::Error;
+use windows::Win32::Foundation::LPARAM;
+use windows::Win32::Globalization::{LCMAP_UPPERCASE, LCMapStringEx, LOCALE_NAME_INVARIANT};
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::UI::Shell::{FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, SHGetKnownFolderPath};
 
@@ -102,6 +104,10 @@ fn on_a_lettered_drive(path: &Path, resolved: bool) -> bool {
     }
 }
 
+pub fn identity(path: &Path) -> Result<String, FolderError> {
+    Ok(key_by(&resolve(path)?, upcase)?.join("\\"))
+}
+
 fn resolve(path: &Path) -> Result<PathBuf, FolderError> {
     let mut path = absolute(path)?;
     let mut below = Vec::new();
@@ -146,6 +152,13 @@ fn resolve(path: &Path) -> Result<PathBuf, FolderError> {
 }
 
 fn key(path: &Path) -> Result<Vec<String>, FolderError> {
+    key_by(path, |name| Ok(fold(name)))
+}
+
+fn key_by(
+    path: &Path,
+    fold: impl Fn(&str) -> Result<String, FolderError>,
+) -> Result<Vec<String>, FolderError> {
     let mut key = Vec::new();
     for component in path.components() {
         match component {
@@ -155,11 +168,11 @@ fn key(path: &Path) -> Result<Vec<String>, FolderError> {
                 }
                 Prefix::UNC(server, share) | Prefix::VerbatimUNC(server, share) => format!(
                     r"\\{}\{}",
-                    fold(&server.to_string_lossy()),
-                    fold(&share.to_string_lossy())
+                    fold(&server.to_string_lossy())?,
+                    fold(&share.to_string_lossy())?
                 ),
                 Prefix::DeviceNS(name) | Prefix::Verbatim(name) => {
-                    format!(r"\\.\{}", fold(&name.to_string_lossy()))
+                    format!(r"\\.\{}", fold(&name.to_string_lossy())?)
                 }
             }),
             Component::RootDir | Component::CurDir => {}
@@ -170,7 +183,7 @@ fn key(path: &Path) -> Result<Vec<String>, FolderError> {
                 if name.contains(':') {
                     return Err(FolderError::NotPlain);
                 }
-                key.push(fold(&name));
+                key.push(fold(&name)?);
             }
         }
     }
@@ -180,6 +193,31 @@ fn key(path: &Path) -> Result<Vec<String>, FolderError> {
 // Folding both ways joins more names than NTFS does, never fewer: a folder may be refused that is not the same one, and none is let through that is.
 fn fold(name: &str) -> String {
     name.to_uppercase().to_lowercase()
+}
+
+// The file system's own casing, one unit for one, so "straße" and "strasse" stay two folders as they are on disk.
+fn upcase(name: &str) -> Result<String, FolderError> {
+    let wide: Vec<u16> = name.encode_utf16().collect();
+    if wide.is_empty() {
+        return Ok(String::new());
+    }
+    let mut upper = vec![0_u16; wide.len()];
+    let written = unsafe {
+        LCMapStringEx(
+            LOCALE_NAME_INVARIANT,
+            LCMAP_UPPERCASE,
+            &wide,
+            Some(&mut upper),
+            None,
+            None,
+            LPARAM(0),
+        )
+    };
+    if written <= 0 {
+        return Err(io::Error::last_os_error().into());
+    }
+    upper.truncate(written as usize);
+    Ok(String::from_utf16_lossy(&upper))
 }
 
 #[cfg(test)]

@@ -38,6 +38,15 @@ impl PageScroll {
         clamped(&self.handle, 0.);
     }
 
+    pub fn handle(&self) -> &ScrollHandle {
+        &self.handle
+    }
+
+    pub fn scroll_by(&self, pixels: f32) {
+        let scrolled = -f32::from(self.handle.offset().y);
+        clamped(&self.handle, scrolled + pixels);
+    }
+
     // As a browser brings the field that takes the keyboard into sight.
     pub fn reveal(&self, target: Bounds<Pixels>) {
         let view = self.handle.bounds();
@@ -81,7 +90,7 @@ pub fn scroll_page(
                 .track_scroll(&scroll.handle)
                 .child(column(body)),
         )
-        .child(scrollbar(scroll))
+        .child(scrollbar(scroll, false))
 }
 
 struct Laid {
@@ -99,7 +108,7 @@ fn clamped(handle: &ScrollHandle, scrolled: f32) {
     handle.set_offset(point(offset.x, px(-scrolled.clamp(0., max))));
 }
 
-fn scrollbar(scroll: &PageScroll) -> impl IntoElement + use<> {
+pub fn scrollbar(scroll: &PageScroll, always: bool) -> impl IntoElement + use<> {
     let (handle, grab, over) = (
         scroll.handle.clone(),
         scroll.grab.clone(),
@@ -151,7 +160,7 @@ fn scrollbar(scroll: &PageScroll) -> impl IntoElement + use<> {
             } = laid;
             over.set(page.is_hovered(window));
             if let Some(thumb) = thumb
-                && (over.get() || grab.get().is_some())
+                && (always || over.get() || grab.get().is_some())
             {
                 let bar = Bounds::new(
                     thumb.origin + point(px(THUMB_INSET), px(THUMB_INSET)),

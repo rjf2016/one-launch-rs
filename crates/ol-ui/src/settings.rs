@@ -4,13 +4,14 @@ use std::rc::Rc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, ClickEvent, Context, Div, Keystroke, MouseDownEvent, Pixels, SharedString, Size,
-    StyledText, TextRun, Window, anchored, deferred, div, font, px,
+    AnyElement, ClickEvent, Context, Div, EventEmitter, Keystroke, MouseDownEvent, Pixels,
+    SharedString, Size, StyledText, TextRun, Window, anchored, deferred, div, font, px,
 };
 use ol_api::settings::{
     AutostartStatus, EncryptionState, Folder, RESET_BANNER, RESET_WARNING, UpdateStatus,
     VaultBackend, VaultHealth,
 };
+use ol_api::whats_new::{RELEASES, Release, latest_whats_new};
 use ol_api::{ApiError, AppInfo, Backend};
 use ol_model::{
     BATTLENET_LAUNCH_CHOICES, DEFAULT_BACKUPS_TO_KEEP, EPIC_LAUNCH_URI_CHOICES, LauncherId,
@@ -148,6 +149,14 @@ enum Control {
     Refresh,
     Section(LauncherId),
     Restore(LauncherId, usize),
+    ShowGuide,
+    ShowWhatsNew,
+    PreviewWhatsNew,
+}
+
+pub enum SettingsAsk {
+    SetupGuide,
+    WhatsNew(&'static Release),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -200,13 +209,17 @@ pub struct SettingsView {
     known: KnownStatuses,
     launchers: launchers::Launchers,
     backups: backups::Backups,
+    developer: bool,
 }
+
+impl EventEmitter<SettingsAsk> for SettingsView {}
 
 impl SettingsView {
     pub fn new(
         backend: Backend,
         tab: Rc<Cell<SettingsTab>>,
         known: KnownStatuses,
+        developer: bool,
         cx: &mut Context<Self>,
     ) -> Self {
         let mut view = Self {
@@ -239,6 +252,7 @@ impl SettingsView {
             known,
             launchers: launchers::Launchers::default(),
             backups: backups::Backups::default(),
+            developer,
         };
         view.reload(cx);
         view.read_vault(cx);
@@ -562,10 +576,17 @@ impl SettingsView {
         };
         let loaded = self.settings.is_some();
         match self.tab.get() {
-            SettingsTab::General => controls.extend(toggles(&[
-                SettingKey::WindowCloseToTray,
-                SettingKey::UpdatesAuto,
-            ])),
+            SettingsTab::General => {
+                controls.extend(toggles(&[SettingKey::WindowCloseToTray]));
+                controls.push(Control::ShowGuide);
+                controls.extend(toggles(&[
+                    SettingKey::UpdatesAuto,
+                    SettingKey::WhatsNewEnabled,
+                ]));
+                if latest_whats_new(&self.info.version).is_some() {
+                    controls.push(Control::ShowWhatsNew);
+                }
+            }
             SettingsTab::Launchers => {
                 self.launchers.controls(&mut controls);
                 controls.extend(toggles(&[
@@ -595,6 +616,9 @@ impl SettingsView {
                 controls.extend([Control::Open(Folder::Logs), Control::Open(Folder::Data)]);
                 if loaded {
                     controls.push(Control::Pick(Pick::LogLevel));
+                }
+                if self.developer && !RELEASES.is_empty() {
+                    controls.push(Control::PreviewWhatsNew);
                 }
             }
         }
@@ -694,10 +718,44 @@ impl SettingsView {
             Control::Refresh if press => self.list_backups(None, cx),
             Control::Section(launcher) if press => self.toggle_section(launcher, cx),
             Control::Restore(launcher, seen) if press => self.ask_restore(launcher, seen, cx),
+            Control::ShowGuide if press => cx.emit(SettingsAsk::SetupGuide),
+            Control::ShowWhatsNew if press => self.show_whats_new(cx),
+            Control::PreviewWhatsNew if press => self.preview_whats_new(cx),
             _ => return false,
         }
         cx.notify();
         true
+    }
+
+    fn show_whats_new(&mut self, cx: &mut Context<Self>) {
+        if let Some(release) = latest_whats_new(&self.info.version) {
+            cx.emit(SettingsAsk::WhatsNew(release));
+        }
+    }
+
+    fn preview_whats_new(&mut self, cx: &mut Context<Self>) {
+        if let Some(release) = RELEASES.first() {
+            cx.emit(SettingsAsk::WhatsNew(release));
+        }
+    }
+
+    fn button(
+        &self,
+        control: Control,
+        id: &'static str,
+        label: &'static str,
+        disabled: bool,
+        act: fn(&mut Self, &mut Context<Self>),
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let button = Button::new(id, Tone::Secondary, label)
+            .disabled(disabled)
+            .leading(self.ringed_on(control))
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.clicked(control);
+                act(this, cx);
+            }));
+        self.track(control, button)
     }
 
     fn clicked(&mut self, control: Control) {
@@ -1005,8 +1063,26 @@ impl SettingsView {
                     SettingKey::WindowCloseToTray,
                     "Minimize One Launch to System Tray",
                     "Closing One Launch minimizes the app.",
-                    (false, true),
+                    (false, false),
                     cx,
+                ))
+                .child(setting_row(
+                    "Setup guide",
+                    Some(
+                        "The welcome steps: your launchers, how Play works, and adding accounts."
+                            .into(),
+                    ),
+                    None,
+                    false,
+                    true,
+                    self.button(
+                        Control::ShowGuide,
+                        "show-guide",
+                        "Show again",
+                        false,
+                        |_, cx| cx.emit(SettingsAsk::SetupGuide),
+                        cx,
+                    ),
                 )),
         );
         let (state, hint) = match &self.update {
@@ -1029,15 +1105,37 @@ impl SettingsView {
                     (true, false),
                     cx,
                 ))
+                .child(self.toggle_row(
+                    SettingKey::WhatsNewEnabled,
+                    "Show what's new after an update",
+                    "The first time you open One Launch after an update, a short list of what changed.",
+                    (false, false),
+                    cx,
+                ))
                 .child(setting_row(
                     "Version",
                     hint.map(SharedString::from),
                     None,
                     false,
-                    true,
+                    false,
                     div()
                         .truncate()
                         .child(format!("{} · {state}", self.info.version)),
+                ))
+                .child(setting_row(
+                    "What's new",
+                    Some("The changes in the latest update.".into()),
+                    None,
+                    false,
+                    true,
+                    self.button(
+                        Control::ShowWhatsNew,
+                        "show-whats-new",
+                        "Show",
+                        latest_whats_new(&self.info.version).is_none(),
+                        Self::show_whats_new,
+                        cx,
+                    ),
                 )),
         );
         vec![general, updates]
@@ -1233,7 +1331,37 @@ impl SettingsView {
                     div().child(self.info.build),
                 )),
         );
-        vec![launching, encryption, diagnostics]
+        let mut panels = vec![launching, encryption, diagnostics];
+        if self.developer
+            && let Some(newest) = RELEASES.first()
+        {
+            panels.push(panel(
+                "Developer",
+                Some("Only in a development build.".into()),
+                None,
+                setting_row(
+                    "Preview What's New",
+                    Some("The newest notes the app ships, whatever the running version.".into()),
+                    None,
+                    true,
+                    true,
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(12.))
+                        .child(div().font_family(theme::MONO).child(newest.version))
+                        .child(self.button(
+                            Control::PreviewWhatsNew,
+                            "preview-whats-new",
+                            "Preview",
+                            false,
+                            Self::preview_whats_new,
+                            cx,
+                        )),
+                ),
+            ));
+        }
+        panels
     }
 }
 

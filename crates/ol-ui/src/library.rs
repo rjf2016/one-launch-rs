@@ -677,6 +677,10 @@ impl LibraryView {
         self.await_frame(window, cx);
     }
 
+    pub fn scanned(&self) -> bool {
+        self.scanned
+    }
+
     pub fn focus_search(&self, window: &mut Window, cx: &mut App) {
         self.search.focus(window, cx);
     }

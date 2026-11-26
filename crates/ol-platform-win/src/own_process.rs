@@ -68,3 +68,26 @@ fn times() -> Option<Times> {
 fn from_ticks(ticks: u64) -> Duration {
     Duration::from_nanos(ticks * 100)
 }
+
+#[expect(
+    clippy::disallowed_methods,
+    reason = "processes are started here, in ol-platform-win"
+)]
+pub fn start_again(arguments: &[String]) -> bool {
+    std::env::current_exe()
+        .and_then(|exe| std::process::Command::new(exe).args(arguments).spawn())
+        .is_ok()
+}
+
+#[expect(
+    clippy::disallowed_methods,
+    reason = "processes are started here, in ol-platform-win"
+)]
+pub fn run_again(arguments: &[String]) -> std::io::Result<(Option<i32>, String)> {
+    let exe = std::env::current_exe()?;
+    let ran = std::process::Command::new(exe).args(arguments).output()?;
+    Ok((
+        ran.status.code(),
+        String::from_utf8_lossy(&ran.stdout).into_owned(),
+    ))
+}

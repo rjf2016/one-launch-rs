@@ -90,6 +90,88 @@ pub fn start_hidden<S: AsRef<str>>(args: &[S], close_to_tray: bool) -> bool {
     close_to_tray && args.iter().any(|arg| arg.as_ref() == START_HIDDEN_FLAG)
 }
 
+pub const MIN_WINDOW: (f64, f64) = (960., 600.);
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Rect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Placement {
+    pub bounds: Option<Rect>,
+    pub maximized: bool,
+}
+
+pub fn placement_from(raw: Option<&str>, work_areas: &[Rect]) -> Placement {
+    let Some(stored) = raw
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|value| value.as_object().cloned())
+    else {
+        return Placement::default();
+    };
+    let number = |key: &str| stored.get(key).and_then(serde_json::Value::as_f64);
+    let bounds = match (number("x"), number("y"), number("width"), number("height")) {
+        (Some(x), Some(y), Some(width), Some(height)) => Some(Rect {
+            x,
+            y,
+            width: width.max(MIN_WINDOW.0),
+            height: height.max(MIN_WINDOW.1),
+        }),
+        _ => None,
+    };
+    let on_screen = bounds.filter(|bounds| display_for(bounds, work_areas).is_some());
+    Placement {
+        bounds: on_screen,
+        maximized: stored.get("maximized") == Some(&serde_json::Value::Bool(true)),
+    }
+}
+
+const GRAB: f64 = 64.;
+
+pub fn display_for(bounds: &Rect, work_areas: &[Rect]) -> Option<usize> {
+    let grabbed = |area: &Rect| {
+        bounds.x < area.x + area.width - GRAB
+            && bounds.x + bounds.width > area.x + GRAB
+            && bounds.y >= area.y - 8.
+            && bounds.y < area.y + area.height - GRAB
+    };
+    let across =
+        |area: &Rect| (bounds.x + bounds.width).min(area.x + area.width) - bounds.x.max(area.x);
+    // Of two displays the title bar spans, the one that holds more of it, as Windows counts a window to the display with most of it.
+    work_areas
+        .iter()
+        .enumerate()
+        .filter(|(_, area)| grabbed(area))
+        .max_by(|(at, a), (other, b)| across(a).total_cmp(&across(b)).then(other.cmp(at)))
+        .map(|(at, _)| at)
+}
+
+// `placement_from` keeps any size, as its recorded cases want; Windows cuts a window larger than the screen.
+pub fn fit(bounds: Rect, area: &Rect) -> Rect {
+    let width = bounds.width.min(area.width).max(MIN_WINDOW.0);
+    // A width cut from the right can take the whole title bar off the display `display_for` chose.
+    let x = if bounds.x + width > area.x + GRAB {
+        bounds.x
+    } else {
+        area.x
+    };
+    Rect {
+        x,
+        width,
+        height: bounds.height.min(area.height).max(MIN_WINDOW.1),
+        ..bounds
+    }
+}
+
+// The Electron app's own key order.
+pub fn bounds_setting(x: i32, y: i32, width: i32, height: i32, maximized: bool) -> String {
+    format!(r#"{{"x":{x},"y":{y},"width":{width},"height":{height},"maximized":{maximized}}}"#)
+}
+
 // The question before a quit stops a running switch. Its first button keeps the app running, and is the answer to Escape and to a close of the question.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QuitQuestion {
@@ -201,5 +283,40 @@ impl WindowLog {
 
     pub fn fatal_during_startup(&self) {
         self.0.error("fatal during startup", ());
+    }
+
+    pub fn started_in_tray(&self) {
+        self.0.info("started in the tray", ());
+    }
+
+    pub fn shown_for_second_start(&self) {
+        self.0.info("window shown for a second start", ());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_place_cut_to_its_display_keeps_its_title_bar_on_that_display() {
+        let area = Rect {
+            x: 0.,
+            y: 0.,
+            width: 1920.,
+            height: 1040.,
+        };
+        let wide = Rect {
+            x: -3000.,
+            y: 100.,
+            width: 3200.,
+            height: 800.,
+        };
+        assert_eq!(display_for(&wide, &[area]), Some(0));
+        let fitted = fit(wide, &area);
+        assert_eq!(display_for(&fitted, &[area]), Some(0));
+        assert_eq!((fitted.x, fitted.y, fitted.width), (0., 100., 1920.));
+        let kept = Rect { x: 100., ..wide };
+        assert_eq!(fit(kept, &area).x, 100.);
     }
 }

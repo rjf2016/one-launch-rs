@@ -193,6 +193,7 @@ enum Command {
     BackUpDatabase(Reply<()>),
     Settings(Reply<Settings>),
     SetSetting(SettingKey, String, Reply<()>),
+    SetWindowBounds(String),
     #[cfg(feature = "fake")]
     SeedSetting(SettingKey, String, Reply<()>),
     WatchSettings(Sender<SettingChange>),
@@ -248,6 +249,7 @@ impl Command {
             Self::BackUpDatabase(_) => "database:backUp",
             Self::Settings(_) => "settings:getAll",
             Self::SetSetting(..) => "settings:set",
+            Self::SetWindowBounds(_) => "window:bounds",
             #[cfg(feature = "fake")]
             Self::SeedSetting(..) => "settings:seed",
             Self::WatchSettings(_) => "settings:watch",
@@ -668,6 +670,13 @@ impl Backend {
     pub async fn set_setting(&self, key: SettingKey, value: String) -> Result<(), ApiError> {
         self.ask(|reply| Command::SetSetting(key, value, reply))
             .await
+    }
+
+    // No answer is waited for, so a place handed over as the window closes is still stored before the database closes.
+    pub fn remember_window_bounds(&self, bounds: String) {
+        let _ = self
+            .commands
+            .send_blocking(Command::SetWindowBounds(bounds));
     }
 
     // Stores a setting as the fake launchers' seed gives it, as the Electron app's seed does: a key only the app sets is passed over, and any other is stored without its rule.
@@ -1212,6 +1221,16 @@ impl Serving {
                     self.changed(key, Some(&value));
                 }
                 said.answer(&reply, changed.map(|_| ()));
+            }
+            Command::SetWindowBounds(bounds) => {
+                if let Ok(store) = store
+                    && let Err(error) = store.set_setting(SettingKey::WindowBounds, &bounds)
+                {
+                    self.log.warn(
+                        "the window's place could not be stored",
+                        json!({ "code": error.code() }),
+                    );
+                }
             }
             #[cfg(feature = "fake")]
             Command::SeedSetting(key, value, reply) => said.answer(
@@ -1948,8 +1967,15 @@ impl Serving {
         let on_job = Arc::clone(&self.on_job);
         let commands = self.commands.upgrade();
         let database: Arc<dyn StoreThread> = Arc::new(DatabaseThread(commands.clone()));
+        let (board, job_id, log) = (self.jobs.clone(), job.id.clone(), self.log.clone());
         let run = move || {
-            let finished = launch::run(prepared, database, &*on_job);
+            // A panic in a switch must not leave the board busy for good.
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                launch::run(prepared, database, &*on_job)
+            }));
+            let Some(finished) = ran.ok().or_else(|| launch::unwound(&board, &job_id, &log)) else {
+                return;
+            };
             // Without the database thread nobody can record the launch; the job still ends for whoever watches it.
             let undelivered = match commands {
                 Some(commands) => commands

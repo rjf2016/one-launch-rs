@@ -22,8 +22,16 @@ pub mod settings {
         VaultReset, VaultResetRefusal, VaultResetSummary,
     };
     pub use ol_services::window::{
-        AfterPlay, CloseAction, QuitAnswer, QuitQuestion, START_HIDDEN_FLAG, WindowLog,
-        close_request_action, hide_after_instant_play, start_hidden,
+        AfterPlay, CloseAction, MIN_WINDOW, Placement, QuitAnswer, QuitQuestion, Rect,
+        START_HIDDEN_FLAG, WindowLog, bounds_setting, close_request_action, display_for, fit,
+        hide_after_instant_play, placement_from, start_hidden,
+    };
+}
+
+pub mod whats_new {
+    pub use ol_services::whats_new::{
+        AtStart, Image, Item, RELEASES, Release, Section, Tone, at_start, latest_whats_new,
+        pick_whats_new, release_date, shows_setup_guide,
     };
 }
 
@@ -49,6 +57,7 @@ pub mod accounts {
 // What the launch dialog, its banner and the recovery dialog say about a switch.
 pub mod launch {
     pub use ol_services::accounts::in_pick_order;
+    pub use ol_services::launch::UNWOUND;
     pub use ol_services::phases::{
         Phase, PhaseId, PhaseNames, Recommend, RecoveryCopy, banner_text, failed_note, group_steps,
         phase_label, plan_phases, recovery_copy, sentence, stopped_note, update_note,

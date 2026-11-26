@@ -42,6 +42,8 @@ fn every_line(window: &WindowLog) {
     window.quit_answered(QuitAnswer::Quit);
     window.stopping_for_quit();
     window.fatal_during_startup();
+    window.started_in_tray();
+    window.shown_for_second_start();
 }
 
 #[test]
@@ -71,6 +73,8 @@ fn the_window_the_tray_and_a_quit_are_written_with_facts_alone() {
             r#"INFO  [main] quit prompt answered {"answer":"quit"}"#,
             r#"WARN  [main] stopping the running switch {"reason":"quit confirmed during a switch"}"#,
             "ERROR [main] fatal during startup",
+            "INFO  [main] started in the tray",
+            "INFO  [main] window shown for a second start",
         ]
     );
 }
@@ -81,11 +85,11 @@ fn the_close_buttons_action_is_written_only_at_debug() {
     let logger = Logger::open(&scratch.join("logs"), LogOptions::default());
     every_line(&WindowLog::new(&logger.log()));
     let written = lines(&logger);
-    assert_eq!(written.len(), 12);
+    assert_eq!(written.len(), 14);
     assert!(!written.iter().any(|line| line.contains("close requested")));
     logger.log().set_level(LogLevel::Error);
     every_line(&WindowLog::new(&logger.log()));
     let written = lines(&logger);
-    assert_eq!(written.len(), 13);
-    assert_eq!(written[12], "ERROR [main] fatal during startup");
+    assert_eq!(written.len(), 15);
+    assert_eq!(written[14], "ERROR [main] fatal during startup");
 }
