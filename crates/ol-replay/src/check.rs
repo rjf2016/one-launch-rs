@@ -1,6 +1,6 @@
 // Holds the replay of a recorded run to its recording in oracle/l2: every platform event, the job events, and what the run left behind for the four launchers, their games' artwork among it. Left out of every comparison: the vault probe and the log lines, because nothing builds them yet, and the copies to the clipboard, which the replay does not make.
 //
-// One difference from the recordings is on purpose, on the owner's word of 2026-11-22: a Riot game is looked up like every other game and gets its cover from SteamGridDB once a key is stored, so the launcher's own icon is no longer stored in a cover's place. Where a recording ends with that stand-in, the replay is held to what the same lookup leaves without it: no artwork row for the game, and the reason of the miss in place of the stand-in's sentence. `without_the_stand_in` is that rule, and the only one.
+// One difference from the recordings is on purpose, on the owner's word of 2026-11-22: a Riot game is looked up like every other game and gets its cover from SteamGridDB once a key is stored, so the launcher's own icon is no longer stored in a cover's place. Where a recording ends with that stand-in, the replay is held to what the same lookup leaves without it: no artwork row for the game, and the reason of the miss in place of the stand-in's sentence. `without_the_stand_in` is that rule, and the only one. It rewrites the recording alone: a stand-in the replay writes is a difference.
 
 use std::fs;
 
@@ -95,10 +95,18 @@ fn without_the_stand_in(artwork: &Value, attempts: &Value) -> (Value, Value, usi
 }
 
 // What of a final state this build can be held to: see the head of this file.
-fn comparable(state: &Value) -> Value {
+fn comparable(state: &Value, recorded: bool) -> Value {
     let tables = &state["db"]["tables"];
-    let (artwork, attempts, _) =
-        without_the_stand_in(&tables["artwork"], &tables["artwork_attempts"]);
+    let (artwork, attempts) = if recorded {
+        let (artwork, attempts, _) =
+            without_the_stand_in(&tables["artwork"], &tables["artwork_attempts"]);
+        (artwork, attempts)
+    } else {
+        (
+            tables["artwork"].clone(),
+            tables["artwork_attempts"].clone(),
+        )
+    };
     let mut backups = Map::new();
     backups.insert("db".to_owned(), state["backups"]["db"].clone());
     for launcher in LAUNCHERS {
@@ -199,12 +207,33 @@ fn check_events(name: &str, actual: &Value, wanted: &[Value]) {
 pub fn check(name: &str) {
     let (actual, expected) = replay(name);
     check_events(name, &actual, expected["events"].as_array().unwrap());
-    let expected = comparable(&expected["final"]);
-    let mut actual = comparable(&actual["final"]);
+    let expected = comparable(&expected["final"], true);
+    let mut actual = comparable(&actual["final"], false);
     shaped_like(&mut actual, &expected);
     assert_eq!(
         difference(&actual, &expected),
         None,
         "{name}: the final state"
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_stand_in_the_replay_writes_is_a_difference() {
+        let game = "@game:riot:valorant.live";
+        let stand_in = json!({ "game_id": game, "source": STAND_IN_SOURCE, "grid_path": format!("{game}/grid.ico") });
+        let attempt = |error: &str| json!({ "game_id": game, "error": error });
+        let state = |error: &str| json!({ "db": { "tables": { "artwork": [stand_in], "artwork_attempts": [attempt(error)] } } });
+        let recorded = comparable(&state(STAND_IN_MISS), true);
+        assert_eq!(recorded["db"]["artwork"], json!([]));
+        assert_eq!(
+            recorded["db"]["artwork_attempts"],
+            json!([attempt(MISS_WITHOUT_A_KEY)])
+        );
+        assert_ne!(comparable(&state(STAND_IN_MISS), false), recorded);
+        assert_ne!(comparable(&state(MISS_WITHOUT_A_KEY), false), recorded);
+    }
 }
