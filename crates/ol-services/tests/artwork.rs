@@ -1102,6 +1102,75 @@ fn a_lookup_the_users_own_picture_overtook_writes_nothing() {
 }
 
 #[test]
+fn a_picture_of_the_users_own_chosen_while_a_refresh_of_all_waits_is_kept() {
+    let mut library = Library::new();
+    let id = library.install(LauncherId::Steam, "252950", "Rocket League");
+    let other = library.install(LauncherId::Steam, "440", "Team Fortress 2");
+    assert_eq!(
+        library
+            .art
+            .refresh(&library.store, None, true, NOW)
+            .unwrap(),
+        2
+    );
+    let chosen = library.scratch.join("chosen.jpg");
+    fs::write(&chosen, encoded(ImageFormat::Jpeg)).unwrap();
+    library
+        .art
+        .set_manual(&library.store, &id, ArtworkKind::Grid, &chosen, NOW)
+        .unwrap();
+
+    let http = Web::default()
+        .steam_pictures("252950")
+        .steam_pictures("440")
+        .http();
+    library.run(&http, &Keys::none());
+    assert!(http.urls().iter().all(|url| url.contains("/440/")));
+    let row = library.row(&id).unwrap();
+    assert_eq!(
+        (row.source.as_str(), row.grid_path),
+        ("manual", Some(format!("{id}/grid.jpg")))
+    );
+    assert_eq!(library.files(&id), ["grid.jpg"]);
+    assert_eq!(library.row(&other), Some(steam_row(&other)));
+}
+
+#[test]
+fn a_refresh_of_one_game_that_waits_behind_a_refresh_of_all_still_replaces_the_users_own() {
+    let mut library = Library::new();
+    let id = library.install(LauncherId::Steam, "252950", "Rocket League");
+    library.install(LauncherId::Steam, "440", "Team Fortress 2");
+    assert_eq!(
+        library
+            .art
+            .refresh(&library.store, None, true, NOW)
+            .unwrap(),
+        2
+    );
+    let chosen = library.scratch.join("chosen.jpg");
+    fs::write(&chosen, encoded(ImageFormat::Jpeg)).unwrap();
+    library
+        .art
+        .set_manual(&library.store, &id, ArtworkKind::Grid, &chosen, NOW)
+        .unwrap();
+    assert_eq!(
+        library
+            .art
+            .refresh(&library.store, Some(&id), true, NOW)
+            .unwrap(),
+        0
+    );
+
+    let http = Web::default()
+        .steam_pictures("252950")
+        .steam_pictures("440")
+        .http();
+    library.run(&http, &Keys::none());
+    assert_eq!(library.row(&id), Some(steam_row(&id)));
+    assert_eq!(library.files(&id), ["grid.png", "hero.png", "logo.png"]);
+}
+
+#[test]
 fn after_a_quit_a_lookup_on_its_way_writes_nothing() {
     let mut library = Library::new();
     let id = library.install(LauncherId::Steam, "252950", "Rocket League");

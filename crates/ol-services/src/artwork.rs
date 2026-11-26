@@ -2,7 +2,7 @@
 
 pub mod fetch;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::io::{self, Cursor, Read};
 use std::path::{Path, PathBuf};
@@ -191,6 +191,7 @@ fn on_disk(dir: &Path, rel_path: &str) -> bool {
 pub struct Job {
     pub wanted: Wanted,
     pub force: bool,
+    pub replaces_manual: bool,
     picks_at_start: u64,
     have: Kinds,
     // A launcher's icon an earlier version stored in place of the cover. It stays until a cover is found.
@@ -203,14 +204,35 @@ pub enum Outcome {
     Failed,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Ask {
+    force: bool,
+    replaces_manual: bool,
+}
+
+impl Ask {
+    const fn with(self, other: Self) -> Self {
+        Self {
+            force: self.force || other.force,
+            replaces_manual: self.replaces_manual || other.replaces_manual,
+        }
+    }
+}
+
+struct Active {
+    id: String,
+    ask: Ask,
+    picks_at_start: u64,
+}
+
 // Which games wait for a lookup and which are being looked up, as the Electron app's service keeps them.
 pub struct Queue {
     concurrency: usize,
-    // In the order asked, each with whether it is to download again what is cached.
-    pending: Vec<(String, bool)>,
-    active: Vec<(String, bool)>,
-    // Forced requests that came while an unforced lookup of the same game ran: they run when it ends.
-    again: BTreeSet<String>,
+    // In the order asked.
+    pending: Vec<(String, Ask)>,
+    active: Vec<Active>,
+    // Forced requests the lookup running for the same game does not cover, with whether each may replace the user's picture: they run when it ends.
+    again: BTreeMap<String, bool>,
     // How often the user chose a picture for a game, so a lookup a choice overtook can tell.
     manual_picks: HashMap<String, u64>,
     completed: usize,
@@ -230,7 +252,7 @@ impl Queue {
             concurrency,
             pending: Vec::new(),
             active: Vec::new(),
-            again: BTreeSet::new(),
+            again: BTreeMap::new(),
             manual_picks: HashMap::new(),
             completed: 0,
             failed: 0,
@@ -238,24 +260,42 @@ impl Queue {
         }
     }
 
-    // How many of `ids` the call added to what will run.
+    // How many of `ids` the call added to what will run. None of them replaces a picture the user chose.
     pub fn enqueue(&mut self, ids: &[String], force: bool) -> usize {
+        self.ask(
+            ids,
+            Ask {
+                force,
+                replaces_manual: false,
+            },
+        )
+    }
+
+    fn ask(&mut self, ids: &[String], ask: Ask) -> usize {
         if self.stopped {
             return 0;
         }
         let mut queued = 0;
         for id in ids {
-            if let Some((_, running_forced)) = self.active.iter().find(|(active, _)| active == id) {
-                // The lookup that runs covers the request, unless the request is for a new download and the lookup is not one.
-                if force && !running_forced && self.again.insert(id.clone()) {
-                    queued += 1;
+            if let Some(running) = self.active.iter().find(|active| active.id == *id) {
+                // A lookup a picture of the user's own overtook writes nothing, so it covers no new download.
+                let covered =
+                    !ask.force || (running.ask.force && running.picks_at_start == self.picks(id));
+                if !covered {
+                    match self.again.get_mut(id) {
+                        Some(replaces_manual) => *replaces_manual |= ask.replaces_manual,
+                        None => {
+                            self.again.insert(id.clone(), ask.replaces_manual);
+                            queued += 1;
+                        }
+                    }
                 }
                 continue;
             }
             match self.pending.iter_mut().find(|(pending, _)| pending == id) {
-                Some(waiting) => waiting.1 |= force,
+                Some(waiting) => waiting.1 = waiting.1.with(ask),
                 None => {
-                    self.pending.push((id.clone(), force));
+                    self.pending.push((id.clone(), ask));
                     queued += 1;
                 }
             }
@@ -263,35 +303,49 @@ impl Queue {
         queued
     }
 
-    // The next game to look up, when fewer run than may.
+    // The next game to look up, when fewer run than may, with whether it is to download again what is cached.
     pub fn take_next(&mut self) -> Option<(String, bool)> {
         if self.active.len() >= self.concurrency || self.pending.is_empty() {
             return None;
         }
-        let next = self.pending.remove(0);
-        self.active.push(next.clone());
-        Some(next)
+        let (id, ask) = self.pending.remove(0);
+        self.active.push(Active {
+            id: id.clone(),
+            ask,
+            picks_at_start: self.picks(&id),
+        });
+        Some((id, ask.force))
+    }
+
+    fn replaces_manual(&self, id: &str) -> bool {
+        self.active
+            .iter()
+            .any(|active| active.id == id && active.ask.replaces_manual)
     }
 
     pub fn finish(&mut self, id: &str, outcome: Outcome) {
-        self.active.retain(|(active, _)| active != id);
+        self.active.retain(|active| active.id != id);
         match outcome {
             Outcome::Done => self.completed += 1,
             Outcome::Failed => self.failed += 1,
         }
-        if self.again.remove(id) && !self.stopped {
+        if let Some(replaces_manual) = self.again.remove(id)
+            && !self.stopped
+        {
+            let ask = Ask {
+                force: true,
+                replaces_manual,
+            };
             match self.pending.iter_mut().find(|(pending, _)| pending == id) {
-                Some(waiting) => waiting.1 = true,
-                None => self.pending.push((id.to_owned(), true)),
+                Some(waiting) => waiting.1 = waiting.1.with(ask),
+                None => self.pending.push((id.to_owned(), ask)),
             }
         }
     }
 
     pub fn is_busy(&self, id: &str) -> bool {
-        self.active
-            .iter()
-            .chain(&self.pending)
-            .any(|(held, _)| held == id)
+        self.active.iter().any(|active| active.id == id)
+            || self.pending.iter().any(|(held, _)| held == id)
     }
 
     pub fn is_idle(&self) -> bool {
@@ -463,7 +517,11 @@ impl Artwork {
                 .map(|game| game.id)
                 .collect(),
         };
-        Ok(self.queue.enqueue(&ids, force))
+        let ask = Ask {
+            force,
+            replaces_manual: force && game_id.is_some(),
+        };
+        Ok(self.queue.ask(&ids, ask))
     }
 
     // What a game that left the queue needs looked up, from the database and the disk as they are now.
@@ -477,7 +535,8 @@ impl Artwork {
             return Ok(Prepared::Nothing);
         };
         let row = store.artwork_row(game_id)?;
-        if !force
+        let replaces_manual = self.queue.replaces_manual(game_id);
+        if !replaces_manual
             && row
                 .as_ref()
                 .is_some_and(|row| row.source == ArtworkSource::Manual.as_str())
@@ -513,6 +572,7 @@ impl Artwork {
                 missing,
             },
             force,
+            replaces_manual,
             picks_at_start: self.queue.picks(game_id),
             have,
             stand_in,
@@ -802,6 +862,20 @@ mod tests {
         queue.finish("a", Outcome::Done);
         assert_eq!(queue.take_next(), Some(("a".to_owned(), true)));
         assert_eq!(queue.enqueue(&ids(&["a"]), true), 0);
+        queue.finish("a", Outcome::Done);
+        assert_eq!(queue.take_next(), None);
+    }
+
+    #[test]
+    fn a_forced_request_after_a_pick_during_a_forced_lookup_runs_after_it() {
+        let mut queue = Queue::default();
+        queue.enqueue(&ids(&["a"]), true);
+        assert_eq!(queue.take_next(), Some(("a".to_owned(), true)));
+        queue.picked("a");
+        assert_eq!(queue.enqueue(&ids(&["a"]), true), 1);
+        assert_eq!(queue.enqueue(&ids(&["a"]), true), 0);
+        queue.finish("a", Outcome::Done);
+        assert_eq!(queue.take_next(), Some(("a".to_owned(), true)));
         queue.finish("a", Outcome::Done);
         assert_eq!(queue.take_next(), None);
     }
