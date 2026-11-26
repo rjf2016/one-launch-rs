@@ -391,8 +391,11 @@ impl Step {
                 .and_then(|(from, to)| Some(Self::Drag(spot(from)?, spot(to)?))),
             "size" => size(rest).map(Self::Size),
             "window-at" => rest.split_once('x').and_then(|(x, y)| {
-                let side =
-                    |side: &str| side.parse::<i32>().ok().filter(|side| side.abs() <= 20_000);
+                let side = |side: &str| {
+                    side.parse::<i32>()
+                        .ok()
+                        .filter(|side| (-20_000..=20_000).contains(side))
+                };
                 Some(Self::WindowAt(side(x)?, side(y)?))
             }),
             "frames" => match rest {
@@ -804,6 +807,10 @@ mod tests {
             Step::parse("window-at:-5000x-5000"),
             Ok(Step::WindowAt(-5000, -5000))
         ));
+        assert!(matches!(
+            Step::parse("window-at:-20000x20000"),
+            Ok(Step::WindowAt(-20_000, 20_000))
+        ));
         assert!(matches!(Step::parse("tray-open"), Ok(Step::TrayOpen)));
         assert!(matches!(Step::parse("tray-quit"), Ok(Step::TrayQuit)));
         assert!(matches!(Step::parse("frames:print"), Ok(Step::PrintFrames)));
@@ -840,6 +847,10 @@ mod tests {
             "frames:all",
             "window-at:1",
             "window-at:99999x0",
+            "window-at:20001x0",
+            "window-at:0x-20001",
+            "window-at:-2147483648x0",
+            "window-at:0x-2147483648",
             "click:1x2&second-start",
         ] {
             assert!(Step::parse(refused).is_err(), "{refused}");
