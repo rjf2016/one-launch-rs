@@ -10,7 +10,8 @@ use std::time::{Duration, Instant};
 
 use ol_platform_win::instance::{Claim, bring_forward, claim, claim_waiting, name_for};
 use ol_testkit::Scratch;
-use windows::Win32::Foundation::{LPARAM, WPARAM};
+use windows::Win32::Foundation::{CloseHandle, LPARAM, WPARAM};
+use windows::Win32::System::Threading::{OpenMutexW, SYNCHRONIZATION_SYNCHRONIZE};
 use windows::Win32::UI::WindowsAndMessaging::{
     DispatchMessageW, FindWindowExW, HWND_MESSAGE, MSG, PM_REMOVE, PeekMessageW, PostMessageW,
     WM_CLOSE,
@@ -107,6 +108,46 @@ fn one_copy_holds_a_folder_however_it_is_reached_and_a_second_start_reaches_it()
 }
 
 #[test]
+fn names_the_file_system_tells_apart_are_two_locks_and_names_it_joins_are_one() {
+    let scratch = Scratch::new("instance-names");
+    let sharp = scratch.join("straße");
+    let Claim::First(held) = claim(&sharp).unwrap() else {
+        panic!("a free folder was held");
+    };
+    assert!(matches!(
+        claim(&scratch.join("STRAßE")).unwrap(),
+        Claim::Second
+    ));
+    let Claim::First(beside) = claim(&scratch.join("strasse")).unwrap() else {
+        panic!("another folder was blocked");
+    };
+    drop(beside);
+    fs::create_dir(&sharp).unwrap();
+    assert!(scratch.join("STRAßE").is_dir());
+    assert!(!scratch.join("strasse").exists());
+    assert!(matches!(
+        claim(&scratch.join("STRAßE")).unwrap(),
+        Claim::Second
+    ));
+    drop(held);
+}
+
+#[test]
+fn the_lock_is_one_every_session_of_this_user_sees() {
+    let scratch = Scratch::new("instance-global");
+    let folder = scratch.join("data");
+    let global = HSTRING::from(format!("Global\\{}", name_for(&folder).unwrap()));
+    assert!(unsafe { OpenMutexW(SYNCHRONIZATION_SYNCHRONIZE, false, &global) }.is_err());
+    let Claim::First(held) = claim(&folder).unwrap() else {
+        panic!("a free folder was held");
+    };
+    let seen = unsafe { OpenMutexW(SYNCHRONIZATION_SYNCHRONIZE, false, &global) }
+        .expect("the lock is not in the global namespace");
+    unsafe { CloseHandle(seen) }.unwrap();
+    drop(held);
+}
+
+#[test]
 fn a_second_start_before_anyone_listens_is_heard_from_the_loop_once_someone_does() {
     let scratch = Scratch::new("instance-early");
     let folder = scratch.join("data");
@@ -131,14 +172,17 @@ fn a_relaunched_copy_waits_for_the_lock_of_the_copy_before_it() {
         panic!("a free folder was held");
     };
     let waiting = folder.clone();
+    let (timing, timed) = std::sync::mpsc::channel();
     let relaunched = thread::spawn(move || {
         let started = Instant::now();
+        timing.send(()).unwrap();
         let first = matches!(
             claim_waiting(&waiting, Duration::from_secs(10)).unwrap(),
             Claim::First(_)
         );
         (first, started.elapsed())
     });
+    timed.recv().unwrap();
     thread::sleep(Duration::from_millis(300));
     assert!(matches!(claim(&folder).unwrap(), Claim::Second));
     drop(held);
@@ -156,12 +200,14 @@ fn a_copy_that_ends_without_letting_go_of_the_lock_leaves_no_lock() {
     let scratch = Scratch::new("instance-ended");
     let folder = scratch.join("data");
     let echo = scratch.join("echo.txt");
+    let release = scratch.join("release.txt");
     let child =
         scratch.join(format!("olrs-test-child-{}.exe", uuid::Uuid::new_v4().simple()).as_str());
     fs::copy(env!("CARGO_BIN_EXE_ol-test-child"), &child).unwrap();
     let mut running = Command::new(&child)
         .arg(format!("--claim={}", folder.display()))
         .arg(format!("--echo={}", echo.display()))
+        .arg(format!("--release={}", release.display()))
         .spawn()
         .unwrap();
     let deadline = Instant::now() + Duration::from_secs(20);
@@ -171,6 +217,7 @@ fn a_copy_that_ends_without_letting_go_of_the_lock_leaves_no_lock() {
     }
     assert!(said().contains("claimed true"), "{}", said());
     assert!(matches!(claim(&folder).unwrap(), Claim::Second));
+    fs::write(&release, "").unwrap();
     assert_eq!(running.wait().unwrap().code(), Some(3));
     assert!(matches!(claim(&folder).unwrap(), Claim::First(_)));
 }
