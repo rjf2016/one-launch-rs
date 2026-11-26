@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use image::{DynamicImage, ImageFormat, RgbImage};
+use image::{DynamicImage, GrayAlphaImage, GrayImage, ImageFormat, Luma, LumaA, Rgb, RgbImage};
 use ol_model::{ArtworkKind, ArtworkSource, InstalledGame, LauncherId, SettingKey};
 use ol_platform_api::CancelToken;
 use ol_platform_api::http::{
@@ -19,7 +19,8 @@ use ol_platform_fake::RecordingHttp;
 use ol_platform_fake::http::{json, picture, redirect, status};
 use ol_services::artwork::fetch::{MAX_DOWNLOAD_BYTES, MAX_JSON_BYTES};
 use ol_services::artwork::{
-    Artwork, ArtworkError, KeySource, MAX_MANUAL_BYTES, Outcome, Prepared, fetch, sniff_image,
+    Artwork, ArtworkError, KeySource, MAX_MANUAL_BYTES, Outcome, Prepared, decode, fetch,
+    is_steam_placeholder, sniff_image,
 };
 use ol_services::log::Log;
 use ol_sim::artwork::solid_png;
@@ -1652,4 +1653,283 @@ fn bytes_are_told_apart_as_the_electron_app_tells_them() {
     );
     assert_eq!(sniff_image(&png()).map(|ext| ext.as_str()), Some("png"));
     assert_eq!(KEY_HOST, "www.steamgriddb.com");
+}
+
+// Made up in the shape of what Steam's servers answer for a picture a game never had: one gray, a lighter line at the edge, and for the logo an edge a little transparent.
+fn gray_cover() -> DynamicImage {
+    DynamicImage::ImageLuma8(GrayImage::from_fn(30, 45, |x, y| {
+        let edge = x == 0 || y == 0 || x == 29 || y == 44;
+        Luma([if edge { 88 } else { 75 }])
+    }))
+}
+
+fn gray_logo() -> DynamicImage {
+    DynamicImage::ImageLumaA8(GrayAlphaImage::from_fn(64, 36, |x, y| {
+        let edge = x == 0 || y == 0 || x == 63 || y == 35;
+        LumaA([75, if edge { 248 } else { 255 }])
+    }))
+}
+
+fn bytes_of(picture: &DynamicImage, format: ImageFormat) -> Vec<u8> {
+    let mut bytes = Cursor::new(Vec::new());
+    picture.write_to(&mut bytes, format).unwrap();
+    bytes.into_inner()
+}
+
+fn judged(bytes: &[u8]) -> bool {
+    let ext = sniff_image(bytes).unwrap();
+    is_steam_placeholder(&decode(bytes, ext).unwrap())
+}
+
+const APP: &str = "2000000";
+const LANDED: &str = "https://shared.steamstatic.com/store_item_assets/steam/apps/2000000";
+
+// Steam's two hosts answer the cover and the logo with the placeholder, the second through its redirect, and the hero with a picture.
+fn steam_placeholders() -> Web {
+    let cover = picture("image/jpeg", bytes_of(&gray_cover(), ImageFormat::Jpeg));
+    let logo = picture("image/png", bytes_of(&gray_logo(), ImageFormat::Png));
+    let mut web = Web::default().with(
+        format!("{CDN}/{APP}/library_hero.jpg"),
+        picture("image/png", png()),
+    );
+    for (file, answer) in [("library_600x900.jpg", cover), ("logo.png", logo)] {
+        web = web
+            .with(format!("{CDN}/{APP}/{file}"), answer.clone())
+            .with(
+                format!("{SHARED}/{APP}/{file}"),
+                redirect(301, &format!("{LANDED}/{file}")),
+            )
+            .with(format!("{LANDED}/{file}"), answer);
+    }
+    web
+}
+
+#[test]
+fn steams_placeholder_is_one_gray_and_a_picture_is_not() {
+    let noisy = DynamicImage::ImageRgb8(RgbImage::from_fn(30, 45, |x, y| {
+        let wobble = |seed: u32| (75 + (x * seed + y * 13) % 7) as u8;
+        Rgb([wobble(3), wobble(5), wobble(11)])
+    }));
+    for (name, bytes) in [
+        ("flat gray", bytes_of(&gray_cover(), ImageFormat::Png)),
+        (
+            "flat gray as a JPEG",
+            bytes_of(&gray_cover(), ImageFormat::Jpeg),
+        ),
+        ("gray with noise", bytes_of(&noisy, ImageFormat::Png)),
+        (
+            "gray with noise as a JPEG",
+            bytes_of(&noisy, ImageFormat::Jpeg),
+        ),
+        ("gray and alpha", bytes_of(&gray_logo(), ImageFormat::Png)),
+        (
+            "a gray just short of a tint",
+            solid_png(30, 45, [75, 75, 83]),
+        ),
+    ] {
+        assert!(judged(&bytes), "{name} is the placeholder");
+    }
+
+    let two_tone = DynamicImage::ImageLuma8(GrayImage::from_fn(30, 45, |_, y| {
+        Luma([if y < 20 { 75 } else { 200 }])
+    }));
+    let cover = DynamicImage::ImageRgb8(RgbImage::from_fn(30, 45, |x, y| {
+        Rgb([(x * 8) as u8, (y * 5) as u8, 128])
+    }));
+    let faded_logo = DynamicImage::ImageLumaA8(GrayAlphaImage::from_fn(64, 36, |x, _| {
+        LumaA([75, if x < 32 { 0 } else { 255 }])
+    }));
+    for (name, bytes) in [
+        ("one colour that is not gray", png()),
+        ("a gray with a tint", solid_png(30, 45, [75, 75, 84])),
+        ("two grays far apart", bytes_of(&two_tone, ImageFormat::Png)),
+        ("a cover", bytes_of(&cover, ImageFormat::Jpeg)),
+        (
+            "a logo on a transparent ground",
+            bytes_of(&faded_logo, ImageFormat::Png),
+        ),
+    ] {
+        assert!(!judged(&bytes), "{name} is a picture");
+    }
+}
+
+#[test]
+fn steams_placeholder_is_no_picture_and_steamgriddb_is_asked_in_its_place() {
+    let mut library = Library::new();
+    let id = library.install(LauncherId::Steam, APP, "Made Up Game");
+    let http = steam_placeholders().http();
+    assert_eq!(library.look_up(&id, &http, &Keys::none()), Outcome::Done);
+    assert_eq!(
+        http.urls(),
+        [
+            format!("{CDN}/{APP}/library_600x900.jpg"),
+            format!("{SHARED}/{APP}/library_600x900.jpg"),
+            format!("{LANDED}/library_600x900.jpg"),
+            format!("{CDN}/{APP}/library_hero.jpg"),
+            format!("{CDN}/{APP}/logo.png"),
+            format!("{SHARED}/{APP}/logo.png"),
+            format!("{LANDED}/logo.png"),
+        ]
+    );
+    assert_eq!(
+        library.row(&id),
+        Some(ArtworkRow {
+            grid_path: None,
+            logo_path: None,
+            ..steam_row(&id)
+        })
+    );
+    assert_eq!(library.files(&id), ["hero.png"]);
+
+    let grids = format!("{SGDB}/grids/steam/{APP}?dimensions=600x900&{FILTER}");
+    let logos = format!("{SGDB}/logos/steam/{APP}?{FILTER}");
+    let http = steam_placeholders()
+        .with(&grids, json(200, &recorded("grids-steam-252950.json")))
+        .with(
+            "https://cdn2.steamgriddb.com/grid/aaaa1111.png",
+            picture("image/png", png()),
+        )
+        .http();
+    assert_eq!(library.look_up(&id, &http, &Keys::stored()), Outcome::Done);
+    assert_eq!(
+        http.urls()[7..],
+        [
+            grids,
+            "https://cdn2.steamgriddb.com/grid/aaaa1111.png".to_owned(),
+            logos,
+        ]
+    );
+    assert_eq!(
+        library.row(&id),
+        Some(ArtworkRow {
+            source: "steamgriddb".to_owned(),
+            logo_path: None,
+            ..steam_row(&id)
+        })
+    );
+    assert_eq!(library.files(&id), ["grid.png", "hero.png"]);
+}
+
+#[test]
+fn a_placeholder_an_earlier_lookup_kept_goes_at_the_next_scan_and_is_looked_up_again_once() {
+    let mut library = Library::new();
+    let id = library.install(LauncherId::Steam, APP, "Made Up Game");
+    let gray = library.install(LauncherId::Steam, "2000001", "Made Up Gray Game");
+    for (game, files) in [
+        (
+            &id,
+            vec![
+                ("grid.jpg", bytes_of(&gray_cover(), ImageFormat::Jpeg)),
+                ("hero.png", png()),
+                ("logo.png", bytes_of(&gray_logo(), ImageFormat::Png)),
+            ],
+        ),
+        (
+            &gray,
+            vec![("grid.jpg", bytes_of(&gray_cover(), ImageFormat::Jpeg))],
+        ),
+    ] {
+        fs::create_dir_all(library.folder(game)).unwrap();
+        for (name, bytes) in files {
+            fs::write(library.folder(game).join(name), bytes).unwrap();
+        }
+    }
+    let kept = ArtworkRow {
+        grid_path: Some(format!("{id}/grid.jpg")),
+        ..steam_row(&id)
+    };
+    library.store.put_artwork(&id, &kept).unwrap();
+    library
+        .store
+        .put_artwork(
+            &gray,
+            &ArtworkRow {
+                grid_path: Some(format!("{gray}/grid.jpg")),
+                hero_path: None,
+                logo_path: None,
+                ..steam_row(&gray)
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        library.art.enqueue_after_scan(&library.store, NOW).unwrap(),
+        0,
+        "before the check the placeholder counts as a cover"
+    );
+
+    assert_eq!(library.art.prune(&library.store).unwrap(), 2);
+    let healed = ArtworkRow {
+        grid_path: None,
+        logo_path: None,
+        ..kept
+    };
+    assert_eq!(library.row(&id), Some(healed.clone()));
+    assert_eq!(library.files(&id), ["hero.png"]);
+    assert_eq!(library.row(&gray), None);
+    assert!(library.files(&gray).is_empty());
+
+    assert_eq!(
+        library.art.enqueue_after_scan(&library.store, NOW).unwrap(),
+        2
+    );
+    let http = steam_placeholders().http();
+    assert_eq!(
+        library.run(&http, &Keys::none()),
+        [Outcome::Failed, Outcome::Failed]
+    );
+    assert_eq!(library.row(&id), Some(healed));
+    assert_eq!(library.files(&id), ["hero.png"]);
+    assert_eq!(
+        library.miss(&id).as_deref(),
+        Some(
+            "Steam CDN grid: only Steam's gray placeholder; Steam CDN logo: only Steam's gray placeholder; No SteamGridDB API key in Settings"
+        )
+    );
+
+    assert_eq!(library.art.prune(&library.store).unwrap(), 0);
+    assert_eq!(
+        library.art.enqueue_after_scan(&library.store, NOW).unwrap(),
+        0
+    );
+}
+
+#[test]
+fn a_gray_picture_the_user_chose_or_steamgriddb_gave_is_kept() {
+    let mut library = Library::new();
+    let chosen_for = library.install(LauncherId::Steam, APP, "Made Up Game");
+    let given_to = library.install(LauncherId::Riot, "valorant.live", "VALORANT");
+    let chosen = library.scratch.join("chosen.jpg");
+    fs::write(&chosen, bytes_of(&gray_cover(), ImageFormat::Jpeg)).unwrap();
+    library
+        .art
+        .set_manual(&library.store, &chosen_for, ArtworkKind::Grid, &chosen, NOW)
+        .unwrap();
+    let http = Web::default()
+        .with(
+            format!("{SGDB}/search/autocomplete/VALORANT"),
+            json(200, &recorded("autocomplete-rocket-league.json")),
+        )
+        .with(
+            format!("{SGDB}/grids/game/5267?dimensions=600x900&{FILTER}"),
+            json(200, &recorded("grids-steam-252950.json")),
+        )
+        .with(
+            "https://cdn2.steamgriddb.com/grid/aaaa1111.png",
+            picture("image/png", bytes_of(&gray_cover(), ImageFormat::Png)),
+        )
+        .http();
+    assert_eq!(
+        library.look_up(&given_to, &http, &Keys::stored()),
+        Outcome::Done
+    );
+
+    assert_eq!(library.art.prune(&library.store).unwrap(), 0);
+    let chosen_row = library.row(&chosen_for).unwrap();
+    assert_eq!(chosen_row.source, "manual");
+    assert_eq!(chosen_row.grid_path, Some(format!("{chosen_for}/grid.jpg")));
+    assert_eq!(library.files(&chosen_for), ["grid.jpg"]);
+    let given_row = library.row(&given_to).unwrap();
+    assert_eq!(given_row.source, "steamgriddb");
+    assert_eq!(given_row.grid_path, Some(format!("{given_to}/grid.png")));
+    assert_eq!(library.files(&given_to), ["grid.png"]);
 }
