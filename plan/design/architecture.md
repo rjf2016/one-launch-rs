@@ -54,7 +54,7 @@ The diagram above gives the layers. This table is the record: `cargo xtask check
 | `ol-services` | `ol-adapters`, `ol-formats`, `ol-model`, `ol-platform-api`, `ol-runtime`, `ol-store`, `ol-vault` | `ol-platform-fake`, `ol-sim`, `ol-testkit` |
 | `ol-api` | `ol-adapters`, `ol-model`, `ol-platform-api`, `ol-runtime`, `ol-services`, `ol-store`, `ol-vault` | `ol-platform-fake`, `ol-sim`, `ol-testkit` |
 | `ol-platform-win` | `ol-model`, `ol-platform-api` | `ol-testkit` |
-| `ol-net` | `ol-model`, `ol-platform-api` | `ol-testkit` |
+| `ol-net` | `ol-formats`, `ol-model`, `ol-platform-api` | `ol-testkit` |
 | `ol-platform-fake` | `ol-model`, `ol-platform-api` | `ol-testkit` |
 | `ol-sim` | `ol-formats`, `ol-model`, `ol-platform-api`, `ol-platform-fake`, `ol-runtime` | `ol-testkit` |
 | `ol-testkit-macros` | none | none |

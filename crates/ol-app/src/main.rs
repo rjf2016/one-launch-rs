@@ -537,12 +537,15 @@ fn start_backend(args: &Args, log: &Log) -> anyhow::Result<(Backend, Machine)> {
     Ok((backend, Machine::None))
 }
 
-// This PC behind the launchers. The Riot Client is given no way to its local server: Play is left to the user, as the hand-over says.
+// This PC behind the launchers. The Riot Client's local server is reached through `ol_net::RiotLoopback`, named here and nowhere else outside ol-net: the one launch request its Play button sends, to 127.0.0.1, with the lockfile read through the real file port.
 #[cfg(not(feature = "fake"))]
 fn real_launchers() -> ol_api::launchers::Launchers {
+    use ol_platform_win::files::WindowsFiles;
     use ol_platform_win::machine;
 
     let mut launchers = ol_api::launchers::on_this_pc(machine::platform());
+    launchers.riot = std::mem::take(&mut launchers.riot)
+        .with_local_launch(Arc::new(ol_net::RiotLoopback::new(Arc::new(WindowsFiles))));
     let folders = machine::folders();
     if let Some(app_data) = folders.app_data {
         launchers.battlenet.app_data = app_data;
@@ -1326,6 +1329,42 @@ mod tests {
                 "a build with the fake launchers takes no real ones"
             );
         }
+    }
+
+    // The Riot Client's local server is reached through one channel, and `real_launchers()` alone hands it to the launchers: outside ol-net no source of the workspace names it but that function and the line above it. That function is in no build with the fake launchers, and the parser refuses `--real-launchers` beside a capture, a probe or `--doctor` (the test above).
+    #[test]
+    fn the_riot_channel_is_handed_out_by_real_launchers_alone() {
+        let name = concat!("Riot", "Loopback");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut named = Vec::new();
+        let mut folders = vec![root.join("crates"), root.join("xtask"), root.join("spikes")];
+        while let Some(folder) = folders.pop() {
+            let Ok(entries) = std::fs::read_dir(&folder) else {
+                continue;
+            };
+            for entry in entries {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    if !path.ends_with("ol-net") && !path.ends_with("target") {
+                        folders.push(path);
+                    }
+                } else if path.extension().is_some_and(|extension| extension == "rs")
+                    && std::fs::read_to_string(&path).unwrap().contains(name)
+                {
+                    let path = path.strip_prefix(&root).unwrap().to_string_lossy();
+                    named.push(path.replace('\\', "/"));
+                }
+            }
+        }
+        assert_eq!(named, ["crates/ol-app/src/main.rs"]);
+
+        let main = include_str!("main.rs");
+        let from = main.find("// This PC behind the launchers.").unwrap();
+        let to = from + main[from..].find("\n}\n").unwrap();
+        let real = &main[from..to];
+        assert_eq!(main.matches(name).count(), real.matches(name).count());
+        assert!(real.contains("#[cfg(not(feature = \"fake\"))]\nfn real_launchers() "));
+        assert!(real.contains(&format!("ol_net::{name}::new(Arc::new(WindowsFiles))")));
     }
 
     // Locate's dialog is GPUI's `prompt_for_paths`, which only `FilePicker::Windows` reaches.

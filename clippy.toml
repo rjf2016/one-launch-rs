@@ -38,4 +38,5 @@ disallowed-methods = [
     { path = "ureq::RequestBuilder::send_form", reason = "HTTP goes through HttpClient in ol-net" },
     { path = "ureq::RequestExt::with_agent", reason = "HTTP goes through HttpClient in ol-net" },
     { path = "ureq::RequestExt::with_default_agent", reason = "HTTP goes through HttpClient in ol-net" },
+    { path = "ureq::tls::TlsConfigBuilder::disable_verification", reason = "only the Riot loopback channel of ol-net, which reaches 127.0.0.1 alone, does not check certificates" },
 ]
