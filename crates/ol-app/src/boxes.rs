@@ -75,6 +75,8 @@ pub fn could_not_start(boxes: Boxes, reason: &str, data_dir: &Path) {
 
 pub const NOT_ANSWERING: &str = "Another copy of One Launch runs on this data folder and did not answer. Look for it in the notification area, or end it in Task Manager, then start One Launch again.";
 
+pub const NOT_RELAUNCHED: &str = "One Launch closed to start again, and the new copy could not be started. Start One Launch again.";
+
 pub const STARTING_FAILED: &str = "One Launch hit an error inside it while starting, and stopped.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -187,7 +189,41 @@ pub fn relaunch_asked() -> bool {
 
 pub fn relaunch() {
     if let Some(watch) = WATCH.get() {
-        ol_platform_win::own_process::start_again(&watch.relaunch_args);
+        relaunch_with(
+            &watch.relaunch_args,
+            ol_platform_win::own_process::start_again,
+            || {
+                let (boxes, data_dir) = (watch.boxes, watch.data_dir.clone());
+                // Off the window's thread, as the crash box: a crash ends the app from inside a GPUI update.
+                let _ = std::thread::spawn(move || {
+                    could_not_start(boxes, NOT_RELAUNCHED, &data_dir);
+                })
+                .join();
+            },
+        );
+    }
+}
+
+fn relaunch_with(
+    arguments: &[String],
+    start: impl FnOnce(&[String]) -> bool,
+    not_started: impl FnOnce(),
+) {
+    if !start(arguments) {
+        not_started();
+    }
+}
+
+fn admitted(last_box: &AtomicU64, now: u64) -> bool {
+    let mut last = last_box.load(Ordering::SeqCst);
+    loop {
+        if last != 0 && now.saturating_sub(last) < CRASH_BOX_EVERY.as_secs() {
+            return false;
+        }
+        match last_box.compare_exchange(last, now.max(1), Ordering::SeqCst, Ordering::SeqCst) {
+            Ok(_) => return true,
+            Err(seen) => last = seen,
+        }
     }
 }
 
@@ -218,10 +254,7 @@ fn after_panic() {
         }
         return;
     }
-    let now = now_secs();
-    let last = LAST_BOX.load(Ordering::SeqCst);
-    let relaunch_now = if last == 0 || now.saturating_sub(last) >= CRASH_BOX_EVERY.as_secs() {
-        LAST_BOX.store(now.max(1), Ordering::SeqCst);
+    let relaunch_now = if admitted(&LAST_BOX, now_secs()) {
         let text = crash_box(crashed, &watch.data_dir);
         let boxes = watch.boxes;
         // A box on the window's thread mid-update would hand GPUI messages it cannot take.
@@ -369,6 +402,54 @@ mod tests {
             relaunch_arguments(arguments.into_iter()),
             [r"--data-dir=D:\scratch\data", RELAUNCHED]
         );
+    }
+
+    #[test]
+    fn a_relaunch_that_starts_no_copy_says_so() {
+        let said = std::cell::Cell::new(0);
+        let arguments = [RELAUNCHED.to_owned()];
+        relaunch_with(
+            &arguments,
+            |given| {
+                assert_eq!(given, [RELAUNCHED]);
+                false
+            },
+            || said.set(said.get() + 1),
+        );
+        assert_eq!(said.get(), 1);
+        relaunch_with(&arguments, |_| true, || said.set(said.get() + 1));
+        assert_eq!(said.get(), 1);
+    }
+
+    #[test]
+    fn of_panics_together_one_box_is_shown_and_the_next_after_a_minute() {
+        let every = CRASH_BOX_EVERY.as_secs();
+        for _ in 0..200 {
+            let last = AtomicU64::new(0);
+            let together = std::sync::Barrier::new(16);
+            let shown = std::thread::scope(|scope| {
+                let panics: Vec<_> = (0..16)
+                    .map(|_| {
+                        scope.spawn(|| {
+                            together.wait();
+                            admitted(&last, 1000)
+                        })
+                    })
+                    .collect();
+                panics
+                    .into_iter()
+                    .filter_map(|panic| panic.join().ok())
+                    .filter(|shown| *shown)
+                    .count()
+            });
+            assert_eq!(shown, 1);
+        }
+        let last = AtomicU64::new(0);
+        assert!(admitted(&last, 0));
+        assert!(!admitted(&last, every - 1));
+        assert!(admitted(&last, every + 1));
+        assert!(!admitted(&last, every + 2));
+        assert!(admitted(&last, 2 * every + 1));
     }
 
     #[test]
