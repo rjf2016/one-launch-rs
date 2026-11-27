@@ -133,6 +133,8 @@ struct State {
     quits: Vec<(String, OffsetDateTime)>,
     // Until then the client checks what the product needs and its page offers no Play.
     checking_until: Option<OffsetDateTime>,
+    // How many checks launch requests began: only the latest one ends the check and shows the page.
+    checks: u32,
 }
 
 pub struct RiotSim {
@@ -372,6 +374,7 @@ impl RiotSim {
                 closes: 0,
                 quits: Vec::new(),
                 checking_until: None,
+                checks: 0,
             }),
         });
         if let Some(uid) = &sim.knobs.running_as {
@@ -688,14 +691,21 @@ impl RiotSim {
         lines.push(self.declined_line(boot, "Product is not up to date"));
         let wait = Duration::from_millis(after);
         let now = self.clock.now();
-        self.state().checking_until = Some(now + wait);
-        let run = self.state().closes;
+        let (run, number) = {
+            let mut state = self.state();
+            state.checking_until = Some(now + wait);
+            state.checks += 1;
+            (state.closes, state.checks)
+        };
         let (sim, launch) = (Arc::clone(self), launch.clone());
         self.clock.schedule(wait, move || {
-            if sim.state().closes != run {
-                return;
+            {
+                let mut state = sim.state();
+                if state.closes != run || state.checks != number {
+                    return;
+                }
+                state.checking_until = None;
             }
-            sim.state().checking_until = None;
             let mut lines = vec![sim.patch_line(&launch)];
             lines.extend(sim.page_lines(&launch, boot, check));
             sim.append_log(&lines);
@@ -1010,6 +1020,47 @@ mod tests {
         sim.press_play("valorant.live").unwrap();
         let image = game_images_of("valorant")[0];
         assert!(!processes.is_running(image).unwrap());
+    }
+
+    #[test]
+    fn a_launch_request_during_a_check_starts_the_check_again_and_the_page_comes_once_at_its_end() {
+        use ol_platform_api::{CancelToken, ProcessArg, ProcessLister, ProcessRunner};
+        let scratch = ol_testkit::Scratch::new("sim-riot-checks");
+        let knobs = RiotKnobs {
+            running_as: Some("11111111-1111-4111-8111-111111111111".to_owned()),
+            dependency_update_ms: Some(2_000),
+            ..RiotKnobs::default()
+        };
+        let (sim, processes, clock) = client(&scratch, knobs);
+        let image = game_images_of("valorant")[0];
+        let request = || {
+            let args = [
+                ProcessArg::Plain("--launch-product=valorant"),
+                ProcessArg::Plain("--launch-patchline=live"),
+            ];
+            processes.start(EXE, &args, "").unwrap();
+        };
+        let pages = || {
+            let file = sim.state().log_file.clone().unwrap();
+            fs::read_to_string(file)
+                .unwrap()
+                .matches("(Auto-launch is disabled)")
+                .count()
+        };
+        let wait = |ms| clock.sleep(Duration::from_millis(ms), &CancelToken::new());
+
+        request();
+        wait(1_000);
+        request();
+        wait(1_000);
+        assert_eq!(pages(), 0);
+        sim.press_play("valorant.live").unwrap();
+        assert!(!processes.is_running(image).unwrap());
+
+        wait(1_000);
+        assert_eq!(pages(), 1);
+        sim.press_play("valorant.live").unwrap();
+        assert!(processes.is_running(image).unwrap());
     }
 
     fn recorded(relative: &str) -> Value {

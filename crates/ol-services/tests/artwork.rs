@@ -1739,7 +1739,22 @@ fn steams_placeholder_is_one_gray_and_a_picture_is_not() {
     let faded_logo = DynamicImage::ImageLumaA8(GrayAlphaImage::from_fn(64, 36, |x, _| {
         LumaA([75, if x < 32 { 0 } else { 255 }])
     }));
+    let see_through = DynamicImage::ImageLumaA8(GrayAlphaImage::from_pixel(64, 36, LumaA([75, 0])));
     for (name, bytes) in [
+        ("flat black", solid_png(30, 45, [0, 0, 0])),
+        ("flat white", solid_png(30, 45, [255, 255, 255])),
+        (
+            "a gray that is wholly transparent",
+            bytes_of(&see_through, ImageFormat::Png),
+        ),
+        (
+            "a gray darker than Steam's",
+            solid_png(30, 45, [60, 60, 60]),
+        ),
+        (
+            "a gray lighter than Steam's",
+            solid_png(30, 45, [110, 110, 110]),
+        ),
         ("one colour that is not gray", png()),
         ("a gray with a tint", solid_png(30, 45, [75, 75, 84])),
         ("two grays far apart", bytes_of(&two_tone, ImageFormat::Png)),
@@ -1860,11 +1875,10 @@ fn a_placeholder_an_earlier_lookup_kept_goes_at_the_next_scan_and_is_looked_up_a
     assert_eq!(library.art.prune(&library.store).unwrap(), 2);
     let healed = ArtworkRow {
         grid_path: None,
-        logo_path: None,
         ..kept
     };
     assert_eq!(library.row(&id), Some(healed.clone()));
-    assert_eq!(library.files(&id), ["hero.png"]);
+    assert_eq!(library.files(&id), ["hero.png", "logo.png"]);
     assert_eq!(library.row(&gray), None);
     assert!(library.files(&gray).is_empty());
 
@@ -1878,12 +1892,10 @@ fn a_placeholder_an_earlier_lookup_kept_goes_at_the_next_scan_and_is_looked_up_a
         [Outcome::Failed, Outcome::Failed]
     );
     assert_eq!(library.row(&id), Some(healed));
-    assert_eq!(library.files(&id), ["hero.png"]);
+    assert_eq!(library.files(&id), ["hero.png", "logo.png"]);
     assert_eq!(
         library.miss(&id).as_deref(),
-        Some(
-            "Steam CDN grid: only Steam's gray placeholder; Steam CDN logo: only Steam's gray placeholder; No SteamGridDB API key in Settings"
-        )
+        Some("Steam CDN grid: only Steam's gray placeholder; No SteamGridDB API key in Settings")
     );
 
     assert_eq!(library.art.prune(&library.store).unwrap(), 0);
@@ -1891,6 +1903,67 @@ fn a_placeholder_an_earlier_lookup_kept_goes_at_the_next_scan_and_is_looked_up_a
         library.art.enqueue_after_scan(&library.store, NOW).unwrap(),
         0
     );
+}
+
+// A row has one source, its cover's: a hero or a logo beside a cover from Steam may be SteamGridDB's.
+#[test]
+fn of_a_row_marked_as_steams_only_the_cover_is_judged_at_the_scan() {
+    let mut library = Library::new();
+    let real_cover = library.install(LauncherId::Steam, APP, "Made Up Game");
+    let gray_cover_game = library.install(LauncherId::Steam, "2000001", "Made Up Gray Game");
+    let gray_hero = bytes_of(&gray_cover(), ImageFormat::Jpeg);
+    let gray_logo = bytes_of(&gray_logo(), ImageFormat::Png);
+    for (game, files) in [
+        (
+            &real_cover,
+            vec![
+                ("grid.png", png()),
+                ("hero.jpg", gray_hero.clone()),
+                ("logo.png", gray_logo.clone()),
+            ],
+        ),
+        (
+            &gray_cover_game,
+            vec![
+                ("grid.jpg", bytes_of(&gray_cover(), ImageFormat::Jpeg)),
+                ("logo.png", gray_logo.clone()),
+            ],
+        ),
+    ] {
+        fs::create_dir_all(library.folder(game)).unwrap();
+        for (name, bytes) in files {
+            fs::write(library.folder(game).join(name), bytes).unwrap();
+        }
+    }
+    let mixed = ArtworkRow {
+        hero_path: Some(format!("{real_cover}/hero.jpg")),
+        ..steam_row(&real_cover)
+    };
+    library.store.put_artwork(&real_cover, &mixed).unwrap();
+    let placeholder_cover = ArtworkRow {
+        grid_path: Some(format!("{gray_cover_game}/grid.jpg")),
+        hero_path: None,
+        ..steam_row(&gray_cover_game)
+    };
+    library
+        .store
+        .put_artwork(&gray_cover_game, &placeholder_cover)
+        .unwrap();
+
+    assert_eq!(library.art.prune(&library.store).unwrap(), 1);
+    assert_eq!(library.row(&real_cover), Some(mixed));
+    assert_eq!(
+        library.files(&real_cover),
+        ["grid.png", "hero.jpg", "logo.png"]
+    );
+    assert_eq!(
+        library.row(&gray_cover_game),
+        Some(ArtworkRow {
+            grid_path: None,
+            ..placeholder_cover
+        })
+    );
+    assert_eq!(library.files(&gray_cover_game), ["logo.png"]);
 }
 
 #[test]

@@ -5,6 +5,7 @@ pub mod fetch;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::io::{self, Cursor, Read};
+use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -31,7 +32,8 @@ const LARGEST_SIDE: u32 = 8192;
 const MOST_DECODED_BYTES: u64 = 256 * 1024 * 1024;
 const ATTEMPT_MOST: usize = 500;
 // Steam's placeholders seen so far are one gray from 69 to 103 with an alpha from 245 to 255, and under 5 KB.
-const PLACEHOLDER_BAND: u8 = 40;
+const PLACEHOLDER_GRAY: RangeInclusive<u8> = 69..=103;
+const PLACEHOLDER_ALPHA: RangeInclusive<u8> = 245..=255;
 const PLACEHOLDER_TINT: u8 = 8;
 const PLACEHOLDER_MOST_BYTES: u64 = 16 * 1024;
 pub const KEY_REFUSED: &str =
@@ -95,24 +97,16 @@ pub fn decode(bytes: &[u8], ext: Ext) -> Option<DynamicImage> {
     reader.decode().ok()
 }
 
-// What Steam's image servers answer for a picture a game never had: one gray, give or take a faint border. A picture of a single other colour is not it.
+// What Steam's image servers answer for a picture a game never had: their one dark gray, almost opaque. Any other picture, a flat black, white or transparent one among them, is not it.
 pub fn is_steam_placeholder(picture: &DynamicImage) -> bool {
-    let mut low = [u8::MAX; 2];
-    let mut high = [u8::MIN; 2];
-    for (_, _, pixel) in picture.pixels() {
+    picture.pixels().all(|(_, _, pixel)| {
         let [red, green, blue, alpha] = pixel.0;
-        if red.max(green).max(blue) - red.min(green).min(blue) > PLACEHOLDER_TINT {
-            return false;
-        }
-        for (at, value) in [red, alpha].into_iter().enumerate() {
-            low[at] = low[at].min(value);
-            high[at] = high[at].max(value);
-            if high[at] - low[at] > PLACEHOLDER_BAND {
-                return false;
-            }
-        }
-    }
-    true
+        red.max(green).max(blue) - red.min(green).min(blue) <= PLACEHOLDER_TINT
+            && [red, green, blue]
+                .iter()
+                .all(|value| PLACEHOLDER_GRAY.contains(value))
+            && PLACEHOLDER_ALPHA.contains(&alpha)
+    })
 }
 
 fn is_stored_placeholder(file: &Path) -> bool {
@@ -455,7 +449,7 @@ impl Artwork {
         Ok(gone + self.remove_placeholders(store)?)
     }
 
-    // Once a run for each installed game: a picture from Steam's servers that is its placeholder goes with its place in the row, so the game counts as missing it.
+    // Once a run for each installed game: a cover from Steam's servers that is its placeholder goes with its place in the row, so the game counts as missing it. A row has one source, its cover's, so a hero or a logo beside it may be SteamGridDB's and is left.
     fn remove_placeholders(&mut self, store: &Store) -> Result<usize, StoreError> {
         let mut healed = 0;
         for game in store.installed_games()? {
@@ -468,38 +462,28 @@ impl Artwork {
             else {
                 continue;
             };
-            let mut kept = row.clone();
-            let mut removed = Vec::new();
-            for (kind, path) in [
-                (ArtworkKind::Grid, &mut kept.grid_path),
-                (ArtworkKind::Hero, &mut kept.hero_path),
-                (ArtworkKind::Logo, &mut kept.logo_path),
-            ] {
-                let placeholder = path
-                    .as_deref()
-                    .and_then(|stored| artwork_file(&self.dir, stored))
-                    .filter(|file| is_stored_placeholder(file));
-                if let Some(file) = placeholder {
-                    removed.push((kind, file));
-                    *path = None;
-                }
-            }
-            if removed.is_empty() {
+            let Some(file) = row
+                .grid_path
+                .as_deref()
+                .and_then(|stored| artwork_file(&self.dir, stored))
+                .filter(|file| is_stored_placeholder(file))
+            else {
                 continue;
-            }
-            if kept.grid_path.is_none() && kept.hero_path.is_none() && kept.logo_path.is_none() {
+            };
+            if row.hero_path.is_none() && row.logo_path.is_none() {
                 store.delete_artwork(&game.id)?;
             } else {
-                store.put_artwork(&game.id, &kept)?;
+                store.put_artwork(
+                    &game.id,
+                    &ArtworkRow {
+                        grid_path: None,
+                        ..row
+                    },
+                )?;
             }
-            for (_, file) in &removed {
-                let _ = fs::remove_file(file);
-            }
-            let kinds: Vec<&str> = removed.iter().map(|(kind, _)| kind.as_str()).collect();
-            self.log.info(
-                "artwork placeholder removed",
-                json!({ "gameId": game.id, "kinds": kinds }),
-            );
+            let _ = fs::remove_file(file);
+            self.log
+                .info("artwork placeholder removed", json!({ "gameId": game.id }));
             healed += 1;
         }
         Ok(healed)
