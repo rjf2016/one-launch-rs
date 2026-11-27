@@ -1106,9 +1106,14 @@ impl<'a> RiotAdapter<'a> {
         }
         let waited_for = seconds(timing.launch_confirm);
         if declined.as_deref() == Some(NOT_UP_TO_DATE) {
-            return Err(AdapterError::Failed(format!(
-                "{name} did not start within {waited_for} s: the Riot Client is still updating it or something it needs. When the Riot Client has finished, press Play there."
-            )));
+            return Ok(Launched {
+                hand_off: Some(format!(
+                    "The Riot Client is still updating {name} or something it needs. When it has finished, press Play in the Riot Client window."
+                )),
+                ..Launched::sent(said(&format!(
+                    "the Riot Client had not started the game within {waited_for} s: {NOT_UP_TO_DATE}"
+                )))
+            });
         }
         Err(AdapterError::Failed(if accepted {
             format!(

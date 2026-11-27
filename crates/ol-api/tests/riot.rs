@@ -1335,29 +1335,56 @@ fn play_is_pressed_only_once_a_client_that_was_not_up_to_date_is_ready() {
     fakes.backend.shut_down();
 }
 
-#[test]
-fn a_client_still_not_up_to_date_when_the_watch_ends_fails_the_launch_and_nothing_goes_to_recent() {
-    let fakes = fakes(Some(&checking_for(10_000)));
-    let states = fakes.play(ALT);
-    let last = states.last().unwrap();
-    assert!(last.state == JobState::Failed && last.switched && !last.game_seen);
-    assert!(last.hand_off.is_none());
-    let error = last.error.clone().unwrap_or_default();
+const STILL_UPDATING: &str = "The Riot Client is still updating VALORANT or something it needs. When it has finished, press Play in the Riot Client window.";
+
+fn handed_over_while_updating(fakes: &Fakes, login: &str, last: &LaunchJob, how: &str) {
     assert!(
-        error.ends_with(
-            "VALORANT did not start within 2 s: the Riot Client is still updating it or something it needs. When the Riot Client has finished, press Play there."
-        ),
-        "{error}"
+        last.state == JobState::Done && !last.game_seen,
+        "{:?}",
+        last.error
     );
-    assert_eq!(launch_requests(&fakes), 0);
+    assert!(last.error.is_none());
+    assert_eq!(last.hand_off.as_deref(), Some(STILL_UPDATING));
     assert!(
-        block_on(fakes.backend.recent_launches(50))
-            .unwrap()
-            .is_empty()
+        detail(last, "launch").ends_with(&format!(
+            "--launch-product=valorant --launch-patchline=live ({how}the Riot Client had not started the game within 2 s: Product is not up to date)"
+        )),
+        "{}",
+        detail(last, "launch")
     );
+    assert_eq!(launch_requests(fakes), 0);
+    let recent = block_on(fakes.backend.recent_launches(50)).unwrap();
+    let (game, account) = (fakes.game(), fakes.account(login));
+    assert_eq!(recent.len(), 1);
+    assert!(recent[0].game_id == game.id && recent[0].account_id == account.id);
     fakes.backend.shut_down();
     let opened = Store::open_read_only(&database_path(&fakes.scratch.join("data"))).unwrap();
     assert_eq!(opened.store.row_counts().unwrap().launch_history, 1);
+}
+
+#[test]
+fn a_client_still_not_up_to_date_when_the_watch_ends_hands_play_over_and_the_game_goes_to_recent() {
+    let fakes = fakes(Some(&checking_for(10_000)));
+    let states = fakes.play(ALT);
+    let last = states.last().unwrap();
+    assert!(last.switched);
+    handed_over_while_updating(
+        &fakes,
+        ALT,
+        last,
+        "the switch started the client with these arguments; ",
+    );
+}
+
+#[test]
+fn a_client_that_runs_as_the_account_and_is_still_not_up_to_date_hands_play_over_too() {
+    let knobs =
+        json!({ "knobs": { "riot": { "runningAs": MAIN_UID, "dependencyUpdateMs": 10_000 } } });
+    let fakes = fakes(Some(&knobs));
+    let states = fakes.play(MAIN);
+    let last = states.last().unwrap();
+    assert!(last.direct, "{:?}", last.error);
+    handed_over_while_updating(&fakes, MAIN, last, "");
 }
 
 #[test]
