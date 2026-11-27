@@ -297,6 +297,76 @@ fn looking_up_by_itself_can_be_turned_off_and_turning_it_on_again_looks_up_what_
 }
 
 #[test]
+fn turned_off_the_lookups_that_wait_go_and_a_refresh_of_all_still_looks_up_every_game() {
+    let run = Run::new();
+    let (entered, entering) = channel();
+    let (release, released) = channel::<()>();
+    let entered: Mutex<Sender<()>> = Mutex::new(entered);
+    let released = Mutex::new(released);
+    let http = Arc::new(RecordingHttp::new(move |request| {
+        let _ = entered.lock().unwrap().send(());
+        let _ = released.lock().unwrap().recv();
+        respond(request)
+    }));
+    run.backend.use_http(Arc::clone(&http) as _);
+    let heard = run.backend.artwork_changes();
+    block_on(run.backend.rescan()).unwrap();
+    entering
+        .recv_timeout(WAIT)
+        .expect("a lookup asked something");
+    let status = run.status();
+    assert_eq!((status.running, status.queued), (2, 2));
+
+    block_on(
+        run.backend
+            .set_setting(SettingKey::ArtworkAutoFetch, "false".to_owned()),
+    )
+    .unwrap();
+    let status = run.status();
+    assert_eq!((status.running, status.queued), (2, 0));
+    let mut last = None;
+    while let Ok(status) = heard.try_recv() {
+        last = Some(status);
+    }
+    assert_eq!(
+        last.map(|status| (status.running, status.queued)),
+        Some((2, 0)),
+        "the Library heard the drop at once"
+    );
+
+    drop(release);
+    let status = run.settled();
+    assert_eq!(status.completed + status.failed, 2);
+    let library = block_on(run.backend.library()).unwrap();
+    let looked_up = library
+        .games
+        .iter()
+        .filter(|entry| entry.game.artwork.is_some() || entry.game.artwork_error.is_some())
+        .count();
+    assert_eq!(looked_up, 2, "only the lookups already running ended");
+    assert!(
+        run.log_text()
+            .contains(r#"INFO  [main:ipc] automatic artwork dropped {"dropped":2}"#)
+    );
+
+    assert_eq!(
+        block_on(run.backend.refresh_artwork(None, true)).unwrap(),
+        4
+    );
+    let status = run.settled();
+    assert_eq!(status.completed + status.failed, 6);
+    let library = block_on(run.backend.library()).unwrap();
+    assert_eq!(library.games.len(), 4);
+    assert!(
+        library
+            .games
+            .iter()
+            .all(|entry| entry.game.artwork.is_some() || entry.game.artwork_error.is_some())
+    );
+    run.backend.shut_down();
+}
+
+#[test]
 fn the_key_is_sealed_in_the_database_sent_to_steamgriddb_alone_and_named_nowhere() {
     let (run, http) = Run::with_the_fake_internet();
     block_on(run.backend.rescan()).unwrap();
@@ -492,8 +562,8 @@ fn the_one_page_the_app_opens_in_a_browser_is_the_steamgriddb_key_page() {
 #[test]
 fn a_client_that_answers_nothing_leaves_every_game_with_its_reason() {
     let run = Run::new();
-    run.backend
-        .use_http(Arc::new(RecordingHttp::new(|_| Ok(status(404)))));
+    let http = Arc::new(RecordingHttp::new(|_| Ok(status(404))));
+    run.backend.use_http(Arc::clone(&http) as _);
     block_on(run.backend.rescan()).unwrap();
     let status = run.settled();
     assert_eq!((status.completed, status.failed), (0, 4));
@@ -502,8 +572,16 @@ fn a_client_that_answers_nothing_leaves_every_game_with_its_reason() {
     assert_eq!(
         steam.artwork_error.as_deref(),
         Some(
-            "Steam CDN grid: HTTP 404; Steam CDN hero: HTTP 404; Steam CDN logo: HTTP 404; No SteamGridDB API key in Settings"
+            "Steam CDN grid: HTTP 404; Steam CDN hero: HTTP 404; Steam CDN logo: HTTP 404; Steam store: HTTP 404; No SteamGridDB API key in Settings"
         )
+    );
+    assert_eq!(
+        http.urls()
+            .iter()
+            .filter(|url| url.starts_with("https://api.steampowered.com/"))
+            .count(),
+        3,
+        "one store request for each game with a Steam id"
     );
     run.backend.shut_down();
 }
