@@ -6,7 +6,7 @@ use gpui::{
     AnyElement, App, Bounds, Context, Div, ElementId, Entity, FocusHandle, Focusable as _,
     MouseButton, Pixels, SharedString, Stateful, Subscription, Window, div, px,
 };
-use gpui_kit::base::input::{Input, InputEditorStyle, InputEvent, InputState};
+use gpui_kit::base::input::{Escape, Input, InputEditorStyle, InputEvent, InputState};
 
 use crate::theme::{self, alpha, color};
 
@@ -211,6 +211,17 @@ impl TextField {
         Input::new(&self.state)
     }
 
+    // A frame of the caller's own, which must hold `bare()`.
+    pub fn holder(&self, id: impl Into<ElementId>, cx: &App) -> Stateful<Div> {
+        let field = self.clone();
+        let frame = div().id(id).when(!self.is_disabled(cx), |frame| {
+            frame.on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                field.focus(window, cx);
+            })
+        });
+        holding(frame, self.focus_handle(cx))
+    }
+
     fn framed(
         &self,
         id: impl Into<ElementId>,
@@ -223,7 +234,7 @@ impl TextField {
         let disabled = self.is_disabled(cx);
         let focused = !disabled && self.state.read(cx).focus_handle(cx).is_focused(window);
         let field = self.clone();
-        div()
+        let frame = div()
             .id(id)
             .flex()
             .items_center()
@@ -246,6 +257,22 @@ impl TextField {
                 frame.on_mouse_down(MouseButton::Left, move |_, window, cx| {
                     field.focus(window, cx);
                 })
-            })
+            });
+        holding(frame, self.focus_handle(cx))
     }
+}
+
+pub(crate) fn holding(frame: Stateful<Div>, field: FocusHandle) -> Stateful<Div> {
+    let outside = field.clone();
+    frame
+        .on_mouse_down_out(move |_, window, cx| {
+            if outside.is_focused(window) {
+                window.blur(cx);
+            }
+        })
+        .on_action(move |_: &Escape, window, cx| {
+            if field.is_focused(window) {
+                window.blur(cx);
+            }
+        })
 }

@@ -5,7 +5,7 @@ use gpui::{
 };
 use gpui_kit::base::input::{InputEvent, Textarea, TextareaState};
 
-use crate::text_field::{FieldEvent, editor_style};
+use crate::text_field::{FieldEvent, editor_style, holding};
 use crate::theme::{self, color};
 
 #[derive(Clone)]
@@ -102,7 +102,7 @@ impl TextArea {
         let disabled = self.is_disabled(cx);
         let focused = !disabled && self.is_focused(window, cx);
         let field = self.clone();
-        div()
+        let frame = div()
             .id(id)
             .px(px(12.))
             .py(px(8.))
@@ -121,6 +121,7 @@ impl TextArea {
                     field.focus(window, cx);
                 })
             })
-            .child(div().w_full().child(Textarea::new(&self.state)))
+            .child(div().w_full().child(Textarea::new(&self.state)));
+        holding(frame, self.focus_handle(cx))
     }
 }

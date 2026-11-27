@@ -1387,11 +1387,6 @@ impl LibraryView {
                         window,
                         cx,
                     )
-                    .on_mouse_down_out(cx.listener(|this, _, window, cx| {
-                        if this.typing(window, cx) {
-                            window.blur(cx);
-                        }
-                    }))
                     .flex_grow(1.)
                     .flex_basis(px(256.))
                     .min_w(px(256.))
