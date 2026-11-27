@@ -45,6 +45,15 @@ Slice 1 is closed: on 2026-11-21 the owner said go on GPUI, after using the Rust
 
 A small number of beta testers have the Electron app installed. So slice 6 keeps the data folder, the database schema, the vault format, the installer identity and the update feed exact: their installs are taken over in place, with their saved accounts intact.
 
+## Slice 6: the owner's decisions of 2026-11-27
+
+- Order: the updater and what makes the app an installed one (the real data folder, Start with Windows, a version) first; the installer last, since it runs on GitHub alone.
+- Releases: the takeover release is published on the Electron repository's releases, where installed copies look. Later Rust releases move to this repository; when is decided at the cutover. A rollback after the move needs a release in both places.
+- Version: the first Rust release is the next beta above the last Electron release.
+- The real data folder: only the build the release workflow makes on GitHub opens it without `--data-dir`. A build made on the owner's PC keeps refusing it.
+- The installer stays unsigned, as the Electron one is.
+- The security review of the vault, the switch writes and the updater is at the end of this slice, before anything is published. It also looks at the Riot Client's local server, whose certificate is not checked.
+
 ## Dropped
 
 Tickets and write scopes; the verifier role and its rounds; the policy check on pull requests (#9, closed); the ledger; waves and slots; pixel tolerance as a gate; the spike sheet; the remaining Milestone 1 guardrail tickets (F6d, F6e, F7a to F7c).

@@ -114,7 +114,9 @@ pub trait LauncherAdapter {
 
 ## Async model
 
-Target: runtime-agnostic `async fn`, driven by a single-threaded executor on one dedicated backend thread. As built in slice 3, there is no executor: the adapter and the switch pipeline are plain blocking code over the ports, a launch job runs on a thread of its own (`switch`) that never touches the database and hands its result to the backend thread, and every wait goes through `Clock::sleep` with a `CancelToken`. The fake clock moves time only when something sleeps, which gives the same determinism the virtual-clock executor was for. The points below describe the target.
+As built since slice 3, and the design on the owner's word of 2026-11-27: there is no executor. The adapter and the switch pipeline are plain blocking code over the ports. A launch job runs on a thread of its own (`switch`) that never touches the database: it asks the database's thread for what a switch needs of the accounts and their saved sign-ins (`StoreThread`), waits for the answer, and hands its result to the backend thread. Every wait goes through `Clock::sleep` with a `CancelToken`. The fake clock moves time only when something sleeps, which gives the determinism the virtual-clock executor was for.
+
+The first plan was runtime-agnostic `async fn`, driven by a single-threaded executor on one dedicated backend thread. The points below describe that plan and are kept for what they say about the Electron code; they are not a target.
 
 - The TS code is cooperative and single-threaded: the job, the IPC handlers and the simulator timers interleave only at `await`, and nothing is locked. A single-threaded executor reproduces that exactly, so `Backend` owns the DB, services and adapters without `Arc<Mutex>`.
 - Commands arrive on an `async-channel` with oneshot replies; events leave on a watch channel.
@@ -122,7 +124,7 @@ Target: runtime-agnostic `async fn`, driven by a single-threaded executor on one
 - `AbortSignal` becomes `CancelToken`. `sleep(ms, &cancel)` never errors. `wait_until` keeps the exact order: abort, condition, deadline, sleep.
 - Virtual clock: the test executor runs until stalled, then jumps virtual time to the next timer. That is the Node fake-timer model the existing tests were written against, so replay and the operation log are deterministic.
 
-Rejected: threads and channels (virtual time needs quiescence detection across threads; ordering becomes nondeterministic), GPUI's executor in the core (drags GPUI in and forces `Send` and locks), tokio (unnecessary weight).
+Rejected in that plan: threads and channels (virtual time needs quiescence detection across threads; ordering becomes nondeterministic), which the one job thread and the sleeping fake clock answered; GPUI's executor in the core (drags GPUI in and forces `Send` and locks), tokio (unnecessary weight).
 
 ## Command surface
 
