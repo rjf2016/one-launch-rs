@@ -23,8 +23,8 @@ pub mod settings {
     };
     pub use ol_services::window::{
         AfterPlay, CloseAction, MIN_WINDOW, Placement, QuitAnswer, QuitQuestion, Rect,
-        START_HIDDEN_FLAG, WindowLog, bounds_setting, close_request_action, display_for, fit,
-        hide_after_instant_play, placement_from, start_hidden,
+        START_HIDDEN_FLAG, WindowAfterPlay, WindowLog, bounds_setting, close_request_action,
+        display_for, fit, hide_after_play, placement_from, start_hidden, window_after_play,
     };
 }
 
@@ -65,8 +65,9 @@ pub mod launch {
     pub use ol_services::accounts::in_pick_order;
     pub use ol_services::launch::UNWOUND;
     pub use ol_services::phases::{
-        Phase, PhaseId, PhaseNames, Recommend, RecoveryCopy, banner_text, failed_note, group_steps,
-        phase_label, plan_phases, recovery_copy, sentence, stopped_note, update_note,
+        Phase, PhaseId, PhaseNames, Recommend, RecoveryCopy, banner_text, done_pill, failed_note,
+        group_steps, handed_over, phase_label, plan_phases, recovery_copy, sent_note, sentence,
+        stopped_note, update_note, waits_for_you,
     };
 }
 

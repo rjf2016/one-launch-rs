@@ -5,10 +5,11 @@ pub mod fetch;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::io::{self, Cursor, Read};
+use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use image::{ImageFormat, ImageReader, Limits};
+use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader, Limits};
 use ol_formats::battlenet::products::known_product;
 use ol_formats::epic::steam_ids;
 use ol_model::{ArtworkKind, ArtworkSource, ArtworkStatus, Game, LauncherId, SettingKey};
@@ -30,6 +31,11 @@ pub const MAX_MANUAL_BYTES: u64 = 20 * 1024 * 1024;
 const LARGEST_SIDE: u32 = 8192;
 const MOST_DECODED_BYTES: u64 = 256 * 1024 * 1024;
 const ATTEMPT_MOST: usize = 500;
+// Steam's placeholders seen so far are one gray from 69 to 103 with an alpha from 245 to 255, and under 5 KB.
+const PLACEHOLDER_GRAY: RangeInclusive<u8> = 69..=103;
+const PLACEHOLDER_ALPHA: RangeInclusive<u8> = 245..=255;
+const PLACEHOLDER_TINT: u8 = 8;
+const PLACEHOLDER_MOST_BYTES: u64 = 16 * 1024;
 pub const KEY_REFUSED: &str =
     "That does not look like a SteamGridDB API key. Paste the key itself.";
 
@@ -73,6 +79,10 @@ pub fn sniff_image(bytes: &[u8]) -> Option<Ext> {
 
 // Whether the bytes are a whole picture of the kind they start as, no larger than the Library draws. A file from the internet is decoded once here, before it is kept.
 pub fn decodes(bytes: &[u8], ext: Ext) -> bool {
+    decode(bytes, ext).is_some()
+}
+
+pub fn decode(bytes: &[u8], ext: Ext) -> Option<DynamicImage> {
     let format = match ext {
         Ext::Jpg => ImageFormat::Jpeg,
         Ext::Png => ImageFormat::Png,
@@ -84,7 +94,31 @@ pub fn decodes(bytes: &[u8], ext: Ext) -> bool {
     limits.max_image_height = Some(LARGEST_SIDE);
     limits.max_alloc = Some(MOST_DECODED_BYTES);
     reader.limits(limits);
-    reader.decode().is_ok()
+    reader.decode().ok()
+}
+
+// What Steam's image servers answer for a picture a game never had: their one dark gray, almost opaque. Any other picture, a flat black, white or transparent one among them, is not it.
+pub fn is_steam_placeholder(picture: &DynamicImage) -> bool {
+    picture.pixels().all(|(_, _, pixel)| {
+        let [red, green, blue, alpha] = pixel.0;
+        red.max(green).max(blue) - red.min(green).min(blue) <= PLACEHOLDER_TINT
+            && [red, green, blue]
+                .iter()
+                .all(|value| PLACEHOLDER_GRAY.contains(value))
+            && PLACEHOLDER_ALPHA.contains(&alpha)
+    })
+}
+
+fn is_stored_placeholder(file: &Path) -> bool {
+    if fs::metadata(file).map_or(true, |meta| meta.len() > PLACEHOLDER_MOST_BYTES) {
+        return false;
+    }
+    let Ok(bytes) = fs::read(file) else {
+        return false;
+    };
+    sniff_image(&bytes)
+        .and_then(|ext| decode(&bytes, ext))
+        .is_some_and(|picture| is_steam_placeholder(&picture))
 }
 
 // The shape the settings screen and the backend hold a key to: one run of 20 to 64 letters and digits.
@@ -395,6 +429,8 @@ pub struct Artwork {
     dir: PathBuf,
     pub queue: Queue,
     log: Log,
+    // The games whose stored pictures were checked for Steam's placeholder in this run.
+    checked: BTreeSet<String>,
 }
 
 impl Artwork {
@@ -403,11 +439,57 @@ impl Artwork {
             dir: folder(data_dir),
             queue: Queue::default(),
             log: log.child("artwork"),
+            checked: BTreeSet::new(),
         }
     }
 
-    // Removes the cached pictures and the rows of games that are no longer installed, so the cache holds what the Library shows. A game installed again is looked up again.
-    pub fn prune(&self, store: &Store) -> Result<usize, StoreError> {
+    // Removes the cached pictures and the rows of games that are no longer installed, so the cache holds what the Library shows, and Steam's placeholder where an earlier lookup kept it. A game installed again is looked up again.
+    pub fn prune(&mut self, store: &Store) -> Result<usize, StoreError> {
+        let gone = self.prune_gone(store)?;
+        Ok(gone + self.remove_placeholders(store)?)
+    }
+
+    // Once a run for each installed game: a cover from Steam's servers that is its placeholder goes with its place in the row, so the game counts as missing it. A row has one source, its cover's, so a hero or a logo beside it may be SteamGridDB's and is left.
+    fn remove_placeholders(&mut self, store: &Store) -> Result<usize, StoreError> {
+        let mut healed = 0;
+        for game in store.installed_games()? {
+            if self.queue.is_busy(&game.id) || !self.checked.insert(game.id.clone()) {
+                continue;
+            }
+            let Some(row) = store
+                .artwork_row(&game.id)?
+                .filter(|row| row.source == ArtworkSource::SteamCdn.as_str())
+            else {
+                continue;
+            };
+            let Some(file) = row
+                .grid_path
+                .as_deref()
+                .and_then(|stored| artwork_file(&self.dir, stored))
+                .filter(|file| is_stored_placeholder(file))
+            else {
+                continue;
+            };
+            if row.hero_path.is_none() && row.logo_path.is_none() {
+                store.delete_artwork(&game.id)?;
+            } else {
+                store.put_artwork(
+                    &game.id,
+                    &ArtworkRow {
+                        grid_path: None,
+                        ..row
+                    },
+                )?;
+            }
+            let _ = fs::remove_file(file);
+            self.log
+                .info("artwork placeholder removed", json!({ "gameId": game.id }));
+            healed += 1;
+        }
+        Ok(healed)
+    }
+
+    fn prune_gone(&self, store: &Store) -> Result<usize, StoreError> {
         let keep: BTreeSet<String> = store
             .installed_games()?
             .into_iter()

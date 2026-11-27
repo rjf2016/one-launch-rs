@@ -4105,11 +4105,15 @@ name = "ol-net"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "base64 0.23.1",
+ "ol-formats",
  "ol-model",
  "ol-platform-api",
  "ol-testkit",
  "thiserror 2.0.21",
+ "time",
  "ureq",
+ "zeroize",
 ]
 
 [[package]]

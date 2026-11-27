@@ -9,8 +9,8 @@ use gpui::{
 };
 use ol_api::clipboard::CopyField;
 use ol_api::launch::{
-    PhaseNames, failed_note, group_steps, phase_label, plan_phases, sentence, stopped_note,
-    update_note,
+    PhaseNames, done_pill, failed_note, group_steps, phase_label, plan_phases, sent_note, sentence,
+    stopped_note, update_note, waits_for_you,
 };
 use ol_api::library::{date_time, relative};
 use ol_model::{
@@ -600,20 +600,18 @@ fn hand_over(
 }
 
 fn outcome(job: &LaunchJob, client: &str, plays: bool) -> Option<Div> {
-    let account = &job.account.display_name;
     match job.state {
         JobState::Running => None,
         JobState::Done => {
-            let said = if job.game.is_some() && job.hand_off.is_none() {
-                "Launched as"
-            } else {
-                "Switched to"
-            };
-            let mut launched = div().flex().flex_col().gap(px(12.)).child(pill(
-                PillTone::Ok,
-                Some(assets::CHECK),
-                format!("{said} {account}"),
-            ));
+            let mut launched = div()
+                .flex()
+                .flex_col()
+                .gap(px(12.))
+                .child(pill(PillTone::Ok, Some(assets::CHECK), done_pill(job)))
+                .children(
+                    sent_note(job)
+                        .map(|note| small(div()).text_color(color(theme::MUTED)).child(note)),
+                );
             if let Some(hand_off) = &job.hand_off {
                 launched = launched.child(
                     div()
@@ -674,10 +672,16 @@ fn phases(job: &LaunchJob, client: &str) -> Div {
         .into_iter()
         .enumerate()
         .map(|(index, phase)| {
+            let yours = waits_for_you(job, phase.id);
+            let status = if yours {
+                JobStepStatus::Pending
+            } else {
+                phase.status
+            };
             let label = format!(
                 "{}{}",
                 phase_label(phase.id, &names),
-                if phase.status == JobStepStatus::Running {
+                if status == JobStepStatus::Running {
                     "\u{2026}"
                 } else {
                     ""
@@ -685,14 +689,21 @@ fn phases(job: &LaunchJob, client: &str) -> Div {
             );
             // While the hand-over panel is up it says what the running phase waits for.
             let current = phase.current.filter(|_| {
-                phase.status != JobStepStatus::Done
-                    && !(phase.status == JobStepStatus::Running && job.attention.is_some())
+                status != JobStepStatus::Done
+                    && !(status == JobStepStatus::Running && job.attention.is_some())
             });
+            let aside = if yours {
+                Some("waiting for you")
+            } else if status == JobStepStatus::Skipped {
+                Some("not needed")
+            } else {
+                None
+            };
             div()
                 .flex()
                 .items_start()
                 .gap(px(10.))
-                .text_color(color(if waits(phase.status) {
+                .text_color(color(if waits(status) {
                     theme::MUTED
                 } else {
                     theme::TEXT
@@ -701,21 +712,21 @@ fn phases(job: &LaunchJob, client: &str) -> Div {
                     div()
                         .mt(px(2.))
                         .flex_none()
-                        .child(step_mark(phase.status, ("phase-mark", index))),
+                        .child(step_mark(status, ("phase-mark", index))),
                 )
                 .child(
                     div()
                         .min_w_0()
-                        .child(div().flex().items_baseline().gap(px(8.)).child(label).when(
-                            phase.status == JobStepStatus::Skipped,
-                            |line| {
-                                line.child(
-                                    tiny(div())
-                                        .text_color(color(theme::FAINT))
-                                        .child("not needed"),
-                                )
-                            },
-                        ))
+                        .child(
+                            div()
+                                .flex()
+                                .items_baseline()
+                                .gap(px(8.))
+                                .child(label)
+                                .children(aside.map(|aside| {
+                                    tiny(div()).text_color(color(theme::FAINT)).child(aside)
+                                })),
+                        )
                         .children(current.map(|step| {
                             small(div())
                                 .text_color(color(theme::MUTED))

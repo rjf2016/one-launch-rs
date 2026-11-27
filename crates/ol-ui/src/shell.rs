@@ -18,7 +18,7 @@ use crate::account::AccountPage;
 use crate::accounts::AccountsView;
 use crate::assets;
 use crate::guide::{GuideDone, GuideExit, SetupGuide};
-use crate::host::{LaunchHost, PlayEnded, overlay};
+use crate::host::{Ask, LaunchHost, PlayEnded, overlay};
 use crate::library::{LibraryView, OpenArtworkSettings};
 use crate::settings::{KnownStatuses, SettingsAsk, SettingsTab, SettingsView};
 use crate::whats_new::{WhatsNewCard, WhatsNewDone};
@@ -135,7 +135,6 @@ pub struct QuitAnyway;
 // A job the app followed has ended: the window may go to the tray.
 pub struct Played {
     pub job: LaunchJob,
-    pub instant: bool,
 }
 
 enum Welcome {
@@ -289,7 +288,6 @@ impl Shell {
         let played = cx.subscribe(&host, |_, _, ended: &PlayEnded, cx| {
             cx.emit(Played {
                 job: ended.job.clone(),
-                instant: ended.instant,
             });
         });
         let library = cx.new(|cx| LibraryView::new(backend.clone(), host.clone(), window, cx));
@@ -338,6 +336,11 @@ impl Shell {
         if let Page::Settings(page) = &self.page {
             page.update(cx, |page, cx| page.setting_changed(key, value, cx));
         }
+    }
+
+    pub fn close_finished_job(&mut self, job_id: &str, cx: &mut Context<Self>) {
+        self.host
+            .update(cx, |host, cx| host.close_finished_job(job_id, cx));
     }
 
     // The question before a quit stops a running switch. Asked once at a time; it takes the place of a question about leaving a page.
@@ -626,7 +629,7 @@ impl Shell {
         });
         if let Some((game, account)) = play {
             self.host
-                .update(cx, |host, cx| host.open(game, account, false, cx));
+                .update(cx, |host, cx| host.open(game, account, Ask::ListOrJob, cx));
         }
         cx.notify();
     }

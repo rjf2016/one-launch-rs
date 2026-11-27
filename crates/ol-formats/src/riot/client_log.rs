@@ -12,6 +12,7 @@ pub const STUB_LOG_MAX_BYTES: u64 = 64 * 1024;
 pub const STUB_LOG_MARK: &str = "ProcessSingleton: Did not acquire process singleton";
 // How long a reason the client gives for not launching may be, in UTF-16 units.
 const MAX_REASON_LENGTH: usize = 80;
+pub const NOT_UP_TO_DATE: &str = "Product is not up to date";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SignedInHow {
@@ -633,16 +634,16 @@ pub fn launch_declined(events: &[LogEvent], product: &str, patchline: &str) -> O
         .last()
 }
 
-// The game's page is up with its Play button ready: after the product's own lines, with no other product's since, the pipeline reached WaitForLaunch or the client said why it is not launching.
+// The game's page is up with its Play button ready: after the product's own lines, with no other product's since, the pipeline reached WaitForLaunch or the client said why it is not launching. "Product is not up to date" is no such reason: the client is still patching the game or something it needs, and is ready only later. The client's last word of these counts, so that refusal after the page takes it back.
 pub fn launch_page_shown(events: &[LogEvent], product: &str, patchline: &str) -> bool {
-    while_named(events, product, patchline).any(|(event, named)| {
-        named
-            && match event {
-                LogEvent::Lifecycle { to, .. } => to == "WaitForLaunch",
-                LogEvent::LaunchDeclined { .. } => true,
-                _ => false,
-            }
-    })
+    while_named(events, product, patchline)
+        .filter_map(|(event, named)| match event {
+            LogEvent::Lifecycle { to, .. } if named && to == "WaitForLaunch" => Some(true),
+            LogEvent::LaunchDeclined { reason } if named => Some(reason != NOT_UP_TO_DATE),
+            _ => None,
+        })
+        .last()
+        .unwrap_or(false)
 }
 
 // The client started the product's game: the pipeline reached WaitForSessionExit after the product's own lines, with no other product's since, or the game ran to its end.
@@ -874,6 +875,184 @@ mod tests {
         let other = events(&other);
         assert!(!game_started(&other, "valorant", "live"));
         assert!(game_started(&other, "league_of_legends", "live"));
+    }
+
+    #[test]
+    fn a_refusal_because_the_product_is_not_up_to_date_does_not_show_the_page() {
+        let step = |at, from: &str, to: &str| {
+            line(
+                at,
+                "ALWAYS",
+                &format!(
+                    "riot-client-lifecycle: Context #1: Middleware transition ({from}) -> ({to})"
+                ),
+            )
+        };
+        let running = |at, reason: &str| {
+            line(
+                at,
+                "OKAY",
+                &format!(
+                    "riot-client-lifecycle: Client is already running. Explicitly request focus instead of launching ({reason})"
+                ),
+            )
+        };
+        let mut lines = vec![
+            line(
+                1,
+                "ALWAYS",
+                "riot-client-lifecycle: Setting product context to valorant.live, willAutoLaunch=false",
+            ),
+            step(2, "AppRepairAndUpdate", "PatchStatus"),
+            running(3, NOT_UP_TO_DATE),
+        ];
+        let updating = events(&lines);
+        assert!(!launch_page_shown(&updating, "valorant", "live"));
+        assert_eq!(
+            launch_declined(&updating, "valorant", "live").as_deref(),
+            Some(NOT_UP_TO_DATE)
+        );
+
+        let at_boot = [
+            lines[0].clone(),
+            line(
+                2,
+                "OKAY",
+                "riot-client-lifecycle: Attempting to launch default product with reason (Product is not up to date)",
+            ),
+        ];
+        assert!(!launch_page_shown(&events(&at_boot), "valorant", "live"));
+
+        let mut ready = lines.clone();
+        ready.push(step(4, "RestartRequired", "WaitForLaunch"));
+        assert!(launch_page_shown(&events(&ready), "valorant", "live"));
+
+        lines.push(running(4, "Auto-launch is disabled"));
+        assert!(launch_page_shown(&events(&lines), "valorant", "live"));
+    }
+
+    fn context(at: u32, id: &str) -> String {
+        line(
+            at,
+            "ALWAYS",
+            &format!(
+                "riot-client-lifecycle: Setting product context to {id}, willAutoLaunch=false"
+            ),
+        )
+    }
+
+    fn step(at: u32, from: &str, to: &str) -> String {
+        line(
+            at,
+            "ALWAYS",
+            &format!("riot-client-lifecycle: Context #1: Middleware transition ({from}) -> ({to})"),
+        )
+    }
+
+    fn running(at: u32, reason: &str) -> String {
+        line(
+            at,
+            "OKAY",
+            &format!(
+                "riot-client-lifecycle: Client is already running. Explicitly request focus instead of launching ({reason})"
+            ),
+        )
+    }
+
+    #[test]
+    fn a_page_shown_and_then_refused_as_not_up_to_date_is_taken_back_until_it_is_shown_again() {
+        let updated = [
+            context(1, "valorant.live"),
+            running(2, NOT_UP_TO_DATE),
+            running(3, "Auto-launch is disabled"),
+        ];
+        assert!(launch_page_shown(&events(&updated), "valorant", "live"));
+
+        let mut lines = vec![
+            context(1, "valorant.live"),
+            step(2, "RestartRequired", "WaitForLaunch"),
+            running(3, "Auto-launch is disabled"),
+            context(4, "valorant.live"),
+            step(5, "AppRepairAndUpdate", "PatchStatus"),
+            running(6, NOT_UP_TO_DATE),
+        ];
+        assert!(!launch_page_shown(&events(&lines), "valorant", "live"));
+
+        lines.push(line(7, "OKAY", "Sentry Enabled"));
+        assert!(!launch_page_shown(&events(&lines), "valorant", "live"));
+
+        let mut shown_again = lines.clone();
+        shown_again.push(step(8, "RestartRequired", "WaitForLaunch"));
+        assert!(launch_page_shown(&events(&shown_again), "valorant", "live"));
+
+        let mut declined_again = lines.clone();
+        declined_again.push(running(8, "Auto-launch is disabled"));
+        assert!(launch_page_shown(
+            &events(&declined_again),
+            "valorant",
+            "live"
+        ));
+    }
+
+    #[test]
+    fn a_refusal_as_not_up_to_date_counts_only_for_the_product_whose_lines_named_one_last() {
+        let mut lines = vec![
+            context(1, "valorant.live"),
+            step(2, "RestartRequired", "WaitForLaunch"),
+            context(3, "league_of_legends.live"),
+            running(4, NOT_UP_TO_DATE),
+        ];
+        let other_updating = events(&lines);
+        assert!(launch_page_shown(&other_updating, "valorant", "live"));
+        assert!(!launch_page_shown(
+            &other_updating,
+            "league_of_legends",
+            "live"
+        ));
+
+        lines.extend([
+            step(5, "RestartRequired", "WaitForLaunch"),
+            context(6, "valorant.live"),
+            running(7, NOT_UP_TO_DATE),
+            context(8, "league_of_legends.live"),
+        ]);
+        let valorant_updating = events(&lines);
+        assert!(!launch_page_shown(&valorant_updating, "valorant", "live"));
+        assert!(launch_page_shown(
+            &valorant_updating,
+            "league_of_legends",
+            "live"
+        ));
+    }
+
+    // The one recorded run with an update: the client refuses with "Product is not up to date" while its patch state is DependencyUpdate, and is ready about 8 s later.
+    #[test]
+    fn in_the_recorded_run_the_page_is_shown_only_once_the_client_is_ready() {
+        let file =
+            ol_testkit::oracle("fixtures/launchers/riot/2026-10-07T17-26-29_10005_Riot Client.log");
+        let text = String::from_utf8(std::fs::read(file).unwrap()).unwrap();
+        let ready = text
+            .find("Middleware transition (PatchStatus) -> (AgeRestriction)")
+            .unwrap();
+        let before = &text[..text[..ready].rfind('\n').unwrap()];
+        let updating = parse_log_events(before);
+        assert!(updating.iter().any(|event| matches!(
+            event,
+            LogEvent::PatchState { status, .. } if status == "DependencyUpdate"
+        )));
+        assert_eq!(
+            launch_declined(&updating, "valorant", "live").as_deref(),
+            Some(NOT_UP_TO_DATE)
+        );
+        assert!(!launch_page_shown(&updating, "valorant", "live"));
+        assert!(products_needing_update(&updating).is_empty());
+
+        let whole = parse_log_events(&text);
+        assert!(launch_page_shown(&whole, "valorant", "live"));
+        assert_eq!(
+            launch_declined(&whole, "valorant", "live").as_deref(),
+            Some("Auto-launch is disabled")
+        );
     }
 
     #[test]

@@ -112,9 +112,8 @@ impl AccountPage {
                     )
                 })
         });
-        let typing = field.clone();
-        div()
-            .id("tags")
+        field
+            .holder("tags", cx)
             .flex()
             .flex_wrap()
             .items_center()
@@ -131,11 +130,6 @@ impl AccountPage {
             }))
             .bg(color(theme::SURFACE_2))
             .when(disabled, |frame| frame.opacity(0.6))
-            .on_mouse_down(gpui::MouseButton::Left, move |_, window, cx| {
-                if !typing.is_disabled(cx) {
-                    typing.focus(window, cx);
-                }
-            })
             .children(chips)
             .child(
                 div()

@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use ol_model::LogLevel;
 use ol_services::log::{LogOptions, Logger};
-use ol_services::window::{CloseAction, QuitAnswer, WindowLog};
+use ol_services::window::{AfterPlay, CloseAction, QuitAnswer, WindowLog};
 use ol_testkit::{Scratch, oracle};
 
 const WAIT: Duration = Duration::from_secs(10);
@@ -32,7 +32,18 @@ fn every_line(window: &WindowLog) {
     window.close_requested(CloseAction::Hide);
     window.hidden_to_tray();
     window.shown_from_tray();
-    window.hidden_after_instant_launch(&job);
+    window.hidden_after_launch(&job);
+    window.kept_after_launch(
+        &job,
+        AfterPlay {
+            direct: false,
+            done: true,
+            hand_off: false,
+            tray_present: true,
+            close_to_tray: true,
+            hide_to_tray: true,
+        },
+    );
     window.tray_added();
     window.tray_removed();
     window.tray_unavailable("TRAY_WINDOW", Some(0x8007_0005_u32.cast_signed()));
@@ -63,7 +74,8 @@ fn the_window_the_tray_and_a_quit_are_written_with_facts_alone() {
             r#"DEBUG [main] window close requested {"action":"hide"}"#,
             "INFO  [main] window hidden to the tray",
             "INFO  [main] window shown from the tray",
-            r#"INFO  [main] window hidden to the tray after an instant launch {"jobId":"[UUID…[REDACTED]]"}"#,
+            r#"INFO  [main] window hidden to the tray after a launch {"jobId":"[UUID…[REDACTED]]"}"#,
+            r#"INFO  [main] window kept after a launch {"jobId":"[UUID…[REDACTED]]","direct":false,"handOff":false,"tray":true,"closeToTray":true}"#,
             "INFO  [main] tray icon added",
             "INFO  [main] tray icon removed",
             r#"WARN  [main] tray icon unavailable; closing the window quits {"error":{"code":"TRAY_WINDOW","hresult":"0x80070005"}}"#,
@@ -85,11 +97,11 @@ fn the_close_buttons_action_is_written_only_at_debug() {
     let logger = Logger::open(&scratch.join("logs"), LogOptions::default());
     every_line(&WindowLog::new(&logger.log()));
     let written = lines(&logger);
-    assert_eq!(written.len(), 14);
+    assert_eq!(written.len(), 15);
     assert!(!written.iter().any(|line| line.contains("close requested")));
     logger.log().set_level(LogLevel::Error);
     every_line(&WindowLog::new(&logger.log()));
     let written = lines(&logger);
-    assert_eq!(written.len(), 15);
-    assert_eq!(written[14], "ERROR [main] fatal during startup");
+    assert_eq!(written.len(), 16);
+    assert_eq!(written[15], "ERROR [main] fatal during startup");
 }

@@ -208,14 +208,29 @@ pub async fn run(plan: &CapturePlan, life: &Rc<Life>, cx: &mut AsyncApp) -> anyh
     } else {
         "shown"
     };
+    let pointer = if cx.update(|cx| cx.is_cursor_visible()) {
+        "shown"
+    } else {
+        "hidden"
+    };
     println!(
-        "OneLaunch: at the shot the window is {shown} and {} the foreground window",
+        "OneLaunch: at the shot the window is {shown} and {} the foreground window, and the pointer is {pointer}",
         if native.is_foreground() {
             "is"
         } else {
             "is not"
         }
     );
+    let keyboard = in_library(window, cx, |library, window, cx| {
+        if library.typing(window, cx) {
+            "in the Library's search field"
+        } else if window.focused(cx).is_some() {
+            "in another element"
+        } else {
+            "held by nothing"
+        }
+    })?;
+    println!("OneLaunch: at the shot the keyboard is {keyboard}");
     let shot = native.capture()?;
     image::save_buffer(
         &plan.file,

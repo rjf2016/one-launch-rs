@@ -246,6 +246,10 @@ pub struct RiotLaunchRequest<'a> {
 // Why the launch request did not take. Each is a fixed sentence with at most a status or a word of the network's: none can carry the lockfile's password or anything the client answered.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
 pub enum RiotLaunchError {
+    #[error("the launch request was not sent, because the job was stopped")]
+    Stopped,
+    #[error("the launch request names a product that is not in the shape of a Riot product id")]
+    ProductShape,
     #[error("the Riot Client has no lockfile to answer on")]
     NoLockfile,
     #[error("the lockfile is not in the shape One Launch knows")]

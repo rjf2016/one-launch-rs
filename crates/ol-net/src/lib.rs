@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 
-// The app's one way to the internet: the artwork requests, sent with ureq over TLS. What may be asked, of which host and with which headers, is the request's own (`ol_platform_api::http`); this client adds nothing to it but the Host line, follows no redirect, asks no proxy, keeps no cookie and reads no more of an answer than the request allows.
+// The app's one way to the internet: the artwork requests, sent with ureq over TLS. What may be asked, of which host and with which headers, is the request's own (`ol_platform_api::http`); this client adds nothing to it but the Host line, follows no redirect, asks no proxy, keeps no cookie and reads no more of an answer than the request allows. Beside it, on an agent of its own that reaches 127.0.0.1 alone, the Riot Client's launch request (`riot`).
+
+mod riot;
+
+pub use riot::RiotLoopback;
 
 use ol_platform_api::http::{HttpClient, HttpError, HttpRequest, HttpResponse, TooLarge};
 use ureq::config::Config;

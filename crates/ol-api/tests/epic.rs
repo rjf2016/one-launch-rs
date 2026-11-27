@@ -629,6 +629,7 @@ fn a_launcher_that_runs_as_the_account_is_left_alone_and_the_game_starts_at_once
     let states = fakes.play(ALT);
     let last = states.last().unwrap();
     assert!(last.state == JobState::Done && last.direct && last.backup_id.is_none());
+    assert!(!last.game_seen && last.hand_off.is_none());
     assert_eq!(asked_of_the_machine(&fakes), ["shell.open"]);
     assert!(fs::read(fakes.settings_file()).unwrap() == fixture_settings());
     assert!(

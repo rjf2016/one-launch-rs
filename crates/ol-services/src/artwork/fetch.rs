@@ -13,7 +13,7 @@ use ol_vault::Secret;
 use regex::Regex;
 use serde_json::Value;
 
-use super::{Download, decodes, sniff_image};
+use super::{Download, decode, is_steam_placeholder, sniff_image};
 
 pub const TIMEOUT: Duration = Duration::from_secs(15);
 pub const MAX_DOWNLOAD_BYTES: u64 = 10 * 1024 * 1024;
@@ -28,6 +28,7 @@ const SGDB_API: &str = "https://www.steamgriddb.com/api/v2";
 const SGDB_FILTER: &str = "types=static&nsfw=false&humor=false";
 const REDIRECTS: [u16; 5] = [301, 302, 303, 307, 308];
 const STOPPED: &str = "stopped";
+const PLACEHOLDER: &str = "only Steam's gray placeholder";
 
 static NOT_A_WORD: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[^\p{L}\p{N}]+").expect("the pattern is fixed"));
@@ -208,7 +209,7 @@ impl Asking<'_> {
         Ok(None)
     }
 
-    // The second host is asked only when the first has no such file.
+    // The second host is asked only when the first has no such file, or only its gray placeholder.
     fn steam_picture(&self, app_id: &str, kind: ArtworkKind) -> Result<Download, String> {
         let mut last_error = String::new();
         for host in STEAM_CDN {
@@ -217,10 +218,10 @@ impl Asking<'_> {
                 encode_uri_component(app_id),
                 steam_file(kind)
             );
-            match self.download(&url) {
+            match self.download(&url, ArtworkSource::SteamCdn) {
                 Ok(image) => return Ok(image),
                 Err(error) => {
-                    let gone = error.starts_with("HTTP 404");
+                    let gone = error.starts_with("HTTP 404") || error == PLACEHOLDER;
                     last_error = error;
                     if !gone {
                         break;
@@ -298,7 +299,7 @@ impl Asking<'_> {
                 ));
                 continue;
             }
-            match self.download(image_url) {
+            match self.download(image_url, ArtworkSource::SteamGridDb) {
                 Ok(image) => fetched
                     .found
                     .push((*kind, image, ArtworkSource::SteamGridDb)),
@@ -337,8 +338,8 @@ impl Asking<'_> {
         Ok(body.get_mut("data").map(Value::take).unwrap_or(Value::Null))
     }
 
-    // A picture, asked without the key. Redirects are followed by hand, a few at most and only among the image hosts, within one time limit for the whole chain; what comes back must say it is an image, stay within the size limit, start as a JPEG, PNG or WebP and decode as one.
-    fn download(&self, url: &str) -> Result<Download, String> {
+    // A picture, asked without the key. Redirects are followed by hand, a few at most and only among the image hosts, within one time limit for the whole chain; what comes back must say it is an image, stay within the size limit, start as a JPEG, PNG or WebP and decode as one, and from Steam's servers be more than their placeholder.
+    fn download(&self, url: &str, from: ArtworkSource) -> Result<Download, String> {
         let started = Instant::now();
         let mut next = ArtworkUrl::image(url).ok_or("not an artwork host")?;
         let mut hops = 0;
@@ -380,8 +381,9 @@ impl Asking<'_> {
             .body
             .map_err(|large| too_large(large, MAX_DOWNLOAD_BYTES))?;
         let ext = sniff_image(&bytes).ok_or("unrecognised image data")?;
-        if !decodes(&bytes, ext) {
-            return Err("unrecognised image data".to_owned());
+        let picture = decode(&bytes, ext).ok_or("unrecognised image data")?;
+        if from == ArtworkSource::SteamCdn && is_steam_placeholder(&picture) {
+            return Err(PLACEHOLDER.to_owned());
         }
         Ok(Download { bytes, ext })
     }

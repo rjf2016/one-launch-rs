@@ -39,7 +39,7 @@ use crate::files::{
     MAX_LAUNCHER_FILE_BYTES, read_launcher_bytes, read_launcher_text, read_log_since, read_log_tail,
 };
 use crate::running::game_with_running_process;
-use crate::{AccountRef, AdapterError, Directory};
+use crate::{AccountRef, AdapterError, Directory, Launched};
 
 pub use plan::{PlanContext, STEP, close_message};
 
@@ -803,7 +803,7 @@ impl<'a> BattlenetAdapter<'a> {
         launcher_game_id: &str,
         name: &str,
         cancel: &CancelToken,
-    ) -> Result<String, AdapterError> {
+    ) -> Result<Launched, AdapterError> {
         if !is_codename(launcher_game_id) {
             return Err(AdapterError::Failed(format!(
                 "Not a Battle.net product codename: {launcher_game_id}"
@@ -873,11 +873,20 @@ impl<'a> BattlenetAdapter<'a> {
             },
         );
         match (started, sent) {
-            (Err(Aborted), _) => Ok(format!("{command} (stopped watching for the game start)")),
-            (Ok(true), _) => Ok(format!("{command} (Battle.net started the game)")),
-            (Ok(false), LaunchCommand::Uri(_)) => Ok(format!(
-                "{command} (this link only opens the game page: press Play there, or switch the Battle.net launch setting to the launch command)"
-            )),
+            (Err(Aborted), _) => Ok(Launched::sent(format!(
+                "{command} (stopped watching for the game start)"
+            ))),
+            (Ok(true), _) => Ok(Launched::started(format!(
+                "{command} (Battle.net started the game)"
+            ))),
+            (Ok(false), LaunchCommand::Uri(_)) => Ok(Launched {
+                hand_off: Some(format!(
+                    "Press Play in the Battle.net window to start {name}; the launch link only opens the game's page."
+                )),
+                ..Launched::sent(format!(
+                    "{command} (this link only opens the game page: press Play there, or switch the Battle.net launch setting to the launch command)"
+                ))
+            }),
             (Ok(false), LaunchCommand::Exec(_)) => Err(AdapterError::Failed(format!(
                 "{name} did not start within {} s of the launch command. Look at the Battle.net window: the game may need an update or a repair, or the client may be busy updating itself.",
                 crate::steam::seconds(timing.launch_confirm)

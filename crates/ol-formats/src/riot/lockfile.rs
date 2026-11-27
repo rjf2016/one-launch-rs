@@ -1,4 +1,4 @@
-// Config\lockfile of a running Riot Client: `name:pid:port:password:protocol` on one line. The file is read for one thing, the launch request the client's own Play button sends, at the moment of that request. Its presence says the client runs; nothing else ever opens it.
+// Config\lockfile of a running Riot Client: `name:pid:port:password:protocol` on one line. The file is read for one thing, the launch request the client's own Play button sends, at the moment of that request: the Riot loopback channel of ol-net reads it and is the one caller of `parse_lockfile`. Its presence says the client runs; nothing else ever opens it.
 
 use zeroize::{Zeroize, Zeroizing};
 

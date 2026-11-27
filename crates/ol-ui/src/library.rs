@@ -22,7 +22,7 @@ use ol_ui_kit::theme::{self, alpha, color};
 
 use crate::assets;
 use crate::follow::{Follow, follow};
-use crate::host::{JobSettled, LaunchHost};
+use crate::host::{Ask, JobSettled, LaunchHost};
 use crate::picker::{Picked, pick_image};
 use crate::posters::{self, Lookup, Posters, Shape};
 use crate::shell::sidebar_width;
@@ -312,9 +312,42 @@ async fn read(backend: &Backend) -> Loaded {
 }
 
 // Whether a Play may skip the dialog: nothing to say about an update first, and no job to show instead.
-fn plays_at_once(game: &Game, host: &LaunchHost) -> bool {
+fn plays_at_once(game: &Game, job_running: bool) -> bool {
     let update_first = game.needs_update && game.launcher != LauncherId::Steam;
-    !update_first && !host.job_running()
+    !update_first && !job_running
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Clicked {
+    Card,
+    Recent,
+    PlayAs,
+}
+
+// Only the Recent strip plays at once. A card always opens the account list, also over a finished job of the same game, which it lets go of as it does a job of another game.
+fn asks(clicked: Clicked, game: &Game, job_running: bool) -> Ask {
+    match clicked {
+        Clicked::Card => Ask::List,
+        Clicked::Recent if plays_at_once(game, job_running) => Ask::AtOnce,
+        Clicked::Recent | Clicked::PlayAs => Ask::ListOrJob,
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SearchEscape {
+    Pass,
+    Leave,
+    ClearAndLeave,
+}
+
+fn escape_in_search(keystroke: &Keystroke, typing: bool, empty: bool) -> SearchEscape {
+    let held = keystroke.modifiers;
+    let bare = !held.control && !held.alt && !held.shift && !held.platform && !held.function;
+    match (keystroke.key == "escape" && bare && typing, empty) {
+        (false, _) => SearchEscape::Pass,
+        (true, true) => SearchEscape::Leave,
+        (true, false) => SearchEscape::ClearAndLeave,
+    }
 }
 
 impl LibraryView {
@@ -324,8 +357,7 @@ impl LibraryView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let search =
-            TextField::new("Search games (Ctrl+F)", false, window, cx).clearing_on_escape(cx);
+        let search = TextField::new("Search games (Ctrl+F)", false, window, cx);
         search.set_disabled(true, cx);
         let this = cx.weak_entity();
         let search_changed = search.on_change(cx, {
@@ -601,20 +633,19 @@ impl LibraryView {
         cx.notify();
     }
 
-    // A click on a card plays at once as the account the game was last launched with. The dialog comes first when there is no such account, when the launcher wants to update the game, and while a job runs.
+    // A click on a card opens the account list with the account the game was last launched with chosen.
     fn open_card(&mut self, game: usize, cx: &mut Context<Self>) {
         let Some(entry) = self.games.get(game) else {
             return;
         };
         let game = entry.game.clone();
-        let last = game.last_launch.clone();
-        let known = last
+        let ask = asks(Clicked::Card, &game, self.host.read(cx).job_running());
+        let account = game
+            .last_launch
             .as_ref()
-            .is_some_and(|last| last.account_name.is_some());
-        let instant = known && plays_at_once(&game, self.host.read(cx));
-        let account = last.map(|last| last.account_id);
+            .map(|last| last.account_id.clone());
         self.host
-            .update(cx, |host, cx| host.open(game, account, instant, cx));
+            .update(cx, |host, cx| host.open(game, account, ask, cx));
     }
 
     fn open_card_menu(
@@ -656,12 +687,13 @@ impl LibraryView {
         else {
             return;
         };
+        let ask = asks(Clicked::PlayAs, &game, self.host.read(cx).job_running());
         let account = game
             .last_launch
             .as_ref()
             .map(|last| last.account_id.clone());
         self.host
-            .update(cx, |host, cx| host.open(game, account, false, cx));
+            .update(cx, |host, cx| host.open(game, account, ask, cx));
     }
 
     fn pick_card_item(&mut self, item: usize, cx: &mut Context<Self>) {
@@ -725,10 +757,10 @@ impl LibraryView {
         let Some(game) = played.map(|game| game.game.clone()) else {
             return;
         };
-        let instant = plays_at_once(&game, self.host.read(cx));
+        let ask = asks(Clicked::Recent, &game, self.host.read(cx).job_running());
         let account = Some(recent.account_id.clone());
         self.host
-            .update(cx, |host, cx| host.open(game, account, instant, cx));
+            .update(cx, |host, cx| host.open(game, account, ask, cx));
     }
 
     fn reword(&mut self, cx: &mut Context<Self>) {
@@ -895,6 +927,18 @@ impl LibraryView {
             self.menu = None;
             cx.notify();
             return true;
+        }
+        match escape_in_search(keystroke, self.typing(window, cx), self.search.is_empty(cx)) {
+            SearchEscape::Pass => {}
+            SearchEscape::Leave => {
+                window.blur(cx);
+                return true;
+            }
+            SearchEscape::ClearAndLeave => {
+                self.search.clear(window, cx);
+                window.blur(cx);
+                return true;
+            }
         }
         let held = keystroke.modifiers;
         let only_control =
@@ -2144,6 +2188,7 @@ fn empty_state(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::host::shows_job;
 
     fn game(artwork: Option<ArtworkSource>, error: Option<&str>) -> Game {
         Game {
@@ -2181,6 +2226,106 @@ mod tests {
         }
         assert_eq!(artwork_line(&game(None, Some("Not found"))), "Not found");
         assert_eq!(artwork_line(&game(None, None)), "No artwork yet");
+    }
+
+    const RUNNING: [bool; 2] = [false, true];
+
+    fn every_game() -> Vec<Game> {
+        let lasts = [None, Some(Some("Main".to_owned())), Some(None)];
+        let mut games = Vec::new();
+        for launcher in [LauncherId::Steam, LauncherId::Epic, LauncherId::Riot] {
+            for needs_update in [false, true] {
+                for last in &lasts {
+                    let mut game = game(None, None);
+                    game.launcher = launcher;
+                    game.needs_update = needs_update;
+                    game.last_launch = last.clone().map(|account_name| ol_model::LastLaunch {
+                        account_id: "a".to_owned(),
+                        account_name,
+                        launched_at: "2026-11-26T10:00:00.000Z".to_owned(),
+                    });
+                    games.push(game);
+                }
+            }
+        }
+        games
+    }
+
+    #[test]
+    fn escape_in_the_search_field_clears_any_text_and_takes_the_keyboard_away() {
+        let escape = Keystroke::parse("escape").unwrap();
+        assert_eq!(
+            escape_in_search(&escape, true, false),
+            SearchEscape::ClearAndLeave
+        );
+        assert_eq!(escape_in_search(&escape, true, true), SearchEscape::Leave);
+        assert_eq!(escape_in_search(&escape, false, false), SearchEscape::Pass);
+        assert_eq!(escape_in_search(&escape, false, true), SearchEscape::Pass);
+        for other in ["shift-escape", "ctrl-escape", "alt-escape", "a", "enter"] {
+            let other = Keystroke::parse(other).unwrap();
+            for (typing, empty) in [(true, true), (true, false), (false, false)] {
+                assert_eq!(
+                    escape_in_search(&other, typing, empty),
+                    SearchEscape::Pass,
+                    "{other:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_card_never_asks_for_a_one_click_play_whatever_the_last_launch_and_the_update() {
+        for game in every_game() {
+            for running in RUNNING {
+                let asked = asks(Clicked::Card, &game, running);
+                assert_eq!(asked, Ask::List, "{game:?} running {running}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_recent_entry_plays_at_once_exactly_when_no_update_comes_first_and_no_job_runs() {
+        for game in every_game() {
+            for running in RUNNING {
+                let update_first = game.needs_update && game.launcher != LauncherId::Steam;
+                let at_once = !update_first && !running;
+                let asked = asks(Clicked::Recent, &game, running);
+                assert_eq!(asked == Ask::AtOnce, at_once, "{game:?} running {running}");
+                assert_eq!(at_once, plays_at_once(&game, running));
+            }
+        }
+    }
+
+    #[test]
+    fn play_as_never_asks_for_a_one_click_play() {
+        for game in every_game() {
+            for running in RUNNING {
+                assert_eq!(asks(Clicked::PlayAs, &game, running), Ask::ListOrJob);
+            }
+        }
+    }
+
+    #[test]
+    fn a_card_click_over_a_finished_job_of_the_same_game_shows_the_list_where_play_as_follows_it() {
+        for game in every_game() {
+            let card = asks(Clicked::Card, &game, false);
+            let play_as = asks(Clicked::PlayAs, &game, false);
+            assert!(!shows_job(card, false, true), "{game:?}");
+            assert!(shows_job(play_as, false, true), "{game:?}");
+            assert!(!shows_job(play_as, false, false), "{game:?}");
+        }
+    }
+
+    #[test]
+    fn a_running_job_is_shown_in_place_of_the_list_whatever_asked_for_it() {
+        for game in every_game() {
+            for clicked in [Clicked::Card, Clicked::Recent, Clicked::PlayAs] {
+                for same in [false, true] {
+                    let asked = asks(clicked, &game, true);
+                    assert!(shows_job(asked, true, same), "{clicked:?} {game:?}");
+                }
+            }
+        }
     }
 
     const NARROWEST: usize = 960;

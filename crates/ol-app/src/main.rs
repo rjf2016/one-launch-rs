@@ -15,13 +15,16 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use gpui::{App, AsyncApp, Bounds, Task, Window, WindowBounds, WindowHandle, point, px, size};
+use gpui::{
+    App, AsyncApp, Bounds, CursorHideMode, Task, Window, WindowBounds, WindowHandle, point, px,
+    size,
+};
 use ol_api::Backend;
 use ol_api::library::HourClock;
 use ol_api::log::{Log, LogOptions, Logger, log_panics, register_windows_user};
 use ol_api::settings::{
-    AfterPlay, CloseAction, Folder, Rect, bounds_setting, close_request_action, display_for, fit,
-    hide_after_instant_play, placement_from, start_hidden,
+    AfterPlay, CloseAction, Folder, Rect, WindowAfterPlay, bounds_setting, close_request_action,
+    display_for, fit, placement_from, start_hidden, window_after_play,
 };
 use ol_model::{SettingKey, Settings};
 use ol_platform_api::{Shell as FolderShell, ShellError, WebPage};
@@ -537,12 +540,15 @@ fn start_backend(args: &Args, log: &Log) -> anyhow::Result<(Backend, Machine)> {
     Ok((backend, Machine::None))
 }
 
-// This PC behind the launchers. The Riot Client is given no way to its local server: Play is left to the user, as the hand-over says.
+// This PC behind the launchers. The Riot Client's local server is reached through `ol_net::RiotLoopback`, named here and nowhere else outside ol-net: the one launch request its Play button sends, to 127.0.0.1, with the lockfile read through the real file port.
 #[cfg(not(feature = "fake"))]
 fn real_launchers() -> ol_api::launchers::Launchers {
+    use ol_platform_win::files::WindowsFiles;
     use ol_platform_win::machine;
 
     let mut launchers = ol_api::launchers::on_this_pc(machine::platform());
+    launchers.riot = std::mem::take(&mut launchers.riot)
+        .with_local_launch(Arc::new(ol_net::RiotLoopback::new(Arc::new(WindowsFiles))));
     let folders = machine::folders();
     if let Some(app_data) = folders.app_data {
         launchers.battlenet.app_data = app_data;
@@ -588,7 +594,8 @@ struct Start {
     instance: Rc<Instance>,
 }
 
-fn start(args: Args, started: Start, cx: &mut App) {
+fn set_up(args: &Args, cx: &mut App) {
+    cx.set_cursor_hide_mode(CursorHideMode::Never);
     let clock = if ol_platform_win::clock::uses_24_hour_clock() {
         HourClock::TwentyFour
     } else {
@@ -602,9 +609,13 @@ fn start(args: Args, started: Start, cx: &mut App) {
         },
     );
     ol_ui::read_double_click_time_with(ol_platform_win::window::double_click_time);
-    if !Board::for_run(&args).keys_reach_it() {
+    if !Board::for_run(args).keys_reach_it() {
         ol_ui_kit::refuse_clipboard_keys(cx);
     }
+}
+
+fn start(args: Args, started: Start, cx: &mut App) {
+    set_up(&args, cx);
     // Read before the window, so it opens where it was and a database that cannot be opened shows no window.
     cx.spawn(async move |cx| {
         let Start {
@@ -839,20 +850,33 @@ fn open(args: Args, opened: Opened, cx: &mut App) -> anyhow::Result<()> {
         move |_, played: &Played, cx| {
             let after = AfterPlay::of(
                 &played.job,
-                played.instant,
                 life.tray.borrow().is_some(),
                 life.close_to_tray.get(),
                 life.hide_to_tray.get(),
             );
-            if hide_after_instant_play(after) {
-                let (log, job) = (life.backend.window_log(), played.job.id.clone());
-                cx.spawn(async move |_| {
-                    if hide_window() {
-                        log.hidden_after_instant_launch(&job);
+            let (life, job, for_game) = (
+                Rc::clone(&life),
+                played.job.id.clone(),
+                played.job.game.is_some(),
+            );
+            cx.spawn(async move |cx| {
+                let Some(native) = AppWindow::on_this_thread() else {
+                    return;
+                };
+                let log = life.backend.window_log();
+                match window_after_play(after, for_game, native.is_visible()) {
+                    WindowAfterPlay::Hide => {
+                        native.hide();
+                        log.hidden_after_launch(&job);
+                        let _ = life.window.update(cx, |shell, _, cx| {
+                            shell.close_finished_job(&job, cx);
+                        });
                     }
-                })
-                .detach();
-            }
+                    WindowAfterPlay::Kept => log.kept_after_launch(&job, after),
+                    WindowAfterPlay::LeaveAlone => {}
+                }
+            })
+            .detach();
         }
     })
     .detach();
@@ -1315,6 +1339,42 @@ mod tests {
         }
     }
 
+    // The Riot Client's local server is reached through one channel, and `real_launchers()` alone hands it to the launchers: outside ol-net no source of the workspace names it but that function and the line above it. That function is in no build with the fake launchers, and the parser refuses `--real-launchers` beside a capture, a probe or `--doctor` (the test above).
+    #[test]
+    fn the_riot_channel_is_handed_out_by_real_launchers_alone() {
+        let name = concat!("Riot", "Loopback");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut named = Vec::new();
+        let mut folders = vec![root.join("crates"), root.join("xtask"), root.join("spikes")];
+        while let Some(folder) = folders.pop() {
+            let Ok(entries) = std::fs::read_dir(&folder) else {
+                continue;
+            };
+            for entry in entries {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    if !path.ends_with("ol-net") && !path.ends_with("target") {
+                        folders.push(path);
+                    }
+                } else if path.extension().is_some_and(|extension| extension == "rs")
+                    && std::fs::read_to_string(&path).unwrap().contains(name)
+                {
+                    let path = path.strip_prefix(&root).unwrap().to_string_lossy();
+                    named.push(path.replace('\\', "/"));
+                }
+            }
+        }
+        assert_eq!(named, ["crates/ol-app/src/main.rs"]);
+
+        let main = include_str!("main.rs");
+        let from = main.find("// This PC behind the launchers.").unwrap();
+        let to = from + main[from..].find("\n}\n").unwrap();
+        let real = &main[from..to];
+        assert_eq!(main.matches(name).count(), real.matches(name).count());
+        assert!(real.contains("#[cfg(not(feature = \"fake\"))]\nfn real_launchers() "));
+        assert!(real.contains(&format!("ol_net::{name}::new(Arc::new(WindowsFiles))")));
+    }
+
     // Locate's dialog is GPUI's `prompt_for_paths`, which only `FilePicker::Windows` reaches.
     #[test]
     fn a_capture_or_a_probe_never_opens_the_file_dialog() {
@@ -1375,6 +1435,38 @@ mod tests {
         assert!(!second_start_quiet(&person));
         assert!(takes_focus(true, false));
         assert!(!takes_focus(false, false));
+    }
+
+    #[test]
+    fn no_key_ever_hides_the_pointer_whichever_way_the_app_starts() {
+        let checks: [&[&str]; 5] = [
+            &[],
+            &[r"--capture=D:\scratch\shot.png"],
+            &[
+                r"--capture=D:\scratch\shot.png",
+                "--capture-focus",
+                "--capture-keys=a",
+            ],
+            &[r"--capture=D:\scratch\shot.png", "--capture-type=abc"],
+            &["--probe"],
+        ];
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        gpui_platform::headless().run({
+            let seen = Rc::clone(&seen);
+            move |cx| {
+                for check in checks {
+                    cx.set_cursor_hide_mode(CursorHideMode::default());
+                    set_up(&parsed(check), cx);
+                    seen.borrow_mut().push((check, cx.cursor_hide_mode()));
+                }
+                cx.quit();
+            }
+        });
+        let seen = seen.borrow();
+        assert_eq!(seen.len(), checks.len());
+        for (check, mode) in seen.iter() {
+            assert_eq!(*mode, CursorHideMode::Never, "{check:?}");
+        }
     }
 
     #[test]

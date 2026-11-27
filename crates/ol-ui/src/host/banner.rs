@@ -1,6 +1,6 @@
 use gpui::prelude::*;
 use gpui::{Context, Div, div, px};
-use ol_api::launch::banner_text;
+use ol_api::launch::{banner_text, handed_over};
 use ol_model::JobState;
 use ol_ui_kit::theme::{self, alpha, color};
 
@@ -13,8 +13,10 @@ impl LaunchHost {
     pub(super) fn render_banner(&self, cx: &mut Context<Self>) -> Option<Div> {
         let job = &self.active.as_ref().filter(|_| self.request.is_none())?.job;
         let running = job.state == JobState::Running;
+        let yours = handed_over(job);
         let (hex, line, fill) = match job.state {
             JobState::Running => (theme::TEXT, theme::ACCENT, 0.16),
+            JobState::Done if yours => (theme::TEXT, theme::ACCENT, 0.1),
             JobState::Done => (theme::SUCCESS, theme::SUCCESS, 0.1),
             _ => (theme::WARNING, theme::WARNING, 0.1),
         };
@@ -23,6 +25,7 @@ impl LaunchHost {
                 icon(assets::KEY, 14., hex).into_any_element()
             }
             JobState::Running => spinner("banner-mark", 14., hex),
+            JobState::Done if yours => icon(assets::PLAY, 14., theme::ACCENT).into_any_element(),
             JobState::Done => icon(assets::CHECK, 14., hex).into_any_element(),
             _ => icon(assets::FAILED, 14., hex).into_any_element(),
         };

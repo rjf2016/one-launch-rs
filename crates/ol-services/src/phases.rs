@@ -1,4 +1,4 @@
-// A switch as the user follows it: the adapter's dozen steps in five phases, and the sentences about how a job stands or how it ended. The words are the Electron app's.
+// A switch as the user follows it: the adapter's dozen steps in five phases, and the sentences about how a job stands or how it ended. The words are the Electron app's, but for a game that was only handed to its launcher.
 
 use ol_model::{
     JobState, JobStep, JobStepStatus, LaunchJob, LauncherId, RecoveryPhase, SwitchPlan,
@@ -209,6 +209,55 @@ pub fn plan_phases(plan: &SwitchPlan, with_launch: bool) -> Vec<PhaseId> {
         .collect()
 }
 
+// A game that ended well, with no hand-over, whose start the launcher was not seen making: all One Launch knows is that the launcher was asked.
+fn only_sent(job: &LaunchJob) -> bool {
+    job.state == JobState::Done && job.game.is_some() && job.hand_off.is_none() && !job.game_seen
+}
+
+// A job that ended well with the game's page open in its launcher and Play left to the user.
+pub fn handed_over(job: &LaunchJob) -> bool {
+    job.state == JobState::Done && job.hand_off.is_some()
+}
+
+// The Launch phase of a hand-over is drawn as still to come: the game has not started, and starting it is the user's.
+pub fn waits_for_you(job: &LaunchJob, phase: PhaseId) -> bool {
+    phase == PhaseId::Launch && handed_over(job)
+}
+
+// What a hand-over says of the account: nothing was switched when the launcher already ran as it.
+fn handed_over_as(job: &LaunchJob) -> String {
+    let account = &job.account.display_name;
+    if job.direct {
+        format!("Signed in as {account}")
+    } else {
+        format!("Switched to {account}")
+    }
+}
+
+// The pill of a job that ended well.
+pub fn done_pill(job: &LaunchJob) -> String {
+    let account = &job.account.display_name;
+    if job.hand_off.is_some() {
+        handed_over_as(job)
+    } else if job.game.is_none() {
+        format!("Switched to {account}")
+    } else if job.game_seen {
+        format!("Launched as {account}")
+    } else {
+        format!("Sent to {} as {account}", job.launcher.client_name())
+    }
+}
+
+// Under the pill of a game that was only handed to its launcher, which may update itself or the game before it starts it.
+pub fn sent_note(job: &LaunchJob) -> Option<String> {
+    let game = job.game.as_ref().filter(|_| only_sent(job))?;
+    Some(format!(
+        "{} starts {} from here. If it has to update itself or the game first, the game starts after that.",
+        sentence(job.launcher.client_name()),
+        game.name
+    ))
+}
+
 // The one line of the banner that stands for a job while its dialog is closed.
 pub fn banner_text(job: &LaunchJob) -> String {
     let account = &job.account.display_name;
@@ -225,10 +274,15 @@ pub fn banner_text(job: &LaunchJob) -> String {
         }
         (JobState::Running, None) => format!("Switching to {account}\u{2026}"),
         (JobState::Done, _) if job.hand_off.is_some() => format!(
-            "Switched to {account}. {}",
+            "{}. {}",
+            handed_over_as(job),
             job.hand_off.as_deref().unwrap_or_default()
         ),
-        (JobState::Done, Some(game)) => format!("Launched {game} as {account}"),
+        (JobState::Done, Some(game)) if job.game_seen => format!("Launched {game} as {account}"),
+        (JobState::Done, Some(game)) => format!(
+            "Asked {} to start {game} as {account}",
+            job.launcher.client_name()
+        ),
         (JobState::Done, None) => format!("Switched to {account}"),
         (JobState::NeedsSignIn, _) => {
             format!("The switch to {account} is waiting for a sign-in")

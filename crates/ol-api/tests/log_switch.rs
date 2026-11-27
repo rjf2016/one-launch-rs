@@ -15,7 +15,7 @@ use ol_api::launchers::{
     RiotTiming, Secret, SteamTiming,
 };
 use ol_api::log::{LogLevel, LogOptions, Logger, log_panics};
-use ol_api::settings::{CloseAction, QuitAnswer};
+use ol_api::settings::{AfterPlay, CloseAction, QuitAnswer};
 use ol_api::{Backend, StartLaunch};
 use ol_model::{JobState, LaunchJob, LauncherId, SettingKey};
 use ol_platform_api::CancelToken;
@@ -552,7 +552,8 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
     window.close_requested(CloseAction::Hide);
     window.hidden_to_tray();
     window.shown_from_tray();
-    window.hidden_after_instant_launch(&cancelled.id);
+    window.hidden_after_launch(&cancelled.id);
+    window.kept_after_launch(&cancelled.id, AfterPlay::of(&cancelled, true, true, true));
     window.tray_added();
     window.tray_removed();
     window.tray_unavailable("TRAY_WINDOW", Some(-1));
@@ -772,7 +773,9 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
         r#"DEBUG [main] window close requested {"action":"hide"}"#,
         "INFO  [main] window hidden to the tray\n",
         "INFO  [main] window shown from the tray",
-        r#"INFO  [main] window hidden to the tray after an instant launch {"jobId":"#,
+        r#"INFO  [main] window hidden to the tray after a launch {"jobId":"#,
+        r#"INFO  [main] window kept after a launch {"jobId":"#,
+        r#""direct":false,"handOff":false,"tray":true,"closeToTray":true}"#,
         "INFO  [main] tray icon added",
         "INFO  [main] tray icon removed",
         r#"WARN  [main] tray icon unavailable; closing the window quits {"error":{"code":"TRAY_WINDOW","hresult":"0xffffffff"}}"#,
@@ -811,6 +814,35 @@ fn a_whole_run_on_each_launcher_leaves_no_secret_in_the_log() {
         log.lines()
             .any(|line| line.contains("ipc backups:restore") && line.contains("[PATH]")),
         "an error that quotes a path outside the data folder has it masked"
+    );
+    let sent: Vec<&str> = log
+        .lines()
+        .filter_map(|line| line.split_once(" INFO  [main:launch] launch command sent "))
+        .map(|(_, fields)| fields)
+        .collect();
+    assert!(
+        sent.contains(&r#"{"jobId":"[UUID…[REDACTED]]","seen":false,"handOff":false,"detail":"Sent steam://rungameid/252950"}"#),
+        "{sent:#?}"
+    );
+    let program = |name: &str, seen: &str| {
+        sent.iter().any(|fields| {
+            fields.contains(seen)
+                && fields.contains(&format!(r#""detail":"Sent \"[PATH]\" {name}"#))
+        })
+    };
+    assert!(
+        program(
+            "--exec=launch Pro (Battle.net started the game)",
+            r#""seen":true,"handOff":false"#
+        ),
+        "{sent:#?}"
+    );
+    assert!(
+        program(
+            "--launch-product=valorant --launch-patchline=live (",
+            r#""seen":true,"handOff":false"#
+        ),
+        "{sent:#?}"
     );
     let secrets = secrets(&scratch, &fake);
     assert!(

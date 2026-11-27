@@ -78,6 +78,10 @@ pub struct RiotKnobs {
     pub direct_launch: bool,
     // The client refuses the launch request its Play button sends.
     pub press_play_fails: bool,
+    // The client takes the launch request its Play button sends and starts nothing, as one that first updates the game or something it needs may.
+    pub press_play_ignored: bool,
+    // Each launch request finds the client checking what the product needs for this long, as the recorded run shows it: the DependencyUpdate patch state and the refusal "Product is not up to date", and only then UpToDate and the game's page.
+    pub dependency_update_ms: Option<u64>,
     // The simulated user quits a game this long after its start. Without it the game runs until a test ends it.
     pub game_quits_after_ms: Option<u64>,
 }
@@ -96,6 +100,8 @@ impl Default for RiotKnobs {
             updates_pending: Vec::new(),
             direct_launch: false,
             press_play_fails: false,
+            press_play_ignored: false,
+            dependency_update_ms: None,
             game_quits_after_ms: None,
         }
     }
@@ -125,6 +131,10 @@ struct State {
     closes: u32,
     // The games the user will quit, by image, each with the time they quit it.
     quits: Vec<(String, OffsetDateTime)>,
+    // Until then the client checks what the product needs and its page offers no Play.
+    checking_until: Option<OffsetDateTime>,
+    // How many checks launch requests began: only the latest one ends the check and shows the page.
+    checks: u32,
 }
 
 pub struct RiotSim {
@@ -363,6 +373,8 @@ impl RiotSim {
                 signed_in: false,
                 closes: 0,
                 quits: Vec::new(),
+                checking_until: None,
+                checks: 0,
             }),
         });
         if let Some(uid) = &sim.knobs.running_as {
@@ -601,13 +613,16 @@ impl RiotSim {
             .updates_pending
             .iter()
             .any(|held| *held == id.key());
+        self.patch_status(id, if pending { "OutOfDate" } else { "UpToDate" })
+    }
+
+    fn patch_status(&self, id: &RiotProductId, status: &str) -> String {
         self.line(
             "OKAY",
             &format!(
-                "patch-proxy: HandleProductPatchlineStatusUpdate: productId: {}, patchlineId: {}, status: {}, progress: 0",
+                "patch-proxy: HandleProductPatchlineStatusUpdate: productId: {}, patchlineId: {}, status: {status}, progress: 0",
                 id.product(),
                 id.patchline(),
-                if pending { "OutOfDate" } else { "UpToDate" }
             ),
         )
     }
@@ -631,66 +646,121 @@ impl RiotSim {
     }
 
     // What the client logs for a launch request: the product's context, the patch state and the pipeline as far as WaitForLaunch; then either the launch itself, or the line with which the real client showed the page in place of launching. A product that needs an update only gets its page; one the simulated install does not hold only gets its context.
-    fn launch_lines(&self, launch: &RiotProductId, boot: bool) -> Vec<String> {
+    fn launch_lines(self: &Arc<Self>, launch: &RiotProductId, boot: bool) -> Vec<String> {
         let direct = boot && self.knobs.direct_launch;
-        let declined = |reason: &str| {
-            self.line(
-                "OKAY",
-                &if boot {
-                    format!(
-                        "riot-client-lifecycle: Attempting to launch default product with reason ({reason})"
-                    )
-                } else {
-                    format!(
-                        "riot-client-lifecycle: Client is already running. Explicitly request focus instead of launching ({reason})"
-                    )
-                },
-            )
-        };
-        let context = |auto_launch: bool| {
-            self.line(
-                "ALWAYS",
-                &format!(
-                    "riot-client-lifecycle: Setting product context to {}, willAutoLaunch={auto_launch}",
-                    launch.key()
-                ),
-            )
-        };
         // At a start the context is set to launch by itself, and the client's own switch takes that back at once.
         let mut lines = if boot && !direct {
-            vec![context(true), context(false)]
+            vec![
+                self.context_line(launch, true),
+                self.context_line(launch, false),
+            ]
         } else {
-            vec![context(boot)]
+            vec![self.context_line(launch, boot)]
         };
-        lines.push(self.patch_line(launch));
         let key = launch.key();
-        if !PRODUCTS.contains(&key.as_str()) {
+        let installed = PRODUCTS.contains(&key.as_str());
+        let pending = self.knobs.updates_pending.contains(&key);
+        let Some(after) = self
+            .knobs
+            .dependency_update_ms
+            .filter(|_| installed && !pending)
+        else {
+            lines.push(self.patch_line(launch));
+            if !installed {
+                return lines;
+            }
+            if pending {
+                lines.push(self.line(
+                    "OKAY",
+                    &format!(
+                        "riot-client-lifecycle: Patchline '{key}' is out of date, and needs patching before launch"
+                    ),
+                ));
+                lines.push(self.declined_line(boot, "Product is not up to date"));
+                return lines;
+            }
+            lines.extend(self.page_lines(launch, boot, 0));
+            return lines;
+        };
+        lines.push(self.patch_status(launch, "DependencyUpdate"));
+        let check = LAUNCH_PIPELINE
+            .iter()
+            .position(|step| *step == "PatchStatus")
+            .expect("the pipeline has a patch check");
+        lines.extend(self.transitions(&LAUNCH_PIPELINE[..=check]));
+        lines.push(self.declined_line(boot, "Product is not up to date"));
+        let wait = Duration::from_millis(after);
+        let now = self.clock.now();
+        let (run, number) = {
+            let mut state = self.state();
+            state.checking_until = Some(now + wait);
+            state.checks += 1;
+            (state.closes, state.checks)
+        };
+        let (sim, launch) = (Arc::clone(self), launch.clone());
+        self.clock.schedule(wait, move || {
+            {
+                let mut state = sim.state();
+                if state.closes != run || state.checks != number {
+                    return;
+                }
+                state.checking_until = None;
+            }
+            let mut lines = vec![sim.patch_line(&launch)];
+            lines.extend(sim.page_lines(&launch, boot, check));
+            sim.append_log(&lines);
+        });
+        lines
+    }
+
+    fn context_line(&self, launch: &RiotProductId, auto_launch: bool) -> String {
+        self.line(
+            "ALWAYS",
+            &format!(
+                "riot-client-lifecycle: Setting product context to {}, willAutoLaunch={auto_launch}",
+                launch.key()
+            ),
+        )
+    }
+
+    fn declined_line(&self, boot: bool, reason: &str) -> String {
+        self.line(
+            "OKAY",
+            &if boot {
+                format!(
+                    "riot-client-lifecycle: Attempting to launch default product with reason ({reason})"
+                )
+            } else {
+                format!(
+                    "riot-client-lifecycle: Client is already running. Explicitly request focus instead of launching ({reason})"
+                )
+            },
+        )
+    }
+
+    fn transitions(&self, steps: &[&str]) -> Vec<String> {
+        steps
+            .windows(2)
+            .map(|step| {
+                self.line(
+                    "ALWAYS",
+                    &format!(
+                        "riot-client-lifecycle: Context #1: Middleware transition ({}) -> ({})",
+                        step[0], step[1]
+                    ),
+                )
+            })
+            .collect()
+    }
+
+    // The pipeline from the step at `from` to WaitForLaunch, then the line with which the real client showed the page in place of launching, or the launch itself for a client that still launches at its start.
+    fn page_lines(&self, launch: &RiotProductId, boot: bool, from: usize) -> Vec<String> {
+        let mut lines = self.transitions(&LAUNCH_PIPELINE[from..]);
+        if !(boot && self.knobs.direct_launch) {
+            lines.push(self.declined_line(boot, "Auto-launch is disabled"));
             return lines;
         }
-        if self.knobs.updates_pending.contains(&key) {
-            lines.push(self.line(
-                "OKAY",
-                &format!(
-                    "riot-client-lifecycle: Patchline '{key}' is out of date, and needs patching before launch"
-                ),
-            ));
-            lines.push(declined("Product is not up to date"));
-            return lines;
-        }
-        for step in LAUNCH_PIPELINE.windows(2) {
-            lines.push(self.line(
-                "ALWAYS",
-                &format!(
-                    "riot-client-lifecycle: Context #1: Middleware transition ({}) -> ({})",
-                    step[0], step[1]
-                ),
-            ));
-        }
-        if !direct {
-            lines.push(declined("Auto-launch is disabled"));
-            return lines;
-        }
-        lines.push(context(false));
+        lines.push(self.context_line(launch, false));
         lines.extend(self.game_start_lines(launch));
         lines
     }
@@ -736,6 +806,11 @@ impl RiotSim {
         let Some(launch) = parse_product_id(id).filter(|_| ready) else {
             return Err(RiotLaunchError::NoLockfile);
         };
+        let now = self.clock.now();
+        let checking = self.state().checking_until.is_some_and(|until| now < until);
+        if self.knobs.press_play_ignored || checking {
+            return Ok(());
+        }
         // The page of a product that waits for an update offers Update, not Play: nothing starts.
         if self.knobs.updates_pending.contains(&launch.key()) {
             let lines = [self.patch_line(&launch)];
@@ -748,7 +823,7 @@ impl RiotSim {
     }
 
     // A launch request handed to the running client: it sets the context and shows the page, never the game. On the login page the request waits for the user.
-    fn forwarded_launch(&self, launch: &RiotProductId) {
+    fn forwarded_launch(self: &Arc<Self>, launch: &RiotProductId) {
         if !self.state().signed_in {
             return;
         }
@@ -945,6 +1020,47 @@ mod tests {
         sim.press_play("valorant.live").unwrap();
         let image = game_images_of("valorant")[0];
         assert!(!processes.is_running(image).unwrap());
+    }
+
+    #[test]
+    fn a_launch_request_during_a_check_starts_the_check_again_and_the_page_comes_once_at_its_end() {
+        use ol_platform_api::{CancelToken, ProcessArg, ProcessLister, ProcessRunner};
+        let scratch = ol_testkit::Scratch::new("sim-riot-checks");
+        let knobs = RiotKnobs {
+            running_as: Some("11111111-1111-4111-8111-111111111111".to_owned()),
+            dependency_update_ms: Some(2_000),
+            ..RiotKnobs::default()
+        };
+        let (sim, processes, clock) = client(&scratch, knobs);
+        let image = game_images_of("valorant")[0];
+        let request = || {
+            let args = [
+                ProcessArg::Plain("--launch-product=valorant"),
+                ProcessArg::Plain("--launch-patchline=live"),
+            ];
+            processes.start(EXE, &args, "").unwrap();
+        };
+        let pages = || {
+            let file = sim.state().log_file.clone().unwrap();
+            fs::read_to_string(file)
+                .unwrap()
+                .matches("(Auto-launch is disabled)")
+                .count()
+        };
+        let wait = |ms| clock.sleep(Duration::from_millis(ms), &CancelToken::new());
+
+        request();
+        wait(1_000);
+        request();
+        wait(1_000);
+        assert_eq!(pages(), 0);
+        sim.press_play("valorant.live").unwrap();
+        assert!(!processes.is_running(image).unwrap());
+
+        wait(1_000);
+        assert_eq!(pages(), 1);
+        sim.press_play("valorant.live").unwrap();
+        assert!(processes.is_running(image).unwrap());
     }
 
     fn recorded(relative: &str) -> Value {
