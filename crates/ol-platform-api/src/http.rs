@@ -86,10 +86,7 @@ impl ArtworkUrl {
             whole.push('?');
             whole.push_str(query);
         }
-        let plain = whole
-            .bytes()
-            .all(|byte| matches!(byte, 0x21..=0x7e) && byte != b'\\');
-        plain.then_some(Self { host, path: whole })
+        plain(&whole).then_some(Self { host, path: whole })
     }
 
     // Where a redirect's Location leads from here, when that is an image host again.
@@ -103,23 +100,8 @@ impl ArtworkUrl {
         if !IMAGE_HOSTS.contains(&self.host) {
             return None;
         }
-        let location = location.split('#').next().unwrap_or_default();
-        let (here, query_here) = match self.path.split_once('?') {
-            Some((path, query)) => (path, Some(query)),
-            None => (self.path.as_str(), None),
-        };
-        let (path, query) = match location.split_once('?') {
-            Some((path, query)) => (path, Some(query)),
-            None => (location, None),
-        };
-        if path.is_empty() {
-            return Self::on(self.host, here, query.or(query_here));
-        }
-        if path.starts_with('/') {
-            return Self::on(self.host, path, query);
-        }
-        let folder = here.rfind('/').map_or("/", |slash| &here[..=slash]);
-        Self::on(self.host, &format!("{folder}{path}"), query)
+        let (path, query) = relative_target(&self.path, location);
+        Self::on(self.host, &path, query)
     }
 
     pub const fn host(&self) -> &'static str {
@@ -143,13 +125,13 @@ impl fmt::Debug for ArtworkUrl {
     }
 }
 
-fn strip_prefix_ignoring_case<'a>(text: &'a str, prefix: &str) -> Option<&'a str> {
+pub(crate) fn strip_prefix_ignoring_case<'a>(text: &'a str, prefix: &str) -> Option<&'a str> {
     let head = text.get(..prefix.len())?;
     head.eq_ignore_ascii_case(prefix)
         .then(|| &text[prefix.len()..])
 }
 
-fn has_scheme(text: &str) -> bool {
+pub(crate) fn has_scheme(text: &str) -> bool {
     let Some((scheme, _)) = text.split_once(':') else {
         return false;
     };
@@ -160,7 +142,34 @@ fn has_scheme(text: &str) -> bool {
         && letters.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
 }
 
-fn without_dot_segments(path: &str) -> String {
+// Plain visible ASCII and no backslash, which some readers of an address take for a slash.
+pub(crate) fn plain(text: &str) -> bool {
+    text.bytes()
+        .all(|byte| matches!(byte, 0x21..=0x7e) && byte != b'\\')
+}
+
+// The path and query a Location that names no host leads to from `here`, a path with its query; the dot segments are still in the path.
+pub(crate) fn relative_target<'a>(here: &'a str, location: &'a str) -> (String, Option<&'a str>) {
+    let location = location.split('#').next().unwrap_or_default();
+    let (here, query_here) = match here.split_once('?') {
+        Some((path, query)) => (path, Some(query)),
+        None => (here, None),
+    };
+    let (path, query) = match location.split_once('?') {
+        Some((path, query)) => (path, Some(query)),
+        None => (location, None),
+    };
+    if path.is_empty() {
+        return (here.to_owned(), query.or(query_here));
+    }
+    if path.starts_with('/') {
+        return (path.to_owned(), query);
+    }
+    let folder = here.rfind('/').map_or("/", |slash| &here[..=slash]);
+    (format!("{folder}{path}"), query)
+}
+
+pub(crate) fn without_dot_segments(path: &str) -> String {
     let mut kept: Vec<&str> = Vec::new();
     let segments: Vec<&str> = path.split('/').skip(1).collect();
     let last = segments.len().saturating_sub(1);

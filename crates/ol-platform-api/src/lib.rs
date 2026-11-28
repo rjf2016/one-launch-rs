@@ -5,6 +5,7 @@ pub mod contract;
 pub mod http;
 mod ports;
 pub mod protected;
+pub mod update_http;
 
 pub use ports::{
     CancelToken, Clipboard, ClipboardError, Clock, FileReader, FileWriter, Files, Hive, Platform,

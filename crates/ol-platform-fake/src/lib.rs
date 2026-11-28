@@ -11,6 +11,7 @@ mod processes;
 mod registry;
 mod riot;
 mod shell;
+pub mod update_http;
 
 pub use clipboard::{Kept, RecordingClipboard};
 pub use clock::FakeClock;
@@ -21,3 +22,4 @@ pub use processes::{CLOSE_ARGUMENT, FakeProcesses, ProcessKnobs};
 pub use registry::{FakeRegistry, RegistryValue};
 pub use riot::FakeRiotLaunch;
 pub use shell::FakeShell;
+pub use update_http::ScriptedUpdates;
