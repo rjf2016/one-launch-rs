@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -11,7 +12,10 @@ use ol_model::{
     SecretKey, SettingKey, Settings, Sidebar, SwitchPlan, SwitchRecovery,
 };
 use ol_platform_api::http::HttpClient;
-use ol_platform_api::{CancelToken, Clipboard, DataProtector, Shell, WebPage};
+use ol_platform_api::update_http::{ReleaseTag, UpdateHttp};
+use ol_platform_api::{
+    CancelToken, Clipboard, Clock, DataProtector, InstallerStart, Shell, WebPage,
+};
 use ol_services::accounts::{self, AccountError, AccountPatch, NewAccount};
 use ol_services::artwork::{
     self, Artwork, ArtworkError, Fetched, Job, KeySource, Outcome, Prepared,
@@ -19,7 +23,9 @@ use ol_services::artwork::{
 use ol_services::capture::{self, Captured};
 use ol_services::clipboard::{self, ClipboardService, CopyError, CopyField, CopyResult, Timer};
 use ol_services::data_folder::{self, Folder, OpenError};
-use ol_services::install::{self, AutostartError, AutostartStatus, UpdateStatus};
+use ol_services::install::{
+    self, AutostartError, AutostartStatus, UpdateStatus, UpdateUnavailable,
+};
 use ol_services::journal::Recovery;
 use ol_services::launch::{self, FinishedJob, JobBoard, LastPreflight, StartInput};
 use ol_services::launchers::{
@@ -31,6 +37,13 @@ use ol_services::log::{Log, is_refusal};
 use ol_services::sessions::{StoreThread, StoreWork};
 use ol_services::settings::{self as setting, SettingError};
 use ol_services::switch;
+use ol_services::updates::check::{self as release_check, Checked};
+use ol_services::updates::download::{self as release_download, Fetched as Downloaded};
+use ol_services::updates::failure::UpdateFailure;
+use ol_services::updates::manifest::{ManifestFile, ReleaseKey};
+use ol_services::updates::service::{
+    UpdateEffect, UpdateNotReady, Updates, UpdatesSetup, running_version,
+};
 use ol_services::vault_health::{
     self, EncryptionState, VaultAccess, VaultHealth, VaultHealthError, VaultReset,
     VaultResetRefusal, VaultResetSummary,
@@ -43,6 +56,8 @@ use thiserror::Error;
 use time::OffsetDateTime;
 
 const RECENT_LAUNCHES_MOST: u32 = 50;
+const CHECK_STOPPED: &str = "the update check stopped unexpectedly";
+const DOWNLOAD_STOPPED: &str = "the update download stopped unexpectedly";
 
 // What the Electron app sends across to its page for a failure: a code to act on and a sentence to show.
 #[derive(Clone, PartialEq, Eq, Error)]
@@ -158,6 +173,15 @@ impl From<VaultError> for ApiError {
     }
 }
 
+impl From<UpdateNotReady> for ApiError {
+    fn from(refusal: UpdateNotReady) -> Self {
+        Self {
+            code: refusal.code(),
+            message: refusal.to_string(),
+        }
+    }
+}
+
 impl From<CopyError> for ApiError {
     fn from(error: CopyError) -> Self {
         Self {
@@ -203,6 +227,26 @@ pub struct AppInfo {
     pub db_path: PathBuf,
     // "Development" or "Packaged", as the Build row says.
     pub build: &'static str,
+}
+
+// A release key the updater trusts: its id and its public key, SPKI in base64.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TrustedKey {
+    pub id: String,
+    pub spki: String,
+}
+
+// Everything the updater reaches the world through, handed in by the app once. A run that hands in none says updates are off for this copy and never asks anything.
+pub struct UpdatesKit {
+    pub http: Arc<dyn UpdateHttp>,
+    // Used only by `install_at_quit`.
+    pub installer: Arc<dyn InstallerStart>,
+    pub clock: Arc<dyn Clock>,
+    pub timer: Arc<dyn Timer>,
+    // Where the installer is downloaded to and started from.
+    pub pending: PathBuf,
+    pub keys: Vec<TrustedKey>,
+    pub this_copy: Result<(), UpdateUnavailable>,
 }
 
 type Reply<T> = Sender<Result<T, ApiError>>;
@@ -265,6 +309,17 @@ enum Command {
     // A lookup's end, handed over from its own thread.
     ArtworkDone(Box<(Job, Fetched)>),
     StopArtwork,
+    UseUpdates(Box<UpdatesKit>),
+    UpdateStatus(Reply<UpdateStatus>),
+    WatchUpdates(Sender<UpdateStatus>),
+    CheckUpdates(Reply<UpdateStatus>),
+    InstallUpdate(Reply<()>),
+    // Handed over by the updater's timer, with the arm it belongs to.
+    UpdateTimer(u64),
+    UpdateChecked(Box<Result<Checked, UpdateFailure>>),
+    UpdateProgress(u8),
+    UpdateDownloaded(Result<Downloaded, UpdateFailure>),
+    StopUpdates,
     #[cfg(feature = "fake")]
     SeedSession(String, Option<String>, ol_vault::Secret, Reply<()>),
     // Work a switch hands over from its own thread: a question about accounts or saved sign-ins.
@@ -332,6 +387,16 @@ impl Command {
             Self::ArtworkKey(_) => "artwork:key",
             Self::ArtworkDone(_) => "artwork:done",
             Self::StopArtwork => "artwork:stop",
+            Self::UseUpdates(_) => "updates:use",
+            Self::UpdateStatus(_) => "updates:status",
+            Self::WatchUpdates(_) => "updates:watch",
+            Self::CheckUpdates(_) => "updates:check",
+            Self::InstallUpdate(_) => "updates:install",
+            Self::UpdateTimer(_) => "updates:timer",
+            Self::UpdateChecked(_) => "updates:checked",
+            Self::UpdateProgress(_) => "updates:progress",
+            Self::UpdateDownloaded(_) => "updates:downloaded",
+            Self::StopUpdates => "updates:stop",
             #[cfg(feature = "fake")]
             Self::SeedSession(..) => "sessions:seed",
             Self::OnStore(_) => "store:work",
@@ -516,6 +581,7 @@ pub struct Backend {
     has_launchers: bool,
     data_dir: PathBuf,
     version: String,
+    updates: Arc<UpdateSlot>,
     log: Log,
 }
 
@@ -663,8 +729,10 @@ impl Backend {
         let job_thread: Thread = Arc::default();
         let has_launchers = launchers.is_some();
         let folder = data_dir.clone();
+        let updates: Arc<UpdateSlot> = Arc::default();
         let serving = Serving {
             artwork: ArtworkDesk::new(&data_dir, &log),
+            updates: UpdateDesk::new(Arc::clone(&updates), &version, commands.downgrade(), &log),
             data_dir,
             launchers,
             vault: Arc::default(),
@@ -693,6 +761,7 @@ impl Backend {
             has_launchers,
             data_dir: folder,
             version,
+            updates,
             log,
         }
     }
@@ -822,6 +891,66 @@ impl Backend {
 
     pub fn update_status(&self) -> UpdateStatus {
         install::update_status()
+    }
+
+    // Until this is called the copy's updates are off and nothing is ever asked; the first kit is the one used. The machine is made on the database's thread, with automatic updates as stored, and its first check is armed.
+    pub fn use_updates(&self, kit: UpdatesKit) {
+        let _ = self
+            .commands
+            .send_blocking(Command::UseUpdates(Box::new(kit)));
+    }
+
+    // The status the Version row shows, as the updater has it now.
+    pub async fn update_status_now(&self) -> Result<UpdateStatus, ApiError> {
+        self.ask(Command::UpdateStatus).await
+    }
+
+    // Check for updates: answers the status to show at once; how the check ends comes through `update_changes`.
+    pub async fn check_updates(&self) -> Result<UpdateStatus, ApiError> {
+        self.ask(Command::CheckUpdates).await
+    }
+
+    // Restart to update. Refused while a switch runs and while no verified update waits. `Ok` means the app is to quit now; the installer is started by `install_at_quit`.
+    pub async fn install_update(&self) -> Result<(), ApiError> {
+        self.ask(Command::InstallUpdate).await
+    }
+
+    // The answer hears the update status as it is now, and from then on each time it changes. Every caller is told, until it lets its answer go.
+    pub fn update_changes(&self) -> Receiver<UpdateStatus> {
+        let (changes, heard) = async_channel::unbounded();
+        let _ = self.commands.send_blocking(Command::WatchUpdates(changes));
+        heard
+    }
+
+    // This run crashed: the update that waits is not installed at its quit. Safe from any thread, a panic hook's included.
+    pub fn update_crashed(&self) {
+        self.updates.crashed.store(true, Ordering::SeqCst);
+    }
+
+    // Windows is ending the session: the update that waits is left for the next quit.
+    pub fn update_session_ending(&self) {
+        self.updates.session_ending.store(true, Ordering::SeqCst);
+    }
+
+    // For the app's quit, after `shut_down`: starts the verified installer when the quit allows it. Before `shut_down`, without a kit, or a second time it does nothing.
+    pub fn install_at_quit(&self, exit_code: i32) {
+        let slot = &self.updates;
+        if !slot.closed.load(Ordering::SeqCst) || slot.installed.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let mut machine = slot.machine();
+        let Some(fitted) = machine.as_mut() else {
+            return;
+        };
+        if slot.crashed.load(Ordering::SeqCst) {
+            fitted.updates.on_crash();
+        }
+        if slot.session_ending.load(Ordering::SeqCst) {
+            fitted.updates.on_session_end();
+        }
+        fitted
+            .updates
+            .install_at_quit(exit_code, &*fitted.installer);
     }
 
     pub fn autostart_status(&self) -> AutostartStatus {
@@ -1113,6 +1242,8 @@ impl Backend {
 
     // Stops a running switch and waits for it, then waits for the request in hand and for the database to close, which folds its journal back into the one file.
     pub fn shut_down(&self) {
+        // No check or download is started from here on, the timer is disarmed and a download on its way is cancelled.
+        let _ = self.commands.send_blocking(Command::StopUpdates);
         if let Some(job) = self.jobs.current() {
             self.log
                 .warn("stopping the running switch", json!({ "reason": "quit" }));
@@ -1136,6 +1267,7 @@ impl Backend {
         if let Some(thread) = take(&self.thread) {
             let _ = thread.join();
         }
+        self.updates.closed.store(true, Ordering::SeqCst);
     }
 
     async fn ask<T>(&self, command: impl FnOnce(Reply<T>) -> Command) -> Result<T, ApiError> {
@@ -1186,7 +1318,272 @@ struct Serving {
     recovery: Recovery,
     clipboard: Option<ClipboardService>,
     artwork: ArtworkDesk,
+    updates: UpdateDesk,
     log: Log,
+}
+
+struct Fitted {
+    updates: Updates,
+    installer: Arc<dyn InstallerStart>,
+}
+
+// The updater, where the database's thread and a quit after that thread has ended both reach it.
+#[derive(Default)]
+struct UpdateSlot {
+    machine: Mutex<Option<Fitted>>,
+    crashed: AtomicBool,
+    session_ending: AtomicBool,
+    closed: AtomicBool,
+    installed: AtomicBool,
+}
+
+impl UpdateSlot {
+    fn machine(&self) -> MutexGuard<'_, Option<Fitted>> {
+        self.machine.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn status(&self) -> UpdateStatus {
+        self.machine()
+            .as_ref()
+            .map_or_else(install::update_status, |fitted| fitted.updates.status())
+    }
+}
+
+struct UpdatePorts {
+    http: Arc<dyn UpdateHttp>,
+    clock: Arc<dyn Clock>,
+    timer: Arc<dyn Timer>,
+    pending: PathBuf,
+}
+
+// The updater's machine with what carries out its effects: the one timer, a check or a download on a thread of its own, and whoever watches.
+struct UpdateDesk {
+    slot: Arc<UpdateSlot>,
+    version: String,
+    ports: Option<UpdatePorts>,
+    commands: WeakSender<Command>,
+    // Moves at every arm and disarm, so a timer that fires after it was disarmed or replaced is not heard.
+    arm: u64,
+    timer: Option<CancelToken>,
+    download: Option<CancelToken>,
+    watch: Vec<Sender<UpdateStatus>>,
+    told: Option<UpdateStatus>,
+    log: Log,
+}
+
+impl UpdateDesk {
+    fn new(slot: Arc<UpdateSlot>, version: &str, commands: WeakSender<Command>, log: &Log) -> Self {
+        Self {
+            slot,
+            version: version.to_owned(),
+            ports: None,
+            commands,
+            arm: 0,
+            timer: None,
+            download: None,
+            watch: Vec::new(),
+            told: None,
+            log: log.clone(),
+        }
+    }
+
+    fn status(&self) -> UpdateStatus {
+        self.slot.status()
+    }
+
+    fn fit(&mut self, kit: UpdatesKit, auto: bool) {
+        if self.ports.is_some() {
+            self.log
+                .child("updates")
+                .warn("a second updater kit was ignored", ());
+            return;
+        }
+        let (version, this_copy) = running_version(&self.version, kit.this_copy);
+        let keys: Vec<ReleaseKey<'_>> = kit
+            .keys
+            .iter()
+            .map(|key| ReleaseKey {
+                id: &key.id,
+                spki: &key.spki,
+            })
+            .collect();
+        let mut updates = Updates::new(UpdatesSetup {
+            version,
+            keys: &keys,
+            auto,
+            this_copy,
+            log: &self.log,
+            clock: Arc::clone(&kit.clock),
+        });
+        let effects = updates.start();
+        *self.slot.machine() = Some(Fitted {
+            updates,
+            installer: kit.installer,
+        });
+        self.ports = Some(UpdatePorts {
+            http: kit.http,
+            clock: kit.clock,
+            timer: kit.timer,
+            pending: kit.pending,
+        });
+        self.carry_out(effects);
+    }
+
+    // One event of the machine, its effects carried out once the machine is let go. None without a machine.
+    fn event<T>(
+        &mut self,
+        event: impl FnOnce(&mut Updates) -> (T, Vec<UpdateEffect>),
+    ) -> Option<T> {
+        let (answer, effects) = {
+            let mut machine = self.slot.machine();
+            event(&mut machine.as_mut()?.updates)
+        };
+        self.carry_out(effects);
+        Some(answer)
+    }
+
+    fn carry_out(&mut self, effects: Vec<UpdateEffect>) {
+        for effect in effects {
+            match effect {
+                UpdateEffect::Arm(delay) => self.arm(delay),
+                UpdateEffect::Disarm => self.disarm(),
+                UpdateEffect::Check => self.start_check(),
+                UpdateEffect::Download { tag, file } => self.start_download(tag, file),
+                UpdateEffect::CancelDownload => {
+                    if let Some(download) = &self.download {
+                        download.cancel();
+                    }
+                }
+                // The caller of `install_update` quits when it is answered.
+                UpdateEffect::Quit => {}
+            }
+        }
+    }
+
+    fn arm(&mut self, delay: Duration) {
+        self.disarm();
+        let Some(ports) = &self.ports else {
+            return;
+        };
+        let cancel = CancelToken::new();
+        let (arm, commands) = (self.arm, self.commands.clone());
+        ports.timer.after(
+            delay,
+            cancel.clone(),
+            Box::new(move || {
+                if let Some(commands) = commands.upgrade() {
+                    let _ = commands.send_blocking(Command::UpdateTimer(arm));
+                }
+            }),
+        );
+        self.timer = Some(cancel);
+    }
+
+    fn disarm(&mut self) {
+        self.arm += 1;
+        if let Some(timer) = self.timer.take() {
+            timer.cancel();
+        }
+    }
+
+    fn timer_fired(&mut self, arm: u64) {
+        if arm != self.arm || self.timer.take().is_none() {
+            return;
+        }
+        self.arm += 1;
+        self.event(|updates| ((), updates.timer_fired()));
+    }
+
+    fn start_check(&mut self) {
+        let running = self
+            .slot
+            .machine()
+            .as_ref()
+            .map(|fitted| fitted.updates.running().clone());
+        let (Some(ports), Some(commands), Some(running)) =
+            (&self.ports, self.commands.upgrade(), running)
+        else {
+            return;
+        };
+        let http = Arc::clone(&ports.http);
+        let log = self.log.child("updates");
+        let check = move || {
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                release_check::check(&*http, &running)
+            }));
+            let answer = ran.unwrap_or_else(|_| {
+                log.error("update check crashed", json!({ "error": CHECK_STOPPED }));
+                Err(UpdateFailure::Other(CHECK_STOPPED.to_owned()))
+            });
+            let _ = commands.send_blocking(Command::UpdateChecked(Box::new(answer)));
+        };
+        if thread::Builder::new()
+            .name("updates".to_owned())
+            .spawn(check)
+            .is_err()
+        {
+            let failed = Err(UpdateFailure::Other(CHECK_STOPPED.to_owned()));
+            self.event(|updates| ((), updates.checked(failed)));
+        }
+    }
+
+    fn start_download(&mut self, tag: ReleaseTag, file: ManifestFile) {
+        let (Some(ports), Some(commands)) = (&self.ports, self.commands.upgrade()) else {
+            return;
+        };
+        let cancel = CancelToken::new();
+        let (http, clock, pending) = (
+            Arc::clone(&ports.http),
+            Arc::clone(&ports.clock),
+            ports.pending.clone(),
+        );
+        let (stop, log) = (cancel.clone(), self.log.child("updates"));
+        let download = move || {
+            let told = commands.clone();
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                release_download::download(
+                    &*http,
+                    &*clock,
+                    &pending,
+                    &tag,
+                    &file,
+                    &mut |percent| {
+                        let _ = told.send_blocking(Command::UpdateProgress(percent));
+                    },
+                    &stop,
+                )
+            }));
+            let answer = ran.unwrap_or_else(|_| {
+                log.error(
+                    "update download crashed",
+                    json!({ "error": DOWNLOAD_STOPPED }),
+                );
+                Err(UpdateFailure::Other(DOWNLOAD_STOPPED.to_owned()))
+            });
+            let _ = commands.send_blocking(Command::UpdateDownloaded(answer));
+        };
+        self.download = Some(cancel);
+        if thread::Builder::new()
+            .name("updates".to_owned())
+            .spawn(download)
+            .is_err()
+        {
+            self.download = None;
+            let failed = Err(UpdateFailure::Other(DOWNLOAD_STOPPED.to_owned()));
+            self.event(|updates| ((), updates.downloaded(failed)));
+        }
+    }
+
+    // Whoever watches hears the status when it is not the one they heard last.
+    fn tell(&mut self) {
+        let status = self.status();
+        if self.told.as_ref() == Some(&status) {
+            return;
+        }
+        self.watch
+            .retain(|watch| watch.try_send(status.clone()).is_ok());
+        self.told = Some(status);
+    }
 }
 
 // The artwork queue with what the backend keeps around it.
@@ -1273,6 +1670,7 @@ impl Serving {
             let store = opened.as_ref().map_err(ApiError::clone);
             self.handle(command, store);
             self.tell_artwork();
+            self.updates.tell();
         }
         drop(opened);
         log.info("exit", ());
@@ -1381,6 +1779,10 @@ impl Serving {
                         json!({ "key": key.as_str(), "value": value }),
                     );
                     self.changed(key, Some(&value));
+                    if key == SettingKey::UpdatesAuto {
+                        let on = value == "true" || value == "1";
+                        self.updates.event(|updates| ((), updates.set_auto(on)));
+                    }
                     if key == SettingKey::ArtworkAutoFetch && value == "false" {
                         let dropped = self.artwork.service.queue.drop_automatic();
                         ipc.info("automatic artwork dropped", json!({ "dropped": dropped }));
@@ -1878,6 +2280,57 @@ impl Serving {
             Command::StopArtwork => {
                 self.artwork.service.queue.stop();
                 self.artwork.cancel.cancel();
+            }
+            Command::UseUpdates(kit) => {
+                let auto = store
+                    .ok()
+                    .and_then(|store| store.settings().ok())
+                    .is_none_or(|settings| settings.toggle(SettingKey::UpdatesAuto));
+                self.updates.fit(*kit, auto);
+            }
+            Command::UpdateStatus(reply) => said.answer(&reply, Ok(self.updates.status())),
+            Command::WatchUpdates(changes) => {
+                self.updates.tell();
+                if changes.try_send(self.updates.status()).is_ok() {
+                    self.updates.watch.push(changes);
+                }
+            }
+            Command::CheckUpdates(reply) => {
+                let shown = self
+                    .updates
+                    .event(Updates::check)
+                    .unwrap_or_else(|| self.updates.status());
+                said.answer(&reply, Ok(shown));
+            }
+            Command::InstallUpdate(reply) => {
+                let asked = self.require_idle().and_then(|()| {
+                    let requested = self
+                        .updates
+                        .event(|updates| match updates.request_install() {
+                            Ok(effects) => (Ok(()), effects),
+                            Err(refusal) => (Err(refusal), Vec::new()),
+                        });
+                    Ok(requested.unwrap_or(Err(UpdateNotReady))?)
+                });
+                said.answer(&reply, asked);
+            }
+            Command::UpdateTimer(arm) => self.updates.timer_fired(arm),
+            Command::UpdateChecked(answer) => {
+                self.updates.event(|updates| ((), updates.checked(*answer)));
+            }
+            Command::UpdateProgress(percent) => {
+                self.updates.event(|updates| {
+                    updates.progress(percent);
+                    ((), Vec::new())
+                });
+            }
+            Command::UpdateDownloaded(answer) => {
+                self.updates.download = None;
+                self.updates
+                    .event(|updates| ((), updates.downloaded(answer)));
+            }
+            Command::StopUpdates => {
+                self.updates.event(|updates| ((), updates.stop()));
             }
             Command::Copy(account_id, field, reply) => {
                 let copied = store.and_then(|store| {
@@ -2595,6 +3048,7 @@ mod tests {
         let (commands, _requests) = async_channel::unbounded();
         let mut serving = Serving {
             artwork: ArtworkDesk::new(&data_dir, &Log::off()),
+            updates: UpdateDesk::new(Arc::default(), "9.8.7", commands.downgrade(), &Log::off()),
             data_dir: data_dir.clone(),
             launchers: None,
             vault: Arc::default(),
@@ -2637,6 +3091,7 @@ mod tests {
         let (commands, _requests) = async_channel::unbounded();
         let mut serving = Serving {
             artwork: ArtworkDesk::new(&data_dir, &Log::off()),
+            updates: UpdateDesk::new(Arc::default(), "9.8.7", commands.downgrade(), &Log::off()),
             data_dir: data_dir.clone(),
             launchers: None,
             vault: Arc::default(),

@@ -20,7 +20,7 @@ use ol_services::updates::download::Fetched;
 use ol_services::updates::failure::UpdateFailure;
 use ol_services::updates::manifest::{ManifestFile, ReleaseKey, canonical_payload, key_id_of};
 use ol_services::updates::service::{
-    CHECK_EVERY, FIRST_CHECK, UpdateEffect, Updates, UpdatesSetup,
+    CHECK_EVERY, FIRST_CHECK, UpdateEffect, Updates, UpdatesSetup, running_version,
 };
 use ol_testkit::Scratch;
 use semver::Version;
@@ -911,4 +911,21 @@ mod after_stop {
         rig.settle();
         assert_eq!(rig.due, Some(CHECK_EVERY));
     }
+}
+
+#[test]
+fn a_copy_whose_own_version_is_not_a_semantic_version_gets_no_updates() {
+    let installed: Result<(), UpdateUnavailable> = Ok(());
+    let (version, this_copy) = running_version("1.0.0-beta.3", installed);
+    assert_eq!(
+        (version, this_copy),
+        (Version::parse("1.0.0-beta.3").unwrap(), Ok(()))
+    );
+    for odd in ["", "v1.0.0", "1.0", "not a version", " 1.0.0"] {
+        let (_, this_copy) = running_version(odd, installed);
+        assert_eq!(this_copy, Err(UpdateUnavailable::NotInstalled), "{odd:?}");
+    }
+    let development = Err(UpdateUnavailable::Development);
+    assert_eq!(running_version("1.0.0", development).1, development);
+    assert_eq!(running_version("odd", development).1, development);
 }

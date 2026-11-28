@@ -62,6 +62,20 @@ impl UpdateNotReady {
     }
 }
 
+// The version this copy runs as, for the machine to compare a release with. A copy that does not know its own version cannot tell a newer one, so it is not offered any.
+pub fn running_version(
+    text: &str,
+    this_copy: Result<(), UpdateUnavailable>,
+) -> (Version, Result<(), UpdateUnavailable>) {
+    match Version::parse(text) {
+        Ok(version) => (version, this_copy),
+        Err(_) => (
+            Version::new(0, 0, 0),
+            this_copy.and(Err(UpdateUnavailable::NotInstalled)),
+        ),
+    }
+}
+
 pub struct UpdatesSetup<'a> {
     pub version: Version,
     pub keys: &'a [ReleaseKey<'a>],

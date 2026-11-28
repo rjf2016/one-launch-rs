@@ -23,6 +23,7 @@ use crate::epic::{EpicKnobs, EpicSim};
 use crate::files::ContainedFiles;
 use crate::riot::{RiotFolders, RiotKnobs, RiotSim, fake_session_file};
 use crate::steam::{SteamKnobs, SteamSim};
+use crate::updates::UpdateStory;
 
 const SCENARIO_FILE: &str = "scenario.json";
 const KNOBS_FILE: &str = "knobs.json";
@@ -118,6 +119,8 @@ pub struct FakeLaunchers {
     pub local_app_data: String,
     pub program_data: String,
     pub seed: Seed,
+    // What the release feed of this run tells, if anything: without a story the run has no updater.
+    pub update_story: Option<UpdateStory>,
 }
 
 fn shape(message: impl Into<String>) -> ScenarioError {
@@ -204,6 +207,23 @@ fn strings(value: Option<&Value>) -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+fn update_story(fields: &Map<String, Value>) -> Result<Option<UpdateStory>, ScenarioError> {
+    match fields.get("story") {
+        None | Some(Value::Null) => Ok(None),
+        Some(name) => name
+            .as_str()
+            .and_then(UpdateStory::named)
+            .map(Some)
+            .ok_or_else(|| {
+                let names: Vec<&str> = UpdateStory::ALL.map(UpdateStory::name).to_vec();
+                shape(format!(
+                    "knobs.updates.story is {name}, and the stories are {}",
+                    names.join(", ")
+                ))
+            }),
+    }
 }
 
 fn process_knobs(fields: &Map<String, Value>) -> ProcessKnobs {
@@ -498,6 +518,8 @@ fn materialize_on(
         Value::Null
     };
 
+    let update_story = update_story(&merged(&scenario, &overrides, &["knobs", "updates"]))?;
+
     let root = text_path(dir)?;
     let steam_dir = join(&[&root, "steam"]);
     let app_data = join(&[&root, "appdata"]);
@@ -636,6 +658,7 @@ fn materialize_on(
         local_app_data,
         program_data,
         seed: seed(&scenario),
+        update_story,
     })
 }
 
@@ -919,5 +942,55 @@ mod tests {
         let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
         start_battlenet(&fake, &dir);
         assert!(newest_battlenet_log(&dir).contains("(prometheus): currentOperation=Update"));
+    }
+
+    #[test]
+    fn a_scenario_without_an_update_story_has_none() {
+        let (scratch, dir) = battlenet_scenario("sim-story-none", &Value::Null);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let fake = materialize(&dir, &scratch.join("data"), at).unwrap();
+        assert_eq!(fake.update_story, None);
+    }
+
+    #[test]
+    fn the_update_story_is_read_from_the_scenario_and_the_knobs_file_wins() {
+        let (scratch, dir) = battlenet_scenario("sim-story", &Value::Null);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        let mut scenario = read_json(&dir.join(SCENARIO_FILE), SCENARIO_FILE).unwrap();
+        scenario["knobs"]["updates"] = serde_json::json!({ "story": "http-503" });
+        fs::write(dir.join(SCENARIO_FILE), scenario.to_string()).unwrap();
+        let story = |dir: &Path| {
+            materialize(dir, &scratch.join("data"), at)
+                .unwrap()
+                .update_story
+        };
+        assert_eq!(story(&dir), Some(UpdateStory::Http503));
+
+        for name in UpdateStory::ALL.map(UpdateStory::name) {
+            let knobs = serde_json::json!({ "knobs": { "updates": { "story": name } } });
+            write_knobs(&dir, &knobs).unwrap();
+            assert_eq!(story(&dir), UpdateStory::named(name), "{name}");
+        }
+        let knobs = serde_json::json!({ "knobs": { "updates": { "story": null } } });
+        write_knobs(&dir, &knobs).unwrap();
+        assert_eq!(story(&dir), None);
+    }
+
+    #[test]
+    fn an_update_story_it_does_not_know_is_refused_with_the_names_it_knows() {
+        let (scratch, dir) = battlenet_scenario("sim-story-unknown", &Value::Null);
+        let at = datetime!(2026-11-06 16:46:23 UTC);
+        for story in [serde_json::json!("Ready"), serde_json::json!(3)] {
+            let knobs = serde_json::json!({ "knobs": { "updates": { "story": story } } });
+            write_knobs(&dir, &knobs).unwrap();
+            let refused = materialize(&dir, &scratch.join("data"), at)
+                .err()
+                .expect("an unknown story is refused")
+                .to_string();
+            assert!(refused.contains("knobs.updates.story"), "{refused}");
+            for name in UpdateStory::ALL.map(UpdateStory::name) {
+                assert!(refused.contains(name), "{refused}");
+            }
+        }
     }
 }

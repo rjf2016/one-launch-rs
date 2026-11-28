@@ -9,7 +9,7 @@ use gpui::{
     Stateful, Subscription, Svg, Window, WindowControlArea, canvas, div, px, svg,
 };
 use ol_api::Backend;
-use ol_api::settings::{QuitAnswer, QuitQuestion};
+use ol_api::settings::{QuitAnswer, QuitQuestion, UpdateStatus};
 use ol_api::whats_new::{AtStart, Release, at_start, shows_setup_guide};
 use ol_model::{Game, LaunchJob, LauncherId, SettingKey, Sidebar};
 use ol_ui_kit::theme::{self, alpha, color};
@@ -103,6 +103,8 @@ enum Asked {
         then: Route,
         return_to: Option<Box<Game>>,
     },
+    // Restart to update, asked from a page with unsaved edits.
+    Restart(RestartFrom),
     // A quit while a switch runs; its first answer keeps the app running.
     Quit,
     // "Quit anyway" was answered: no answer is left, only the line that the switch is being stopped.
@@ -131,6 +133,64 @@ struct Asking {
 
 // The user answered Quit anyway: the app is to quit.
 pub struct QuitAnyway;
+
+// The backend took Restart to update: the app is to quit for real, and the installer starts at its end.
+pub struct RestartToUpdate;
+
+// Where Restart to update was pressed, which is where a refusal is told.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RestartFrom {
+    Card,
+    Settings,
+}
+
+// Shared with the Settings page: whether a restart is under way, and whether a switch or launch runs, either of which keeps Restart to update from being pressed.
+#[derive(Default)]
+pub(crate) struct RestartGate {
+    restarting: Cell<bool>,
+    running: Cell<bool>,
+}
+
+impl RestartGate {
+    pub fn restarting(&self) -> bool {
+        self.restarting.get()
+    }
+
+    pub fn running(&self) -> bool {
+        self.running.get()
+    }
+
+    pub fn shut(&self) -> bool {
+        self.restarting() || self.running()
+    }
+}
+
+// The Update ready card's title and second line, and whether that line is a refusal.
+fn card_lines(
+    version: &str,
+    restarting: bool,
+    refusal: Option<&str>,
+) -> (&'static str, String, bool) {
+    let title = if restarting {
+        "Restarting…"
+    } else {
+        "Update ready"
+    };
+    match refusal {
+        Some(message) if !restarting => (title, format!("Could not restart: {message}"), true),
+        _ => (title, format!("Restart to install {version}"), false),
+    }
+}
+
+fn card_tip(version: &str, running: bool) -> String {
+    if running {
+        format!(
+            "One Launch {version} is ready. Restart to install it once the switch has finished."
+        )
+    } else {
+        format!("One Launch {version} is ready. Restart to install it.")
+    }
+}
 
 // A job the app followed has ended: the window may go to the tray.
 pub struct Played {
@@ -181,14 +241,20 @@ pub struct Shell {
     settings_tab: Rc<Cell<SettingsTab>>,
     launcher_statuses: KnownStatuses,
     preview: bool,
+    update: Option<UpdateStatus>,
+    gate: Rc<RestartGate>,
+    card_refusal: Option<SharedString>,
     _page: Option<Subscription>,
     _keys: Subscription,
     _host: Subscription,
     _played: Subscription,
     _library: Subscription,
+    _running: Subscription,
 }
 
 impl EventEmitter<QuitAnyway> for Shell {}
+
+impl EventEmitter<RestartToUpdate> for Shell {}
 
 impl EventEmitter<Played> for Shell {}
 
@@ -272,6 +338,19 @@ impl Shell {
             }
         })
         .detach();
+        // The sidebar's Update ready card follows the updater for as long as the window lives.
+        cx.spawn({
+            let changes = backend.update_changes();
+            async move |this, cx| {
+                while let Ok(status) = changes.recv().await {
+                    let heard = this.update(cx, |this, cx| this.update_heard(status, cx));
+                    if heard.is_err() {
+                        break;
+                    }
+                }
+            }
+        })
+        .detach();
         let this = cx.weak_entity();
         let keys = cx.intercept_keystrokes(move |event, window, cx| {
             let taken = this
@@ -285,6 +364,12 @@ impl Shell {
         });
         let host = cx.new(|cx| LaunchHost::new(backend.clone(), cx));
         let from_host = cx.subscribe_in(&host, window, Self::on_go);
+        let running = cx.observe(&host, |this: &mut Self, host, cx| {
+            let running = host.read(cx).job_running();
+            if this.gate.running.replace(running) != running {
+                cx.notify();
+            }
+        });
         let played = cx.subscribe(&host, |_, _, ended: &PlayEnded, cx| {
             cx.emit(Played {
                 job: ended.job.clone(),
@@ -312,12 +397,88 @@ impl Shell {
             settings_tab: Rc::default(),
             launcher_statuses: KnownStatuses::default(),
             preview: false,
+            update: None,
+            gate: Rc::default(),
+            card_refusal: None,
             _page: None,
             _keys: keys,
             _host: from_host,
             _played: played,
             _library: artwork_settings,
+            _running: running,
         }
+    }
+
+    fn update_heard(&mut self, status: UpdateStatus, cx: &mut Context<Self>) {
+        if !matches!(status, UpdateStatus::Ready { .. }) {
+            self.card_refusal = None;
+        }
+        self.update = Some(status);
+        cx.notify();
+    }
+
+    // As the Electron app's restartToUpdate: the page with unsaved edits has its say first, then the backend is asked; the app quits once it has said yes.
+    fn restart_to_update(
+        &mut self,
+        from: RestartFrom,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.gate.shut() || self.stopping() {
+            return;
+        }
+        if from == RestartFrom::Card {
+            self.card_refusal = None;
+        }
+        self.gate.restarting.set(true);
+        cx.notify();
+        if let Some(question) = self.question(cx) {
+            self.asking = Some(Asking {
+                title: question.title.into(),
+                message: question.message.into(),
+                detail: None,
+                keep: "Stay",
+                act: "Leave",
+                asked: Asked::Restart(from),
+                act_leads: false,
+                appeared: Appeared::now(),
+                had_keyboard: window.focused(cx),
+            });
+            window.blur(cx);
+            return;
+        }
+        self.install_update(from, cx);
+    }
+
+    fn install_update(&mut self, from: RestartFrom, cx: &mut Context<Self>) {
+        let backend = self.backend.clone();
+        cx.spawn(async move |this, cx| {
+            let installed = backend.install_update().await;
+            this.update(cx, |this, cx| match installed {
+                Ok(()) => cx.emit(RestartToUpdate),
+                Err(error) => this.restart_refused(from, error.message.into(), cx),
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    fn restart_refused(
+        &mut self,
+        from: RestartFrom,
+        message: SharedString,
+        cx: &mut Context<Self>,
+    ) {
+        self.gate.restarting.set(false);
+        match from {
+            RestartFrom::Card => self.card_refusal = Some(message),
+            RestartFrom::Settings => {
+                if let Page::Settings(page) = &self.page {
+                    page.update(cx, |page, cx| page.restart_refused(&message, cx));
+                }
+            }
+        }
+        cx.notify();
     }
 
     // A setting the backend stored: the sidebar's Preview mode card and the Settings page follow it.
@@ -358,6 +519,15 @@ impl Shell {
             })
         ) {
             return;
+        }
+        if matches!(
+            self.asking,
+            Some(Asking {
+                asked: Asked::Restart(_),
+                ..
+            })
+        ) {
+            self.gate.restarting.set(false);
         }
         self.backend.window_log().quit_asked(&question.job_id);
         self.asking = Some(Asking {
@@ -449,6 +619,9 @@ impl Shell {
         match ask {
             SettingsAsk::SetupGuide => self.open_guide(window, cx),
             SettingsAsk::WhatsNew(release) => self.open_whats_new(release, window, cx),
+            SettingsAsk::RestartToUpdate => {
+                self.restart_to_update(RestartFrom::Settings, window, cx);
+            }
         }
     }
 
@@ -531,6 +704,7 @@ impl Shell {
             Asked::Leave { then, return_to } if act => {
                 self.enter(then, return_to.map(|game| *game), window, cx);
             }
+            Asked::Restart(from) if act => self.install_update(from, cx),
             Asked::Quit if act => {
                 self.backend.window_log().quit_answered(QuitAnswer::Quit);
                 self.asking = Some(Asking {
@@ -551,6 +725,9 @@ impl Shell {
             other => {
                 if matches!(other, Asked::Quit) {
                     self.backend.window_log().quit_answered(QuitAnswer::Keep);
+                }
+                if matches!(other, Asked::Restart(_)) {
+                    self.gate.restarting.set(false);
                 }
                 if let Some(field) = &asking.had_keyboard {
                     window.focus(field, cx);
@@ -590,9 +767,10 @@ impl Shell {
                 }
                 let tab = Rc::clone(&self.settings_tab);
                 let known = Rc::clone(&self.launcher_statuses);
+                let gate = Rc::clone(&self.gate);
                 let developer = self.developer;
-                let page =
-                    cx.new(|cx| SettingsView::new(backend, tab, known, developer, window, cx));
+                let page = cx
+                    .new(|cx| SettingsView::new(backend, tab, known, gate, developer, window, cx));
                 self._page = Some(cx.subscribe_in(&page, window, Self::on_settings_ask));
                 Page::Settings(page)
             }
@@ -854,7 +1032,6 @@ impl Shell {
                             .map(|screen| self.nav_item(screen, open, cx)),
                     ),
             )
-            // The Update ready card is to stand in this column too, under the Preview mode card.
             .child(
                 div()
                     .mt_auto()
@@ -864,6 +1041,7 @@ impl Shell {
                     .px(px(8.))
                     .pb(px(12.))
                     .children(self.preview.then(|| self.render_preview_card(open, cx)))
+                    .children(self.render_update_card(open, cx))
                     .child(self.render_toggle_row(open, glyph, toggle_tip, cx)),
             )
     }
@@ -919,6 +1097,77 @@ impl Shell {
                         ),
                 )
             })
+    }
+
+    // The Electron app's Update ready card: shown while a verified update waits, and never dismissed.
+    fn render_update_card(&self, open: bool, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
+        let Some(UpdateStatus::Ready { version }) = &self.update else {
+            return None;
+        };
+        let shut = self.gate.shut();
+        let (title, line, refused) = card_lines(
+            version,
+            self.gate.restarting(),
+            self.card_refusal.as_deref(),
+        );
+        Some(
+            div()
+                .id("update-card")
+                .flex()
+                .items_start()
+                .gap(px(8.))
+                .rounded(px(8.))
+                .border_1()
+                .px(px(11.))
+                .py(px(8.))
+                .text_size(px(12.))
+                .line_height(px(16.))
+                .text_color(color(theme::TEXT_STRONG))
+                .whitespace_nowrap()
+                .map(|card| {
+                    if open {
+                        card.border_color(alpha(theme::ACCENT, 0.3))
+                            .bg(alpha(theme::ACCENT, 0.16))
+                            .when(!shut, |card| {
+                                card.hover(|style| style.border_color(alpha(theme::ACCENT, 0.5)))
+                            })
+                    } else {
+                        card.border_color(gpui::transparent_black())
+                            .when(!shut, |card| {
+                                card.hover(|style| style.bg(alpha(theme::ACCENT, 0.16)))
+                            })
+                    }
+                })
+                .when(shut, |card| card.opacity(0.6))
+                .when(!shut, |card| {
+                    card.cursor_pointer()
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.restart_to_update(RestartFrom::Card, window, cx);
+                        }))
+                })
+                .tooltip(tip(card_tip(version, self.gate.running())))
+                .child(icon(assets::UPDATE_READY, 14., theme::ACCENT_HOVER).mt(px(2.)))
+                .when(open, |card| {
+                    card.child(
+                        div()
+                            .w(px(164.))
+                            .flex_none()
+                            .whitespace_normal()
+                            .child(div().font_weight(FontWeight::MEDIUM).child(title))
+                            .child(
+                                div()
+                                    .text_size(px(11.))
+                                    .line_height(px(15.))
+                                    .text_color(color(if refused {
+                                        theme::DANGER
+                                    } else {
+                                        theme::MUTED
+                                    }))
+                                    .child(line),
+                            ),
+                    )
+                }),
+        )
     }
 
     fn render_toggle_row(
@@ -1300,6 +1549,57 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_update_card_says_what_the_electron_card_says() {
+        assert_eq!(
+            card_lines("1.0.0-beta.4", false, None),
+            (
+                "Update ready",
+                "Restart to install 1.0.0-beta.4".to_owned(),
+                false
+            )
+        );
+        assert_eq!(
+            card_lines("1.0.0-beta.4", true, None),
+            (
+                "Restarting…",
+                "Restart to install 1.0.0-beta.4".to_owned(),
+                false
+            )
+        );
+        assert_eq!(
+            card_lines(
+                "1.0.0-beta.4",
+                false,
+                Some("Another switch or launch is still running")
+            ),
+            (
+                "Update ready",
+                "Could not restart: Another switch or launch is still running".to_owned(),
+                true
+            )
+        );
+        assert_eq!(
+            card_tip("1.0.0-beta.4", false),
+            "One Launch 1.0.0-beta.4 is ready. Restart to install it."
+        );
+        assert_eq!(
+            card_tip("1.0.0-beta.4", true),
+            "One Launch 1.0.0-beta.4 is ready. Restart to install it once the switch has finished."
+        );
+    }
+
+    #[test]
+    fn a_restart_is_kept_from_being_pressed_while_one_is_under_way_or_a_switch_runs() {
+        let gate = RestartGate::default();
+        assert!(!gate.shut());
+        gate.running.set(true);
+        assert!(gate.shut() && !gate.restarting());
+        gate.running.set(false);
+        gate.restarting.set(true);
+        assert!(gate.shut() && !gate.running());
+    }
+
+    #[test]
     fn only_a_leave_question_gives_way_to_a_finished_move() {
         let leave = Asked::Leave {
             then: Route::Library,
@@ -1307,6 +1607,7 @@ mod tests {
         };
         assert!(leave.gives_way_to_a_finished_move());
         assert!(!Asked::Quit.gives_way_to_a_finished_move());
+        assert!(!Asked::Restart(RestartFrom::Card).gives_way_to_a_finished_move());
         assert!(!Asked::Stopping.gives_way_to_a_finished_move());
     }
 }

@@ -9,6 +9,7 @@ mod files;
 mod riot;
 mod scenario;
 mod steam;
+pub mod updates;
 
 pub use battlenet::{BattlenetFolders, BattlenetKnobs, BattlenetScript, BattlenetSim};
 pub use epic::{EpicKnobs, EpicSim};
