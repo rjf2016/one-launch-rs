@@ -634,6 +634,18 @@ pub fn launch_declined(events: &[LogEvent], product: &str, patchline: &str) -> O
         .last()
 }
 
+// The client's last word on the product is still "Product is not up to date": no line has named the product again since that refusal, and no other refusal for it came after.
+pub fn still_not_up_to_date(events: &[LogEvent], product: &str, patchline: &str) -> bool {
+    while_named(events, product, patchline)
+        .filter_map(|(event, named)| match event {
+            LogEvent::LaunchDeclined { reason } if named => Some(reason == NOT_UP_TO_DATE),
+            _ if named_product(event) == Some((product, patchline)) => Some(false),
+            _ => None,
+        })
+        .last()
+        .unwrap_or(false)
+}
+
 // The game's page is up with its Play button ready: after the product's own lines, with no other product's since, the pipeline reached WaitForLaunch or the client said why it is not launching. "Product is not up to date" is no such reason: the client is still patching the game or something it needs, and is ready only later. The client's last word of these counts, so that refusal after the page takes it back.
 pub fn launch_page_shown(events: &[LogEvent], product: &str, patchline: &str) -> bool {
     while_named(events, product, patchline)
@@ -1023,6 +1035,45 @@ mod tests {
             "league_of_legends",
             "live"
         ));
+    }
+
+    #[test]
+    fn a_refusal_as_not_up_to_date_is_the_last_word_until_a_line_names_the_product_again() {
+        let still = |lines: &[String]| still_not_up_to_date(&events(lines), "valorant", "live");
+        let refused = vec![context(1, "valorant.live"), running(2, NOT_UP_TO_DATE)];
+        assert!(still(&refused));
+        assert!(!still_not_up_to_date(&events(&refused), "valorant", "pbe"));
+
+        let mut named_again = refused.clone();
+        named_again.push(context(3, "valorant.live"));
+        assert!(!still(&named_again));
+
+        let mut launching = refused.clone();
+        launching.push(line(
+            3,
+            "OKAY",
+            "product-launcher: Launch starting: productId='valorant' patchlineId='live'",
+        ));
+        assert!(!still(&launching));
+
+        let mut refused_again = named_again.clone();
+        refused_again.push(running(4, NOT_UP_TO_DATE));
+        assert!(still(&refused_again));
+
+        let mut other = refused.clone();
+        other.push(context(3, "league_of_legends.live"));
+        assert!(still(&other));
+
+        let mut ready = refused.clone();
+        ready.push(running(3, "Auto-launch is disabled"));
+        assert!(!still(&ready));
+
+        assert!(!still(&[context(1, "valorant.live")]));
+        assert!(!still(&[
+            context(1, "valorant.live"),
+            running(2, "Auto-launch is disabled")
+        ]));
+        assert!(!still(&[]));
     }
 
     // The one recorded run with an update: the client refuses with "Product is not up to date" while its patch state is DependencyUpdate, and is ready about 8 s later.

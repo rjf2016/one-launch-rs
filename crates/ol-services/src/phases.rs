@@ -214,7 +214,7 @@ fn only_sent(job: &LaunchJob) -> bool {
     job.state == JobState::Done && job.game.is_some() && job.hand_off.is_none() && !job.game_seen
 }
 
-// A job that ended well with the game's page open in its launcher and Play left to the user.
+// A job that ended well with Play left to the user in the game's launcher.
 pub fn handed_over(job: &LaunchJob) -> bool {
     job.state == JobState::Done && job.hand_off.is_some()
 }

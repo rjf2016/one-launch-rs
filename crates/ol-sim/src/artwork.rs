@@ -1,4 +1,4 @@
-// The internet of a run on fake launchers, answered in this process. Steam's searches answer the name asked as a game of its own, except for Riot's games, which Steam does not sell; Steam's image servers and SteamGridDB's answer every picture with a small PNG of one colour, taken from the address; the SteamGridDB API answers from the recordings in oracle/fixtures/external/steamgriddb. Nothing here opens a socket.
+// The internet of a run on fake launchers, answered in this process. Steam's searches answer the name asked as a game of its own, except for Riot's games, which Steam does not sell; Steam's image servers and SteamGridDB's answer every picture with a small PNG of one colour, taken from the address; the SteamGridDB API answers from the recordings in oracle/fixtures/external/steamgriddb; Steam's store API, asked only when the image servers have no cover, which here they always have, answers 404. Nothing here opens a socket.
 
 use ol_formats::riot::products::PRODUCTS;
 use ol_platform_api::http::{HttpError, HttpRequest, HttpResponse, KEY_HEADER};
@@ -241,6 +241,12 @@ mod tests {
         assert_eq!(adler32(b"Wikipedia"), 0x11e6_0398);
         let large = solid_png(300, 300, [1, 2, 3]);
         assert!(large.len() > 270_000);
+    }
+
+    #[test]
+    fn steams_store_api_has_nothing() {
+        let request = HttpRequest::steam_store_items(2_807_960, 1024 * 1024, WAIT).unwrap();
+        assert_eq!(respond(&request).unwrap().status, 404);
     }
 
     #[test]

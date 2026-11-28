@@ -19,8 +19,8 @@ use ol_platform_fake::RecordingHttp;
 use ol_platform_fake::http::{json, picture, redirect, status};
 use ol_services::artwork::fetch::{MAX_DOWNLOAD_BYTES, MAX_JSON_BYTES};
 use ol_services::artwork::{
-    Artwork, ArtworkError, KeySource, MAX_MANUAL_BYTES, Outcome, Prepared, decode, fetch,
-    is_steam_placeholder, sniff_image,
+    Artwork, ArtworkError, Fetched, KeySource, MAX_MANUAL_BYTES, Outcome, Prepared, Wanted, decode,
+    fetch, is_steam_placeholder, sniff_image,
 };
 use ol_services::log::Log;
 use ol_sim::artwork::solid_png;
@@ -668,7 +668,8 @@ fn a_picture_steamgriddb_names_on_another_host_is_never_asked_for() {
             .iter()
             .all(|url| !url.contains("example.com") && !url.contains("8443"))
     );
-    assert_eq!(http.urls().len(), 6 + 3);
+    assert_eq!(http.urls().len(), 6 + 1 + 3);
+    assert_eq!(http.urls()[6], store_items("7"));
 }
 
 #[test]
@@ -909,7 +910,7 @@ fn a_miss_is_not_asked_again_by_itself_for_seven_days() {
     assert_eq!(
         library.miss(&id).as_deref(),
         Some(
-            "Steam CDN grid: HTTP 404; Steam CDN hero: HTTP 404; Steam CDN logo: HTTP 404; No SteamGridDB API key in Settings"
+            "Steam CDN grid: HTTP 404; Steam CDN hero: HTTP 404; Steam CDN logo: HTTP 404; Steam store: HTTP 404; No SteamGridDB API key in Settings"
         )
     );
     let later = |days: i64, seconds: i64| {
@@ -1784,6 +1785,7 @@ fn steams_placeholder_is_no_picture_and_steamgriddb_is_asked_in_its_place() {
             format!("{CDN}/{APP}/logo.png"),
             format!("{SHARED}/{APP}/logo.png"),
             format!("{LANDED}/logo.png"),
+            store_items(APP),
         ]
     );
     assert_eq!(
@@ -1809,6 +1811,7 @@ fn steams_placeholder_is_no_picture_and_steamgriddb_is_asked_in_its_place() {
     assert_eq!(
         http.urls()[7..],
         [
+            store_items(APP),
             grids,
             "https://cdn2.steamgriddb.com/grid/aaaa1111.png".to_owned(),
             logos,
@@ -1895,7 +1898,9 @@ fn a_placeholder_an_earlier_lookup_kept_goes_at_the_next_scan_and_is_looked_up_a
     assert_eq!(library.files(&id), ["hero.png", "logo.png"]);
     assert_eq!(
         library.miss(&id).as_deref(),
-        Some("Steam CDN grid: only Steam's gray placeholder; No SteamGridDB API key in Settings")
+        Some(
+            "Steam CDN grid: only Steam's gray placeholder; Steam store: HTTP 404; No SteamGridDB API key in Settings"
+        )
     );
 
     assert_eq!(library.art.prune(&library.store).unwrap(), 0);
@@ -2005,4 +2010,464 @@ fn a_gray_picture_the_user_chose_or_steamgriddb_gave_is_kept() {
     assert_eq!(given_row.source, "steamgriddb");
     assert_eq!(given_row.grid_path, Some(format!("{given_to}/grid.png")));
     assert_eq!(library.files(&given_to), ["grid.png"]);
+}
+
+const STORE_ASSETS: &str = "https://shared.steamstatic.com/store_item_assets/steam/apps";
+const GRID_HASH: &str = "5efba891507f611d94ef6685cc2af7cd0640f55d";
+const HERO_HASH: &str = "7165682cb6055d92bd2aafd940edbe70cb33ff6b";
+
+// Hand-made, not a recording: the assets as Steam named them for one newer game on 2026-11-27 (a logo added), around the made-up game's id, in an envelope written from memory.
+const STORE_ANSWER: &str = r#"{"response":{"store_items":[{"item_type":0,"id":2000000,"success":1,"visible":true,"name":"Made Up Game","appid":2000000,"assets":{"asset_url_format":"steam/apps/2000000/${FILENAME}?t=1794834044","header":"c12d12ce3c7d217398d3fcad77427bfc9d57c570/header.jpg","library_capsule":"5efba891507f611d94ef6685cc2af7cd0640f55d/library_capsule.jpg","library_capsule_2x":"5efba891507f611d94ef6685cc2af7cd0640f55d/library_capsule_2x.jpg","library_hero":"7165682cb6055d92bd2aafd940edbe70cb33ff6b/library_hero.jpg","library_hero_2x":"7165682cb6055d92bd2aafd940edbe70cb33ff6b/library_hero_2x.jpg","logo":"c12d12ce3c7d217398d3fcad77427bfc9d57c570/logo.png"}}]}}"#;
+
+fn store_items(app_id: &str) -> String {
+    format!(
+        "https://api.steampowered.com/IStoreBrowseService/GetItems/v1?input_json=%7B%22ids%22%3A%5B%7B%22appid%22%3A{app_id}%7D%5D%2C%22context%22%3A%7B%22language%22%3A%22english%22%2C%22country_code%22%3A%22US%22%7D%2C%22data_request%22%3A%7B%22include_assets%22%3Atrue%7D%7D"
+    )
+}
+
+fn hashed(hash: &str, file: &str) -> String {
+    format!("{STORE_ASSETS}/{APP}/{hash}/{file}")
+}
+
+fn store_assets() -> serde_json::Value {
+    let answer: serde_json::Value = serde_json::from_str(STORE_ANSWER).unwrap();
+    answer["response"]["store_items"][0]["assets"].clone()
+}
+
+fn store_answer(items: &serde_json::Value) -> HttpResponse {
+    json(
+        200,
+        &serde_json::json!({ "response": { "store_items": items } }).to_string(),
+    )
+}
+
+fn store_assets_without(names: &[&str]) -> HttpResponse {
+    let mut assets = store_assets();
+    for name in names {
+        assets.as_object_mut().unwrap().remove(*name);
+    }
+    store_answer(&serde_json::json!([{ "appid": 2_000_000, "assets": assets }]))
+}
+
+fn jpeg() -> HttpResponse {
+    picture("image/jpeg", encoded(ImageFormat::Jpeg))
+}
+
+fn made_up(app_id: Option<&str>, launcher: LauncherId, missing: &[ArtworkKind]) -> Wanted {
+    Wanted {
+        game_id: "made-up".to_owned(),
+        name: "Made Up Game".to_owned(),
+        launcher,
+        app_id: app_id.map(str::to_owned),
+        missing: missing.to_vec(),
+    }
+}
+
+fn look_up_made_up(http: &RecordingHttp, keys: &Keys, missing: &[ArtworkKind]) -> Fetched {
+    fetch(
+        http,
+        keys,
+        &made_up(Some(APP), LauncherId::Steam, missing),
+        &CancelToken::new(),
+    )
+}
+
+fn asks_the_store(http: &RecordingHttp) -> usize {
+    http.urls()
+        .iter()
+        .filter(|url| url.starts_with("https://api.steampowered.com/"))
+        .count()
+}
+
+#[test]
+fn a_cover_both_steam_hosts_answer_with_the_placeholder_comes_from_the_name_steams_store_gives() {
+    let mut library = Library::new();
+    let id = library.install(LauncherId::Steam, APP, "Made Up Game");
+    let grid_2x = hashed(GRID_HASH, "library_capsule_2x.jpg");
+    let logos = format!("{SGDB}/logos/steam/{APP}?{FILTER}");
+    let http = steam_placeholders()
+        .with(store_items(APP), json(200, STORE_ANSWER))
+        .with(&grid_2x, jpeg())
+        .http();
+    assert_eq!(library.look_up(&id, &http, &Keys::stored()), Outcome::Done);
+    assert_eq!(
+        http.urls(),
+        [
+            format!("{CDN}/{APP}/library_600x900.jpg"),
+            format!("{SHARED}/{APP}/library_600x900.jpg"),
+            format!("{LANDED}/library_600x900.jpg"),
+            format!("{CDN}/{APP}/library_hero.jpg"),
+            format!("{CDN}/{APP}/logo.png"),
+            format!("{SHARED}/{APP}/logo.png"),
+            format!("{LANDED}/logo.png"),
+            store_items(APP),
+            grid_2x,
+            logos,
+        ]
+    );
+    let store = &http.asked()[7];
+    assert!(!store.with_key);
+    assert_eq!(
+        store.headers,
+        ["accept", "accept-language", "sec-fetch-mode", "user-agent"]
+    );
+    assert!(http.urls().iter().all(|url| !url.contains("/grids/")));
+    assert_eq!(
+        library.row(&id),
+        Some(ArtworkRow {
+            grid_path: Some(format!("{id}/grid.jpg")),
+            logo_path: None,
+            ..steam_row(&id)
+        })
+    );
+    assert_eq!(library.row(&id).unwrap().source, "steamcdn");
+    assert_eq!(library.files(&id), ["grid.jpg", "hero.png"]);
+}
+
+#[test]
+fn a_cover_both_steam_hosts_lack_comes_from_the_store_with_the_hero_and_never_a_logo() {
+    let mut library = Library::new();
+    let id = library.install(LauncherId::Steam, APP, "Made Up Game");
+    let grid_2x = hashed(GRID_HASH, "library_capsule_2x.jpg");
+    let hero_2x = hashed(HERO_HASH, "library_hero_2x.jpg");
+    let http = Web::default()
+        .with(store_items(APP), json(200, STORE_ANSWER))
+        .with(&grid_2x, jpeg())
+        .with(&hero_2x, picture("image/png", png()))
+        .http();
+    assert_eq!(library.look_up(&id, &http, &Keys::stored()), Outcome::Done);
+    assert_eq!(
+        http.urls(),
+        [
+            format!("{CDN}/{APP}/library_600x900.jpg"),
+            format!("{SHARED}/{APP}/library_600x900.jpg"),
+            format!("{CDN}/{APP}/library_hero.jpg"),
+            format!("{SHARED}/{APP}/library_hero.jpg"),
+            format!("{CDN}/{APP}/logo.png"),
+            format!("{SHARED}/{APP}/logo.png"),
+            store_items(APP),
+            grid_2x,
+            hero_2x,
+            format!("{SGDB}/logos/steam/{APP}?{FILTER}"),
+        ]
+    );
+    assert!(http.urls().iter().all(|url| !url.contains("c12d12ce")));
+    assert_eq!(
+        library.row(&id),
+        Some(ArtworkRow {
+            grid_path: Some(format!("{id}/grid.jpg")),
+            logo_path: None,
+            ..steam_row(&id)
+        })
+    );
+    assert_eq!(library.files(&id), ["grid.jpg", "hero.png"]);
+}
+
+#[test]
+fn without_a_2x_name_the_stores_plain_one_is_taken() {
+    let grid = hashed(GRID_HASH, "library_capsule.jpg");
+    let hero = hashed(HERO_HASH, "library_hero.jpg");
+    let http = Web::default()
+        .with(
+            store_items(APP),
+            store_assets_without(&["library_capsule_2x", "library_hero_2x"]),
+        )
+        .with(&grid, jpeg())
+        .with(&hero, jpeg())
+        .http();
+    let fetched = look_up_made_up(&http, &Keys::none(), &ArtworkKind::ALL);
+    assert_eq!(http.urls()[6..], [store_items(APP), grid, hero]);
+    let found: Vec<(ArtworkKind, ArtworkSource)> = fetched
+        .found
+        .iter()
+        .map(|(kind, _, source)| (*kind, *source))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            (ArtworkKind::Grid, ArtworkSource::SteamCdn),
+            (ArtworkKind::Hero, ArtworkSource::SteamCdn)
+        ]
+    );
+}
+
+#[test]
+fn the_store_item_taken_is_the_first_with_assets_that_is_not_another_games() {
+    let other = "1111111111111111111111111111111111111111";
+    let items = serde_json::json!([
+        { "appid": 1, "assets": { "library_capsule": format!("{other}/library_capsule.jpg") } },
+        { "appid": 2_000_000, "assets": "none" },
+        { "appid": 2_000_000 },
+        7,
+        { "assets": store_assets() },
+    ]);
+    let http = steam_placeholders()
+        .with(store_items(APP), store_answer(&items))
+        .http();
+    look_up_made_up(&http, &Keys::none(), &ArtworkKind::ALL);
+    assert_eq!(
+        http.urls()[7..],
+        [
+            store_items(APP),
+            hashed(GRID_HASH, "library_capsule_2x.jpg")
+        ]
+    );
+}
+
+#[test]
+fn a_name_the_store_gives_of_any_other_shape_is_never_asked_for() {
+    let hash = GRID_HASH;
+    for bad in [
+        serde_json::json!(format!("{STORE_ASSETS}/{APP}/{hash}/library_capsule.jpg")),
+        serde_json::json!("../x.jpg"),
+        serde_json::json!(format!("{hash}/../x.jpg")),
+        serde_json::json!(format!("{}/library_capsule.jpg", &hash[..39])),
+        serde_json::json!(format!("{hash}0/library_capsule.jpg")),
+        serde_json::json!(format!("{hash}/a/b.jpg")),
+        serde_json::json!(format!("{hash}/library_capsule.jpg?q")),
+        serde_json::json!(format!("{hash}/library_capsule.jpg#q")),
+        serde_json::json!(format!("{}/library_capsule.jpg", hash.to_uppercase())),
+        serde_json::json!(format!("{hash}/library_capsule.gif")),
+        serde_json::json!(format!("{hash}/.jpg")),
+        serde_json::json!(format!("{hash}/library capsule.jpg")),
+        serde_json::json!(format!("{hash}/library_capsule.jpg\n")),
+        serde_json::json!(format!("/{hash}/library_capsule.jpg")),
+        serde_json::json!(format!("{hash}\\library_capsule.jpg")),
+        serde_json::json!(5),
+        serde_json::json!(null),
+    ] {
+        let mut assets = store_assets();
+        assets["library_capsule"] = bad.clone();
+        assets["library_capsule_2x"] = bad.clone();
+        let http = steam_placeholders()
+            .with(
+                store_items(APP),
+                store_answer(&serde_json::json!([{ "appid": 2_000_000, "assets": assets }])),
+            )
+            .http();
+        let fetched = look_up_made_up(&http, &Keys::none(), &ArtworkKind::ALL);
+        assert_eq!(http.urls().len(), 8, "{bad}");
+        assert_eq!(http.urls()[7], store_items(APP), "{bad}");
+        assert!(
+            fetched
+                .problems
+                .contains(&"Steam store: no grid".to_owned()),
+            "{bad}: {:?}",
+            fetched.problems
+        );
+        assert!(
+            fetched
+                .found
+                .iter()
+                .all(|(kind, ..)| *kind != ArtworkKind::Grid)
+        );
+    }
+}
+
+#[test]
+fn the_store_is_not_asked_unless_both_steam_hosts_have_no_cover() {
+    let grid = format!("{CDN}/{APP}/library_600x900.jpg");
+    let shared_grid = format!("{SHARED}/{APP}/library_600x900.jpg");
+    let all = ArtworkKind::ALL.to_vec();
+    let cases: Vec<(&str, Web, Vec<ArtworkKind>)> = vec![
+        (
+            "the cover was found",
+            Web::default().with(&grid, jpeg()),
+            all.clone(),
+        ),
+        (
+            "a 500 for the cover",
+            Web::default().with(&grid, status(500)),
+            all.clone(),
+        ),
+        (
+            "a 500 for the cover on the second host",
+            Web::default().with(&shared_grid, status(500)),
+            all.clone(),
+        ),
+        (
+            "a timeout for the cover",
+            Web::default().failing(&grid, HttpError::Timeout),
+            all.clone(),
+        ),
+        (
+            "only the logo missing",
+            Web::default(),
+            vec![ArtworkKind::Logo],
+        ),
+        (
+            "only the hero missing",
+            Web::default(),
+            vec![ArtworkKind::Hero],
+        ),
+        (
+            "the hero and the logo missing",
+            Web::default(),
+            vec![ArtworkKind::Hero, ArtworkKind::Logo],
+        ),
+    ];
+    for (case, web, missing) in cases {
+        let http = web.with(store_items(APP), json(200, STORE_ANSWER)).http();
+        let fetched = look_up_made_up(&http, &Keys::none(), &missing);
+        assert_eq!(asks_the_store(&http), 0, "{case}");
+        assert!(
+            fetched
+                .problems
+                .iter()
+                .all(|problem| !problem.starts_with("Steam store")),
+            "{case}"
+        );
+    }
+
+    let http = Web::default().http();
+    for launcher in [LauncherId::Epic, LauncherId::Steam] {
+        fetch(
+            &http,
+            &Keys::none(),
+            &made_up(None, launcher, &ArtworkKind::ALL),
+            &CancelToken::new(),
+        );
+    }
+    assert_eq!(asks_the_store(&http), 0, "no Steam id");
+    assert_eq!(http.urls().len(), 2, "the two searches alone");
+
+    let cancel = CancelToken::new();
+    let stopping = cancel.clone();
+    let stops_at = shared_grid.clone();
+    let http = RecordingHttp::new(move |request| {
+        if request.url().to_string() == stops_at {
+            stopping.cancel();
+        }
+        Ok(status(404))
+    });
+    let fetched = fetch(
+        &http,
+        &Keys::stored(),
+        &made_up(Some(APP), LauncherId::Steam, &ArtworkKind::ALL),
+        &cancel,
+    );
+    assert_eq!(http.urls(), [grid, shared_grid]);
+    assert!(
+        fetched
+            .problems
+            .iter()
+            .all(|problem| !problem.starts_with("Steam store")),
+        "{:?}",
+        fetched.problems
+    );
+}
+
+#[test]
+fn a_store_step_that_finds_no_cover_keeps_its_reason_and_steamgriddb_is_still_asked() {
+    let grid_2x = hashed(GRID_HASH, "library_capsule_2x.jpg");
+    let grids = format!("{SGDB}/grids/steam/{APP}?dimensions=600x900&{FILTER}");
+    let gray = picture("image/jpeg", bytes_of(&gray_cover(), ImageFormat::Jpeg));
+    let another_game = store_answer(&serde_json::json!([{ "appid": 1, "assets": store_assets() }]));
+    let cases: Vec<(&str, Web)> = vec![
+        (
+            "Steam store grid: only Steam's gray placeholder",
+            Web::default()
+                .with(store_items(APP), json(200, STORE_ANSWER))
+                .with(&grid_2x, gray),
+        ),
+        (
+            "Steam store grid: HTTP 404",
+            Web::default().with(store_items(APP), json(200, STORE_ANSWER)),
+        ),
+        (
+            "Steam store: HTTP 503",
+            Web::default().with(store_items(APP), status(503)),
+        ),
+        (
+            "Steam store: the answer is not JSON",
+            Web::default().with(store_items(APP), json(200, "<!DOCTYPE html>")),
+        ),
+        (
+            "Steam store: fetch failed",
+            Web::default().with(store_items(APP), redirect(302, "https://example.com/")),
+        ),
+        (
+            "Steam store: fetch failed",
+            Web::default().failing(store_items(APP), HttpError::Failed("the connection failed")),
+        ),
+        (
+            "Steam store: The operation was aborted due to timeout",
+            Web::default().failing(store_items(APP), HttpError::Timeout),
+        ),
+        (
+            "Steam store: no grid",
+            Web::default().with(store_items(APP), another_game),
+        ),
+        (
+            "Steam store: no grid",
+            Web::default().with(store_items(APP), json(200, "{}")),
+        ),
+    ];
+    for (reason, web) in cases {
+        let http = web
+            .with(&grids, json(200, &recorded("grids-steam-252950.json")))
+            .with(
+                "https://cdn2.steamgriddb.com/grid/aaaa1111.png",
+                picture("image/png", png()),
+            )
+            .http();
+        let fetched = look_up_made_up(&http, &Keys::stored(), &[ArtworkKind::Grid]);
+        assert_eq!(asks_the_store(&http), 1, "{reason}");
+        assert!(
+            fetched
+                .problems
+                .iter()
+                .any(|problem| problem.starts_with(reason)),
+            "{reason}: {:?}",
+            fetched.problems
+        );
+        let urls = http.urls();
+        let store_at = urls.iter().position(|url| *url == store_items(APP));
+        let grids_at = urls.iter().position(|url| *url == grids);
+        assert!(grids_at > store_at && store_at.is_some(), "{reason}");
+        let found: Vec<(ArtworkKind, ArtworkSource)> = fetched
+            .found
+            .iter()
+            .map(|(kind, _, source)| (*kind, *source))
+            .collect();
+        assert_eq!(
+            found,
+            [(ArtworkKind::Grid, ArtworkSource::SteamGridDb)],
+            "{reason}"
+        );
+        assert!(urls.iter().all(|url| !url.contains("example.com")));
+    }
+}
+
+#[test]
+fn turned_off_what_a_scan_queued_is_not_looked_up_and_what_the_user_asked_for_is() {
+    let mut library = Library::new();
+    let rocket = library.install(LauncherId::Steam, "252950", "Rocket League");
+    let tf2 = library.install(LauncherId::Steam, "440", "Team Fortress 2");
+    let one = library.install(LauncherId::Steam, "1", "One");
+    assert_eq!(
+        library.art.enqueue_after_scan(&library.store, NOW).unwrap(),
+        3
+    );
+    assert_eq!(
+        library
+            .art
+            .refresh(&library.store, Some(&tf2), false, NOW)
+            .unwrap(),
+        0,
+        "a game that waits keeps its place"
+    );
+    assert_eq!(library.art.queue.drop_automatic(), 2);
+    assert_eq!(library.art.queue.status(false, 0, false).queued, 1);
+    let http = Web::default()
+        .steam_pictures("252950")
+        .steam_pictures("440")
+        .steam_pictures("1")
+        .http();
+    assert_eq!(library.run(&http, &Keys::none()), [Outcome::Done]);
+    assert!(http.urls().iter().all(|url| url.contains("/440/")));
+    assert_eq!(http.urls().len(), 3);
+    assert_eq!(library.row(&tf2), Some(steam_row(&tf2)));
+    assert_eq!((library.row(&rocket), library.row(&one)), (None, None));
+    assert!(library.art.queue.is_idle());
 }

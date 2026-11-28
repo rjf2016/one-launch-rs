@@ -135,7 +135,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
-    use ol_platform_api::http::{ArtworkUrl, IMAGE_HOSTS, KEY_HOST, LOOKUP_HOSTS};
+    use ol_platform_api::http::{ArtworkUrl, IMAGE_HOSTS, KEY_HOST, LOOKUP_HOSTS, STORE_API_HOST};
     use ureq::http::Uri;
     use ureq::unversioned::resolver::ResolvedSocketAddrs;
     use ureq::unversioned::transport::{
@@ -356,6 +356,27 @@ mod tests {
             assert!(!sent.to_lowercase().contains("authorization"), "{host}");
             assert!(!sent.to_lowercase().contains("cookie"), "{host}");
         }
+
+        let (client, wire) = self::client(vec![ok()]);
+        let store = HttpRequest::steam_store_items(2_807_960, 1024, WAIT).unwrap();
+        client.send(&store).unwrap();
+        assert_eq!(
+            lines(&wire),
+            [
+                format!(
+                    "get {} http/1.1",
+                    store.url().path_and_query().to_lowercase()
+                ),
+                "accept-language: *".to_owned(),
+                "accept: */*".to_owned(),
+                format!("host: {STORE_API_HOST}"),
+                "sec-fetch-mode: cors".to_owned(),
+                "user-agent: node".to_owned(),
+            ]
+        );
+        let wire = wire.lock().unwrap();
+        assert_eq!(wire.looked_up, [STORE_API_HOST]);
+        assert_eq!(wire.connected, [store.url().to_string()]);
     }
 
     #[test]

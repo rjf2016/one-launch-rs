@@ -1381,6 +1381,10 @@ impl Serving {
                         json!({ "key": key.as_str(), "value": value }),
                     );
                     self.changed(key, Some(&value));
+                    if key == SettingKey::ArtworkAutoFetch && value == "false" {
+                        let dropped = self.artwork.service.queue.drop_automatic();
+                        ipc.info("automatic artwork dropped", json!({ "dropped": dropped }));
+                    }
                     if changed.turns_artwork_on
                         && let Ok(store) = store
                     {

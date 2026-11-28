@@ -242,6 +242,8 @@ pub enum Outcome {
 struct Ask {
     force: bool,
     replaces_manual: bool,
+    // The user asked for it, as against a scan queueing what is missing.
+    asked: bool,
 }
 
 impl Ask {
@@ -249,6 +251,7 @@ impl Ask {
         Self {
             force: self.force || other.force,
             replaces_manual: self.replaces_manual || other.replaces_manual,
+            asked: self.asked || other.asked,
         }
     }
 }
@@ -301,8 +304,16 @@ impl Queue {
             Ask {
                 force,
                 replaces_manual: false,
+                asked: false,
             },
         )
+    }
+
+    // When looking up by itself is turned off: what a scan queued and the user did not ask for stops waiting. A lookup already running ends and writes. Answers how many went.
+    pub fn drop_automatic(&mut self) -> usize {
+        let before = self.pending.len();
+        self.pending.retain(|(_, ask)| ask.asked);
+        before - self.pending.len()
     }
 
     fn ask(&mut self, ids: &[String], ask: Ask) -> usize {
@@ -369,6 +380,7 @@ impl Queue {
             let ask = Ask {
                 force: true,
                 replaces_manual,
+                asked: true,
             };
             match self.pending.iter_mut().find(|(pending, _)| pending == id) {
                 Some(waiting) => waiting.1 = waiting.1.with(ask),
@@ -602,6 +614,7 @@ impl Artwork {
         let ask = Ask {
             force,
             replaces_manual: force && game_id.is_some(),
+            asked: true,
         };
         Ok(self.queue.ask(&ids, ask))
     }
@@ -1022,6 +1035,35 @@ mod tests {
         assert_eq!(queue.take_next(), Some(("a".to_owned(), false)));
         queue.finish("a", Outcome::Done);
         assert_eq!(queue.take_next(), Some(("b".to_owned(), true)));
+    }
+
+    #[test]
+    fn turned_off_the_waiting_lookups_a_scan_queued_go_and_what_the_user_asked_for_stays() {
+        let mut queue = Queue::with_concurrency(1);
+        assert_eq!(queue.enqueue(&ids(&["running", "a", "b", "c"]), false), 4);
+        assert_eq!(queue.take_next(), Some(("running".to_owned(), false)));
+        let asked = Ask {
+            force: false,
+            replaces_manual: false,
+            asked: true,
+        };
+        assert_eq!(queue.ask(&ids(&["b"]), asked), 0);
+        assert_eq!(queue.ask(&ids(&["d"]), asked), 1);
+        assert_eq!(queue.status(false, 0, false).queued, 4);
+
+        assert_eq!(queue.drop_automatic(), 2);
+        let waiting: Vec<&str> = queue.pending.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(waiting, ["b", "d"]);
+        let status = queue.status(false, 0, false);
+        assert_eq!((status.queued, status.running), (2, 1));
+        assert!(queue.is_busy("running") && !queue.is_busy("a") && !queue.is_busy("c"));
+        assert_eq!(queue.drop_automatic(), 0);
+
+        queue.finish("running", Outcome::Done);
+        assert_eq!(queue.status(false, 0, false).completed, 1);
+        assert_eq!(queue.take_next(), Some(("b".to_owned(), false)));
+        queue.finish("b", Outcome::Done);
+        assert_eq!(queue.take_next(), Some(("d".to_owned(), false)));
     }
 
     #[test]

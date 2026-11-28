@@ -32,6 +32,16 @@ const ALT: &str = "@acct:battlenet:saved3@example.com";
 const NEW: &str = "@acct:battlenet:new@example.com";
 const STARTED_LINE: &str =
     "I 2026-09-13 03:20:48.092586 [Main] {Main} Logging started for Battle.net build 2.52.11.17778";
+const GOLDENS: [&str; 6] = [
+    "T-battlenet-adapter-4549663a63",
+    "T-battlenet-adapter-5633fa792b",
+    "T-battlenet-adapter-e6c4326a9e",
+    "T-battlenet-adapter-bee0c90ffa",
+    "T-battlenet-adapter-71c22bba0a",
+    "T-battlenet-adapter-e5a389b67a",
+];
+const NEVER_RUN: [&str; 2] = [" (reg add /t REG_BINARY)", " (reg delete)"];
+const COMMANDS: [&str; 5] = ["reg add", "reg delete", "reg.exe", "powershell", "cmd"];
 
 // The accounts and saved tokens of the Electron tests, held in memory. A plan may read them and nothing else: every write is refused.
 struct Book {
@@ -316,6 +326,44 @@ fn without_root(value: &mut Value, root: &str) {
     }
 }
 
+// The Electron app ran reg.exe for these two steps; this build writes through the registry API, the owner's word of 2026-11-27, see plan/GAPS.md under Battle.net.
+fn without_the_commands_this_build_never_runs(value: &mut Value) {
+    match value {
+        Value::Object(fields) => {
+            if let Some(Value::Array(steps)) = fields.get_mut("steps") {
+                for step in steps {
+                    if let Some(Value::String(detail)) = step.get_mut("detail") {
+                        for fragment in NEVER_RUN {
+                            *detail = detail.replace(fragment, "");
+                        }
+                    }
+                }
+            }
+            fields
+                .values_mut()
+                .for_each(without_the_commands_this_build_never_runs);
+        }
+        Value::Array(items) => items
+            .iter_mut()
+            .for_each(without_the_commands_this_build_never_runs),
+        _ => {}
+    }
+}
+
+fn step_details(value: &Value, into: &mut Vec<String>) {
+    match value {
+        Value::Object(fields) => {
+            if let Some(Value::Array(steps)) = fields.get("steps") {
+                let details = steps.iter().filter_map(|step| step["detail"].as_str());
+                into.extend(details.map(str::to_owned));
+            }
+            fields.values().for_each(|field| step_details(field, into));
+        }
+        Value::Array(items) => items.iter().for_each(|item| step_details(item, into)),
+        _ => {}
+    }
+}
+
 // Puts the first calls of a golden to the port, each on the machine `before` has prepared for it. The calls after them are real switches and restores, which are not put here.
 fn check(golden: &str, before: &[&dyn Fn(&mut World)]) {
     let recorded = read_json(&format!("tests/goldens/{golden}.json"));
@@ -353,8 +401,10 @@ fn check(golden: &str, before: &[&dyn Fn(&mut World)]) {
             plan_json(&adapter.plan_switch(&account).unwrap())
         };
         without_root(&mut answered, &root);
+        let mut expected = call["result"].clone();
+        without_the_commands_this_build_never_runs(&mut expected);
         assert_eq!(
-            difference(&answered, &call["result"]),
+            difference(&answered, &expected),
             None,
             "{golden} call {index}"
         );
@@ -456,6 +506,64 @@ fn a_login_that_is_first_already_leaves_the_file_step_out() {
             config_with(world, logins, moved);
         }],
     );
+}
+
+#[test]
+fn the_recordings_still_name_the_commands_the_rule_takes_out() {
+    let mut recorded = Vec::new();
+    let mut ruled = Vec::new();
+    for golden in GOLDENS {
+        let calls = read_json(&format!("tests/goldens/{golden}.json"))["calls"].clone();
+        let results: Vec<Value> = calls
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|call| call["result"].clone())
+            .collect();
+        let mut results = Value::Array(results);
+        step_details(&results, &mut recorded);
+        without_the_commands_this_build_never_runs(&mut results);
+        step_details(&results, &mut ruled);
+    }
+    for fragment in NEVER_RUN {
+        let found = recorded.iter().filter(|detail| detail.contains(fragment));
+        assert!(found.count() >= 1, "a recording names{fragment}");
+    }
+    assert_eq!(recorded.len(), ruled.len());
+    for detail in &ruled {
+        assert!(!detail.contains("reg add"), "{detail}");
+        assert!(!detail.contains("reg delete"), "{detail}");
+    }
+}
+
+#[test]
+fn the_plans_name_no_command() {
+    let mut details = Vec::new();
+    for running in [false, true] {
+        let mut world = world();
+        if running {
+            client_running(&mut world);
+        }
+        let accounts = world.book.accounts.lock().unwrap().clone();
+        let adapter = BattlenetAdapter::new(&world.platform, &world.config, &world.book);
+        for account in &accounts {
+            let plan = adapter.plan_switch(account).unwrap();
+            let preflight = adapter.preflight(account).unwrap();
+            for steps in [&plan.steps, &preflight.plan.steps] {
+                details.extend(steps.iter().map(|step| step.detail.clone()));
+            }
+        }
+    }
+    let restores = "write it as the REG_BINARY value under UnifiedAuth";
+    assert!(details.iter().any(|detail| detail.contains(restores)));
+    let signs_out = "Remove the UnifiedAuth value";
+    assert!(details.iter().any(|detail| detail.starts_with(signs_out)));
+    for detail in &details {
+        let lower = detail.to_ascii_lowercase();
+        for command in COMMANDS {
+            assert!(!lower.contains(command), "{command}: {detail}");
+        }
+    }
 }
 
 fn health(world: &World) -> Vec<HealthCheck> {

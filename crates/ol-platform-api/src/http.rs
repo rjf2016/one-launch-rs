@@ -1,4 +1,4 @@
-// The only requests the app sends to the internet: the artwork lookups and the image downloads. A request can be made for a host of the two lists below and for no other, over https on the default port, and the SteamGridDB key rides in one header of a request to that API alone. The real client and the fakes are handed the same request and send or record its `headers()`, so what a test sees is what would be sent.
+// The only requests the app sends to the internet: the artwork lookups and the image downloads. A request can be made for a host of the two lists below, and for Steam's store API at the one address `HttpRequest::steam_store_items` builds, and for no other, over https on the default port, and the SteamGridDB key rides in one header of a request to that API alone. The real client and the fakes are handed the same request and send or record its `headers()`, so what a test sees is what would be sent.
 
 use std::fmt;
 use std::time::Duration;
@@ -19,6 +19,14 @@ pub const IMAGE_HOSTS: [&str; 4] = [
 
 // The one host the SteamGridDB key is ever sent to.
 pub const KEY_HOST: &str = "www.steamgriddb.com";
+
+// Steam's store API, which names the hashed files of a game's newer covers. It is on neither list: the one address asked of it is built whole by `HttpRequest::steam_store_items`.
+pub const STORE_API_HOST: &str = "api.steampowered.com";
+
+const STORE_ITEMS_PATH: &str = "/IStoreBrowseService/GetItems/v1";
+// `input_json={"ids":[{"appid":` and `}],"context":{"language":"english","country_code":"US"},"data_request":{"include_assets":true}}`, percent-encoded, around the id's digits.
+const STORE_ITEMS_HEAD: &str = "input_json=%7B%22ids%22%3A%5B%7B%22appid%22%3A";
+const STORE_ITEMS_TAIL: &str = "%7D%5D%2C%22context%22%3A%7B%22language%22%3A%22english%22%2C%22country_code%22%3A%22US%22%7D%2C%22data_request%22%3A%7B%22include_assets%22%3Atrue%7D%7D";
 
 // What every request carries beside Host: what the Electron app's fetch sends for a request without headers of its own, less Accept-Encoding, because this app decodes no encoding.
 pub const FIXED_HEADERS: [(&str, &str); 4] = [
@@ -196,6 +204,23 @@ impl HttpRequest {
         if !IMAGE_HOSTS.contains(&url.host) {
             return Err(NotAllowed::Host);
         }
+        Ok(Self {
+            url,
+            key: None,
+            limit,
+            timeout,
+        })
+    }
+
+    // The one request Steam's store API is ever asked: a game's store item with its assets, in English for the US store.
+    pub fn steam_store_items(
+        app_id: u64,
+        limit: u64,
+        timeout: Duration,
+    ) -> Result<Self, NotAllowed> {
+        let query = format!("{STORE_ITEMS_HEAD}{app_id}{STORE_ITEMS_TAIL}");
+        let url = ArtworkUrl::on(STORE_API_HOST, STORE_ITEMS_PATH, Some(&query))
+            .ok_or(NotAllowed::Host)?;
         Ok(Self {
             url,
             key: None,
@@ -529,10 +554,93 @@ mod tests {
         );
     }
 
+    fn percent_decoded(text: &str) -> String {
+        let mut bytes = Vec::new();
+        let mut rest = text.as_bytes();
+        while let Some((&first, after)) = rest.split_first() {
+            match (first, after.get(..2)) {
+                (b'%', Some(pair)) => {
+                    let pair = std::str::from_utf8(pair).unwrap();
+                    bytes.push(u8::from_str_radix(pair, 16).unwrap());
+                    rest = &after[2..];
+                }
+                _ => {
+                    bytes.push(first);
+                    rest = after;
+                }
+            }
+        }
+        String::from_utf8(bytes).unwrap()
+    }
+
+    #[test]
+    fn steams_store_api_is_asked_at_the_one_address_built_for_an_id_and_at_no_other() {
+        let request = HttpRequest::steam_store_items(2_807_960, LIMIT, WAIT).unwrap();
+        assert_eq!(
+            request.url().to_string(),
+            "https://api.steampowered.com/IStoreBrowseService/GetItems/v1?input_json=%7B%22ids%22%3A%5B%7B%22appid%22%3A2807960%7D%5D%2C%22context%22%3A%7B%22language%22%3A%22english%22%2C%22country_code%22%3A%22US%22%7D%2C%22data_request%22%3A%7B%22include_assets%22%3Atrue%7D%7D"
+        );
+        assert_eq!(request.url().host(), STORE_API_HOST);
+        let (path, query) = request.url().path_and_query().split_once('?').unwrap();
+        assert_eq!(path, "/IStoreBrowseService/GetItems/v1");
+        assert_eq!(
+            percent_decoded(query.strip_prefix("input_json=").unwrap()),
+            r#"{"ids":[{"appid":2807960}],"context":{"language":"english","country_code":"US"},"data_request":{"include_assets":true}}"#
+        );
+        assert!(!request.has_key());
+        assert_eq!(request.headers().len(), FIXED_HEADERS.len());
+        for (id, digits) in [(0, "0"), (7, "7"), (u64::MAX, "18446744073709551615")] {
+            let built = HttpRequest::steam_store_items(id, LIMIT, WAIT)
+                .unwrap()
+                .url()
+                .to_string();
+            assert_eq!(
+                built,
+                format!(
+                    "https://{STORE_API_HOST}{STORE_ITEMS_PATH}?{STORE_ITEMS_HEAD}{digits}{STORE_ITEMS_TAIL}"
+                )
+            );
+        }
+
+        let refused = HttpRequest::steam_store_items(1, LIMIT, WAIT)
+            .unwrap()
+            .with_key("placeholderkey0000000000");
+        assert_eq!(refused.err(), Some(NotAllowed::Key));
+        let built = request.url().clone();
+        assert_eq!(
+            HttpRequest::image(built.clone(), LIMIT, WAIT).err(),
+            Some(NotAllowed::Host)
+        );
+        for location in ["/x.png", "x.png", "?t=1", ""] {
+            assert!(built.redirected(location).is_none(), "{location:?}");
+        }
+        for url in [
+            built.to_string(),
+            format!("https://{STORE_API_HOST}/"),
+            format!("https://{STORE_API_HOST}{STORE_ITEMS_PATH}"),
+            format!("https://{STORE_API_HOST}/ISteamUser/GetPlayerSummaries/v2/?steamids=1"),
+            format!("https://{STORE_API_HOST}/steam/apps/1/logo.png"),
+            format!("https://{}/x", STORE_API_HOST.to_uppercase()),
+        ] {
+            assert!(HttpRequest::lookup(&url, LIMIT, WAIT).is_err(), "{url}");
+            assert!(ArtworkUrl::image(&url).is_none(), "{url}");
+        }
+        assert!(
+            !LOOKUP_HOSTS
+                .into_iter()
+                .chain(IMAGE_HOSTS)
+                .any(|host| host.eq_ignore_ascii_case(STORE_API_HOST))
+        );
+    }
+
     // Riot's rule: nothing is ever sent to a host of Riot's.
     #[test]
     fn no_host_on_either_list_is_riots() {
-        for host in LOOKUP_HOSTS.into_iter().chain(IMAGE_HOSTS) {
+        for host in LOOKUP_HOSTS
+            .into_iter()
+            .chain(IMAGE_HOSTS)
+            .chain([STORE_API_HOST])
+        {
             for riot in [
                 "riot",
                 "valorant",

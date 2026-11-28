@@ -1,4 +1,4 @@
-// The part of an artwork lookup that asks the internet, in the Electron app's order: Steam's own id for the game or Steam's two searches, Steam's image servers for each kind that is missing, and SteamGridDB for what is left when a key is stored. Every game takes this one way, a Riot game too: SteamGridDB has their covers. It runs on a thread of its own, holds what it downloads in memory and writes nothing: only a game's name and its Steam or SteamGridDB id ever leave, and the key in its header.
+// The part of an artwork lookup that asks the internet, in the Electron app's order: Steam's own id for the game or Steam's two searches, Steam's image servers for each kind that is missing, then, when they have no cover, Steam's store API once for the hashed name of a newer game's cover, and SteamGridDB for what is left when a key is stored. Every game takes this one way, a Riot game too: SteamGridDB has their covers. It runs on a thread of its own, holds what it downloads in memory and writes nothing: only a game's name and its Steam or SteamGridDB id ever leave, and the key in its header.
 
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
@@ -24,6 +24,9 @@ const STEAM_CDN: [&str; 2] = [
     "https://cdn.cloudflare.steamstatic.com/steam/apps",
     "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps",
 ];
+const STORE_ASSETS: &str = "https://shared.steamstatic.com/store_item_assets/steam/apps";
+const STORE_GRID: [&str; 2] = ["library_capsule_2x", "library_capsule"];
+const STORE_HERO: [&str; 2] = ["library_hero_2x", "library_hero"];
 const SGDB_API: &str = "https://www.steamgriddb.com/api/v2";
 const SGDB_FILTER: &str = "types=static&nsfw=false&humor=false";
 const REDIRECTS: [u16; 5] = [301, 302, 303, 307, 308];
@@ -32,6 +35,11 @@ const PLACEHOLDER: &str = "only Steam's gray placeholder";
 
 static NOT_A_WORD: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[^\p{L}\p{N}]+").expect("the pattern is fixed"));
+
+// A file the store API names: the hash of its content, then one plain file name. Nothing else is ever put into an address.
+static HASHED_FILE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\A[0-9a-f]{40}/[A-Za-z0-9_-]+\.(?:jpg|png|webp)\z").expect("the pattern is fixed")
+});
 
 const fn steam_file(kind: ArtworkKind) -> &'static str {
     match kind {
@@ -97,13 +105,25 @@ pub fn fetch(
         }
     }
     if let Some(app_id) = &app_id {
+        let mut grid_gone = false;
         for kind in &wanted.missing {
             match asking.steam_picture(app_id, *kind) {
                 Ok(image) => fetched.found.push((*kind, image, ArtworkSource::SteamCdn)),
-                Err(error) => fetched
-                    .problems
-                    .push(format!("Steam CDN {}: {error}", kind.as_str())),
+                Err(error) => {
+                    grid_gone |= *kind == ArtworkKind::Grid && is_gone(&error);
+                    fetched
+                        .problems
+                        .push(format!("Steam CDN {}: {error}", kind.as_str()));
+                }
             }
+        }
+        if grid_gone
+            && !cancel.is_cancelled()
+            && let Ok(app_id) = app_id.parse::<u64>()
+        {
+            let hero_too =
+                wanted.missing.contains(&ArtworkKind::Hero) && !fetched.has(ArtworkKind::Hero);
+            asking.ask_steam_store(app_id, hero_too, &mut fetched);
         }
     }
     let still: Vec<ArtworkKind> = wanted
@@ -221,7 +241,7 @@ impl Asking<'_> {
             match self.download(&url, ArtworkSource::SteamCdn) {
                 Ok(image) => return Ok(image),
                 Err(error) => {
-                    let gone = error.starts_with("HTTP 404") || error == PLACEHOLDER;
+                    let gone = is_gone(&error);
                     last_error = error;
                     if !gone {
                         break;
@@ -230,6 +250,72 @@ impl Asking<'_> {
             }
         }
         Err(last_error)
+    }
+
+    // Asked once, when Steam's image servers have no cover: the store item names the files of a newer game's pictures, and only a name of the one expected shape is fetched, from an address built here.
+    fn ask_steam_store(&self, app_id: u64, hero_too: bool, fetched: &mut Fetched) {
+        let assets = match self.store_assets(app_id) {
+            Ok(assets) => assets,
+            Err(error) => {
+                fetched.problems.push(format!("Steam store: {error}"));
+                return;
+            }
+        };
+        let named = |names: [&str; 2]| {
+            names.into_iter().find_map(|name| {
+                assets
+                    .get(name)
+                    .and_then(Value::as_str)
+                    .filter(|file| HASHED_FILE.is_match(file))
+            })
+        };
+        let mut wanted = vec![(ArtworkKind::Grid, named(STORE_GRID))];
+        if hero_too {
+            wanted.push((ArtworkKind::Hero, named(STORE_HERO)));
+        }
+        for (kind, file) in wanted {
+            let Some(file) = file else {
+                if kind == ArtworkKind::Grid {
+                    fetched.problems.push("Steam store: no grid".to_owned());
+                }
+                continue;
+            };
+            match self.download(
+                &format!("{STORE_ASSETS}/{app_id}/{file}"),
+                ArtworkSource::SteamCdn,
+            ) {
+                Ok(image) => fetched.found.push((kind, image, ArtworkSource::SteamCdn)),
+                Err(error) => fetched
+                    .problems
+                    .push(format!("Steam store {}: {error}", kind.as_str())),
+            }
+        }
+    }
+
+    // The `assets` of the first store item that has them and is the game's.
+    fn store_assets(&self, app_id: u64) -> Result<Value, String> {
+        let request = HttpRequest::steam_store_items(app_id, MAX_JSON_BYTES, TIMEOUT)
+            .map_err(|error| error.to_string())?;
+        let mut body = json_of(self.send(&request)?)?;
+        let ours = app_id.to_string();
+        let items = body
+            .get_mut("response")
+            .and_then(|response| response.get_mut("store_items"))
+            .and_then(Value::as_array_mut)
+            .map(std::mem::take)
+            .unwrap_or_default();
+        Ok(items
+            .into_iter()
+            .filter(|item| {
+                item.get("appid")
+                    .is_none_or(|appid| digits(appid).as_deref() == Some(ours.as_str()))
+            })
+            .find_map(|mut item| {
+                item.get_mut("assets")
+                    .filter(|assets| assets.is_object())
+                    .map(Value::take)
+            })
+            .unwrap_or(Value::Null))
     }
 
     fn ask_steamgriddb(
@@ -387,6 +473,11 @@ impl Asking<'_> {
         }
         Ok(Download { bytes, ext })
     }
+}
+
+// Steam's image servers have no such file, as against failing to answer.
+fn is_gone(error: &str) -> bool {
+    error.starts_with("HTTP 404") || error == PLACEHOLDER
 }
 
 fn redacted(text: String, key: &str) -> String {

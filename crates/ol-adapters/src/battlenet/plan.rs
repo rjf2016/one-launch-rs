@@ -304,7 +304,7 @@ impl BattlenetAdapter<'_> {
                 UNIFIED_AUTH_PATH.to_owned(),
                 false,
                 format!(
-                    "Decrypt {name}'s session snapshot from the vault and write it as the REG_BINARY value under UnifiedAuth (reg add /t REG_BINARY). Any other value there (the outgoing token, saved in the step above when it belongs to a One Launch account) is removed, the way the client's own logout removes it. The bytes are a DPAPI blob bound to this Windows user and are never shown or logged. Identity, EncryptionKey, Launch Options, and every file under the client's folders stay untouched."
+                    "Decrypt {name}'s session snapshot from the vault and write it as the REG_BINARY value under UnifiedAuth. Any other value there (the outgoing token, saved in the step above when it belongs to a One Launch account) is removed, the way the client's own logout removes it. The bytes are a DPAPI blob bound to this Windows user and are never shown or logged. Identity, EncryptionKey, Launch Options, and every file under the client's folders stay untouched."
                 ),
             );
             registry.changes.push(SwitchChange {
@@ -339,7 +339,7 @@ impl BattlenetAdapter<'_> {
                     "No change: the client has no remembered session, so it will open on its login page.".to_owned()
                 } else {
                     format!(
-                        "Remove the UnifiedAuth value (reg delete), which is what the client's own logout does, so it opens on its login page instead of signing in as {}. \"Keep me logged in\" (Client.AutoLogin) is not touched, so the next sign-in is remembered.",
+                        "Remove the UnifiedAuth value, which is what the client's own logout does, so it opens on its login page instead of signing in as {}. \"Keep me logged in\" (Client.AutoLogin) is not touched, so the next sign-in is remembered.",
                         outgoing
                             .map_or("the previous account", |owner| owner.display_name.as_str())
                     )
