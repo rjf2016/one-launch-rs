@@ -2,6 +2,7 @@
 
 pub mod js;
 pub mod js_json;
+pub mod latest_yml;
 pub mod vdf;
 pub mod winpath;
 
