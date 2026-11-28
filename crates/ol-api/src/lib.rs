@@ -4,7 +4,7 @@ mod backend;
 
 pub use backend::{
     ApiError, AppInfo, Backend, BackendStart, JobObserver, Library, SavedSignIn, SettingChange,
-    StartLaunch,
+    StartLaunch, TrustedKey, UpdatesKit,
 };
 pub use ol_services::capture::Captured as CapturedSignIn;
 
@@ -26,6 +26,26 @@ pub mod settings {
         START_HIDDEN_FLAG, WindowAfterPlay, WindowLog, bounds_setting, close_request_action,
         display_for, fit, hide_after_play, placement_from, start_hidden, window_after_play,
     };
+}
+
+// What the app hands the updater, and what the Version row shows of it.
+pub mod updates {
+    pub use crate::backend::{TrustedKey, UpdatesKit};
+    pub use ol_platform_api::InstallerStart;
+    pub use ol_platform_api::update_http::UpdateHttp;
+    pub use ol_services::clipboard::{SleepingTimer, Timer};
+    pub use ol_services::install::{UpdateStatus, UpdateStep, UpdateUnavailable};
+
+    // The keys the releases of One Launch are signed with.
+    pub fn release_keys() -> Vec<TrustedKey> {
+        ol_services::updates::release_keys::RELEASE_KEYS
+            .iter()
+            .map(|key| TrustedKey {
+                id: key.id.to_owned(),
+                spki: key.spki.to_owned(),
+            })
+            .collect()
+    }
 }
 
 pub mod whats_new {
