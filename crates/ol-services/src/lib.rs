@@ -17,6 +17,7 @@ pub mod phases;
 pub mod sessions;
 pub mod settings;
 pub mod switch;
+pub mod updates;
 pub mod vault_health;
 pub mod whats_new;
 pub mod window;
