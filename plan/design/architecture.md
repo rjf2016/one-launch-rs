@@ -86,6 +86,8 @@ Launcher-owned writes are the four functions at the top of `crates/ol-services/s
 
 From `E\src\main\launchers\types.ts`. The overloaded `switchAccount` is split into `plan_switch` and `switch_account`.
 
+The trait and `SwitchCtx` below are the first plan's, kept for how they map the TS interface. They are not what is built: there is no trait and nothing is `async` (see "Async model"). Each launcher's adapter is a struct of `ol-adapters` with plain blocking methods that return `Result<_, AdapterError>`. `Adapter` in `crates/ol-services/src/launchers.rs` is the enum of the four and hands each call to the launcher's own. The switch is `run_switch` in `crates/ol-services/src/switch.rs`, over `SwitchOptions` and a `SwitchSink`.
+
 ```rust
 #[async_trait(?Send)]
 pub trait LauncherAdapter {
@@ -114,7 +116,7 @@ pub trait LauncherAdapter {
 
 ## Async model
 
-As built since slice 3, and the design on the owner's word of 2026-11-27: there is no executor. The adapter and the switch pipeline are plain blocking code over the ports. A launch job runs on a thread of its own (`switch`) that never touches the database: it asks the database's thread for what a switch needs of the accounts and their saved sign-ins (`StoreThread`), waits for the answer, and hands its result to the backend thread. Every wait goes through `Clock::sleep` with a `CancelToken`. The fake clock moves time only when something sleeps, which gives the determinism the virtual-clock executor was for.
+As built since slice 3, and the design on the owner's word of 2026-11-27: there is no executor. The adapter and the switch pipeline are plain blocking code over the ports. A launch job runs on a thread of its own (`switch`) that never touches the database: it asks the database's thread for what a switch needs of the accounts and their saved sign-ins (`StoreThread`), waits for the answer, and hands its result to the backend thread. Every timed wait of an adapter or of the switch pipeline goes through `Clock::sleep` with a `CancelToken`. The waits of one thread for another are not timed and take no token: the job's thread waits for each answer of the database's thread, and the backend joins the job's thread before it starts the next job, when that thread is at its end, and at shutdown, after it has stopped the job through its token. The fake clock moves time only when something sleeps, which gives the determinism the virtual-clock executor was for.
 
 The first plan was runtime-agnostic `async fn`, driven by a single-threaded executor on one dedicated backend thread. The points below describe that plan and are kept for what they say about the Electron code; they are not a target.
 
