@@ -54,6 +54,9 @@ pub fn download(
         ));
     };
     fs::create_dir_all(pending).map_err(|_| UpdateFailure::Disk)?;
+    if !is_plain_folder(pending) {
+        return Err(UpdateFailure::Disk);
+    }
     let installer = pending.join(name.as_str());
     if is_plain_file(&installer)
         && sha512_of_file(&installer).is_ok_and(|measured| measured == file.sha512)
@@ -132,6 +135,11 @@ fn fetch(
 
 fn is_plain_file(path: &Path) -> bool {
     fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_file())
+}
+
+// A junction or a link to a folder is not a directory here, so nothing of another folder is removed or written.
+fn is_plain_folder(path: &Path) -> bool {
+    fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir())
 }
 
 // A file this or the Electron updater left; a folder or a link is not this app's to remove, and a file that will not go is left.

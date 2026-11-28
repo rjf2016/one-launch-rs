@@ -256,6 +256,10 @@ fn failure(error: &Error) -> HttpError {
     match error {
         Error::Timeout(_) => HttpError::Timeout,
         Error::HostNotFound => HttpError::Failed("the host was not found"),
+        // rustls hands a refused handshake or a bad record to ureq as an io error of this kind, and with no proxy nothing else here makes one.
+        Error::Io(error) if error.kind() == io::ErrorKind::InvalidData => {
+            HttpError::Failed("TLS failed")
+        }
         Error::Io(_) | Error::ConnectionFailed => HttpError::Failed("the connection failed"),
         Error::Tls(_) | Error::Rustls(_) | Error::Pem(_) | Error::TlsRequired => {
             HttpError::Failed("TLS failed")
@@ -656,6 +660,48 @@ mod tests {
             let told = format!("{error} {error:?}");
             assert!(!told.contains("steamcommunity"), "{told}");
         }
+    }
+
+    #[derive(Debug)]
+    struct HandshakeRefused;
+
+    impl std::fmt::Display for HandshakeRefused {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("invalid peer certificate: UnknownIssuer")
+        }
+    }
+
+    impl std::error::Error for HandshakeRefused {}
+
+    #[test]
+    fn a_tls_failure_inside_an_io_error_is_told_as_tls_and_the_rest_keep_their_words() {
+        let refused = Error::from(io::Error::new(io::ErrorKind::InvalidData, HandshakeRefused));
+        assert!(matches!(refused, Error::Io(_)));
+        assert_eq!(failure(&refused), HttpError::Failed("TLS failed"));
+        let told = format!("{} {:?}", failure(&refused), failure(&refused));
+        assert!(!told.contains("UnknownIssuer"), "{told}");
+
+        for kind in [
+            io::ErrorKind::ConnectionReset,
+            io::ErrorKind::ConnectionRefused,
+            io::ErrorKind::UnexpectedEof,
+        ] {
+            assert_eq!(
+                failure(&Error::from(io::Error::new(kind, "dropped"))),
+                HttpError::Failed("the connection failed"),
+                "{kind:?}"
+            );
+        }
+        assert_eq!(
+            failure(&Error::Timeout(ureq::Timeout::Connect)),
+            HttpError::Timeout
+        );
+        assert_eq!(
+            failure(&Error::from(io::Error::other(Error::Timeout(
+                ureq::Timeout::PerRead
+            )))),
+            HttpError::Timeout
+        );
     }
 
     const PROXIES: [&str; 6] = [

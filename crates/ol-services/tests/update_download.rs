@@ -327,6 +327,67 @@ fn the_leftovers_in_pending_are_removed_and_folders_links_and_the_outside_are_le
     assert_eq!(fs::read(&beside).unwrap(), b"beside");
 }
 
+fn sorted_names(folder: &std::path::Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(folder)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn a_pending_folder_that_is_a_link_is_refused_before_anything_is_asked_or_touched() {
+    let folder = Folder::new("update-download-pending-link");
+    let updater = folder.scratch.join("one-launch-updater");
+    let elsewhere = updater.join("elsewhere");
+    fs::create_dir_all(&elsewhere).unwrap();
+    let bytes = installer_bytes(50);
+    fs::write(elsewhere.join("notes.txt"), b"not the updater's").unwrap();
+    fs::write(elsewhere.join(NAME), &bytes).unwrap();
+    if std::os::windows::fs::symlink_dir(&elsewhere, &folder.pending).is_err() {
+        eprintln!(
+            "this machine does not let a test make a symbolic link; the linked pending folder is skipped"
+        );
+        return;
+    }
+
+    let http = untouched();
+    let run = run(&http, &folder, &release_file(&bytes));
+    failed("the update could not be saved to disk", &run);
+    assert!(http.asked().is_empty());
+    assert_eq!(
+        sorted_names(&elsewhere),
+        vec![NAME.to_owned(), "notes.txt".to_owned()]
+    );
+    assert_eq!(
+        fs::read(elsewhere.join("notes.txt")).unwrap(),
+        b"not the updater's"
+    );
+    assert_eq!(fs::read(elsewhere.join(NAME)).unwrap(), bytes);
+    assert!(
+        fs::symlink_metadata(&folder.pending)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+}
+
+#[test]
+fn a_pending_folder_that_is_a_file_is_refused_before_anything_is_asked() {
+    let folder = Folder::new("update-download-pending-file");
+    let updater = folder.scratch.join("one-launch-updater");
+    fs::create_dir_all(&updater).unwrap();
+    fs::write(&folder.pending, b"a file").unwrap();
+
+    let http = untouched();
+    let run = run(&http, &folder, &release_file(&installer_bytes(50)));
+    failed("the update could not be saved to disk", &run);
+    assert!(http.asked().is_empty());
+    assert_eq!(fs::read(&folder.pending).unwrap(), b"a file");
+    assert_eq!(sorted_names(&updater), vec!["pending".to_owned()]);
+}
+
 #[test]
 fn the_leftovers_are_removed_before_asking_even_when_the_download_then_fails() {
     let folder = Folder::made("update-download-leftovers-failed");
