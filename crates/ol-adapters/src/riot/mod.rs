@@ -15,7 +15,7 @@ use ol_formats::riot::client_log::{
     FailReason, LogEvent, NOT_UP_TO_DATE, STUB_LOG_MARK, STUB_LOG_MAX_BYTES, SignInOutcome,
     SignedInHow, exited_cleanly, game_started, is_client_log_file, last_sign_in, launch_accepted,
     launch_declined, launch_page_shown, parse_log_events, products_needing_update,
-    startup_finished,
+    startup_finished, still_not_up_to_date,
 };
 use ol_formats::riot::products::{
     RiotInstalls, RiotProductId, RiotProductSettings, game_images_of, image_key, launch_args,
@@ -1105,7 +1105,7 @@ impl<'a> RiotAdapter<'a> {
             return Ok(Launched::started(said("the Riot Client started the game")));
         }
         let waited_for = seconds(timing.launch_confirm);
-        if declined.as_deref() == Some(NOT_UP_TO_DATE) {
+        if still_not_up_to_date(&events, product, patchline) {
             return Ok(Launched {
                 hand_off: Some(format!(
                     "The Riot Client is still updating {name} or something it needs. When it has finished, press Play in the Riot Client window."

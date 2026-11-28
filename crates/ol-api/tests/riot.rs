@@ -1388,6 +1388,74 @@ fn a_client_that_runs_as_the_account_and_is_still_not_up_to_date_hands_play_over
 }
 
 #[test]
+fn a_refusal_as_not_up_to_date_that_a_later_line_of_the_product_takes_back_ends_as_a_failure() {
+    let later_lines = [
+        "009000.000| ALWAYS| riot-client-lifecycle: Setting product context to valorant.live, willAutoLaunch=false\r\n",
+        "009000.000|   OKAY| product-launcher: Launch starting: productId='valorant' patchlineId='live'\r\n",
+    ];
+    for later in later_lines {
+        let fakes = fakes(Some(&checking_for(10_000)));
+        let latest = Arc::clone(&fakes.latest);
+        let logs = fakes
+            .launchers()
+            .join("localappdata/Riot Games/Riot Client/Logs/Riot Client Logs");
+        let added = std::sync::atomic::AtomicBool::new(false);
+        fakes.fake.clock.before_sleep(move || {
+            let job = latest.lock().map(|job| job.clone()).unwrap_or(None);
+            let launching = job.as_ref().is_some_and(|job| {
+                let at_it = |at: &JobStep| at.id == "launch" && at.status == JobStepStatus::Running;
+                job.steps.iter().any(at_it)
+            });
+            if !launching || added.load(std::sync::atomic::Ordering::SeqCst) {
+                return;
+            }
+            let mut names: Vec<_> = fs::read_dir(&logs)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .map(|entry| entry.path())
+                .collect();
+            names.sort();
+            if let Some(newest) = names.pop()
+                && let Ok(mut text) = fs::read_to_string(&newest)
+                && text.contains("(Product is not up to date)")
+            {
+                text.push_str(later);
+                if fs::write(&newest, text).is_ok() {
+                    added.store(true, std::sync::atomic::Ordering::SeqCst);
+                }
+            }
+        });
+        let states = fakes.play(ALT);
+        let last = states.last().unwrap();
+        let log = newest_client_log(&fakes);
+        assert!(log.find("(Product is not up to date)").unwrap() < log.find(later).unwrap());
+        assert!(
+            last.state == JobState::Failed && last.switched && !last.game_seen,
+            "{:?} {:?}",
+            last.state,
+            last.hand_off
+        );
+        assert!(last.hand_off.is_none());
+        assert_eq!(
+            last.error.as_deref(),
+            Some(
+                "Riot Games: VALORANT did not start within 2 s. Look at the Riot Client window: the game may need an update or a repair, or the client may be waiting for you."
+            )
+        );
+        assert_eq!(launch_requests(&fakes), 0);
+        assert!(
+            block_on(fakes.backend.recent_launches(50))
+                .unwrap()
+                .is_empty()
+        );
+        fakes.backend.shut_down();
+        let opened = Store::open_read_only(&database_path(&fakes.scratch.join("data"))).unwrap();
+        assert_eq!(opened.store.row_counts().unwrap().launch_history, 1);
+    }
+}
+
+#[test]
 fn a_press_the_client_took_without_starting_the_game_hands_the_game_over_with_what_was_done() {
     let knobs = json!({ "knobs": { "riot": { "pressPlayIgnored": true } } });
     let fakes = fakes(Some(&knobs));
