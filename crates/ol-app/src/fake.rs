@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 use anyhow::{Context as _, bail};
 use ol_api::launchers::{
@@ -11,7 +12,9 @@ use ol_api::launchers::{
 use ol_api::log::Log;
 use ol_api::{ApiError, Backend};
 use ol_model::SettingKey;
+use ol_platform_api::Clock;
 use ol_sim::Seed;
+use ol_sim::updates::UpdateStory;
 
 use crate::args::FakeMachine;
 
@@ -39,12 +42,18 @@ const SCENARIO_ENTRIES: [&str; 11] = [
     "nowhere",
 ];
 
+// The release feed a scenario names, told on its machine's clock.
+pub struct UpdateFeed {
+    pub story: UpdateStory,
+    pub clock: Arc<dyn Clock>,
+}
+
 pub fn start(
     data_dir: &Path,
     machine: &FakeMachine,
     version: &str,
     log: &Log,
-) -> anyhow::Result<(Backend, Seed)> {
+) -> anyhow::Result<(Backend, Seed, Option<UpdateFeed>)> {
     let folder = &machine.folder;
     let scenario = folder.join(SCENARIO);
     if let Some((from, fixtures)) = &machine.lay_down
@@ -83,6 +92,10 @@ pub fn start(
     }
     let fake = ol_sim::materialize_in_real_time(folder, data_dir)
         .context("--fake-launchers does not hold a scenario that reads")?;
+    let feed = fake.update_story.map(|story| UpdateFeed {
+        story,
+        clock: Arc::clone(&fake.platform.clock),
+    });
     let mut launchers = ol_api::launchers::on_the_stand_in_vault(fake.platform.clone());
     launchers.steam_timing = SteamTiming::with(&fake.steam_timing);
     launchers
@@ -114,7 +127,7 @@ pub fn start(
         launchers,
         None,
     );
-    Ok((backend, fake.seed))
+    Ok((backend, fake.seed, feed))
 }
 
 // What the Electron app does once for a data folder that holds no account: the scenario's accounts, the sign-ins it saves for them, made-up ones, and its settings.

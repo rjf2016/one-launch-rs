@@ -36,7 +36,9 @@ use ol_platform_win::shell::WindowsShell;
 use ol_platform_win::tray::{MenuEntry, Tray, TrayEvent};
 use ol_platform_win::window::AppWindow;
 use ol_platform_win::window::Display;
-use ol_ui::{FilePicker, LibraryLoaded, Opening, Played, Presence, QuitAnyway, Shell};
+use ol_ui::{
+    FilePicker, LibraryLoaded, Opening, Played, Presence, QuitAnyway, RestartToUpdate, Shell,
+};
 
 use crate::args::{Args, Check, DoctorVault};
 use crate::boxes::Boxes;
@@ -202,6 +204,114 @@ fn hand_net(args: &Args, backend: &Backend) -> Option<Box<dyn FnOnce()>> {
     }))
 }
 
+// What the updater reaches the world through. A copy the installer put in place is to get its real parts in a later piece; until then a build without the fake launchers hands it nothing, and every copy says it is off. A run on fake launchers whose scenario names a story is answered in this process, and its installer is recorded and never started.
+#[derive(Debug, PartialEq, Eq)]
+enum Updater {
+    #[cfg(feature = "fake")]
+    InProcess(ol_sim::updates::UpdateStory),
+    Nothing,
+}
+
+impl Updater {
+    fn for_run(args: &Args, machine: &Machine) -> Self {
+        #[cfg(feature = "fake")]
+        if let Machine::Fake(_, Some(feed)) = machine
+            && args.fake.is_some()
+            && args.doctor.is_none()
+        {
+            return Self::InProcess(feed.story);
+        }
+        let _ = (args, machine);
+        Self::Nothing
+    }
+}
+
+// What a run's updater asked and was asked to start. A build without the fake launchers has nothing to record.
+#[cfg(not(feature = "fake"))]
+enum UpdatesRecorded {}
+
+#[cfg(not(feature = "fake"))]
+impl UpdatesRecorded {
+    fn report(&self) {
+        match *self {}
+    }
+}
+
+#[cfg(feature = "fake")]
+struct UpdatesRecorded {
+    http: Arc<ol_platform_fake::update_http::ScriptedUpdates>,
+    installer: Arc<ol_platform_fake::RecordingInstaller>,
+}
+
+#[cfg(feature = "fake")]
+impl UpdatesRecorded {
+    fn report(&self) {
+        for url in self.http.urls() {
+            println!("OneLaunch: update feed asked {url}");
+        }
+        for asked in self.installer.asked() {
+            let name = asked
+                .installer
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            println!(
+                "OneLaunch: installer recorded and not started: {name} {}",
+                asked.args.join(" ")
+            );
+        }
+    }
+}
+
+// The one place a run's backend is handed an updater kit.
+#[cfg(not(feature = "fake"))]
+fn hand_updates(args: &Args, machine: &Machine, _: &Backend) -> Option<UpdatesRecorded> {
+    match Updater::for_run(args, machine) {
+        Updater::Nothing => None,
+    }
+}
+
+#[cfg(feature = "fake")]
+fn hand_updates(args: &Args, machine: &Machine, backend: &Backend) -> Option<UpdatesRecorded> {
+    use ol_api::updates::{InstallerStart, SleepingTimer, TrustedKey, UpdateHttp, UpdatesKit};
+    use ol_sim::updates::{release_key, respond};
+
+    let (Updater::InProcess(story), Machine::Fake(_, Some(feed))) =
+        (Updater::for_run(args, machine), machine)
+    else {
+        return None;
+    };
+    let clock = Arc::clone(&feed.clock);
+    // Each answer takes a moment, as a real one does, so "Checking…" can be seen.
+    let http = Arc::new(ol_platform_fake::update_http::ScriptedUpdates::new({
+        let clock = Arc::clone(&clock);
+        move |request| {
+            std::thread::sleep(FAKE_ANSWER);
+            respond(story, VERSION, &clock, request)
+        }
+    }));
+    let installer = Arc::new(ol_platform_fake::RecordingInstaller::new());
+    let (id, spki) = release_key();
+    backend.use_updates(UpdatesKit {
+        http: Arc::clone(&http) as Arc<dyn UpdateHttp>,
+        installer: Arc::clone(&installer) as Arc<dyn InstallerStart>,
+        timer: Arc::new(SleepingTimer::new(Arc::clone(&clock))),
+        clock,
+        pending: backend
+            .app_info()
+            .data_dir
+            .join("update-cache")
+            .join("pending"),
+        keys: vec![TrustedKey { id, spki }],
+        this_copy: Ok(()),
+    });
+    println!(
+        "OneLaunch: updates: the release feed of the story {}, answered in this process; no request leaves it and no installer is started",
+        story.name()
+    );
+    Some(UpdatesRecorded { http, installer })
+}
+
 // The one place a run's backend is handed its shell. Answers the recording shell when that is the one given.
 fn hand_shell(args: &Args, backend: &Backend) -> Option<Arc<RecordingShell>> {
     match Opener::for_run(args) {
@@ -314,7 +424,7 @@ impl Life {
 enum Machine {
     None,
     #[cfg(feature = "fake")]
-    Fake(ol_sim::Seed),
+    Fake(ol_sim::Seed, Option<fake::UpdateFeed>),
 }
 
 fn main() -> ExitCode {
@@ -435,6 +545,7 @@ fn run(args: Args, logger: &Arc<Logger>, instance: Rc<Instance>) -> (ExitCode, O
     let heard = use_clipboard(Board::for_run(&args).give(), &backend);
     let _recorded = hand_shell(&args, &backend);
     let asked = hand_net(&args, &backend);
+    let updated = hand_updates(&args, &machine, &backend);
     let picker = Rc::new(RefCell::new(None));
     let failed = Rc::new(Cell::new(false));
     let failure = Rc::new(RefCell::new(None));
@@ -464,11 +575,16 @@ fn run(args: Args, logger: &Arc<Logger>, instance: Rc<Instance>) -> (ExitCode, O
         backend.window_log().tray_removed();
     }
     backend.shut_down();
+    // A run that could not start installs nothing. A capture or a probe the app quit before its report still exits with 1, but the app itself did not fail.
+    backend.install_at_quit(i32::from(failure.borrow().is_some()));
     if let Some(heard) = heard {
         heard();
     }
     if let Some(asked) = asked {
         asked();
+    }
+    if let Some(updated) = &updated {
+        updated.report();
     }
     if let Some(picker) = picker.borrow().as_ref() {
         report_picks(picker);
@@ -581,8 +697,8 @@ fn start_backend(args: &Args, log: &Log) -> anyhow::Result<(Backend, Machine)> {
             Machine::None,
         ));
     };
-    let (backend, seed) = fake::start(&args.data_dir, machine, VERSION, log)?;
-    Ok((backend, Machine::Fake(seed)))
+    let (backend, seed, feed) = fake::start(&args.data_dir, machine, VERSION, log)?;
+    Ok((backend, Machine::Fake(seed, feed)))
 }
 
 struct Start {
@@ -632,7 +748,7 @@ fn start(args: Args, started: Start, cx: &mut App) {
         let title = match machine {
             Machine::None => TITLE,
             #[cfg(feature = "fake")]
-            Machine::Fake(seed) => {
+            Machine::Fake(seed, _) => {
                 // The code and not the sentence, which can name an account.
                 if let Err(error) = fake::seed(&backend, seed).await {
                     eprintln!(
@@ -843,6 +959,16 @@ fn open(args: Args, opened: Opened, cx: &mut App) -> anyhow::Result<()> {
     cx.subscribe(&shell, {
         let life = Rc::clone(&life);
         move |_, _: &QuitAnyway, cx| quit_after_the_switch(&life, cx)
+    })
+    .detach();
+    // Restart to update quits for real, whatever Minimize to System Tray says; the installer is started at the end of `run`.
+    cx.subscribe(&shell, {
+        let life = Rc::clone(&life);
+        move |_, _: &RestartToUpdate, cx| {
+            life.quitting.set(true);
+            let life = Rc::clone(&life);
+            cx.spawn(async move |cx| quit_app(&life, cx)).detach();
+        }
     })
     .detach();
     cx.subscribe(&shell, {
@@ -1400,6 +1526,209 @@ mod tests {
         }
         let (set, _) = handed(&[]);
         assert!(matches!(set, FilePicker::Windows));
+    }
+
+    // Stands where a feed would: it answers nothing and says whether it was asked.
+    struct ProbeFeed(std::sync::atomic::AtomicBool);
+
+    impl ol_api::updates::UpdateHttp for ProbeFeed {
+        fn send(
+            &self,
+            _: &ol_platform_api::update_http::UpdateRequest,
+        ) -> Result<ol_platform_api::http::HttpResponse, ol_platform_api::http::HttpError> {
+            self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+            Err(ol_platform_api::http::HttpError::Failed(
+                "a test feed answers nothing",
+            ))
+        }
+
+        fn download(
+            &self,
+            _: &ol_platform_api::update_http::UpdateRequest,
+            _: &mut dyn std::io::Write,
+            _: &mut dyn FnMut(u64),
+            _: &ol_platform_api::CancelToken,
+        ) -> Result<
+            ol_platform_api::update_http::Downloaded,
+            ol_platform_api::update_http::DownloadError,
+        > {
+            self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+            Err(ol_platform_api::update_http::DownloadError::Cancelled)
+        }
+    }
+
+    struct NoInstaller;
+
+    impl ol_api::updates::InstallerStart for NoInstaller {
+        fn start(&self, _: &Path, _: &[&str]) -> bool {
+            false
+        }
+    }
+
+    // The backend uses the first kit it is handed and ignores every later one: a kit handed after `hand_updates` is asked only when `hand_updates` handed none.
+    fn a_kit_was_handed_before(backend: &Backend) -> bool {
+        let feed = Arc::new(ProbeFeed(std::sync::atomic::AtomicBool::new(false)));
+        let clock: Arc<dyn ol_platform_api::Clock> = Arc::new(ol_platform_win::clock::SystemClock);
+        backend.use_updates(ol_api::updates::UpdatesKit {
+            http: Arc::clone(&feed) as Arc<dyn ol_api::updates::UpdateHttp>,
+            installer: Arc::new(NoInstaller),
+            timer: Arc::new(ol_api::updates::SleepingTimer::new(Arc::clone(&clock))),
+            clock,
+            pending: backend.app_info().data_dir.join("probe-pending"),
+            keys: Vec::new(),
+            this_copy: Ok(()),
+        });
+        let _ = block_on(backend.check_updates());
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        let asked = || feed.0.load(std::sync::atomic::Ordering::SeqCst);
+        while !asked() && std::time::Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        !asked()
+    }
+
+    // An installed copy is to get its real kit in a later piece. Until then no start of a build without the fake launchers hands the updater anything, so every copy says it is off and nothing asks the release feed.
+    #[cfg(not(feature = "fake"))]
+    #[test]
+    fn a_development_build_hands_the_updater_nothing() {
+        use ol_api::updates::{UpdateStatus, UpdateUnavailable};
+
+        let sets: [&[&str]; 8] = [
+            &[],
+            &["--real-launchers"],
+            &[r"--capture=D:\scratch\shot.png"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-keys=enter"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-size=960x600"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-focus"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-type=abc"],
+            &["--probe"],
+        ];
+        let mut runs: Vec<Args> = sets.iter().map(|set| parsed(set)).collect();
+        for set in &sets[2..] {
+            let mut forged = parsed(set);
+            forged.real_launchers = true;
+            runs.push(forged);
+        }
+        runs.push(parsed(&["--doctor"]));
+        let scratch = ol_testkit::Scratch::new("app-updates");
+        for args in runs {
+            assert_eq!(Updater::for_run(&args, &Machine::None), Updater::Nothing);
+            let backend = Backend::start(scratch.join("data"), VERSION);
+            assert!(hand_updates(&args, &Machine::None, &backend).is_none());
+            assert_eq!(
+                block_on(backend.update_status_now()),
+                Ok(UpdateStatus::Unavailable(UpdateUnavailable::Development))
+            );
+            assert!(!a_kit_was_handed_before(&backend));
+            backend.shut_down();
+        }
+    }
+
+    // A run on fake launchers gets an updater only when its scenario names a story, and never beside --doctor; its feed is answered in this process and its installer recorded, never started.
+    #[cfg(feature = "fake")]
+    #[test]
+    fn a_fake_run_gets_an_in_process_updater_only_when_its_scenario_names_a_story() {
+        use ol_api::updates::UpdateStatus;
+        use ol_sim::updates::{INSTALLER_NAME, UpdateStory};
+
+        let story = |story| {
+            Machine::Fake(
+                ol_sim::Seed::default(),
+                Some(fake::UpdateFeed {
+                    story,
+                    clock: Arc::new(ol_platform_fake::FakeClock::following_the_system()),
+                }),
+            )
+        };
+        let untold = Machine::Fake(ol_sim::Seed::default(), None);
+        let fake = [
+            r"--fake-launchers=D:\scratch\launchers",
+            r"--fake-scenario=D:\scratch\scenario",
+            r"--fake-fixtures=D:\scratch\fixtures",
+        ];
+        let sets: [&[&str]; 7] = [
+            &[],
+            &[r"--capture=D:\scratch\shot.png"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-keys=enter"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-size=960x600"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-focus"],
+            &[r"--capture=D:\scratch\shot.png", "--capture-type=abc"],
+            &["--probe"],
+        ];
+        for set in sets {
+            let with_fakes: Vec<&str> = set.iter().chain(&fake).copied().collect();
+            let args = parsed(&with_fakes);
+            for told in UpdateStory::ALL {
+                assert_eq!(
+                    Updater::for_run(&args, &story(told)),
+                    Updater::InProcess(told),
+                    "{set:?}"
+                );
+            }
+            assert_eq!(Updater::for_run(&args, &untold), Updater::Nothing);
+            assert_eq!(Updater::for_run(&args, &Machine::None), Updater::Nothing);
+            let mut doctor = parsed(&with_fakes);
+            doctor.doctor = Some(DoctorVault::OfTheFixtures);
+            assert_eq!(
+                Updater::for_run(&doctor, &story(UpdateStory::Ready)),
+                Updater::Nothing
+            );
+            assert_eq!(
+                Updater::for_run(&parsed(set), &story(UpdateStory::Ready)),
+                Updater::Nothing
+            );
+        }
+        assert_eq!(
+            Updater::for_run(&parsed(&["--doctor"]), &Machine::None),
+            Updater::Nothing
+        );
+
+        let scratch = ol_testkit::Scratch::new("app-updates-fake");
+        let args = parsed(&fake);
+        let backend = Backend::start(scratch.join("untold"), VERSION);
+        assert!(hand_updates(&args, &untold, &backend).is_none());
+        assert!(!a_kit_was_handed_before(&backend));
+        backend.shut_down();
+
+        let backend = Backend::start(scratch.join("data"), VERSION);
+        let changes = backend.update_changes();
+        let recorded = hand_updates(&args, &story(UpdateStory::Ready), &backend)
+            .expect("a story is handed a kit");
+        assert!(a_kit_was_handed_before(&backend));
+        let until = std::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            match changes.try_recv() {
+                Ok(UpdateStatus::Ready { .. }) => break,
+                Ok(_) => {}
+                Err(_) if std::time::Instant::now() < until => {
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                Err(_) => panic!("the story never got ready"),
+            }
+        }
+        block_on(backend.install_update()).unwrap();
+        backend.shut_down();
+        backend.install_at_quit(0);
+        let urls = recorded.http.urls();
+        assert!(!urls.is_empty());
+        for url in urls {
+            assert!(
+                url.starts_with("https://github.com/rjf2016/one-launch/releases/")
+                    || url.starts_with("https://release-assets.githubusercontent.com/"),
+                "{url}"
+            );
+        }
+        let asked = recorded.installer.asked();
+        assert_eq!(asked.len(), 1);
+        assert_eq!(
+            asked[0].installer,
+            scratch
+                .join("data")
+                .join("update-cache")
+                .join("pending")
+                .join(INSTALLER_NAME)
+        );
+        assert_eq!(asked[0].args, ["--updated", "/S", "--force-run"]);
     }
 
     fn parsed(arguments: &[&str]) -> Args {

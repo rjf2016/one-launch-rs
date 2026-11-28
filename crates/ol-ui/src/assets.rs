@@ -62,6 +62,8 @@ pub const EYE_PREVIEW: &str = "icons/eye-preview.svg";
 pub const IMAGES: &str = "icons/images.svg";
 pub const IMAGE_PLUS: &str = "icons/image-plus.svg";
 pub const EXTERNAL_LINK: &str = "icons/external-link.svg";
+pub const UPDATE_READY: &str = "icons/circle-arrow-down.svg";
+pub const RESTART: &str = "icons/rotate-cw.svg";
 
 macro_rules! oracle_icon {
     ($file:literal) => {
@@ -137,6 +139,8 @@ const FILES: &[(&str, &[u8])] = &[
     (IMAGES, oracle_icon!("lucide/Images.svg")),
     (IMAGE_PLUS, oracle_icon!("lucide/ImagePlus.svg")),
     (EXTERNAL_LINK, oracle_icon!("lucide/ExternalLink.svg")),
+    (UPDATE_READY, oracle_icon!("lucide/CircleArrowDown.svg")),
+    (RESTART, oracle_icon!("lucide/RotateCw.svg")),
     (MINIMIZE, caption_icon!(r#"<path d="M0 5.5h10"/>"#)),
     (
         MAXIMIZE,

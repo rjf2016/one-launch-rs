@@ -238,6 +238,10 @@ fn switch_runs() -> bool {
 }
 
 fn after_panic() {
+    // A run that goes on after a crash installs nothing at its quit.
+    if let Some(ending) = ENDING.get() {
+        ending.backend.update_crashed();
+    }
     let Some(watch) = WATCH.get() else {
         return;
     };

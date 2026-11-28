@@ -7,9 +7,10 @@ use gpui::{
     AnyElement, App, ClickEvent, Context, Div, EventEmitter, Keystroke, MouseDownEvent, Pixels,
     SharedString, Size, StyledText, TextRun, Window, anchored, deferred, div, font, px,
 };
+use ol_api::library::date_time;
 use ol_api::settings::{
     AutostartStatus, EncryptionState, Folder, RESET_BANNER, RESET_WARNING, UpdateStatus,
-    VaultBackend, VaultHealth,
+    UpdateStep, VaultBackend, VaultHealth,
 };
 use ol_api::whats_new::{RELEASES, Release, latest_whats_new};
 use ol_api::{ApiError, AppInfo, Backend};
@@ -22,6 +23,7 @@ use ol_ui_kit::theme::{self, alpha, color};
 use crate::assets;
 use crate::host::overlay;
 use crate::page::{PageScroll, scroll_page};
+use crate::shell::RestartGate;
 use crate::widgets::{
     Appeared, Button, DropdownMenu, Spot, Tone, dropdown_menu, dropdown_place, dropdown_trigger,
     icon, page_title, panel, setting_row, spot_of, switch, tab_strip,
@@ -145,6 +147,8 @@ enum Control {
     Pick(Pick),
     RunTest,
     Open(Folder),
+    // The Updates panel's button: Check for updates, or Restart to update while an update waits.
+    UpdateAction,
     Recheck,
     Disclose(LauncherId),
     Locate(LauncherId),
@@ -166,6 +170,67 @@ enum Control {
 pub enum SettingsAsk {
     SetupGuide,
     WhatsNew(&'static Release),
+    RestartToUpdate,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StateTone {
+    Plain,
+    Good,
+    Bad,
+}
+
+const fn state_tone(status: &UpdateStatus) -> StateTone {
+    match status {
+        UpdateStatus::UpToDate { .. } | UpdateStatus::Ready { .. } => StateTone::Good,
+        UpdateStatus::Failed { .. } => StateTone::Bad,
+        _ => StateTone::Plain,
+    }
+}
+
+// The Version row's hint. `checked`: the time of day a check ended, in the form the row shows.
+fn version_hint(
+    status: &UpdateStatus,
+    auto: bool,
+    checked: impl FnOnce(&str) -> Option<String>,
+) -> Option<String> {
+    match status {
+        UpdateStatus::Unavailable(reason) => Some(reason.hint().to_owned()),
+        UpdateStatus::UpToDate { checked_at } => {
+            checked(checked_at).map(|at| format!("Last checked at {at}."))
+        }
+        UpdateStatus::Ready { .. } if auto => {
+            Some("It installs the next time One Launch restarts.".to_owned())
+        }
+        UpdateStatus::Ready { .. } => {
+            Some("It installs when you choose Restart to update.".to_owned())
+        }
+        _ => None,
+    }
+}
+
+// The line under the Updates panel while the last check, download or check of the signature failed.
+fn failure_line(status: &UpdateStatus) -> Option<String> {
+    let UpdateStatus::Failed { step, message } = status else {
+        return None;
+    };
+    Some(match step {
+        UpdateStep::Check => format!("Could not check for updates: {message}."),
+        UpdateStep::Download => format!("Could not download the update: {message}."),
+        UpdateStep::Verify => {
+            format!("Could not verify the update, so it was not installed: {message}.")
+        }
+    })
+}
+
+// Hours and minutes in the clock of the regional settings, as the Electron app's short time style gives them.
+fn hours_and_minutes(
+    at: &str,
+    offset_of: impl Fn(i64) -> Option<i32>,
+    clock: ol_api::library::HourClock,
+) -> Option<String> {
+    let stamped = date_time(at, offset_of, clock)?;
+    stamped.rsplit_once(", ").map(|(_, time)| time.to_owned())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -206,7 +271,10 @@ pub struct SettingsView {
     reset_note: Option<SharedString>,
     folder_error: Option<SharedString>,
     info: AppInfo,
-    update: UpdateStatus,
+    update: Option<UpdateStatus>,
+    // A press of Check for updates or Restart to update the backend refused, told until the next press of either.
+    update_refusal: Option<SharedString>,
+    gate: Rc<RestartGate>,
     autostart: AutostartStatus,
     menu: Option<(Pick, usize)>,
     spots: HashMap<Pick, Spot>,
@@ -229,6 +297,7 @@ impl SettingsView {
         backend: Backend,
         tab: Rc<Cell<SettingsTab>>,
         known: KnownStatuses,
+        gate: Rc<RestartGate>,
         developer: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -249,10 +318,27 @@ impl SettingsView {
             }
         })
         .detach();
+        cx.spawn({
+            let changes = backend.update_changes();
+            async move |this, cx| {
+                while let Ok(status) = changes.recv().await {
+                    let heard = this.update(cx, |this, cx| {
+                        this.update = Some(status);
+                        cx.notify();
+                    });
+                    if heard.is_err() {
+                        break;
+                    }
+                }
+            }
+        })
+        .detach();
         let mut view = Self {
             artwork: artwork::Artwork::new(window, cx),
             info: backend.app_info(),
-            update: backend.update_status(),
+            update: None,
+            update_refusal: None,
+            gate,
             autostart: backend.autostart_status(),
             backend,
             tab,
@@ -588,6 +674,52 @@ impl SettingsView {
         cx.notify();
     }
 
+    fn update_action_works(&self) -> bool {
+        match &self.update {
+            Some(UpdateStatus::Ready { .. }) => !self.gate.shut(),
+            Some(status) => status.can_check(),
+            None => false,
+        }
+    }
+
+    fn press_update_action(&mut self, cx: &mut Context<Self>) {
+        if !self.update_action_works() {
+            return;
+        }
+        self.update_refusal = None;
+        if matches!(self.update, Some(UpdateStatus::Ready { .. })) {
+            cx.emit(SettingsAsk::RestartToUpdate);
+        } else {
+            self.check_updates(cx);
+        }
+        cx.notify();
+    }
+
+    fn check_updates(&mut self, cx: &mut Context<Self>) {
+        let backend = self.backend.clone();
+        cx.spawn(async move |this, cx| {
+            let checked = backend.check_updates().await;
+            this.update(cx, |this, cx| {
+                match checked {
+                    Ok(status) => this.update = Some(status),
+                    Err(error) => {
+                        this.update_refusal =
+                            Some(format!("Could not check for updates: {}", error.message).into());
+                    }
+                }
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    // The Shell asked the backend, and it refused.
+    pub(crate) fn restart_refused(&mut self, message: &str, cx: &mut Context<Self>) {
+        self.update_refusal = Some(format!("Could not restart to update: {message}").into());
+        cx.notify();
+    }
+
     fn controls(&self) -> Vec<Control> {
         let mut controls = vec![Control::Tabs];
         if self.shows_reset() && !self.resetting {
@@ -608,6 +740,9 @@ impl SettingsView {
             SettingsTab::General => {
                 controls.extend(toggles(&[SettingKey::WindowCloseToTray]));
                 controls.push(Control::ShowGuide);
+                if self.update_action_works() {
+                    controls.push(Control::UpdateAction);
+                }
                 controls.extend(toggles(&[
                     SettingKey::UpdatesAuto,
                     SettingKey::WhatsNewEnabled,
@@ -781,6 +916,7 @@ impl SettingsView {
             Control::Section(launcher) if press => self.toggle_section(launcher, cx),
             Control::Restore(launcher, seen) if press => self.ask_restore(launcher, seen, cx),
             Control::ShowGuide if press => cx.emit(SettingsAsk::SetupGuide),
+            Control::UpdateAction if press => self.press_update_action(cx),
             Control::ShowWhatsNew if press => self.show_whats_new(cx),
             Control::PreviewWhatsNew if press => self.preview_whats_new(cx),
             _ => return false,
@@ -1150,18 +1286,53 @@ impl SettingsView {
                     ),
                 )),
         );
-        let (state, hint) = match &self.update {
-            UpdateStatus::Unavailable(reason) => (self.update.state_text(), Some(reason.hint())),
-            other => (other.state_text(), None),
-        };
-        let check = Button::new("check-updates", Tone::Secondary, "Check for updates")
-            .glyph(assets::RESCAN)
-            .disabled(!self.update.can_check())
-            .on_click(|_, _, _| {});
-        let updates = panel(
+        let updates = self.render_updates(cx);
+        vec![general, updates]
+    }
+
+    fn render_updates(&self, cx: &mut Context<Self>) -> Div {
+        let auto = self.on(SettingKey::UpdatesAuto);
+        let local = crate::local_time(cx);
+        let hint = self.update.as_ref().and_then(|status| {
+            version_hint(status, auto, |at| {
+                hours_and_minutes(at, local.offset, local.clock)
+            })
+        });
+        let action = match &self.update {
+            Some(UpdateStatus::Ready { .. }) => {
+                Button::new("restart-update", Tone::Primary, "Restart to update")
+                    .glyph(assets::RESTART)
+                    .disabled(self.gate.shut())
+            }
+            status => {
+                let busy = matches!(
+                    status,
+                    Some(UpdateStatus::Checking | UpdateStatus::Downloading { .. })
+                );
+                Button::new("check-updates", Tone::Secondary, "Check for updates")
+                    .glyph(assets::RESCAN)
+                    .turning(busy)
+                    .disabled(!status.as_ref().is_some_and(UpdateStatus::can_check))
+            }
+        }
+        .leading(self.ringed_on(Control::UpdateAction))
+        .on_click(cx.listener(|this, _, _, cx| {
+            this.clicked(Control::UpdateAction);
+            this.press_update_action(cx);
+        }));
+        let action = self.track(Control::UpdateAction, action);
+        let lines: Vec<String> = self
+            .update
+            .as_ref()
+            .and_then(failure_line)
+            .into_iter()
+            .chain(self.update_refusal.as_ref().map(ToString::to_string))
+            .collect();
+        let last = lines.is_empty();
+        panel(
             "Updates",
             None,
-            Some(check),
+            Some(action),
             div()
                 .child(self.toggle_row(
                     SettingKey::UpdatesAuto,
@@ -1184,15 +1355,16 @@ impl SettingsView {
                     false,
                     false,
                     div()
+                        .min_w_0()
                         .truncate()
-                        .child(format!("{} · {state}", self.info.version)),
+                        .child(self.version_value()),
                 ))
                 .child(setting_row(
                     "What's new",
                     Some("The changes in the latest update.".into()),
                     None,
                     false,
-                    true,
+                    last,
                     self.button(
                         Control::ShowWhatsNew,
                         "show-whats-new",
@@ -1201,9 +1373,40 @@ impl SettingsView {
                         Self::show_whats_new,
                         cx,
                     ),
-                )),
+                ))
+                .children(lines.into_iter().map(|line| {
+                    div()
+                        .pt(px(8.))
+                        .text_size(px(12.))
+                        .line_height(px(16.))
+                        .text_color(color(theme::DANGER))
+                        .child(line)
+                })),
+        )
+    }
+
+    // "<version> · <state>", the state in the colour of how it went.
+    fn version_value(&self) -> StyledText {
+        let (state, tone) = self.update.as_ref().map_or_else(
+            || ("…".to_owned(), StateTone::Plain),
+            |status| (status.state_text(), state_tone(status)),
         );
-        vec![general, updates]
+        let lead = format!("{} · ", self.info.version);
+        let hex = match tone {
+            StateTone::Plain => theme::MUTED,
+            StateTone::Good => theme::SUCCESS,
+            StateTone::Bad => theme::DANGER,
+        };
+        let run = |len: usize, hex: u32| TextRun {
+            len,
+            font: font(theme::FONT),
+            color: gpui::Hsla::from(color(hex)),
+            background_color: None,
+            underline: None,
+            strikethrough: None,
+        };
+        let runs = vec![run(lead.len(), theme::MUTED), run(state.len(), hex)];
+        StyledText::new(format!("{lead}{state}")).with_runs(runs)
     }
 
     fn render_launchers(&self, cx: &mut Context<Self>) -> Vec<Div> {
@@ -1486,5 +1689,120 @@ impl Render for SettingsView {
             .child(scroll_page("settings-page", &self.scroll, header, body))
             .children(menu)
             .children(dialog)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ol_api::library::HourClock;
+    use ol_api::settings::UpdateUnavailable;
+
+    use super::*;
+
+    const CHECKED: &str = "2026-11-06T16:46:23.000Z";
+
+    fn utc(_: i64) -> Option<i32> {
+        Some(0)
+    }
+
+    fn hint(status: &UpdateStatus, auto: bool) -> Option<String> {
+        version_hint(status, auto, |at| {
+            hours_and_minutes(at, utc, HourClock::Twelve)
+        })
+    }
+
+    #[test]
+    fn the_time_a_check_ended_is_told_in_hours_and_minutes_in_either_clock() {
+        assert_eq!(
+            hours_and_minutes(CHECKED, utc, HourClock::Twelve).as_deref(),
+            Some("4:46\u{202f}PM")
+        );
+        assert_eq!(
+            hours_and_minutes(CHECKED, utc, HourClock::TwentyFour).as_deref(),
+            Some("16:46")
+        );
+        assert_eq!(
+            hours_and_minutes(CHECKED, |_| Some(3600), HourClock::TwentyFour).as_deref(),
+            Some("17:46")
+        );
+        assert_eq!(
+            hours_and_minutes("not a time", utc, HourClock::Twelve),
+            None
+        );
+    }
+
+    #[test]
+    fn the_version_row_says_what_the_electron_panel_says() {
+        let ready = UpdateStatus::Ready {
+            version: "1.0.0-beta.4".to_owned(),
+        };
+        let up_to_date = UpdateStatus::UpToDate {
+            checked_at: CHECKED.to_owned(),
+        };
+        assert_eq!(
+            hint(&up_to_date, true).as_deref(),
+            Some("Last checked at 4:46\u{202f}PM.")
+        );
+        assert_eq!(
+            hint(&ready, true).as_deref(),
+            Some("It installs the next time One Launch restarts.")
+        );
+        assert_eq!(
+            hint(&ready, false).as_deref(),
+            Some("It installs when you choose Restart to update.")
+        );
+        assert_eq!(
+            hint(
+                &UpdateStatus::Unavailable(UpdateUnavailable::Development),
+                true
+            )
+            .as_deref(),
+            Some("Updates work only in the installed app.")
+        );
+        for quiet in [
+            UpdateStatus::Idle,
+            UpdateStatus::Checking,
+            UpdateStatus::Downloading {
+                version: "1.0.0-beta.4".to_owned(),
+                percent: 40,
+            },
+            UpdateStatus::Failed {
+                step: UpdateStep::Check,
+                message: "the update server answered HTTP 503".to_owned(),
+            },
+        ] {
+            assert_eq!(hint(&quiet, true), None, "{quiet:?}");
+        }
+        assert_eq!(state_tone(&up_to_date), StateTone::Good);
+        assert_eq!(state_tone(&ready), StateTone::Good);
+        assert_eq!(state_tone(&UpdateStatus::Checking), StateTone::Plain);
+        assert_eq!(
+            state_tone(&UpdateStatus::Unavailable(UpdateUnavailable::Development)),
+            StateTone::Plain
+        );
+    }
+
+    #[test]
+    fn a_failed_step_is_told_under_the_panel_as_the_electron_panel_tells_it() {
+        let failed = |step| UpdateStatus::Failed {
+            step,
+            message: "the update server answered HTTP 503".to_owned(),
+        };
+        assert_eq!(
+            failure_line(&failed(UpdateStep::Check)).as_deref(),
+            Some("Could not check for updates: the update server answered HTTP 503.")
+        );
+        assert_eq!(
+            failure_line(&failed(UpdateStep::Download)).as_deref(),
+            Some("Could not download the update: the update server answered HTTP 503.")
+        );
+        assert_eq!(
+            failure_line(&failed(UpdateStep::Verify)).as_deref(),
+            Some(
+                "Could not verify the update, so it was not installed: the update server answered HTTP 503."
+            )
+        );
+        assert_eq!(failure_line(&UpdateStatus::Idle), None);
+        assert_eq!(state_tone(&failed(UpdateStep::Verify)), StateTone::Bad);
     }
 }
