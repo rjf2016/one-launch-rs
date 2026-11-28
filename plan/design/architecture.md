@@ -24,7 +24,7 @@ implementations of ol-platform-api: ol-platform-win, ol-net (real) | ol-platform
 | `ol-services` | Logger, accounts, sessions, backup, journal, launchers, library, artwork, launch, clipboard, updates | `E\src\main\services\*`, `E\src\main\updates\*` |
 | `ol-api` | `Backend` composition root, envelope, validators, `require_idle`, `dispatch_json`, events | `E\src\main\ipc\*`, `E\src\shared\ipc-contract.ts` |
 | `ol-platform-win` | The only crate with `unsafe` and the `windows` dependency | `E\src\main\platform\*`, parts of `index.ts`, `tray.ts` |
-| `ol-net` | `HttpClient` on ureq with host allowlists and caps; the Riot loopback POST | fetch use in `artwork.ts`, `riot\local-launch.ts` |
+| `ol-net` | `HttpClient` and `UpdateHttp` on ureq with host allowlists and caps; the Riot loopback POST | fetch use in `artwork.ts`, `riot\local-launch.ts` |
 | `ol-platform-fake`, `ol-sim` | Static registry, processes and login item, recording clipboard, operation log; simulators, scenario and knobs | `registry.ts` (StaticRegistry), `processes.ts` (Static/Sim controllers), `E\src\main\launchers\sim\*` |
 | `ol-testkit`, `ol-replay` | Vector loader, JSON normalisers; headless replay runner | new |
 | `ol-testkit-macros` | The `#[parity]` attribute that marks a test ported from the oracle; a proc-macro crate with no dependency, re-exported by `ol-testkit` | new |
@@ -76,6 +76,7 @@ In `ol-app`, `ol-automation` is behind the feature `automation`, and `ol-platfor
 - `Clipboard` (`write_text`, `read_text`, `clear`, `write_private`).
 - `DataProtector` (DPAPI) beneath `Vault`.
 - `HttpClient`, `LoopbackTls`, `LoginItem`, `InstallProbe`, `Roots`.
+- As built in slice 6: `UpdateHttp` (`send`, `download`), the updater's three requests, and `InstallerStart` (`start`), which starts the downloaded installer at quit.
 - `Clock` (`now_utc`, `instant`, `sleep`) and `IdSource`.
 
 As built in slice 3, launcher files go through a port as well: `FileReader` and `FileWriter` (`write_atomic`). The fake behind them, `ScratchFiles`, is the real disk under the scenario folder and the data folder and refuses every other path, so a test cannot reach a real launcher's files even by mistake. A snapshot's manifest is written through the same port, as the Electron app writes it through its atomic writer.

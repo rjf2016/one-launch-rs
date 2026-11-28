@@ -1,4 +1,4 @@
-// The only requests the app sends to the internet: the artwork lookups and the image downloads. A request can be made for a host of the two lists below, and for Steam's store API at the one address `HttpRequest::steam_store_items` builds, and for no other, over https on the default port, and the SteamGridDB key rides in one header of a request to that API alone. The real client and the fakes are handed the same request and send or record its `headers()`, so what a test sees is what would be sent.
+// The requests the app sends to the internet for artwork, the lookups and the image downloads; the updater's are in `update_http`, and there are no others. A request can be made for a host of the two lists below, and for Steam's store API at the one address `HttpRequest::steam_store_items` builds, and for no other, over https on the default port, and the SteamGridDB key rides in one header of a request to that API alone. The real client and the fakes are handed the same request and send or record its `headers()`, so what a test sees is what would be sent.
 
 use std::fmt;
 use std::time::Duration;

@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::io;
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -287,6 +288,12 @@ pub trait Clock: Send + Sync {
     fn now(&self) -> OffsetDateTime;
     // Returns after `duration`, or at once when the token is cancelled.
     fn sleep(&self, duration: Duration, cancel: &CancelToken);
+}
+
+// Starts the downloaded installer at quit, as a process of its own that outlives this one. Handed to the updater and to nothing else.
+pub trait InstallerStart: Send + Sync {
+    // Whether the process was started.
+    fn start(&self, installer: &Path, args: &[&str]) -> bool;
 }
 
 // Everything a launcher adapter and the switch pipeline may touch on the machine.
