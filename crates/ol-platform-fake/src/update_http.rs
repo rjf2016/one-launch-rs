@@ -15,6 +15,8 @@ pub enum Part {
     Bytes(Vec<u8>),
     // Run once the part before it has been read and before the next is asked: to cancel, to move a fake clock, to switch a setting.
     Run(Box<dyn FnOnce() + Send>),
+    // Run when the next read reaches it, as a wait on the wire: what came before has been written and told to `progress` by then.
+    Pause(Box<dyn FnOnce() + Send>),
     // The connection drops here.
     Drop,
     // Nothing more comes, and the read times out.
@@ -24,6 +26,10 @@ pub enum Part {
 impl Part {
     pub fn run(hook: impl FnOnce() + Send + 'static) -> Self {
         Self::Run(Box::new(hook))
+    }
+
+    pub fn pause(hook: impl FnOnce() + Send + 'static) -> Self {
+        Self::Pause(Box::new(hook))
     }
 }
 
@@ -129,7 +135,7 @@ impl Body {
             match self.parts.pop_front() {
                 None if self.left.is_some() => return Err(DROPPED),
                 None => return Ok(0),
-                Some(Part::Run(hook)) => hook(),
+                Some(Part::Run(hook) | Part::Pause(hook)) => hook(),
                 Some(Part::Drop) => return Err(DROPPED),
                 Some(Part::Stall) => return Err(HttpError::Timeout),
                 Some(Part::Bytes(mut bytes)) => {
@@ -477,6 +483,36 @@ mod tests {
         let fetched = fetch(&http, &installer(9), &cancel);
         assert_eq!(fetched.result.unwrap().body, BodyEnd::Cancelled(0));
         assert!(fetched.into.is_empty());
+    }
+
+    #[test]
+    fn a_pause_runs_after_the_part_before_it_was_told_and_a_run_before() {
+        let order = Arc::new(Mutex::new(Vec::new()));
+        let note = |text: &'static str| {
+            let order = Arc::clone(&order);
+            move || order.lock().unwrap().push(text)
+        };
+        let http = ScriptedUpdates::new({
+            let (ran, paused) = (note("run"), note("pause"));
+            let parts = Mutex::new(Some(vec![
+                bytes("abc"),
+                Part::run(ran),
+                Part::pause(paused),
+                bytes("def"),
+            ]));
+            move |_| Ok(in_parts(Some(6), parts.lock().unwrap().take().unwrap()))
+        });
+        let mut into = Vec::new();
+        let told = note("told");
+        let result = http.download(
+            &installer(6),
+            &mut into,
+            &mut |_| told(),
+            &CancelToken::new(),
+        );
+        assert_eq!(result.unwrap().body, BodyEnd::Complete(6));
+        assert_eq!(into, b"abcdef");
+        assert_eq!(*order.lock().unwrap(), ["run", "told", "pause", "told"]);
     }
 
     #[test]
